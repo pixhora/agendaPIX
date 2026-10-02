@@ -11,3 +11,9 @@ Terminal 4: substitua os tokens provisórios pela identidade final antes das tel
 
 Revisar o esqueleto após os checks: schema financeiro em centavos, isolamento por dono e chaves compostas, configuração de autenticação e persistência do volume Podman.
 O resultado deve indicar bloqueia, melhorar ou ok, com arquivo e linha. Merge continua a cargo do humano.
+
+
+### Situação da revisão
+
+O pedido foi encaminhado via skill Maestri ao Antigravidade, que confirmou não ter o terminal 6 conectado.
+A revisão fica pendente até o humano conectar o terminal 6. Nenhum merge foi feito.

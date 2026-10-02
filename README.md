@@ -34,7 +34,7 @@ pnpm build
 pnpm test:db
 ```
 
-`test:db` exige banco iniciado e migrations aplicadas. Os testes usam transações revertidas ao final; não geram dados permanentes.
+`test:db` exige banco iniciado e migrations aplicadas. Os testes de domínio usam transações revertidas ao final. O teste de autenticação remove seus próprios usuários, sessões e verificações ao terminar; o envio SMTP é simulado somente nesse teste.
 `pnpm test:e2e` contém apenas um teste do esqueleto em 375 px. Instale o Chromium do Playwright antes de executá-lo: `pnpm exec playwright install chromium`.
 O terminal 3 adicionará os fluxos reais quando o agendamento e o Pix existirem.
 `/api/health` verifica o processo HTTP, sem afirmar disponibilidade do banco ou do SMTP.
