@@ -182,3 +182,13 @@ Em dúvida entre construir mais uma feature ou falar com um cliente, **fale com 
 - Se encontrar um problema fora do escopo, anote em `/docs/backlog.md` em vez de corrigir sem avisar.
 - Não invente requisitos de negócio, preços ou textos legais. Pergunte.
 - Se algo estiver ambíguo, escolha a opção mais simples e registre a suposição no final da resposta.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
