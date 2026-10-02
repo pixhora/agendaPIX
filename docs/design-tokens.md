@@ -1,24 +1,178 @@
-# Tokens iniciais
+# Design Tokens e Direção Visual
 
-Base técnica provisória para o terminal 4 construir o design system. Não define a identidade final do produto.
+> Documento de referência visual para a interface pública de agendamento e design system.
+> Foco: mobile-first (375px), velocidade operacional, contraste alto e conversão imediata de agendamentos com Pix.
 
-## Cores
+---
 
-| Nome | Claro | Escuro |
-| --- | --- | --- |
-| Fundo | #FFFFFF | #0F172A |
-| Texto | #0F172A | #F8FAFC |
-| Destaque | #1D4ED8 | #93C5FD |
-| Superfície discreta | #F1F5F9 | #1E293B |
-| Borda | #64748B | #94A3B8 |
+## 1. Paleta de Cores (6 cores nomeadas)
 
-Texto sobre destaque: branco no modo claro; #0F172A no escuro. Texto e ações principais mantêm contraste AA.
+Projetada para legibilidade máxima sob luz solar (rua/celular), sem clichês de templates de estética (nada de terracota/creme nem verde neon sobre preto).
 
-## Escalas
+| Nome do Token | Hex | Função / Aplicação | Contraste (WCAG) |
+|---|---|---|---|
+| `color-bg-canvas` | `#F8FAFC` | Fundo principal da aplicação (Slate 50, neutro limpo) | Base |
+| `color-surface` | `#FFFFFF` | Superfície de cartões, formulários e bottom sheets | 1.05:1 vs canvas |
+| `color-text-main` | `#0F172A` | Títulos, valores e textos principais (Slate 900) | 16.2:1 vs surface (AAA) |
+| `color-text-muted` | `#64748B` | Textos de apoio, durações, etiquetas secundárias (Slate 500) | 4.6:1 vs surface (AA) |
+| `color-border` | `#E2E8F0` | Divisores, contorno de inputs e cards desmarcados (Slate 200) | Estrutural |
+| `color-brand-action` | `#0284C7` | **Ação primária disciplinada**: botões de avanço e slot selecionado (Sky 600) | 4.8:1 vs surface (AA) |
 
-Fonte de sistema sans-serif no esqueleto, sem download externo durante build. O terminal 4 definirá até duas famílias finais.
-Tamanhos: 14, 16, 20, 28, 40 e 64 px. Texto limitado a 70 caracteres por linha.
-Espaçamento: 4, 8, 12, 16, 24, 32 e 48 px. Raios: 6 px em botões, 12 px em cards, 16 px em modais.
-Sombra reservada para superfícies sobrepostas: 0 8px 24px rgb(15 23 42 / 12%).
+### Cor funcional de apoio (transacional Pix)
+- `color-pix-confirm`: `#059669` (Emerald 600) — usado com exclusividade na tela de pagamento Pix confirmado e cópia bem-sucedida.
 
-O elemento memorável da agenda será definido pelo terminal 4 antes das telas do produto.
+---
+
+## 2. Tipografia
+
+Duas famílias do Google Fonts via `next/font`:
+1. **Títulos e Ações**: `Plus Jakarta Sans` (geométrica, moderna, corte contemporâneo e excelente leitura em cabeçalhos compactos).
+2. **Corpo, Dados e Horários**: `Inter` (numerais tabulares perfeitos para horários e valores em R$).
+
+### Escala de Tipos
+
+| Token | Tamanho / Altura de Linha | Peso | Uso |
+|---|---|---|---|
+| `type-2xl` | 28px / 36px | Bold (700) | Nome do estabelecimento no cabeçalho |
+| `type-xl` | 20px / 28px | SemiBold (600) | Títulos das etapas do fluxo |
+| `type-lg` | 18px / 26px | SemiBold (600) | Nome do serviço, valor em destaque |
+| `type-base` | 16px / 24px | Regular (400) / Medium (500) | Inputs de formulário (evita zoom no Safari iOS) e botões |
+| `type-sm` | 14px / 20px | Medium (500) | Grade de horários, durações (ex: "45 min") |
+| `type-xs` | 12px / 16px | Regular (400) | Badges de status, avisos de sinal Pix |
+
+*Regra rígida: linhas de texto de leitura nunca ultrapassam 65 caracteres.*
+
+---
+
+## 3. Escalas Estruturais
+
+### Raio de Borda (Border Radius)
+Hierarquia por tamanho de componente, evitando arredondamento uniforme e genérico:
+
+- `radius-sm` (6px): Badges informativas, tags de duração.
+- `radius-md` (10px): Botões de horários, campos de texto (inputs).
+- `radius-lg` (16px): Cards de serviços, caixa do QR Code Pix.
+- `radius-xl` (24px): Barra de ação inferior flutuante e gaveta modal (bottom sheet).
+
+### Sombras (Elevation)
+Sombras suaves e direcionadas, sem excesso de blur escuro:
+
+- `shadow-sm`: `0 1px 2px 0 rgb(15 23 42 / 0.05)` (cards e inputs em repouso).
+- `shadow-md`: `0 4px 12px -2px rgb(15 23 42 / 0.08)` (card selecionado, botão flutuante).
+- `shadow-sheet`: `0 -8px 24px 0 rgb(15 23 42 / 0.10)` (barra inferior de confirmação).
+
+### Espaçamento (Spacing)
+Grid base de 4px:
+- `space-1` (4px): Espaçamento interno entre ícone e texto.
+- `space-2` (8px): Gaps internos em grupos compactos.
+- `space-3` (12px): Padding interno de inputs e botões de slot.
+- `space-4` (16px): **Padding lateral obrigatório no mobile (gutter)**.
+- `space-6` (24px): Separação entre seções verticais.
+- `space-8` (32px): Separação de blocos principais.
+
+---
+
+## 4. Elemento Memorável
+
+**A Régua Tátil de Dias com Indicador de Vagas Imediatas.**
+
+- **O que é**: Uma fita horizontal no topo do Passo 2 que mostra os próximos 7 dias em pílulas compactas com data e contador direto de vagas (ex: `Hoje · 3 vagas`, `Amanhã · 8 vagas`, `Qui · Esgotado`).
+- **Por que é memorável**:
+  1. Elimina a dor clássica do cliente de ficar clicando dia a dia em um calendário grego minúsculo só para descobrir que não tem vaga.
+  2. Cria senso de oportunidade legítimo ("restam 2 vagas") sem precisar de pop-ups agressivos.
+  3. Focado em uso real por celular com polegar (gesto natural de scroll horizontal).
+
+---
+
+## 5. Fluxo de Agendamento em 4 Passos (Wireframe ASCII Mobile 375px)
+
+```text
++-----------------------------------+
+| PASSO 1: ESCOLHA DO SERVIÇO       |
++-----------------------------------+
+| Barbearia do Silva                |
+| Rua Augusta, 1200 · Aberto        |
+|                                   |
+| Escolha o serviço:                |
+| +-------------------------------+ |
+| | Corte Cabelo + Barba          | |
+| | 50 min · R$ 70,00             | |
+| | Sinal de R$ 20,00 no Pix      | |
+| | [ Selecionar ]                | |
+| +-------------------------------+ |
+| +-------------------------------+ |
+| | Corte Tradicional             | |
+| | 30 min · R$ 45,00             | |
+| | Sinal de R$ 15,00 no Pix      | |
+| | [ Selecionar ]                | |
+| +-------------------------------+ |
++-----------------------------------+
+
++-----------------------------------+
+| PASSO 2: DIA E HORÁRIO            |
++-----------------------------------+
+| Corte Cabelo + Barba (50 min)     |
+|                                   |
+| [Hoje · 2 vagas] [Amanhã · 5] >   |
+|                                   |
+| Horários disponíveis para Hoje:   |
+| [ 14:00 ]  [ 15:00 ]  [ 16:30 ]   |
+| [ 17:30 ]  [ 18:30 ]  [ 19:15 ]   |
+|                                   |
+| Horário selecionado: Hoje às 16:30|
+| +-------------------------------+ |
+| | Continuar (R$ 20 de sinal)    | |
+| +-------------------------------+ |
++-----------------------------------+
+
++-----------------------------------+
+| PASSO 3: SEUS DADOS               |
++-----------------------------------+
+| Hoje, 16:30 · Corte + Barba       |
+| Total: R$ 70 (Sinal agora: R$ 20) |
+|                                   |
+| Seu nome completo                 |
+| [ Matheus Silva                 ] |
+|                                   |
+| WhatsApp (para confirmação)       |
+| [ (11) 98765-4321               ] |
+|                                   |
+| +-------------------------------+ |
+| | Gerar Pix de R$ 20,00         | |
+| +-------------------------------+ |
++-----------------------------------+
+
++-----------------------------------+
+| PASSO 4: PAGAMENTO DO SINAL PIX   |
++-----------------------------------+
+| Quase lá! Pague para garantir     |
+| Expira em 10:00 minutos           |
+|                                   |
+|         +---------------+         |
+|         |    QR CODE    |         |
+|         |      PIX      |         |
+|         +---------------+         |
+| Valor do sinal: R$ 20,00          |
+|                                   |
+| [ Copiar código Pix ]             |
+|                                   |
+| [ Já fiz o pagamento no banco ]   |
+| Horário reservado temporariamente |
++-----------------------------------+
+```
+
+---
+
+## 6. O que Vamos Evitar Rigirosamente
+
+1. **Estética clichê de IA**:
+   - Zero fundo creme/bege com tipografia com serifa clássica (estilo "spa boutique genérico").
+   - Zero tema dark total com verde neon/ácido brilhante.
+2. **Poluição visual e atrito**:
+   - Sem rótulos em caixa alta espaçada (`S E R V I Ç O S`).
+   - Sem números ordinais gigantes e puramente decorativos ("01", "02", "03").
+   - Sem setas desnecessárias em botões (`Avançar ->`).
+   - Sem degradês/gradientes roxo-rosa ou enfeites sem função de usabilidade.
+3. **Perda de performance**:
+   - Sem animações de fade-up lentas que atrasam a exibição no 4G de salão.
+   - Sem modais aninhados ou calendários estilo desktop reduzidos à força.
