@@ -233,7 +233,9 @@ export function StepPayment({
       </div>
 
       {checkError && (
-        <p className="text-xs text-destructive text-center">{checkError}</p>
+        <p role="alert" aria-live="polite" className="text-xs text-destructive text-center">
+          {checkError}
+        </p>
       )}
 
       {/* Botão de Verificação Manual */}

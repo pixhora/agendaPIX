@@ -166,7 +166,11 @@ export function StepCustomer({
 
       {/* Erro Geral do Servidor */}
       {errorMessage && (
-        <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-xs text-destructive">
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-xs text-destructive"
+        >
           {errorMessage}
         </div>
       )}

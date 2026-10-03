@@ -176,8 +176,12 @@ export function BookingFlow({ slug }: BookingFlowProps) {
   if (businessError || !business) {
     return (
       <div className="w-full max-w-md mx-auto px-4 py-12 text-center space-y-4">
-        <div className="rounded-2xl border border-destructive/20 bg-surface p-6 shadow-sm space-y-3">
-          <span className="text-3xl">⚠️</span>
+        <div
+          role="alert"
+          aria-live="polite"
+          className="rounded-2xl border border-destructive/20 bg-surface p-6 shadow-sm space-y-3"
+        >
+          <span className="text-3xl" aria-hidden="true">⚠️</span>
           <h2 className="text-lg font-bold text-foreground">Aviso</h2>
           <p className="text-sm text-muted-foreground">{businessError || "Estabelecimento não disponível."}</p>
           <Button

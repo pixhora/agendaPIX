@@ -41,3 +41,12 @@ Para respeitar estritamente a divisão de papéis (o dashboard real e rotas aute
 - Commit `6d12ccf`: régua de datas totalmente aprovada em QA pelo CODEFICADO (4/4 cenários em 375px e 1280px, claro e escuro).
 - P1 (contraste 10,64:1) e P2 (foco sem recorte, scrollbar oculta e fades dinâmicos) encerrados.
 - BookingFlow público integrado aos contratos de disponibilidade, reservas e verificação Pix.
+
+## 2026-10-03 — Terminal 4 / Terminal 3 para Terminal 1 e Coordenador: Medição de Performance Mobile
+
+- Commit testado: `9791651`.
+- Medição T3 (perfil móvel simulado 1,6 Mbps / 750 kbps / 150 ms):
+  - Dev :3001: mediano 18,15s; JS transferido 3,3 MB.
+  - Produção :3006: mediano 1,55s (91% mais rápido); JS transferido ~160 KB (95% menor).
+  - 18 amostras com HTTP 200 e zero erros.
+- T3 aguarda definição da URL pública otimizada apontando para a produção (:3006) para medição final externa.
