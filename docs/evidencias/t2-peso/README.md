@@ -3,7 +3,7 @@
 ## Método reproduzível
 
 Comando: `node docs/evidencias/t2-peso/measure.mjs`.
-Ambiente: Linux, Node 22.23.3, artefatos Next 16.3.8 existentes em `.next` (build de 2026-10-03 12:57 UTC). A medição não recria build, não inicia servidores e não consulta banco.
+Ambiente: Linux, Node 22.23.3, artefatos Next 16.3.8 existentes em `.next`; data dos manifestos registrada em `results.json`. Medição repetida após o build atual, com os mesmos tamanhos. O script não recria build, não inicia servidores e não consulta banco.
 
 O script soma arquivos únicos de `rootMainFiles` e `clientModules` em cada manifesto. Inclui chunks de boundaries de erro; portanto representa um conjunto de artefatos referenciados, não uma medição de download inicial do browser. Gzip é calculado localmente, por arquivo. Exclui HTML/RSC, CSS, polyfills condicionais, tempo de execução e efeito do cache. Resultados completos: `results.json`.
 
