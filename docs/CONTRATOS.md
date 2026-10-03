@@ -1,9 +1,9 @@
-# Contratos do esqueleto
+# Contratos de agendamento e pagamento
 
 ## Escopo e estado
 
-Esta versão cria a base técnica. Somente `/`, `/api/health` e `/api/auth/[...all]` estão implementadas.
-As rotas de negócio abaixo são previstas, não estão disponíveis. Formatos de respostas e políticas comerciais serão definidos antes de sua implementação.
+Esta versão inclui a base técnica e o fluxo público de reserva com Pix simulado.
+Rotas implementadas e seus formatos estão documentados abaixo. Painel, interface pública e gateway real ainda dependem dos próximos trabalhos.
 
 ## Convenções
 
@@ -16,7 +16,7 @@ As rotas de negócio abaixo são previstas, não estão disponíveis. Formatos d
 
 ## Schema de domínio
 
-Todas as tabelas têm `id`, `created_at` e `updated_at`.
+Tabelas de domínio têm `id`, `created_at` e `updated_at`. Tabelas de auditoria têm `id` e `created_at`; cada entrega é um registro independente.
 
 | Tabela | Campos principais | Regras |
 | --- | --- | --- |
@@ -29,7 +29,7 @@ Todas as tabelas têm `id`, `created_at` e `updated_at`.
 
 Estados de agendamento: `pending_payment`, `confirmed`, `cancelled`, `expired`, `completed`.
 Estados de pagamento: `pending`, `paid`, `expired`, `failed`, `refunded`.
-Os enums limitam valores armazenados; transições e integração com o gateway serão implementadas no fluxo Pix.
+Os enums limitam valores armazenados. O fluxo atual cria reservas, expira pendências e confirma por webhook; integração real e demais transições serão implementadas depois.
 Sinal zero é permitido no serviço, mas não cria cobrança de valor zero.
 
 ## Autenticação e isolamento
@@ -41,7 +41,7 @@ Cada query futura do painel deve validar a sessão e filtrar pelo negócio perte
 `findOwnedBusiness` exige o identificador do negócio e o usuário obtido da sessão; retorna `null` para negócio alheio ou inexistente.
 `ownerId` nunca deve vir de um formulário ou corpo HTTP.
 Chaves estrangeiras compostas impedem relacionar um agendamento a serviço/cliente alheio ou um pagamento a agendamento alheio.
-Essas chaves protegem referências; não substituem autorização de leitura. Não há rotas de leitura de domínio nesta etapa.
+Essas chaves protegem referências; não substituem autorização de leitura. Rotas públicas expõem apenas serviços e horários; dados da reserva exigem token de acesso.
 Os testes com Postgres exercitam a consulta por dono e as referências cruzadas entre negócios.
 
 Exclusões de domínio usam `RESTRICT` para evitar perda silenciosa de histórico financeiro.
@@ -67,19 +67,16 @@ Solicitação de link com SMTP inválido falha; nunca simula envio nem revela li
 | Área | Rotas propostas | Responsável |
 | --- | --- | --- |
 | Página pública | `GET /[slug]` | Terminal 4 |
-| Agenda pública | `GET /api/public/[slug]/services`, `GET /api/public/[slug]/availability`, `POST /api/public/[slug]/bookings` | Terminal 1 com terminal 4 |
-| Pagamento de reserva | `GET /api/public/[slug]/bookings/[id]/payment` | Terminal 1; acesso exigirá credencial opaca própria, nunca só UUID |
 | Painel | `/dashboard` e `/dashboard/services`, `/dashboard/customers`, `/dashboard/settings` | Terminal 2 |
 | Dados do painel | `/api/businesses/[businessId]/bookings`, `/services`, `/customers`, `/hours` | Terminal 1 com terminal 2 |
-| Eventos Pix | `POST /api/webhooks/payments/[provider]` | Terminal 1 |
 
-Queries de disponibilidade não devem revelar dados pessoais. A criação de reserva deve impedir concorrência de horários no banco antes de ser disponibilizada.
-Webhooks futuros devem validar token/assinatura, registrar cada evento e confirmar pagamento de forma idempotente.
-O gateway ficará atrás de `PaymentProvider` quando o fluxo Pix for implementado. Não há integração ou cobrança real neste esqueleto.
+Queries de disponibilidade não revelam dados pessoais. A criação de reserva impede concorrência de horários no banco.
+O webhook fake valida assinatura, registra entregas e confirma de forma idempotente.
+O gateway real deverá implementar `PaymentProvider`; nenhuma cobrança bancária real ocorre nesta versão.
 
 ## Aplicação e reversão
 
-Não existiam tabelas, leitores, escritores ou dados de aplicação antes desta migration. O único novo escritor externo é Better Auth.
+Não existiam tabelas, leitores, escritores ou dados de aplicação antes desta migration. Os escritores são Better Auth, as rotas de reserva e o webhook autenticado.
 
 Caminho adiante: iniciar Postgres com `pnpm db:up`, aplicar `pnpm db:migrate`, iniciar aplicação e executar `pnpm test:db`.
 Repetir `db:migrate` não recria tabelas nem reaplica migrations registradas. Falhas SQL são observáveis e a migration usa transação.
@@ -87,3 +84,77 @@ Em mudanças futuras com versões simultâneas, adicionar campos compatíveis an
 
 Reversão segura: voltar ao código anterior e parar os serviços com `pnpm db:down`, mantendo o volume e as tabelas.
 Não há script automático de DROP ou remoção de volume. Após entrada de dados reais, fazer backup e definir reversão específica antes de alterar o schema.
+
+
+# Fluxo de reserva e Pix simulado
+
+## Regras desta etapa
+
+O servidor é a autoridade sobre preço, sinal e duração; o cliente envia somente serviço, horário e dados mínimos.
+A reserva com sinal vence em 15 minutos ou no início do atendimento, o que ocorrer primeiro. Sinal zero confirma sem criar pagamento.
+Um negócio atende um cliente por vez. Intervalos são semiabertos: um horário pode começar exatamente quando o anterior termina.
+Disponibilidade usa o fuso do negócio e o intervalo de funcionamento do dia. Inícios avançam pela duração do serviço desde a abertura.
+Reservas pendentes vencidas não ocupam disponibilidade. Ao criar nova reserva, elas são marcadas como expiradas antes da disputa pelo horário.
+Concorrência é protegida por lock transacional do negócio e restrição de exclusão no Postgres. Não há confirmação após liberar uma reserva vencida.
+
+## Rotas públicas
+
+- `GET /api/public/[slug]/services`: nome e fuso do negócio e serviços ativos com `id`, `name`, `durationMinutes`, `priceCents`, `depositCents`.
+- `GET /api/public/[slug]/availability?serviceId=<uuid>&date=YYYY-MM-DD`: responde `{ timezone, slots: [{ startsAt, endsAt }] }`. Datas de horários são ISO 8601 UTC. Lista vazia significa fechado, passado ou sem vagas.
+- `POST /api/public/[slug]/bookings`: exige header `Idempotency-Key` UUID v4 e JSON `{ serviceId, startsAt, customer: { name, phone } }`. Telefone em E.164. Responde `201` com `{ bookingId, status, startsAt, endsAt, expiresAt, accessToken, payment }`; repetição idêntica responde `200`. Mesma chave com outro corpo responde `409`.
+- `GET /api/public/[slug]/bookings/[id]/payment`: exige `Authorization: Bearer <accessToken>`. Responde `{ bookingId, status, expiresAt, payment }`. Não retorna nome, telefone nem dados do dono.
+
+`payment` é `null` com sinal zero; caso contrário contém `{ id, provider, externalId, amountCents, status, expiresAt, qrCodeDataUrl, copyPaste }`.
+O token de acesso é derivado com HMAC e contexto próprio usando o segredo do servidor; só seu hash é armazenado. UUID da reserva não autoriza leitura.
+A chave de idempotência permite recuperar a resposta com o mesmo corpo e deve ser tratada como credencial: gerar com `crypto.randomUUID()`, não registrar em analytics e não reutilizar em outro pedido.
+Repetições não renovam vencimento nem criam segunda cobrança. Campos extras, preço fornecido pelo cliente e datas sem fuso são rejeitados.
+Respostas de domínio usam `Cache-Control: no-store`.
+
+Erros: `{ error: { code, message } }`, sem detalhes pessoais ou internos. `400` entrada inválida; `404` negócio/serviço/reserva inacessível; `409` horário ocupado ou chave reutilizada; `413` corpo acima de 16 KiB; `503` pagamento indisponível; `500` falha interna.
+
+## PaymentProvider e fake
+
+`PaymentProvider.createPixCharge` recebe chave de idempotência, centavos e vencimento; retorna identificador externo, centavos, vencimento, QR Code e copia-e-cola.
+O provider deve criar no máximo uma cobrança por chave e repetir a resposta após falhas transitórias. Valores retornados são validados antes de persistir.
+`PaymentProvider.verifyWebhook` autentica o corpo bruto e normaliza o evento. O domínio não interpreta protocolo do gateway.
+Somente fake existe nesta etapa. Exige `PAYMENT_PROVIDER=fake`, segredo `FAKE_WEBHOOK_SECRET` exclusivo com ao menos 32 caracteres e ambiente diferente de produção.
+QR Code PNG codifica texto prefixado `FAKE-PIX-NOT-PAYABLE`, não é um Pix bancário. A dependência `qrcode` é necessária para gerar QR Code padrão, sem implementar algoritmo próprio.
+A chamada ao provider ocorre na transação de reserva. Antes de um gateway real, revisar timeout e recuperação de cobranças externas; idempotência da interface já é obrigatória.
+
+## Webhook
+
+`POST /api/webhooks/payments/fake` recebe JSON estrito:
+
+```json
+{
+  "eventId": "evento-unico-do-provider",
+  "type": "payment.paid",
+  "externalId": "fake_uuid-da-cobranca",
+  "amountCents": 1000,
+  "paidAt": "2026-10-02T15:00:00.000Z"
+}
+```
+
+Headers: `X-Fake-Timestamp` em segundos Unix e `X-Fake-Signature` em hexadecimal minúsculo.
+Assinatura: HMAC-SHA256 de `<timestamp>.<corpo bruto>`, usando `FAKE_WEBHOOK_SECRET`. Comparação constante; tolerância de relógio de cinco minutos.
+Assinatura inválida ou vencida responde `401`. JSON ou evento inválido responde `400`. Não há rota pública de simulação de pagamento.
+
+Cada entrega gera linha em `webhook_deliveries`, inclusive assinatura inválida, corpo inválido e repetição. Guarda provider, identificador validado quando disponível, hash do corpo, resultado e motivo; nunca guarda assinatura ou corpo bruto.
+`payment_events` tem identidade única por provider e evento, hash do evento normalizado, identificador da cobrança e resultado. Evento já visto com mesmo conteúdo é duplicado; conteúdo diferente com mesmo identificador responde `409`.
+Deduplicação, alteração do pagamento, confirmação da reserva e resultado do evento ocorrem na mesma transação.
+Somente cobrança identificada pelo provider e identificador externo pode ser alterada. Valor deve corresponder à cobrança e ao sinal contratado.
+Pagamento válido recebido a tempo confirma somente reserva pendente ainda válida. Pagamento tardio registra dinheiro recebido, mas não reabre horário: resultado `ignored`, motivo `late_payment`, requer avaliação do dono antes de um gateway real.
+Evento de valor divergente é `rejected`, sem alterar cobrança ou reserva. Pagamento já pago é `duplicate`. Cobrança desconhecida é `ignored`.
+Eventos autenticados processados respondem `200` com `{ outcome, reason }`, permitindo ao provider parar tentativas sem repetir efeitos.
+Falha de infraestrutura responde `503` e mantém entrega marcada como falha quando o banco estiver acessível; o provider deve tentar novamente. Sem banco disponível não é possível persistir auditoria.
+
+## Migration e compatibilidade
+
+Campos novos em reservas e cobranças são opcionais no banco para preservar dados e testes antigos; endpoints novos só criam registros completos.
+Tabelas de eventos são aditivas. A extensão `btree_gist` e a exclusão de horários entram em migration separada. Ela falha atomicamente se houver horários ativos sobrepostos; nenhum registro é removido ou alterado silenciosamente.
+Aplicar migrations antes do novo código. Reversão: voltar ao código anterior, preservando campos, tabelas e volume. Não executar contração ou DROP automático.
+
+
+A chave enviada ao provider é derivada da identidade do negócio e da chave do pedido, em formato UUID. Assim, a mesma chave pública usada em negócios diferentes não cruza cobranças.
+O endpoint público não altera o nome de um cliente já cadastrado ao encontrar o mesmo telefone; atualização de cadastro fica a cargo do painel autenticado.
+QR Code e copia-e-cola são retornados somente enquanto a cobrança está pendente e válida; tornam-se `null` após vencimento ou pagamento.

@@ -8,6 +8,20 @@
       "when": 1790984114541,
       "tag": "0000_graceful_leader",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790987244211,
+      "tag": "0001_parched_ben_urich",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790987400913,
+      "tag": "0002_prevent_overlapping_bookings",
+      "breakpoints": true
     }
   ]
 }

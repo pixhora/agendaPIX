@@ -73,6 +73,9 @@ export const bookings = pgTable("bookings", {
   businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "restrict" }),
   serviceId: uuid("service_id").notNull(),
   customerId: uuid("customer_id").notNull(),
+  requestKey: uuid("request_key"),
+  requestHash: text("request_hash"),
+  accessTokenHash: text("access_token_hash"),
   startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
   endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
   priceCents: integer("price_cents").notNull(),
@@ -82,6 +85,7 @@ export const bookings = pgTable("bookings", {
   ...timestamps(),
 }, (table) => [
   unique("bookings_business_id_unique").on(table.businessId, table.id),
+  unique("bookings_business_request_unique").on(table.businessId, table.requestKey),
   index("bookings_business_start_idx").on(table.businessId, table.startsAt),
   foreignKey({ name: "bookings_service_tenant_fk", columns: [table.businessId, table.serviceId], foreignColumns: [services.businessId, services.id] }),
   foreignKey({ name: "bookings_customer_tenant_fk", columns: [table.businessId, table.customerId], foreignColumns: [customers.businessId, customers.id] }),
@@ -96,6 +100,8 @@ export const payments = pgTable("payments", {
   bookingId: uuid("booking_id").notNull(),
   provider: text("provider").notNull(),
   externalId: text("external_id"),
+  qrCodeDataUrl: text("qr_code_data_url"),
+  copyPaste: text("copy_paste"),
   idempotencyKey: uuid("idempotency_key").notNull().unique(),
   amountCents: integer("amount_cents").notNull(),
   status: paymentStatus("status").default("pending").notNull(),
@@ -110,3 +116,26 @@ export const payments = pgTable("payments", {
   check("payments_provider_not_empty", sql`length(trim(${table.provider})) > 0`),
   check("payments_paid_timestamp_required", sql`${table.status} <> 'paid' OR ${table.paidAt} IS NOT NULL`),
 ]);
+
+
+// Metadados de auditoria não guardam corpo bruto, telefone, assinatura ou segredo.
+export const paymentEvents = pgTable("payment_events", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  provider: text("provider").notNull(),
+  eventId: text("event_id").notNull(),
+  externalId: text("external_id").notNull(),
+  payloadHash: text("payload_hash").notNull(),
+  outcome: text("outcome").notNull(),
+  reason: text("reason"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [unique("payment_events_provider_event_unique").on(table.provider, table.eventId)]);
+
+export const webhookDeliveries = pgTable("webhook_deliveries", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  provider: text("provider").notNull(),
+  eventId: text("event_id"),
+  bodyHash: text("body_hash"),
+  outcome: text("outcome").default("received").notNull(),
+  reason: text("reason"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [index("webhook_deliveries_event_idx").on(table.provider, table.eventId)]);

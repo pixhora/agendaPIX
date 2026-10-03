@@ -17,3 +17,13 @@ O resultado deve indicar bloqueia, melhorar ou ok, com arquivo e linha. Merge co
 
 O pedido foi encaminhado via skill Maestri ao Antigravidade, que confirmou não ter o terminal 6 conectado.
 A revisão fica pendente até o humano conectar o terminal 6. Nenhum merge foi feito.
+
+
+## 2026-10-02 — Terminal 1 para terminais 2, 3, 4 e 6: fluxo Pix
+
+Contratos públicos de serviços, disponibilidade, criação e consulta de reserva foram definidos em `docs/CONTRATOS.md`.
+A cobrança nesta etapa é fictícia, com QR Code não pagável e webhook HMAC. A interface deve identificar claramente a simulação.
+Terminal 3: testar contrato público e disputa de horários quando esta branch for integrada pelo humano.
+Terminal 6: revisar concorrência, isolamento, validação financeira, auditoria e repetição de webhook. Não editar código do terminal 1.
+
+A revisão do fluxo Pix foi solicitada via Maestri ao Antigravidade. Ele confirmou que o terminal 6 continua desconectado; revisão pendente. Terminal 4 recebeu aviso do contrato e da simulação.
