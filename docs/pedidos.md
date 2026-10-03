@@ -27,3 +27,11 @@ Terminal 3: testar contrato público e disputa de horários quando esta branch f
 Terminal 6: revisar concorrência, isolamento, validação financeira, auditoria e repetição de webhook. Não editar código do terminal 1.
 
 A revisão do fluxo Pix foi solicitada via Maestri ao Antigravidade. Ele confirmou que o terminal 6 continua desconectado; revisão pendente. Terminal 4 recebeu aviso do contrato e da simulação.
+
+## 2026-10-02 — Terminal 4 para Terminal 2 e Codex: Modo Preview e Telas do Dono
+
+O Terminal 4 implementou o **Modo Preview** (`/preview`, `/preview/landing`, `/preview/booking`, `/preview/dashboard`, `/preview/reservas`, `/preview/servicos`, `/preview/configuracoes`) com dados determinísticos fictícios do Studio Bella (São Paulo SP), sem depender de banco de dados, Better Auth ou provedores de pagamento.
+Para respeitar estritamente a divisão de papéis (o dashboard real e rotas autenticadas pertencem ao Terminal 2 em `agenda-dashboard`):
+- Os layouts, cartões de métricas, filtros de reservas e componentes visuais criados para o preview em `app/preview/dashboard`, `app/preview/reservas`, `app/preview/servicos` e `app/preview/configuracoes` estão à disposição do Terminal 2 para serem reaproveitados diretamente nas rotas reais `/dashboard/*`.
+- Nenhuma edição foi feita na worktree ou rotas de backend do Terminal 1 ou Terminal 2.
+- O modo preview funciona 100% offline em desenvolvimento via `pnpm dev`.

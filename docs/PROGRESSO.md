@@ -52,6 +52,16 @@
 - **Passo 4 (Conta e Ativação do Teste Grátis)**: Resumo da configuração, email para autenticação sem senha (Better Auth Magic Link) e ativação dos 7 dias grátis sem cartão.
 - Persistência automática do rascunho de onboarding localmente para evitar perda de dados se o celular recarregar.
 
+### D. Modo Preview Profissional (`/preview`)
+- **Hub Central (`/preview`)**: Painel de navegação geral para todas as áreas do produto com resumo financeiro do Studio Bella (São Paulo SP), métricas de faturamento e acesso rápido às 6 telas.
+- **Landing Preview (`/preview/landing`)**: Demonstração da landing page real com fluxo de navegação adaptado ao ambiente de desenvolvimento.
+- **Booking Preview (`/preview/booking`)**: Fluxo do cliente final no celular em 4 passos (serviço → régua de horários → dados → Pix simulado → confirmação), com atalho de simulação imediata de pagamento no banco e dados locais sem dependência de banco de dados ou APIs remotas.
+- **Dashboard Preview (`/preview/dashboard`)**: Visão operacional do dono com faturamento previsto (R$ 370,00), sinais Pix pagos (R$ 105,00), timeline da agenda do dia e lista de clientes.
+- **Reservas Preview (`/preview/reservas`)**: Gestão de clientes com filtros por status (`confirmadas` com sinal pago, `aguardando sinal`), valores em centavos e link para WhatsApp (`wa.me`).
+- **Serviços Preview (`/preview/servicos`)**: Exibição dos 3 procedimentos determinísticos (Corte feminino R$ 80,00 60min, Corte + escova R$ 120,00 90min, Manicure R$ 45,00 45min) com dinheiro em centavos e sinal Pix.
+- **Configurações Preview (`/preview/configuracoes`)**: Horário de funcionamento, fuso `America/Sao_Paulo` e perfil da empresa.
+- **Indicador Elegante de Preview**: `PreviewBadge` flutuante e discreto com pílula minimalista e menu colapsável para alternar entre as 7 áreas sem poluir a interface.
+
 ---
 
 ## 2. Fluxos Concluídos
@@ -60,6 +70,7 @@
 2. Navegação bidirecional (o cliente pode voltar e alterar serviço ou horário sem quebrar o fluxo).
 3. Geração de chave de idempotência UUID v4 por tentativa de reserva para proteção contra duplicações.
 4. Onboarding com 4 passos guiados e acionamento do fluxo de autenticação por link mágico.
+5. Modo Preview 100% funcional offline para visualização e desenvolvimento imediato via `pnpm dev`.
 
 ---
 
@@ -78,7 +89,8 @@
 - **Testes Unitários (Vitest)**:
   - `tests/unit/booking-ui.test.ts`: 6 testes passando (formatação de moeda BRL em centavos, duração, máscara de telefone, validação com DDD, normalização E.164, timezone).
   - `tests/unit/onboarding.test.ts`: 3 testes passando (normalização de slugs em português com acentos, caracteres especiais, pontuações e hífens).
-  - Total da suíte: **7 arquivos de testes e 57 testes passando**.
+  - `tests/unit/preview.test.ts`: 4 testes passando (dados determinísticos do Studio Bella, 3 serviços em centavos, métricas e slots).
+  - Total da suíte: **8 arquivos de testes e 61 testes passando**.
 - **Lint**: `pnpm lint` passando sem erros e com 0 warnings (`eslint . --max-warnings=0`).
 - **Tipagem**: `pnpm typecheck` passando sem inconsistências.
 - **Design Tokens**: Cores WCAG AA/AAA, fontes Google Fonts (`Plus Jakarta Sans` e `Inter`) aplicadas no `app/layout.tsx`.
@@ -89,12 +101,12 @@
 ## 5. Pendências e Próximos Passos (Outros Terminais)
 
 - **Terminal 1**: Quando houver transição do Pix fake para o gateway bancário real (Asaas / Mercado Pago), manter o mesmo formato de resposta no `PaymentProvider`.
-- **Terminal 2**: Conectar as tabelas de negócio e serviços criadas no onboarding ao painel administrativo do dono (`/dashboard`).
+- **Terminal 2**: Reutilizar os layouts e componentes do dashboard e reservas desenvolvidos no preview para as rotas autenticadas de produção (`/dashboard/*`). Aviso registrado em `docs/pedidos.md`.
 
 ---
 
 ## 6. Status de Entrega
 
-O fluxo de agendamento público (`/[slug]`), a landing page (`/`) e o onboarding (`/onboarding`) estão totalmente implementados, integrados e testados.
+O fluxo de agendamento público (`/[slug]`), a landing page (`/`), o onboarding (`/onboarding`) e o Modo Preview completo (`/preview/*`) estão totalmente implementados, integrados e testados.
 
 O projeto está **pronto para auditoria do Terminal 3 (Testes e2e / QA)**.

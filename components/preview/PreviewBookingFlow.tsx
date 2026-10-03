@@ -1,0 +1,233 @@
+"use client";
+
+import React, { useState } from "react";
+import type {
+  PublicService,
+  AvailabilitySlot,
+  BookingResponse,
+  PaymentStatusResponse,
+} from "@/components/booking/types";
+import {
+  MOCK_PUBLIC_BUSINESS,
+  MOCK_SERVICES,
+  getMockAvailabilitySlots,
+} from "@/lib/preview/mock-data";
+import { StepProgress } from "@/components/booking/StepProgress";
+import { StepService } from "@/components/booking/StepService";
+import { StepCustomer } from "@/components/booking/StepCustomer";
+import { BookingConfirmation } from "@/components/booking/BookingConfirmation";
+import { StepSlot } from "@/components/booking/StepSlot";
+import { StepPayment } from "@/components/booking/StepPayment";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+
+export function PreviewBookingFlow() {
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [isCompleted, setIsCompleted] = useState(false);
+
+  const [selectedService, setSelectedService] = useState<PublicService | null>(
+    MOCK_SERVICES[0] // Corte feminino R$ 80,00 60min
+  );
+  const [selectedSlot, setSelectedSlot] = useState<AvailabilitySlot | null>(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const slots = getMockAvailabilitySlots(today);
+    return slots[0] || null;
+  });
+  const [customerName, setCustomerName] = useState("Juliana Mendes");
+  const [customerPhone, setCustomerPhone] = useState("(11) 98234-5678");
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [bookingResponse, setBookingResponse] = useState<BookingResponse | null>(null);
+
+  const handleCreateMockBooking = async () => {
+    if (!selectedService || !selectedSlot) return;
+
+    setIsSubmitting(true);
+
+    // Simula pequena latência de rede realista
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    const mockBookingId = `bk-preview-${Date.now()}`;
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+
+    // QR Code em SVG/DataURL determinístico para o preview
+    const sampleQr =
+      "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='white'/><rect x='10' y='10' width='30' height='30' fill='black'/><rect x='60' y='10' width='30' height='30' fill='black'/><rect x='10' y='60' width='30' height='30' fill='black'/><rect x='20' y='20' width='10' height='10' fill='white'/><rect x='70' y='20' width='10' height='10' fill='white'/><rect x='20' y='70' width='10' height='10' fill='white'/><rect x='45' y='45' width='10' height='10' fill='black'/><rect x='65' y='65' width='15' height='15' fill='black'/></svg>";
+
+    const mockResponse: BookingResponse = {
+      bookingId: mockBookingId,
+      status: "pending_payment",
+      startsAt: selectedSlot.startsAt,
+      endsAt: selectedSlot.endsAt,
+      expiresAt,
+      accessToken: "mock-preview-token-12345",
+      payment: {
+        id: `pay-preview-${Date.now()}`,
+        provider: "fake",
+        externalId: `fake_charge_${Date.now()}`,
+        amountCents: selectedService.depositCents,
+        status: "pending",
+        expiresAt,
+        qrCodeDataUrl: sampleQr,
+        copyPaste: `00020126580014br.gov.bcb.pix0136studio-bella-preview-${selectedService.id}520400005303986540${(
+          selectedService.depositCents / 100
+        ).toFixed(2)}5802BR5912Studio Bella6009Sao Paulo62070503***6304PREV`,
+      },
+    };
+
+    setBookingResponse(mockResponse);
+    setIsSubmitting(false);
+
+    if (selectedService.depositCents === 0) {
+      setIsCompleted(true);
+    } else {
+      setStep(4);
+    }
+  };
+
+  const handleRestart = () => {
+    setSelectedService(MOCK_SERVICES[0]);
+    setSelectedSlot(null);
+    setCustomerName("");
+    setCustomerPhone("");
+    setBookingResponse(null);
+    setIsCompleted(false);
+    setStep(1);
+  };
+
+  return (
+    <div className="min-h-screen bg-background text-foreground py-8 px-4 sm:px-6">
+      <div className="w-full max-w-md mx-auto space-y-6">
+        {/* Barra Superior do Preview */}
+        <div className="flex items-center justify-between text-xs text-muted-foreground pb-2 border-b border-border">
+          <Link href="/preview" className="font-semibold text-primary hover:underline">
+            ← Voltar ao Hub Preview
+          </Link>
+          <span className="rounded bg-muted px-2 py-0.5 text-[11px] font-mono">
+            {MOCK_PUBLIC_BUSINESS.name}
+          </span>
+        </div>
+
+        {/* Cabeçalho do Estabelecimento */}
+        <header className="text-center space-y-1">
+          <h1 className="font-display text-2xl font-bold text-foreground tracking-tight">
+            {MOCK_PUBLIC_BUSINESS.name}
+          </h1>
+          <p className="text-xs text-muted-foreground">
+            São Paulo, SP · Agendamento online seguro com sinal por Pix
+          </p>
+        </header>
+
+        {isCompleted && selectedService && selectedSlot ? (
+          <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
+            <BookingConfirmation
+              businessName={MOCK_PUBLIC_BUSINESS.name}
+              service={selectedService}
+              slot={selectedSlot}
+              timezone={MOCK_PUBLIC_BUSINESS.timezone}
+              customerName={customerName}
+              customerPhone={customerPhone}
+              onNewBooking={handleRestart}
+            />
+          </div>
+        ) : (
+          <>
+            <StepProgress currentStep={step} />
+
+            <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6 shadow-sm">
+              {step === 1 && (
+                <StepService
+                  services={MOCK_SERVICES}
+                  selectedServiceId={selectedService?.id ?? null}
+                  onSelectService={(srv) => {
+                    setSelectedService(srv);
+                  }}
+                  onNext={() => setStep(2)}
+                />
+              )}
+
+              {step === 2 && selectedService && (
+                <StepSlot
+                  slug="studio-bella"
+                  service={selectedService}
+                  timezone={MOCK_PUBLIC_BUSINESS.timezone}
+                  selectedStartsAt={selectedSlot?.startsAt ?? null}
+                  onSelectSlot={(slot) => setSelectedSlot(slot)}
+                  onBack={() => setStep(1)}
+                  onNext={() => setStep(3)}
+                />
+              )}
+
+              {step === 3 && selectedService && selectedSlot && (
+                <StepCustomer
+                  service={selectedService}
+                  slot={selectedSlot}
+                  timezone={MOCK_PUBLIC_BUSINESS.timezone}
+                  name={customerName}
+                  phone={customerPhone}
+                  isSubmitting={isSubmitting}
+                  errorMessage={null}
+                  onChangeName={setCustomerName}
+                  onChangePhone={setCustomerPhone}
+                  onBack={() => setStep(2)}
+                  onSubmit={handleCreateMockBooking}
+                />
+              )}
+
+              {step === 4 && bookingResponse && (
+                <div className="space-y-4">
+                  <StepPayment
+                    slug="studio-bella"
+                    booking={bookingResponse}
+                    onPaymentConfirmed={() => {
+                      setIsCompleted(true);
+                    }}
+                    onRestart={handleRestart}
+                  />
+
+                  {/* Atalho de Demonstração para Confirmar o Pix Imediatamente */}
+                  <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-center space-y-2">
+                    <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+                      Simulador de Pagamento Instantâneo (Preview)
+                    </p>
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        const updated: PaymentStatusResponse = {
+                          bookingId: bookingResponse.bookingId,
+                          status: "confirmed",
+                          expiresAt: null,
+                          payment: {
+                            ...bookingResponse.payment!,
+                            status: "paid",
+                          },
+                        };
+                        setBookingResponse((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                status: "confirmed",
+                                payment: updated.payment,
+                              }
+                            : null
+                        );
+                        setIsCompleted(true);
+                      }}
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white min-h-10 text-xs font-bold shadow-sm"
+                    >
+                      ⚡ Simular Pix Pago no Banco
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <footer className="text-center text-[11px] text-muted-foreground pt-1">
+              <span>🔒 Ambiente de Preview determinístico com dados locais.</span>
+            </footer>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
