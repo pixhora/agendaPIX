@@ -1,5 +1,13 @@
 # Backlog
 
+## Régua de datas — T3
+
+- **P1 BLOQUEIA — T4:** badge ativo contraste 1,217:1 (`StepSlot.tsx:215/:217`); corrigir AA.
+- **P2 MELHORAR — T4:** no-scrollbar ausente (`:188`), foco recortado e datas parcialmente enquadradas (`:202`).
+- **OK:** swipe alcança último dia; Hub/topo inteiro; sem overflow global, 375/1280 claro/escuro.
+- **Prova:** novos 4/4 Playwright falham; aguardam commit do autor. Screenshots e matriz em PROGRESSO.md.
+- **Próximo MVP:** checkpoint revisável login/painel CRUD de T2/T4 e ativação real de Trilha/T1; fake não é produção.
+
 ## Regressão T3 `a134216`
 
 - **OK:** preview 6/6; booking 18/20 inicialmente, 2/2 repetição; onboarding com rascunho/reload sem erro de hidratação.

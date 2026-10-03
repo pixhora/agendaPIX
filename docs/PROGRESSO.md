@@ -1,5 +1,31 @@
 # Progresso — auditoria Terminal 3
 
+## 2026-10-03 — régua Corte + escova e checkpoint MVP
+
+Plano executado: reproduzir a evidência humana na etapa Horário, medir contraste/foco/rolagem e enviar achados ao autor; preservar as provas reais existentes e identificar próximo checkpoint de painel/onboarding. AGENTS.md, backlog, contratos, progresso e `agenda-backend/docs/EQUIPE.md` lidos. Worktree T3 preservada. Servidor 3001: worktree T4 em `a134216`; referência da branch avançou para `2853e3a`, contendo apenas testes/documentação, sem alteração da régua. Não presumir que branch e servidor são o mesmo checkout.
+
+| Rota / commit | Check e natureza | Prova / resultado |
+| --- | --- | --- |
+| `/preview/booking`, `a134216` | Dados locais; Corte + escova, Horário, 375/1280, claro/escuro | 4/4 cenários falharam nos novos checks; badge, scrollbar e foco detalhados abaixo. Swipe alcança último dia; Hub no topo e ausência de overflow global passaram. |
+| `/preview/*`, `a134216` | Dados locais; teclado, contraste dos alvos anteriores, responsividade/rede | Reutilizada prova 6/6 da rodada anterior. Novos checks revelam lacunas na régua; aquela prova não cobria badge/foco. |
+| `/[slug]`, `a134216` + backend QA `d4451f6` | Ponte QA, API/Postgres reais, provider fake, webhook HMAC | Prova anterior: pendente antes de webhook; confirmado depois, 1/1 repetição. Nenhuma mudança de comportamento relevante exige repetir agora. |
+| `/api/public/*`, webhook | API/Postgres reais, fake | Reutilizadas 8/8 E2E e 25/25 integrações: duplicidade, expiração, assinatura/valor inválidos, isolamento e concorrência. Não equivalem a pagamento bancário. |
+| `/onboarding`, `a134216` | UI local, sem ativação real de negócio | Rascunho/reload/teclado sem hidratação passou anteriormente. E2E de ativação depende de endpoint/checkpoint real. |
+| `/dashboard/*`, T2 | Implementação ainda não commitada no worktree T2 | Solicitado ao CODEXADO checkpoint e servidor/ações revisáveis; não testar/editar trabalho em andamento sem entrega identificada. |
+
+### Achados enviados ao Antigravidade
+
+- **BLOQUEIA / P1 — T4**, `components/booking/StepSlot.tsx:215/:217`: badge ativo “5 vagas” usa branco sobre lima. Esperado AA ≥4,5:1; medido **1,216935731:1** nos quatro cenários, com composição alfa pelo canvas. Impacto: disponibilidade ilegível. Correção: tokens semânticos com contraste adequado no badge ativo.
+- **MELHORAR / P2 — T4**, `StepSlot.tsx:188`, `app/globals.css`: `no-scrollbar` não tem definição. Computed `scrollbarWidth=auto`, pseudo scrollbar sem `display:none`; imagem humana mostra barra clássica branca no escuro. Chromium headless usa barra sobreposta e não reproduz a faixa branca na screenshot; ausência da regra foi comprovada. Correção: definir a utilidade compatível, preservando rolagem touch/teclado.
+- **MELHORAR / P2 — T4**, `StepSlot.tsx:188/:202`: overflow recorta outline de foco nas extremidades. Alguns dias intermediários continuam parcialmente visíveis depois de Tab e espera da rolagem. Todos recebem foco; não afirmar que ficam inacessíveis. Correção: preservar espaço de foco e enquadramento do botão focado no container.
+- **OK**, `components/preview/PreviewBookingFlow.tsx:107`: Hub/topo integral com scroll inicial zero nos quatro cenários; corte superior da imagem humana não reproduzido. Não atribuir causa sem evidência.
+- **OK**, `StepSlot.tsx:188`: swipe via eventos touch do Chromium alcança extremo final; página inteira sem overflow horizontal.
+
+Reprodução: abrir `/preview/booking`, selecionar Corte + escova, avançar para Horário. Tab percorre régua; swipe horizontal alcança último dia. Teste `tests/qa/slot-ruler.spec.ts` foi incorporado ao config de preview; somente testes/config QA alterados. Comando: `PREVIEW_BASE_URL=http://127.0.0.1:3001 node node_modules/@playwright/test/cli.js test --config tests/qa/preview.config.ts --grep 'régua Corte' --output dogfood-output/slot-ruler-a134216-final`. Resultado esperado atualmente: quatro falhas de regressão, preservadas até correção do autor. Screenshots `initial.png`, `last-day-focus.png`, traces e contexto em cada diretório de viewport/tema.
+
+Gates QA: lint sem warnings, typecheck, 48/48 unitários e diff-check passaram. Checks de navegador novos permanecem vermelhos por achados reais. Correção não aprovada; aguardar novo commit T4 e executar somente regressões afetadas. Sem alteração de frontend/backend, gateway, segredo, merge ou push. T1 `f54803f` não foi revisado novamente. Maestri list executado; T4 e CODEXADO contatados. Coordenador nominal `Codex` rejeitado por nomes duplicados; diagnóstico confirmou transporte funcional. Trilha/Prisma não aparecem na lista conectada de T3, portanto coordenação do funil necessita repasse do coordenador. Pedidos registrados abaixo.
+
+
 ## 2026-10-03 — regressão T3 no servidor 3001 (`a134216`)
 
 Última prova: `e8875b4`. Branch atual `feat/booking-ui`: `a134216`; worktree T3 mantido em `feat/tests`. Diff desde a última prova inclui tokens, navegação preview, onboarding e autenticação local. Backend/log sensível de T1 não foi revisado nesta rodada. Nenhuma alteração de produto, dependência, merge ou push.

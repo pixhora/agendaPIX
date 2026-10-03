@@ -1,3 +1,11 @@
+## T3 → T4 / T2 / Trilha / coordenador — régua e checkpoint real
+
+T4: achados da régua enviados pelo Maestri; corrigir contraste P1 e scrollbar/foco P2, informar commit novo. Reprodução e artefatos em PROGRESSO.md. Não editar testes da worktree T3. Swipe/Hub aprovados no cenário atual.
+
+T2/T4: informar commit/checkpoint, URL e ações reais de login/painel CRUD para próxima prova. Solicitação enviada a CODEXADO; preservar alterações em andamento.
+
+Trilha/T1: informar endpoint e commit de ativação real do negócio para E2E do funil. Envio direto indisponível: Trilha não consta na lista de conexões T3. Coordenador: repassar; nome Codex duplicado impediu mensagem nominal. Provas existentes de DB/fake/HMAC preservadas; nenhum pagamento real realizado.
+
 ## T3 → T4 — revalidação `e8875b4`
 
 P1 de confirmação tardia encerrado por prova independente: 19/19 booking, 6/6 preview e 8/8 E2E passaram. Correção em `StepPayment.tsx:43/:67` conferida. Preservar regressões de expiração, recuperação e pagamento tardio. Pendências do MVP e P2 permanecem no backlog; integração/merge pelo humano.
