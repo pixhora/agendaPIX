@@ -1,5 +1,10 @@
 # Backlog
 
+## Régua `0c6b39c`
+
+- **OK / encerrados:** contraste ativo 10,64:1 e scrollbar; setas/touch/gradiente renderizado passaram.
+- **P2 T4:** foco/enquadramento por Tab e fade persistente sobre último dia. Quatro cenários ainda falham nesses checks.
+
 ## Régua de datas — T3
 
 - **P1 BLOQUEIA — T4:** badge ativo contraste 1,217:1 (`StepSlot.tsx:215/:217`); corrigir AA.

@@ -8,15 +8,20 @@ for (const colorScheme of ["light", "dark"] as const) {
       await page.goto("/preview/booking");
       await page.getByRole("radio", { name: /Corte \+ escova/ }).click();
       await page.getByRole("button", { name: "Continuar para escolher horário" }).click();
-      const ruler = page.getByRole("region", { name: "Régua de datas disponíveis" }).locator("div").first();
+      const ruler = page.getByRole("group", { name: "Selecione uma data" });
       const days = ruler.getByRole("button");
+      const fade = page.getByRole("region", { name: "Régua de datas disponíveis" }).locator('[aria-hidden="true"]');
+      const gradient = await fade.evaluate(element => ({ backgroundImage: getComputedStyle(element).backgroundImage, width: element.getBoundingClientRect().width, pointerEvents: getComputedStyle(element).pointerEvents }));
+      expect.soft(gradient.backgroundImage, "overflow exige gradiente renderizado").toContain("gradient");
+      expect.soft(gradient.width).toBeGreaterThan(0);
+      expect.soft(gradient.pointerEvents).toBe("none");
       await expect(days.first().locator("span").last()).toHaveText("5 vagas");
       await page.screenshot({ path: testInfo.outputPath("initial.png"), fullPage: false });
       const initial = await ruler.evaluate((element) => {
         const style = getComputedStyle(element);
         return { scrollbarWidth: style.scrollbarWidth, webkitDisplay: getComputedStyle(element, "::-webkit-scrollbar").display, clientWidth: element.clientWidth, scrollWidth: element.scrollWidth };
       });
-      expect.soft(initial.scrollbarWidth === "none" || initial.webkitDisplay === "none", "scrollbar deve respeitar no-scrollbar").toBe(true);
+      expect.soft(initial.scrollbarWidth === "none" || initial.webkitDisplay === "none", "scrollbar nativa deve ficar oculta").toBe(true);
       const ratio = await days.first().locator("span").last().evaluate((element) => {
         const canvas = document.createElement("canvas");
         canvas.width = canvas.height = 1;
@@ -47,7 +52,7 @@ for (const colorScheme of ["light", "dark"] as const) {
         await expect.configure({ soft: true }).poll(() => days.nth(i).evaluate(element => {
           const box = element.getBoundingClientRect(), parent = element.parentElement!.getBoundingClientRect();
           return box.left >= parent.left - 1 && box.right <= parent.right + 1;
-        })).toBe(true);
+        }), { timeout: 1000 }).toBe(true);
         const geometry = await days.nth(i).evaluate((element) => {
           const box = element.getBoundingClientRect(), parent = element.parentElement!.getBoundingClientRect(), style = getComputedStyle(element);
           const outline = parseFloat(style.outlineWidth) + parseFloat(style.outlineOffset);
@@ -59,6 +64,13 @@ for (const colorScheme of ["light", "dark"] as const) {
       }
       await page.screenshot({ path: testInfo.outputPath("last-day-focus.png") });
       expect.soft(focusClips, "foco não deve ser recortado pela régua").toEqual([]);
+      await ruler.evaluate(element => { element.scrollLeft = 0; });
+      await days.first().focus();
+      for (let press = 0; press < 20; press++) await page.keyboard.press("ArrowRight");
+      await expect.configure({ soft: true }).poll(() => ruler.evaluate(element => element.scrollLeft > 0), { message: "ArrowRight rola régua" }).toBe(true);
+      const afterRight = await ruler.evaluate(element => element.scrollLeft);
+      for (let press = 0; press < 20; press++) await page.keyboard.press("ArrowLeft");
+      await expect.configure({ soft: true }).poll(() => ruler.evaluate(element => element.scrollLeft), { message: "ArrowLeft retorna régua" }).toBeLessThan(afterRight);
       await ruler.evaluate(element => { element.scrollLeft = 0; });
       const box = (await ruler.boundingBox())!;
       const cdp = await context.newCDPSession(page);
@@ -75,7 +87,8 @@ for (const colorScheme of ["light", "dark"] as const) {
       const hubBox = (await hub.boundingBox())!;
       expect.soft(hubBox.y, "Hub não cortado com scroll no topo").toBeGreaterThanOrEqual(0);
       expect.soft(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "página sem overflow horizontal").toBe(true);
-      await testInfo.attach("measurements", { body: JSON.stringify({ initial, ratio, focusClips, hubBox }, null, 2), contentType: "application/json" });
+      await testInfo.attach("measurements", { body: JSON.stringify({ initial, ratio, focusClips, hubBox, gradient, afterRight }, null, 2), contentType: "application/json" });
+      console.log(JSON.stringify({ width, colorScheme, initial, ratio, gradient, focusClips, afterRight, hubTop: hubBox.y }));
       await context.close();
     });
   }

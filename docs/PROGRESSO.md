@@ -1,5 +1,14 @@
 # Progresso — auditoria Terminal 3
 
+## Revalidação T4 `0c6b39c` — régua
+
+Servidor/worktree confirmado em `0c6b39c`. Quatro cenários em 375/1280 claro/escuro: scrollbar computada `none`, badge ativo **10,6386:1**, ArrowRight aumenta scrollLeft e ArrowLeft retorna, swipe alcança último dia, gradiente de 32px renderizado e não intercepta eventos. **P1 contraste encerrado**, scrollbar corrigida.
+
+**P2 permanece — T4**, `components/booking/StepSlot.tsx:192/:209`: Tab dá foco a todos os dias, mas dia intermediário permanece parcialmente visível; outline recortado nos extremos. **P2 — T4**, `:191`: fade fixo continua no extremo final, cobre texto/foco do último dia e indica continuação inexistente. Correção necessária: enquadrar botão/foco e condicionar fade à existência de datas ocultas naquele lado. Quatro testes continuam falhando exclusivamente nos checks de enquadramento/foco; não declarar régua integralmente aprovada.
+
+Prova: `dogfood-output/slot-ruler-0c6b39c/`, screenshots `initial.png` e `last-day-focus.png`, trace/contexto nos quatro diretórios. Gates QA lint/tipos e 48 unitários passaram. Teste adaptado ao novo `role=group` e ampliado para setas/gradiente; nenhum produto alterado.
+
+
 ## 2026-10-03 — régua Corte + escova e checkpoint MVP
 
 Plano executado: reproduzir a evidência humana na etapa Horário, medir contraste/foco/rolagem e enviar achados ao autor; preservar as provas reais existentes e identificar próximo checkpoint de painel/onboarding. AGENTS.md, backlog, contratos, progresso e `agenda-backend/docs/EQUIPE.md` lidos. Worktree T3 preservada. Servidor 3001: worktree T4 em `a134216`; referência da branch avançou para `2853e3a`, contendo apenas testes/documentação, sem alteração da régua. Não presumir que branch e servidor são o mesmo checkout.
