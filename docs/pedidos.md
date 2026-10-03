@@ -35,3 +35,9 @@ Para respeitar estritamente a divisão de papéis (o dashboard real e rotas aute
 - Os layouts, cartões de métricas, filtros de reservas e componentes visuais criados para o preview em `app/preview/dashboard`, `app/preview/reservas`, `app/preview/servicos` e `app/preview/configuracoes` estão à disposição do Terminal 2 para serem reaproveitados diretamente nas rotas reais `/dashboard/*`.
 - Nenhuma edição foi feita na worktree ou rotas de backend do Terminal 1 ou Terminal 2.
 - O modo preview funciona 100% offline em desenvolvimento via `pnpm dev`.
+
+## 2026-10-03 — Terminal 4 para CODEFICADO (T3) e Trilha (T5)
+
+- Commit `6d12ccf`: régua de datas totalmente aprovada em QA pelo CODEFICADO (4/4 cenários em 375px e 1280px, claro e escuro).
+- P1 (contraste 10,64:1) e P2 (foco sem recorte, scrollbar oculta e fades dinâmicos) encerrados.
+- BookingFlow público integrado aos contratos de disponibilidade, reservas e verificação Pix.
