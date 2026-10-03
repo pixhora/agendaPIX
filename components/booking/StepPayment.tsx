@@ -194,7 +194,7 @@ export function StepPayment({
                 type="text"
                 readOnly
                 value={payment.copyPaste}
-                className="flex-1 rounded-lg border border-border bg-muted/50 px-3 py-2 text-xs font-mono text-foreground truncate focus:outline-none"
+                className="flex-1 rounded-lg border border-border bg-muted/50 px-3 py-2 text-xs font-mono text-foreground truncate focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:outline-none"
               />
               <Button
                 type="button"

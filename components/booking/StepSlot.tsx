@@ -176,6 +176,8 @@ export function StepSlot({
               <button
                 key={day.dateString}
                 type="button"
+                aria-pressed={isCurrent}
+                aria-current={isCurrent ? "date" : undefined}
                 onClick={() => handleSelectDay(day.dateString)}
                 className={`flex flex-col items-center justify-center min-w-[76px] py-2 px-2.5 rounded-xl border text-center transition-all min-h-11 shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
                   isCurrent
