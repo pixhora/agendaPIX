@@ -48,4 +48,14 @@ it("link mágico cria sessão uma vez e não armazena token em texto", async () 
   expect(repeated.headers.get("location")).toContain("error=");
   const sessionsAfter = await getDb().select().from(session).where(eq(session.userId, registeredUser.id));
   expect(sessionsAfter).toHaveLength(1);
+
+  const cookie = verified.headers.get("set-cookie")!.split(";")[0];
+  const sessionURL = `${baseURL}/api/auth/get-session`;
+  const authenticated = await auth.handler(new Request(sessionURL, { headers: { cookie } }));
+  expect((await authenticated.json()).user.id).toBe(registeredUser.id);
+  const anonymous = await auth.handler(new Request(sessionURL));
+  expect(await anonymous.json()).toBeNull();
+  await getDb().update(session).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(session.userId, registeredUser.id));
+  const expired = await auth.handler(new Request(sessionURL, { headers: { cookie } }));
+  expect(await expired.json()).toBeNull();
 });

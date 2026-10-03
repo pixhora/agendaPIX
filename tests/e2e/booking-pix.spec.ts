@@ -71,8 +71,8 @@ async function paymentStatus(request: APIRequestContext, slug: string, booking: 
   return response.json();
 }
 
-function paidWebhook(externalId: string, business: Business) {
-  const body = JSON.stringify({ eventId: randomUUID(), type: "payment.paid", externalId, amountCents: 1000, paidAt: new Date().toISOString() });
+function paidWebhook(externalId: string, business: Business, amountCents = 1000) {
+  const body = JSON.stringify({ eventId: randomUUID(), type: "payment.paid", externalId, amountCents, paidAt: new Date().toISOString() });
   const timestamp = String(Math.floor(Date.now() / 1000));
   business.bodyHashes.push(createHash("sha256").update(body).digest("hex"));
   return { data: body, headers: { "Content-Type": "application/json", "X-Fake-Timestamp": timestamp,
@@ -86,6 +86,71 @@ test("agenda, paga sinal fake e confirma pelo HTTP", async ({ request, business 
   expect(response.status()).toBe(200);
   expect(await response.json()).toMatchObject({ outcome: "processed" });
   expect(await paymentStatus(request, business.slug, booking)).toMatchObject({ status: "confirmed", payment: { status: "paid", amountCents: 1000, copyPaste: null, qrCodeDataUrl: null } });
+});
+
+test("interface pública agenda e confirma com API, banco e webhook reais", async ({ page, request, business }) => {
+  test.skip(!process.env.QA_BOOKING_UI_URL, "Defina QA_BOOKING_UI_URL para a interface do Terminal 4.");
+  // Ponte de QA entre branches: respostas vêm do backend real em 3103, sem dados mockados.
+  await page.route("**/api/public/**", async (route) => {
+    const source = route.request();
+    const url = new URL(source.url());
+    const sourceHeaders = source.headers();
+    const headers = Object.fromEntries(["content-type", "idempotency-key", "authorization"].flatMap((name) => sourceHeaders[name] ? [[name, sourceHeaders[name]]] : []));
+    const response = await request.fetch(`${url.pathname}${url.search}`, {
+      method: source.method(), headers, data: source.postData() ?? undefined,
+    });
+    await route.fulfill({ response });
+  });
+  await page.goto(`${process.env.QA_BOOKING_UI_URL}/${business.slug}`);
+  await page.getByRole("radio", { name: /Corte/ }).click();
+  await page.getByRole("button", { name: "Continuar para escolher horário" }).click();
+  await page.getByRole("button", { name: /^Amanhã/ }).click();
+  await page.getByRole("radiogroup", { name: "Horários disponíveis", exact: true }).getByRole("radio").first().click();
+  await page.getByRole("button", { name: "Preencher meus dados" }).click();
+  await page.getByLabel("Nome completo").fill("Cliente UI E2E");
+  await page.getByLabel("WhatsApp para confirmação").fill("11999999999");
+  await page.getByRole("button", { name: /Pagar sinal de/ }).click();
+  await expect(page.getByRole("heading", { name: "Pague o sinal por Pix" })).toBeVisible();
+  const [charge] = await business.database.select().from(schema.payments).where(eq(schema.payments.businessId, business.businessId));
+  expect(charge.amountCents).toBe(1000);
+  const delivery = await request.post("/api/webhooks/payments/fake", paidWebhook(charge.externalId!, business));
+  expect(delivery.status()).toBe(200);
+  await expect(page.getByRole("heading", { name: "Horário confirmado!" })).toBeVisible({ timeout: 8000 });
+  const [booking] = await business.database.select().from(schema.bookings).where(eq(schema.bookings.businessId, business.businessId));
+  expect(booking.status).toBe("confirmed");
+});
+
+test("consulta pública rejeita token, ID e slug manipulados sem expor dados", async ({ request, business }) => {
+  const { booking } = await reserve(request, business);
+  for (const [slug, id, token] of [
+    [business.slug, booking.bookingId, null],
+    [business.slug, booking.bookingId, "invalid-token"],
+    [business.slug, randomUUID(), booking.accessToken],
+    [`other-${randomUUID()}`, booking.bookingId, booking.accessToken],
+  ]) {
+    const response = await request.get(`/api/public/${slug}/bookings/${id}/payment`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    expect(response.status()).toBe(404);
+    expect(await response.json()).toEqual({ error: { code: slug === business.slug ? "booking_not_found" : "business_not_found", message: expect.any(String) } });
+    expect(response.headers()["cache-control"]).toBe("no-store");
+  }
+});
+
+test("payload e webhook inválidos não alteram reserva ou valor do sinal", async ({ request, business }) => {
+  const { booking, input } = await reserve(request, business);
+  for (const data of [{ ...input, depositCents: 1 }, { ...input, serviceId: "invalid" }, { ...input, customer: { name: "", phone: "11999999999" } }]) {
+    const response = await request.post(`/api/public/${business.slug}/bookings`, { headers: { "Idempotency-Key": randomUUID() }, data });
+    expect(response.status()).toBe(400);
+  }
+  const invalidSignature = paidWebhook(booking.payment.externalId, business);
+  invalidSignature.headers["X-Fake-Signature"] = "0".repeat(64);
+  expect((await request.post("/api/webhooks/payments/fake", invalidSignature)).status()).toBe(401);
+  const wrongAmount = await request.post("/api/webhooks/payments/fake", paidWebhook(booking.payment.externalId, business, 999));
+  expect(wrongAmount.status()).toBe(200);
+  expect(await wrongAmount.json()).toMatchObject({ outcome: "rejected", reason: "amount_mismatch" });
+  expect(await paymentStatus(request, business.slug, booking)).toMatchObject({ status: "pending_payment", payment: { status: "pending", amountCents: 1000 } });
+  expect(await business.database.select().from(schema.bookings).where(eq(schema.bookings.businessId, business.businessId))).toHaveLength(1);
 });
 
 test("horário ocupado retorna 409 sem criar segunda reserva ou cobrança", async ({ request, business }) => {
