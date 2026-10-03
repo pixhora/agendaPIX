@@ -120,12 +120,16 @@
   - Implementada navegação completa por teclado (WAI-ARIA) no radiogroup de serviços em `StepService.tsx` com setas (`ArrowDown`, `ArrowRight`, `ArrowUp`, `ArrowLeft`).
   - Ajustado `prefers-reduced-motion` no `app/globals.css` para `transition-duration: 0s !important` e `animation-duration: 0s !important`.
   - Contraste do valor Pix em `StepPayment.tsx` ajustado com `text-foreground` para contraste AAA (>= 16:1) em superfícies claras e escuras.
+- **Correção P1 Bloqueia (StepPayment & Expiração de Reserva)**:
+  - *Problema apontado por T3*: `StepPayment.tsx` marcava `isExpired` exclusivamente pelo relógio local (`diff <= 0`), cancelando o polling e impedindo a confirmação se o endpoint retornasse `confirmed` logo após o tempo limite local.
+  - *Correção aplicada*: Ao atingir o fim da contagem local (`diff <= 0`), `StepPayment.tsx` consulta imediatamente o servidor antes de declarar o agendamento expirado. Se o servidor responder `confirmed`, a reserva é confirmada; se falhar na consulta (ex.: 503), mantém a tela de pagamento com mensagem amigável e botão de nova tentativa; a tela de expiração só é exibida se o servidor expressamente confirmar o status `expired`.
 - **Resultados de Verificação e Gates**:
   - `pnpm lint`: 0 warnings (`eslint . --max-warnings=0`).
   - `pnpm typecheck`: 0 erros (`next typegen && tsc --noEmit`).
   - `pnpm test`: 8 arquivos / 61 testes unitários aprovados (100%).
   - `pnpm build`: build Turbopack concluído com sucesso em 1.2s.
-  - `Playwright E2E`: 6/6 testes passando em 43.8s (contraste claro, hero escuro, teclado/reduced-motion, valor Pix legível, ausência de requests externos/backend em preview e 21 combinações de rota/largura sem overflow).
+  - `Playwright Preview E2E`: 6/6 testes aprovados em 42.2s.
+  - `Playwright QA Booking UI (T3 Suite)`: 17/17 testes aprovados (100%), incluindo o cenário antes bloqueante `tests/qa/booking-ui.spec.ts:137` ("Pix: consulta confirmação antes de anunciar expiração local").
 
 ---
 

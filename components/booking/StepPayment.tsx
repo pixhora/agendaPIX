@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import type { BookingResponse, PaymentStatusResponse } from "./types";
 import { formatCurrency } from "./formatters";
 import { Button } from "@/components/ui/button";
@@ -24,49 +24,25 @@ export function StepPayment({
   const [isChecking, setIsChecking] = useState(false);
   const [checkError, setCheckError] = useState<string | null>(null);
 
+  const isCheckingRef = useRef(false);
+  const hasCheckedOnExpireRef = useRef(false);
+
   const payment = booking.payment;
   const expiresAt = payment?.expiresAt || booking.expiresAt;
 
-  // Atualiza contador regressivo a cada segundo
-  useEffect(() => {
-    if (!expiresAt) return;
-
-    const targetTime = new Date(expiresAt).getTime();
-
-    const updateTimer = () => {
-      const now = Date.now();
-      const diff = targetTime - now;
-
-      if (diff <= 0) {
-        setTimeLeft("00:00");
-        setIsExpired(true);
-        return;
-      }
-
-      const totalSeconds = Math.floor(diff / 1000);
-      const minutes = Math.floor(totalSeconds / 60);
-      const seconds = totalSeconds % 60;
-      setTimeLeft(
-        `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
-      );
-    };
-
-    updateTimer();
-    const interval = setInterval(updateTimer, 1000);
-    return () => clearInterval(interval);
-  }, [expiresAt]);
-
   // Função para verificar status do pagamento via API pública ou mock
   const checkStatus = useCallback(async () => {
+    if (isCheckingRef.current) return;
+    isCheckingRef.current = true;
     setIsChecking(true);
     setCheckError(null);
 
     try {
       if (checkStatusFn) {
         const data = await checkStatusFn();
-        if (data?.status === "confirmed") {
+        if (data?.status === "confirmed" || data?.payment?.status === "paid") {
           onPaymentConfirmed(data);
-        } else if (data?.status === "expired") {
+        } else if (data?.status === "expired" || data?.payment?.status === "expired") {
           setIsExpired(true);
         }
         return;
@@ -88,17 +64,51 @@ export function StepPayment({
       }
 
       const data: PaymentStatusResponse = await res.json();
-      if (data.status === "confirmed") {
+      if (data.status === "confirmed" || data?.payment?.status === "paid") {
         onPaymentConfirmed(data);
-      } else if (data.status === "expired") {
+      } else if (data.status === "expired" || data?.payment?.status === "expired") {
         setIsExpired(true);
       }
     } catch {
       setCheckError("Não foi possível verificar no momento. Tentaremos novamente.");
     } finally {
       setIsChecking(false);
+      isCheckingRef.current = false;
     }
   }, [slug, booking.bookingId, booking.accessToken, onPaymentConfirmed, checkStatusFn]);
+
+  // Atualiza contador regressivo a cada segundo
+  useEffect(() => {
+    if (!expiresAt) return;
+
+    const targetTime = new Date(expiresAt).getTime();
+
+    const updateTimer = () => {
+      const now = Date.now();
+      const diff = targetTime - now;
+
+      if (diff <= 0) {
+        setTimeLeft("00:00");
+        // Consulta o servidor antes de anunciar a expiração local
+        if (!hasCheckedOnExpireRef.current) {
+          hasCheckedOnExpireRef.current = true;
+          checkStatus();
+        }
+        return;
+      }
+
+      const totalSeconds = Math.floor(diff / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      setTimeLeft(
+        `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
+      );
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [expiresAt, checkStatus]);
 
   // Polling automático a cada 4 segundos
   useEffect(() => {
