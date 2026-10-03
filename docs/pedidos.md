@@ -85,3 +85,11 @@ Status confirmado via `maestri list/check`: Antigravidade/T4 e Prisma/T6 conecta
 - **T4/Antigravidade:** instrução pendente após quota: receber handoff `docs/HANDOFF-T2-T4.md`, sem duplicar implementação; revisar contraste do calendário nativo no tema escuro (`app/globals.css:16`).
 - **T5/Trilha e T6/Prisma:** instrução pendente após conexão/quota, sem solicitação enviada nesta rodada.
 - Checks anteriores permanecem evidência; nenhum check aprovado foi repetido nesta varredura e nenhum código foi alterado.
+
+## 2026-10-03 — Fechamento T2 para coordenação T1
+
+Painel `c16fadd`: OK técnico do Codex Revisor e QA integrado CODEFICADO `34c4252` (1/1, 7,3s), além de gates locais e PostgreSQL. Registros completos em PROGRESSO. Contrato administrativo aprovado, sem REST paralelo. Não houve novo defeito de painel reproduzido nesta rodada.
+
+T1: enviar hash final revisado da boundary auth antes da integração. f54803f continua bloqueado. Reprodução exata do revisor: `/tmp/agenda-review-f54803f/tests/unit/reviewer-auth-error.test.ts`; cópia durável `/var/home/matheus/projetos/agenda-review/docs/review-f54803f.md`, seção Reprodução persistida. Handler em `better-call/router.mjs:93` publica Error; teste callback passa e handler falha. Critério: falha SMTP/adapter sem token/SQL/PII/stack sensível, preservando resposta e sessão. Mensagem ao nome Codex é ambígua; coordenação receberá resultado nesta resposta/progresso, sem restart/renomeação.
+
+Humano/coordenação: integração das branches de painel e teste permanente QA ainda pendente; nenhum merge/push feito. Infra T2 sintética permanece ativa para continuidade, sem tocar preview T4.
