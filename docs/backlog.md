@@ -1,5 +1,11 @@
 # Backlog
 
+## Painel T2 `c16fadd` — prova T3
+
+- **OK:** login SMTP/sessão reais locais; serviços criar/editar/centavos/reload; horários salvar/reload; tenant por URL/formulário; agenda semanal e quatro rotas 375/1280. Playwright 1/1 passou.
+- **Pendente:** produção/auth T1 informado pelo autor; ativação real/onboarding e integração das branches. Não declarar CRUD de clientes/reservas, ausente do contrato.
+- **Prova limitada:** loading e falha de infraestrutura não provocados no servidor compartilhado. Matriz e screenshots em PROGRESSO.md.
+
 ## Régua `0c6b39c`
 
 - **OK / encerrados:** contraste ativo 10,64:1 e scrollbar; setas/touch/gradiente renderizado passaram.

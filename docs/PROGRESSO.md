@@ -1,5 +1,34 @@
 # Progresso — auditoria Terminal 3
 
+## 2026-10-03 — painel T2 integrado `c16fadd`
+
+Entrega recebida: `c16faddb5fdbf3db176b8bd33a3b7c9881c001df`, `feat/dashboard`; servidor Next de produção em 3342, PostgreSQL sintético exclusivo de verificação em 55442, SMTP local em 25242. Worktree T2 passou para `99d15bc`, diferença somente documental; comportamento de produto corresponde a `c16fadd`. T3 não editou T2, não integrou `f54803f`, não interrompeu infraestrutura compartilhada e não revisou novamente o log sensível.
+
+Suíte versionada no worktree T3: `tests/qa/dashboard-real.spec.ts` e `dashboard.config.ts`. Lê fixture/env privados de `/tmp/agenda-t2-final` (ou `QA_DASHBOARD_FIXTURES`), sem imprimir credenciais/cookies/tokens. Login feito pelo formulário e link entregue por SMTP; contexto HTTP do navegador consome link, sem fabricar sessão. Trace/vídeo/screenshot automático desativados nas etapas de autenticação. Screenshots explícitos somente de páginas do painel com dados sintéticos. Mutações usam negócios temporários próprios ligados ao dono da fixture, e tenant alheio temporário; cleanup limitado aos registros criados pela suíte. Agenda da fixture é somente lida.
+
+Comando: `node node_modules/@playwright/test/cli.js test --config tests/qa/dashboard.config.ts --output dogfood-output/dashboard-c16fadd-verified`. **1/1 passou em 7,3s**. Lint/tipos, 48 unitários do worktree QA e `git diff --check` passaram. Build T2 e seus 73 unitários/3 DB são provas fornecidas por T2, não reexecutadas por T3. Não repetir auditoria completa por alterações somente documentais.
+
+| Rota / mecanismo | Commit / natureza | Check / prova |
+| --- | --- | --- |
+| `/dashboard/login`, Better Auth | `c16fadd`, SMTP e banco reais locais | Email entregue, link consumido cria sessão; tentativa de reutilização é rejeitada por erro ou limite de tentativas. Sem bypass. |
+| `/dashboard`, `view=week` | `c16fadd`, Server Component/Drizzle reais | Dono acessa agenda com data da fixture; Semana selecionada, sete seções diárias; mobile/desktop sem overflow. |
+| `/dashboard/services`, `saveService` | `c16fadd`, Server Action/Postgres reais | Estado vazio, sinal maior que preço rejeitado, criação com feedback; preço 80,35 vira 8035 e sinal 20,15 vira 2015; edição 85,90 vira 8590; reload conserva dados. |
+| `/dashboard/services`, isolamento | `c16fadd`, sessão/ação reais | BusinessId alheio no formulário retorna erro sem alterar serviço; URL alheia mostra indisponível e remove formulário. Contexto anônimo redireciona para login. |
+| `/dashboard/settings`, `saveHours` | `c16fadd`, Server Action/Postgres reais | Segunda 09:30–17:30 salva com feedback; banco contém apenas esse dia; reload conserva abertura. |
+| `/dashboard/customers` | `c16fadd`, leitura real | Página abre nas duas larguras sem overflow. Esta suíte não exercita edição de cliente, ausente no contrato. |
+
+### Classificação
+
+- **OK**, `app/dashboard/(owner)/actions.ts:15/:28`, `lib/dashboard/session.ts:7`: sessão real, validação monetária, gravações de serviços/horários e proteção da tentativa tenant exercitada.
+- **OK**, `components/dashboard/forms.tsx:18/:41`: vazio, erro de validação, feedback de sucesso e reload exercitados. Loading/erro de infraestrutura não foram provocados na infraestrutura compartilhada; não afirmar cobertura desses estados por esta suíte.
+- **OK**, `app/dashboard/(owner)/page.tsx`: agenda semanal com sete dias; quatro rotas em 375/1280 passaram sem overflow.
+- **Limitação de prova**, `lib/auth.ts`: produção ainda depende de revisão/correção de autenticação preexistente informada por T2/T1. Login SMTP sintético local passou; isso não encerra risco de auth em produção nem comprova entrega real a cliente.
+
+Primeira tentativa parou ao manipular tenant: o teste alterou campo oculto antes de mudar nome, React restaurou o valor no rerender. Corrigida ordem de manipulação em tests/, sem achado de produto. Nova execução passou. Repetição para screenshots atingiu HTTP 429 no verify; aguardada janela normal, sem desativar ou contornar limite. Versão final passou. A rejeição por replay pode ocorrer pelo limite: prova específica de uso único do token permanece também nos testes de integração anteriores.
+
+Artefatos: `dogfood-output/dashboard-c16fadd-verified/`, oito screenshots de agenda/serviços/clientes/funcionamento em 375/1280. Nenhum novo BLOQUEIA de painel reproduzido neste escopo. Contrato não oferece exclusão de serviço, edição de cliente, cadastro do negócio nem alteração de reserva; não declarar CRUD completo do produto. Próxima ação: T4 coordenar integração visual do painel, T1/Trilha entregar ativação real; T3 validar fluxo integrado quando houver checkpoint. Sem merge/push. Correções da régua e riscos de produção permanecem conforme seção anterior.
+
+
 ## Revalidação T4 `0c6b39c` — régua
 
 Servidor/worktree confirmado em `0c6b39c`. Quatro cenários em 375/1280 claro/escuro: scrollbar computada `none`, badge ativo **10,6386:1**, ArrowRight aumenta scrollLeft e ArrowLeft retorna, swipe alcança último dia, gradiente de 32px renderizado e não intercepta eventos. **P1 contraste encerrado**, scrollbar corrigida.

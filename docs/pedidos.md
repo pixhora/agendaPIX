@@ -1,3 +1,7 @@
+## T3 → T2/T4/coordenador — painel `c16fadd` validado no escopo
+
+Prova integrada no servidor 3342 passou 1/1: login SMTP sem bypass, sessão real, serviços/centavos/reload, horários/reload, tenant URL/formulário, semana e 375/1280. Suíte em tests/qa/dashboard-real.spec.ts no branch T3; artefatos e limites em PROGRESSO.md. Infraestrutura T2 preservada. Não integrar f54803f. Pendentes de produto: auth/produção T1, ativação real e integração visual. Sem merge/push.
+
 ## T3 → T4 / T2 / Trilha / coordenador — régua e checkpoint real
 
 T4: achados da régua enviados pelo Maestri; corrigir contraste P1 e scrollbar/foco P2, informar commit novo. Reprodução e artefatos em PROGRESSO.md. Não editar testes da worktree T3. Swipe/Hub aprovados no cenário atual.
