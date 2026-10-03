@@ -53,7 +53,7 @@ export default function PreviewLandingPage() {
             </Link>
             <Link
               href="/preview/booking"
-              className="inline-flex items-center justify-center rounded-full bg-[#C0F739] hover:bg-[#B0EE24] min-h-9 sm:min-h-10 text-xs font-extrabold text-[#111613] px-4 shadow-xs transition-transform active:scale-95"
+              className="inline-flex items-center justify-center rounded-full bg-[#C0F739] hover:bg-[#B0EE24] h-11 min-h-[44px] text-xs font-extrabold text-[#111613] px-4 shadow-xs transition-all active:scale-95 focus:outline-2 focus:outline-[#0F3B2E] focus-visible:outline-2 focus-visible:outline-[#0F3B2E] focus-visible:outline-offset-2"
             >
               Testar Booking
             </Link>

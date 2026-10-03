@@ -39,6 +39,14 @@ export function PreviewBookingFlow() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bookingResponse, setBookingResponse] = useState<BookingResponse | null>(null);
 
+  const handleGetSlots = React.useCallback(
+    async (dateStr: string) => {
+      const duration = selectedService?.durationMinutes ?? 60;
+      return getMockAvailabilitySlots(dateStr, duration);
+    },
+    [selectedService?.durationMinutes]
+  );
+
   const handleCreateMockBooking = async () => {
     if (!selectedService || !selectedSlot) return;
 
@@ -152,9 +160,7 @@ export function PreviewBookingFlow() {
                   service={selectedService}
                   timezone={MOCK_PUBLIC_BUSINESS.timezone}
                   selectedStartsAt={selectedSlot?.startsAt ?? null}
-                  getSlotsForDate={async (dateStr) =>
-                    getMockAvailabilitySlots(dateStr, selectedService.durationMinutes)
-                  }
+                  getSlotsForDate={handleGetSlots}
                   onSelectSlot={(slot) => setSelectedSlot(slot)}
                   onBack={() => setStep(1)}
                   onNext={() => setStep(3)}

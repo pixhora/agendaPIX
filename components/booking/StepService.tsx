@@ -69,11 +69,11 @@ export function StepService({
 
                 <div className="text-right shrink-0">
                   {service.depositCents > 0 ? (
-                    <span className="inline-block rounded-md bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
+                    <span className="inline-block rounded-full bg-[#0F3B2E] px-2.5 py-1 text-xs font-bold text-[#C0F739]">
                       Sinal: {formatCurrency(service.depositCents)}
                     </span>
                   ) : (
-                    <span className="inline-block rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
+                    <span className="inline-block rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
                       Sem sinal
                     </span>
                   )}

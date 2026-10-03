@@ -25,16 +25,16 @@ export function LandingHero() {
             </div>
 
             {/* Título Principal Editorial */}
-            <h1 className="font-display text-3xl font-extrabold tracking-tight text-[#111613] sm:text-5xl lg:text-6xl leading-[1.12]">
+            <h1 className="font-display text-3xl font-extrabold tracking-tight text-foreground sm:text-5xl lg:text-6xl leading-[1.12]">
               Sua agenda no piloto automático com{" "}
-              <span className="text-[#0F3B2E] underline decoration-[#C0F739] decoration-4 underline-offset-4">
+              <span className="text-foreground underline decoration-[#C0F739] decoration-4 underline-offset-4">
                 sinal por Pix
               </span>
               .
             </h1>
 
             {/* Subtítulo Claro e com Respiro */}
-            <p className="mt-5 text-base sm:text-lg text-[#5A645C] leading-relaxed max-w-xl">
+            <p className="mt-5 text-base sm:text-lg text-muted-foreground leading-relaxed max-w-xl">
               Envie seu link no WhatsApp ou Instagram. Seu cliente escolhe o serviço e o horário sozinho e garante a vaga pagando o sinal no Pix. Acabe com o prejuízo de horários vazios.
             </p>
 

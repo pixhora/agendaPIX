@@ -87,13 +87,19 @@ export function StepSlot({
 
   const [slotsRetryCount, setSlotsRetryCount] = useState<number>(0);
 
+  const getSlotsRef = React.useRef(getSlotsForDate);
+  React.useEffect(() => {
+    getSlotsRef.current = getSlotsForDate;
+  });
+
   // Carrega contagens de vagas para todos os 7 dias em background
   useEffect(() => {
     let isCancelled = false;
 
     days.forEach((day) => {
-      const promise = getSlotsForDate
-        ? getSlotsForDate(day.dateString)
+      const fetchFn = getSlotsRef.current;
+      const promise = fetchFn
+        ? fetchFn(day.dateString)
         : fetch(`/api/public/${slug}/availability?serviceId=${service.id}&date=${day.dateString}`)
             .then((res) => (res.ok ? res.json() : Promise.reject()))
             .then((data) => data.slots || []);
@@ -113,7 +119,7 @@ export function StepSlot({
     return () => {
       isCancelled = true;
     };
-  }, [slug, service.id, days, getSlotsForDate]);
+  }, [slug, service.id, days]);
 
   // Carrega horários detalhados da data selecionada
   useEffect(() => {
@@ -124,8 +130,9 @@ export function StepSlot({
     const loadSlots = async () => {
       try {
         let loadedSlots: AvailabilitySlot[] = [];
-        if (getSlotsForDate) {
-          loadedSlots = await getSlotsForDate(selectedDate);
+        const fetchFn = getSlotsRef.current;
+        if (fetchFn) {
+          loadedSlots = await fetchFn(selectedDate);
         } else {
           const res = await fetch(`/api/public/${slug}/availability?serviceId=${service.id}&date=${selectedDate}`);
           if (!res.ok) throw new Error("Não foi possível carregar os horários.");
@@ -151,7 +158,7 @@ export function StepSlot({
     return () => {
       isCancelled = true;
     };
-  }, [slug, service.id, selectedDate, slotsRetryCount, getSlotsForDate]);
+  }, [slug, service.id, selectedDate, slotsRetryCount]);
 
   const handleSelectDay = (dateStr: string) => {
     if (dateStr === selectedDate) return;
