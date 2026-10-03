@@ -1,0 +1,10 @@
+$ vitest run
+
+ RUN  v4.1.11 /var/home/matheus/projetos/agenda-dashboard
+
+
+ Test Files  7 passed (7)
+      Tests  73 passed (73)
+   Start at  09:57:23
+   Duration  795ms (transform 473ms, setup 0ms, import 1.45s, tests 268ms, environment 1ms)
+

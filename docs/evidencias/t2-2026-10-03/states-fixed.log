@@ -1,0 +1,4 @@
+OK loading real: query PostgreSQL bloqueada por lock de teste
+OK pending real: botão Salvando serviço desabilitado
+OK erro real: PostgreSQL indisponível, aviso e Tentar novamente
+OK recuperação real: Tentar novamente recupera painel após retorno do banco

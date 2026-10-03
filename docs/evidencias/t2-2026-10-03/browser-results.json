@@ -1,0 +1,241 @@
+{
+  "results": [
+    {
+      "name": "proteção anônima quatro rotas",
+      "observed": "redirecionadas ao login"
+    },
+    {
+      "name": "login teclado",
+      "observed": "email"
+    },
+    {
+      "name": "login sem SMTP",
+      "observed": "erro explícito, sem sucesso falso"
+    },
+    {
+      "name": "day 375 light",
+      "observed": {
+        "viewport": 375,
+        "content": 375,
+        "background": "rgb(255, 255, 255)"
+      }
+    },
+    {
+      "name": "week 375 light",
+      "observed": {
+        "viewport": 375,
+        "content": 375,
+        "background": "rgb(255, 255, 255)"
+      }
+    },
+    {
+      "name": "customers 375 light",
+      "observed": {
+        "viewport": 375,
+        "content": 375,
+        "background": "rgb(255, 255, 255)"
+      }
+    },
+    {
+      "name": "services 375 light",
+      "observed": {
+        "viewport": 375,
+        "content": 375,
+        "background": "rgb(255, 255, 255)"
+      }
+    },
+    {
+      "name": "settings 375 light",
+      "observed": {
+        "viewport": 375,
+        "content": 375,
+        "background": "rgb(255, 255, 255)"
+      }
+    },
+    {
+      "name": "day 375 dark",
+      "observed": {
+        "viewport": 375,
+        "content": 375,
+        "background": "rgb(15, 23, 42)"
+      }
+    },
+    {
+      "name": "week 375 dark",
+      "observed": {
+        "viewport": 375,
+        "content": 375,
+        "background": "rgb(15, 23, 42)"
+      }
+    },
+    {
+      "name": "customers 375 dark",
+      "observed": {
+        "viewport": 375,
+        "content": 375,
+        "background": "rgb(15, 23, 42)"
+      }
+    },
+    {
+      "name": "services 375 dark",
+      "observed": {
+        "viewport": 375,
+        "content": 375,
+        "background": "rgb(15, 23, 42)"
+      }
+    },
+    {
+      "name": "settings 375 dark",
+      "observed": {
+        "viewport": 375,
+        "content": 375,
+        "background": "rgb(15, 23, 42)"
+      }
+    },
+    {
+      "name": "day 1280 light",
+      "observed": {
+        "viewport": 1280,
+        "content": 1280,
+        "background": "rgb(255, 255, 255)"
+      }
+    },
+    {
+      "name": "week 1280 light",
+      "observed": {
+        "viewport": 1280,
+        "content": 1280,
+        "background": "rgb(255, 255, 255)"
+      }
+    },
+    {
+      "name": "customers 1280 light",
+      "observed": {
+        "viewport": 1280,
+        "content": 1280,
+        "background": "rgb(255, 255, 255)"
+      }
+    },
+    {
+      "name": "services 1280 light",
+      "observed": {
+        "viewport": 1280,
+        "content": 1280,
+        "background": "rgb(255, 255, 255)"
+      }
+    },
+    {
+      "name": "settings 1280 light",
+      "observed": {
+        "viewport": 1280,
+        "content": 1280,
+        "background": "rgb(255, 255, 255)"
+      }
+    },
+    {
+      "name": "day 1280 dark",
+      "observed": {
+        "viewport": 1280,
+        "content": 1280,
+        "background": "rgb(15, 23, 42)"
+      }
+    },
+    {
+      "name": "week 1280 dark",
+      "observed": {
+        "viewport": 1280,
+        "content": 1280,
+        "background": "rgb(15, 23, 42)"
+      }
+    },
+    {
+      "name": "customers 1280 dark",
+      "observed": {
+        "viewport": 1280,
+        "content": 1280,
+        "background": "rgb(15, 23, 42)"
+      }
+    },
+    {
+      "name": "services 1280 dark",
+      "observed": {
+        "viewport": 1280,
+        "content": 1280,
+        "background": "rgb(15, 23, 42)"
+      }
+    },
+    {
+      "name": "settings 1280 dark",
+      "observed": {
+        "viewport": 1280,
+        "content": 1280,
+        "background": "rgb(15, 23, 42)"
+      }
+    },
+    {
+      "name": "agenda dia",
+      "observed": "cliente, 09:00 e confirmado"
+    },
+    {
+      "name": "foco inicial painel",
+      "observed": "Ir para o conteúdo"
+    },
+    {
+      "name": "regressão confirmação edição serviço",
+      "observed": "Serviço salvo. permanece após revalidação"
+    },
+    {
+      "name": "persistência serviço",
+      "observed": "5299 centavos após reload"
+    },
+    {
+      "name": "sinal inválido",
+      "observed": "erro com foco, sem cadastro"
+    },
+    {
+      "name": "regressão confirmação horários",
+      "observed": "sucesso permanece após revalidação"
+    },
+    {
+      "name": "persistência funcionamento",
+      "observed": "quarta aberta após reload"
+    },
+    {
+      "name": "horário invertido",
+      "observed": "erro com foco"
+    },
+    {
+      "name": "vazio /dashboard",
+      "observed": "Nenhum atendimento neste período"
+    },
+    {
+      "name": "vazio /dashboard/services",
+      "observed": "Seu primeiro serviço começa aqui"
+    },
+    {
+      "name": "vazio /dashboard/customers",
+      "observed": "Ainda não há clientes"
+    },
+    {
+      "name": "vazio /dashboard/settings",
+      "observed": "Sua agenda está fechada"
+    },
+    {
+      "name": "negócio inacessível",
+      "observed": "sem dados de outro negócio"
+    },
+    {
+      "name": "PostgreSQL após browser",
+      "observed": "serviço 5299; reserva preservada em 5099; cadastro inválido ausente"
+    },
+    {
+      "name": "logout",
+      "observed": "sessão invalidada e painel protegido"
+    },
+    {
+      "name": "erros JavaScript",
+      "observed": []
+    }
+  ],
+  "errors": []
+}

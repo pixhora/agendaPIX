@@ -1,0 +1,39 @@
+OK proteção anônima quatro rotas "redirecionadas ao login"
+OK login teclado "email"
+OK login sem SMTP "erro explícito, sem sucesso falso"
+OK day 375 light {"viewport":375,"content":375,"background":"rgb(255, 255, 255)"}
+OK week 375 light {"viewport":375,"content":375,"background":"rgb(255, 255, 255)"}
+OK customers 375 light {"viewport":375,"content":375,"background":"rgb(255, 255, 255)"}
+OK services 375 light {"viewport":375,"content":375,"background":"rgb(255, 255, 255)"}
+OK settings 375 light {"viewport":375,"content":375,"background":"rgb(255, 255, 255)"}
+OK day 375 dark {"viewport":375,"content":375,"background":"rgb(15, 23, 42)"}
+OK week 375 dark {"viewport":375,"content":375,"background":"rgb(15, 23, 42)"}
+OK customers 375 dark {"viewport":375,"content":375,"background":"rgb(15, 23, 42)"}
+OK services 375 dark {"viewport":375,"content":375,"background":"rgb(15, 23, 42)"}
+OK settings 375 dark {"viewport":375,"content":375,"background":"rgb(15, 23, 42)"}
+OK day 1280 light {"viewport":1280,"content":1280,"background":"rgb(255, 255, 255)"}
+OK week 1280 light {"viewport":1280,"content":1280,"background":"rgb(255, 255, 255)"}
+OK customers 1280 light {"viewport":1280,"content":1280,"background":"rgb(255, 255, 255)"}
+OK services 1280 light {"viewport":1280,"content":1280,"background":"rgb(255, 255, 255)"}
+OK settings 1280 light {"viewport":1280,"content":1280,"background":"rgb(255, 255, 255)"}
+OK day 1280 dark {"viewport":1280,"content":1280,"background":"rgb(15, 23, 42)"}
+OK week 1280 dark {"viewport":1280,"content":1280,"background":"rgb(15, 23, 42)"}
+OK customers 1280 dark {"viewport":1280,"content":1280,"background":"rgb(15, 23, 42)"}
+OK services 1280 dark {"viewport":1280,"content":1280,"background":"rgb(15, 23, 42)"}
+OK settings 1280 dark {"viewport":1280,"content":1280,"background":"rgb(15, 23, 42)"}
+OK agenda dia "cliente, 09:00 e confirmado"
+OK foco inicial painel "Ir para o conteúdo"
+OK regressão confirmação edição serviço "Serviço salvo. permanece após revalidação"
+OK persistência serviço "5299 centavos após reload"
+OK sinal inválido "erro com foco, sem cadastro"
+OK regressão confirmação horários "sucesso permanece após revalidação"
+OK persistência funcionamento "quarta aberta após reload"
+OK horário invertido "erro com foco"
+OK vazio /dashboard "Nenhum atendimento neste período"
+OK vazio /dashboard/services "Seu primeiro serviço começa aqui"
+OK vazio /dashboard/customers "Ainda não há clientes"
+OK vazio /dashboard/settings "Sua agenda está fechada"
+OK negócio inacessível "sem dados de outro negócio"
+OK PostgreSQL após browser "serviço 5299; reserva preservada em 5099; cadastro inválido ausente"
+OK logout "sessão invalidada e painel protegido"
+OK erros JavaScript []

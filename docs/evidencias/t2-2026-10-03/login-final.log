@@ -1,0 +1,3 @@
+OK login: formulário real envia por SMTP local e mostra sucesso
+OK login: link recebido cria sessão e abre negócio real do dono sintético
+OK login: replay do link rejeitado após logout, erro recuperável

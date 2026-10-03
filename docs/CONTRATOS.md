@@ -3,7 +3,7 @@
 ## Escopo e estado
 
 Esta versão inclui a base técnica e o fluxo público de reserva com Pix simulado.
-Rotas implementadas e seus formatos estão documentados abaixo. Painel, interface pública e gateway real ainda dependem dos próximos trabalhos.
+Rotas implementadas e seus formatos estão documentados abaixo. O painel local usa Server Components e Server Actions com PostgreSQL real; sua revisão e integração entre branches permanecem pendentes. Gateway bancário real não está implementado.
 
 ## Convenções
 
@@ -37,7 +37,7 @@ Sinal zero é permitido no serviço, mas não cria cobrança de valor zero.
 Tabelas `user`, `session`, `account` e `verification` seguem Better Auth. Sessões e contas referenciam o usuário.
 `account` tem identidade única por provedor e conta externa. `verification` guarda o hash do token de link mágico.
 
-Cada query futura do painel deve validar a sessão e filtrar pelo negócio pertencente ao usuário autenticado.
+Cada leitura e gravação do painel deve validar a sessão e filtrar pelo negócio pertencente ao usuário autenticado.
 `findOwnedBusiness` exige o identificador do negócio e o usuário obtido da sessão; retorna `null` para negócio alheio ou inexistente.
 `ownerId` nunca deve vir de um formulário ou corpo HTTP.
 Chaves estrangeiras compostas impedem relacionar um agendamento a serviço/cliente alheio ou um pagamento a agendamento alheio.
@@ -67,8 +67,31 @@ Solicitação de link com SMTP inválido falha; nunca simula envio nem revela li
 | Área | Rotas propostas | Responsável |
 | --- | --- | --- |
 | Página pública | `GET /[slug]` | Terminal 4 |
-| Painel | `/dashboard` e `/dashboard/services`, `/dashboard/customers`, `/dashboard/settings` | Terminal 2 |
-| Dados do painel | `/api/businesses/[businessId]/bookings`, `/services`, `/customers`, `/hours` | Terminal 1 com terminal 2 |
+
+## Painel administrativo implementado — contrato aprovado por T1
+
+T1 aprovou este caminho em 2026-10-03. O caminho administrativo atual é interno ao Next.js: Server Components consultam `lib/dashboard/data.ts`; formulários chamam `app/dashboard/(owner)/actions.ts`. Essas funções acessam Drizzle somente no servidor. Os endpoints REST administrativos anteriormente previstos não existem e não são requisito para este painel. Esta documentação descreve o comportamento existente, sem mudar código, schema ou endpoints públicos. T2 mantém o dashboard; alterações incompatíveis deste contrato exigem alinhamento prévio com T1.
+
+### Leituras e sessão
+
+- `/dashboard`: agenda do dia ou semana. Query `businessId` seleciona negócio do dono; `date` usa `YYYY-MM-DD`; `view=week` seleciona segunda a domingo. Data inválida mostra aviso e usa hoje no fuso do negócio. A agenda apresenta o estado persistido, sem expirar reservas no cliente.
+- `/dashboard/services`, `/dashboard/customers`, `/dashboard/settings`: serviços, clientes e funcionamento do negócio selecionado.
+- `requireOwner()` obtém sessão Better Auth a partir dos headers da requisição. Sem sessão, páginas e ações redirecionam para `/dashboard/login`; `ownerId` nunca vem do formulário.
+- `ownerContext()` lista somente negócios do dono; sem `businessId`, escolhe o primeiro. Negócio alheio ou inexistente não é selecionado e mostra estado indisponível, sem consultar seus dados.
+- Consultas de serviços/clientes/funcionamento/agenda verificam `findOwnedBusiness` antes de ler e filtram `businessId`; joins da agenda incluem vínculo ao mesmo negócio. Datas são exibidas no fuso do negócio.
+
+### Gravações por Server Actions
+
+| Ação | FormData aceito | Resultado |
+| --- | --- | --- |
+| `saveService(previousState, form)` | `businessId` UUID; `id` UUID opcional; `name`; `durationMinutes`; `price` e `deposit` em reais com vírgula ou ponto e até duas casas; `active=on` significa ativo, ausência significa inativo | Cria serviço sem `id` ou atualiza serviço desse negócio com `id`. Retorna `{ success: "Serviço salvo." }` ou `{ error: string }`. |
+| `saveHours(previousState, form)` | `businessId` UUID; para cada dia 0–6, `open-N=on`, `start-N` e `end-N` em `HH:mm` | Substitui todos os dias de funcionamento em transação, com lock do negócio. Dias não marcados ficam fechados; nenhum marcado fecha toda a agenda. Retorna `{ success: "Horários de funcionamento salvos." }` ou `{ error: string }`. |
+
+As ações revalidam a sessão em cada chamada, inclusive chamadas diretas. Os dados normalizados passam por Zod no servidor: nome não vazio até 120 caracteres, duração inteira de 1 a 1440 minutos, valores inteiros em centavos de 0 a 2.147.483.647 e sinal menor ou igual ao preço. Horários exigem abertura anterior ao fechamento, dias únicos e no máximo sete dias. Preços e sinais de reservas anteriores não são alterados ao editar serviço.
+
+Negócio inacessível e serviço não pertencente ao negócio geram erros de domínio internos, convertidos em mensagem de formulário; não se promete status HTTP REST para Server Actions. Erros de validação e infraestrutura retornam mensagens próprias sem detalhes SQL. Falhas de leitura usam a tela de erro do painel. Autenticação ausente redireciona, em vez de retornar sucesso ou erro de formulário.
+
+Depois de salvar, `revalidatePath("/dashboard", "layout")` atualiza leituras do painel. Esta etapa não oferece edição de clientes, cadastro/configuração do negócio, alteração de status de reserva ou operação administrativa de pagamento. Serviços e funcionamento gravam dados reais; isso não torna o Pix fake uma cobrança bancária real.
 
 Queries de disponibilidade não revelam dados pessoais. A criação de reserva impede concorrência de horários no banco.
 O webhook fake valida assinatura, registra entregas e confirma de forma idempotente.

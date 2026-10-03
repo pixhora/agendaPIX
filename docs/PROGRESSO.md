@@ -1,0 +1,86 @@
+# Progresso — Terminal 2
+
+## 2026-10-03 — Contrato aprovado, peso medido e tentativa de ativação QA
+
+- T1 aprovou o contrato Server Components/Server Actions; título/estado atualizado em CONTRATOS.md. Tenant, sessão, Zod, centavos e lock permanecem no servidor. Código de produto não alterado.
+- Executado `node docs/evidencias/t2-peso/measure.mjs`: artefatos existentes de produção, união de runtime e chunks referenciados, gzip local. Agenda/clientes: 531600 bytes brutos / 162233 gzip; serviços/funcionamento: 536995 / 164008; login: 523186 / 158684. Não equivale a transferência HTTP ou latência de browser. Sem regressão/peso excessivo comprovado, nenhuma otimização especulativa. Método, limites e resultados em `docs/evidencias/t2-peso/README.md` e `results.json`.
+- `node --check docs/evidencias/t2-peso/measure.mjs` e `git diff --check` passaram. Gates de produto anteriores não repetidos; sem código de produto novo. Revisão de falhas não reproduziu novo defeito; QA independente permanece pendente.
+- Humano solicitou ativar Codex #2 em revisão somente leitura do backend f54803f (logger, isolamento, Pix/idempotência), e CODEFICADO em QA E2E booking/Preview/375px. `maestri list` retorna exatamente Codex, Antigravidade, Codex #2 e Prisma; não fornece nome alternativo inequívoco de Codex #2. `maestri check "Codex #2"` falha com `No connection to 'Codex #2'`; missão/quota/atividade desconhecidas, tarefa não enviada pela condição explícita de alcançar o agente.
+- CODEFICADO não aparece em list; `check` e uma tentativa de `ask` com tarefa concreta falham com `No connection to 'CODEFICADO'`. Nenhuma entrega ou atividade comprovada. `maestri debug` confirma transporte saudável; sem restart, renomeação, criação de agentes ou delegação ao Antigravidade.
+- T1 informou hash f54803f para revisão backend. Auth não foi copiado nem alterado por T2; validação local dessa correção ainda não executada. Próximo passo: restabelecer endereçamento dos dois pares para execução das tarefas; T2 mantém revisão do painel.
+
+## 2026-10-03 — Contrato administrativo real e propriedade T2
+
+- Nova instrução do humano/coordenação T1 confirma T2 como dono do dashboard; substitui o plano anterior de transferência da propriedade para T4. Trabalho existente permanece preservado nesta worktree, branch `feat/dashboard`, base `db341e6`.
+- `docs/CONTRATOS.md` agora documenta a proposta de formalização do caminho existente: Server Components/Drizzle para leituras; Server Actions `saveService` e `saveHours`; sessão por requisição, autorização do negócio, validação Zod, centavos, retorno de formulário e revalidação. Previsão REST administrativa obsoleta removida. Código, schema e endpoints públicos intactos.
+- Proposta enviada uma vez com `maestri ask "Codex"`; entrega falhou: `Multiple terminals named 'Codex' found (2). Rename them to have unique names.` `maestri debug` confirma transporte saudável. Aceite de T1 permanece pendente, sem mudança incompatível.
+- Codex #2 aparece em `maestri list`, mas `check` retorna `No connection to 'Codex #2'`; papel T3 e quota não foram confirmados. Não houve delegação nem mensagem a destinatário ambíguo.
+- Revisão do fluxo existente não trouxe novo bug reproduzido ou medição de peso que justifique mudança de código nesta rodada. Provas anteriores permanecem históricas; nenhum gate de produto foi repetido para mudança exclusivamente documental. `git diff --check` foi executado para validar o patch.
+- Bloqueador de produção: T1 investiga token Better Auth nos logs. QA independente do painel segue pendente de conexão/papel/quota confirmados. Próximo passo: T1 receber/confirmar proposta; T2 tratar apenas defeitos reproduzidos do painel, com gates após código novo.
+
+## 2026-10-02 — Status da reserva na agenda
+
+- Tarefa: preservar o estado definido pelo backend.
+- Arquivos alterados nesta execução: `app/dashboard/(owner)/page.tsx`, `components/dashboard/booking-status.tsx`, `tests/unit/dashboard-status.test.ts`, `docs/pedidos.md`, `docs/PROGRESSO.md`.
+- Funcionalidade: o painel não converte reservas pendentes em expiradas por conta própria; mantém os cinco estados do contrato.
+- Testes: ESLint sem warnings; Next typegen e TypeScript; Vitest, 7 arquivos e 73 testes aprovados. Executados diretamente com Node nos binários instalados porque os comandos pnpm/Corepack ficaram sem saída.
+- Dependências: APIs administrativas e transições de reserva pertencem ao Terminal 1; pedido registrado.
+- Pendências: validação visual autenticada em 375px/768px/desktop, testes PostgreSQL/E2E e revisão humana. Não se declara o dashboard completo.
+- Git: branch `feat/dashboard` igual a `master` no início; trabalho local preexistente preservado. Fetch executado; rebase não realizado com árvore suja e sem diferença entre branches.
+- Próximo passo: alinhar contratos administrativos com Terminal 1 e validar o painel com sessão e banco reais antes de ampliar telas.
+
+## 2026-10-03 — Verificação real do sistema, Terminal 2
+
+- Identidade confirmada via Maestri: **CODEXADO / T2 painel**, pasta `agenda-dashboard`, branch `feat/dashboard`, commit-base `db341e6a57bf7fda7a9662666b391b4c1c0a2c4f`; alterações locais preexistentes preservadas.
+- Correções reproduzidas: build sem segredos (`headers` antes de auth), confirmação de gravação preservada por keys estáveis nos formulários de serviços/horários, recuperação de erro com `retry` do Next 16.3.8.
+- Checks finais: `pnpm lint`, `pnpm typecheck`, `pnpm test` (**73 testes/7 arquivos**) e `pnpm build` aprovados. PostgreSQL real isolado: **4 testes/2 arquivos**. Browser: **46 checkpoints**, incluindo 20 combinações entre cinco vistas, 375/1280 px e claro/escuro; persistência, teclado, erros, loading e login via SMTP local.
+- **Bloqueia produção / T1:** falha de banco faz Better Auth/Drizzle registrar token de sessão em `params`. Evidência sanitizada; nenhum token real usado. Contrato administrativo T1/T2 segue pendente; consultas atuais são reais, via servidor/Server Actions, não mocks.
+- **Melhorar / T3:** tornar a prova temporária de browser uma suíte permanente e revisar as correções. **T4:** contraste de controles nativos no escuro.
+- Relatório completo com comandos, resultados, reprodução e capturas: [VERIFICACAO-T2-2026-10-03.md](VERIFICACAO-T2-2026-10-03.md).
+- Sem novas funcionalidades, redesign, push, merge, agentes ou mudanças de outra worktree. Pix permanece fake; não houve cobrança nem email externo.
+- Comunicação: `maestri ask "Codex"` tentou entregar o relatório e falhou com `Multiple terminals named 'Codex' found (2)`. `maestri debug` confirmou conexão saudável; `/list` mostra um único peer conectado chamado Codex, mas o resolvedor encontra duplicidade. Entrega pendente de identificação única do destinatário; não foi declarada como enviada.
+
+## 2026-10-03 — Mudança de propriedade de frontend; T2 transfere para T4
+
+- Humano atualizou equipe: T4 Antigravidade assume frontend completo, inclusive dashboard, componentes e integração de UI. T3 segue QA/revisão técnica. T5 conversão/landing/onboarding e T6 auditoria UX/UI estão definidos, porém ainda não criados; nenhum agente foi criado por T2.
+- Papéis e prompts lidos em `/var/home/matheus/projetos/agenda-backend/docs/EQUIPE.md`. Endereço T4 indicado: `agenda-booking-ui` / `feat/booking-ui`.
+- Trabalho local existente em `feat/dashboard` preservado. Arquivos, correções, provas, limite do contrato com T1 e plano sem duplicação documentados em [HANDOFF-T2-T4.md](HANDOFF-T2-T4.md).
+- T2 tentou uma vez `maestri ask "Antigravidade"` com resumo e referência do handoff. Maestri respondeu `No connection to 'Antigravidade'. Connect terminals first in the canvas.` Lista conectada continua Codex e Codex #2; nenhum T4 está acessível.
+- Resultado: handoff documentado, sem acesso ou alteração à worktree T4; entrega interpessoal bloqueada até conectar T4. T2 não continua desenvolvimento de UI sob a nova divisão.
+
+## 2026-10-03 — Checkpoint T2 após reorganização
+
+- Tarefa mantida: preservar painel local de `feat/dashboard` e transferir contexto a T4 sem duplicar frontend. Base/commit: `db341e6a57bf7fda7a9662666b391b4c1c0a2c4f`; alterações locais seguem sem commit.
+- Divisão vigente confirmada em `/var/home/matheus/projetos/agenda-backend/docs/EQUIPE.md`: T1 Codex backend; T2 CODEXADO transição; T3 CODEFICADO QA; T4 Antigravidade frontend/dashboard; T5 Trilha conversão; T6 Prisma auditor UX. Esta nota corrige a entrada anterior: T4 agora consta no Maestri; T5/T6 também foram criados conforme arquivo de equipe.
+- T4 continua sem cota. `maestri check "Antigravidade"` mostra que recebeu missão para coordenar o handoff; nenhum novo pedido foi enviado. A nota [HANDOFF-T2-T4.md](HANDOFF-T2-T4.md) preserva inventário e evidências.
+- Codex #2: `maestri list` mostra nome duplicado sem papel; `maestri check "Codex #2"` retornou `No connection to 'Codex #2'`; envio de alinhamento/Caveman via `ask` retornou `Multiple terminals named 'Codex #2' found (2)`. Missão não confirmada nem alterada.
+- Pendências: transferência revisável T2/T4 quando cota permitir; T1 resolver log de token e contrato administrativo; T3 revisão técnica. Nenhum agente criado, worktree alheia editada, tela limpa, sessão reiniciada ou checks repetidos.
+- Próxima ação: aguardar conexão nominal inequívoca e cota de T4; retomar handoff sem sobrescrever alterações.
+
+## 2026-10-03 — Varredura T2 de handoff e risco do painel
+
+- Identidade: CODEXADO / T2 em `/var/home/matheus/projetos/agenda-dashboard`, branch `feat/dashboard`, commit-base `db341e6a57bf7fda7a9662666b391b4c1c0a2c4f`. Árvore local preservada; nenhuma alteração de código nesta varredura.
+- Escopo lido: `AGENTS.md`, `docs/backlog.md`, `docs/CONTRATOS.md`, `docs/pedidos.md`, este progresso, handoff, rotas e componentes do dashboard e validações/dados.
+- **BLOQUEIA integração / T1 + T2:** `docs/CONTRATOS.md:71`, `lib/dashboard/data.ts:11-63`, `app/dashboard/(owner)/actions.ts:15-38`. Contrato prevê endpoints administrativos; painel usa Server Actions e Drizzle no servidor. CRUD usa banco real de teste e autorização do dono, conforme prova anterior; contrato e ownership seguem sem alinhamento. Reproduzir acessando serviços/horários autenticado e comparar com rotas previstas: esperado caminho administrativo acordado; observado endpoints previstos ausentes. T1 define API/contrato; T2/T4 preservam integração existente até acordo. Sem API paralela.
+- **BLOQUEIA produção / T1:** `lib/auth.ts:11,16`; falha de DB com sessão sintética expõe token em `params` nos logs, conforme evidência sanitizada anterior em `docs/evidencias/t2-2026-10-03/auth-log-redacted.txt`. Esperado log sem credencial; observado token no erro. Nenhuma nova reprodução nesta varredura; encaminhamento T1 segue pendente.
+- **MELHORAR / T3:** `tests/e2e/skeleton.spec.ts:3`; suíte permanente ainda não cobre fluxos completos do painel. Prova temporária anterior tem 46 checkpoints, incluindo 375/1280 px, estados, teclado e persistência. T3 deve incorporar regressões após disponibilidade.
+- **MELHORAR / T4:** `app/globals.css:16`; calendário nativo em tema escuro tem contraste insuficiente/ícone escuro, evidência visual anterior `docs/evidencias/t2-2026-10-03/week-375-dark.png`. Corrigir como frontend T4.
+- Checagem atual: `maestri list` encontrou Codex, Antigravidade, Codex #2 e Prisma/T6. `maestri check` mostrou cota individual esgotada para T4/Antigravidade e T6/Prisma. CODEFICADO/T3, Codex/T1 e Codex #2 não conectados; Codex #2 sem papel inequívoco. `maestri debug` confirmou transporte saudável. Não enviado a agentes indisponíveis ou sem cota; T5 não consta na lista. Instruções de varredura/Caveman ficam pendentes para T3/T4/T5/T6 após conexão/cota.
+- Checks desta passagem: lint, typecheck, unitários, build, DB e browser não repetidos; evidências aprovadas no relatório de 2026-10-03 cobrem o mesmo estado local e não houve mudança de código nesta passagem. Nenhum novo teste alegado.
+- Próxima ação: T1 alinhar APIs administrativas e remover token de logs; T3 revisar/incorporar E2E; T4 retomar contraste e receber handoff sem sobrescrever. Até lá, manter painel local e evidências intactos.
+
+## 2026-10-03 — Plano de fechamento do dashboard
+
+1. Preservar e consolidar o painel real existente, com contrato administrativo aprovado e propriedade T2; T4 mantém tokens/compartilhados.
+2. Executar lint, typecheck, testes e build; corrigir somente falhas reproduzidas do painel. Usar provas PostgreSQL/browser anteriores como histórico, com revisão independente atual.
+3. Registrar commit e evidências, enviar ao Codex Revisor e CODEFICADO agora conectados; tratar bloqueadores apontados. Auth aguarda hash final aprovado de T1, sem copiar f54803f.
+
+## 2026-10-03 — Checkpoint revisável do painel real
+
+- T2 permanece dono do dashboard conforme humano, superando a atribuição histórica de transição em EQUIPE/HANDOFF. T4 mantém booking/tokens/componentes compartilhados. Nenhum compartilhado alterado nesta rodada.
+- Gates atuais: `pnpm lint` exit 0, zero warnings; `pnpm typecheck` exit 0; `pnpm test` exit 0, 73 testes em 7 arquivos; `pnpm build` exit 0, cinco rotas de dashboard dinâmicas.
+- PostgreSQL real exclusivo: container de T2 `agenda-t2-verification`, porta 55442, iniciado somente para `node node_modules/vitest/vitest.mjs run --config vitest.db.config.ts tests/integration/dashboard.test.ts`; exit 0, 3 testes/1 arquivo (leitura por dono/fuso, escrita por tenant/centavos preservados, funcionamento atômico). Container voltou ao estado parado. Credenciais obtidas internamente de seu metadata, sem imprimir ou commitar.
+- Os fluxos existentes são reais: agenda dia/semana, lista de clientes, cadastro/edição de serviços/preços/sinal, edição de dias/horários; sessão real e Drizzle/Server Actions. Não há telas mock no dashboard desta branch.
+- Ausências funcionais, distintas de mock: cadastro/configuração do negócio pertence ao onboarding/backend; edição de clientes e ações de status/pagamento não foram implementadas nesta rodada; gateway bancário/assinatura real continuam ausentes. Painel usa apenas estado persistido da reserva; não simula pagamento.
+- Provas browser anteriores (46 checkpoints) permanecem históricas. QA atual e revisão independente serão solicitados por commit. Não se declara produção pronta sem revisão nem correção final da boundary auth de T1.
+- Revisor informou prova de bloqueio f54803f: `/tmp/agenda-review-f54803f/tests/unit/reviewer-auth-error.test.ts`; cópia durável `/var/home/matheus/projetos/agenda-review/docs/review-f54803f.md`, seção Reprodução persistida. Handler real imprime Error em `better-call/router.mjs:93`; callback passa, handler falha. Sem canal inequívoco de T1, informação preservada nesta resposta/progresso; não copiar f54803f nem editar auth.

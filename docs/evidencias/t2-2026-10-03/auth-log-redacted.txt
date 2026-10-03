@@ -1,0 +1,22 @@
+ERROR [Better Auth]: INTERNAL_SERVER_ERROR Error: Failed query: select "id", "user_id", "token", "expires_at", "ip_address", "user_agent", "created_at", "updated_at" from "session" where "session"."token" = $1
+params: [TOKEN_SINTETICO_REDACTED]
+    at o.queryWithCache (.next/server/chunks/ssr/_0ys98fa._.js:486:36828)
+    at async (.next/server/chunks/ssr/_0ys98fa._.js:486:40375)
+    at async Object.findOne (.next/server/chunks/ssr/_0ys98fa._.js:1:28433)
+    at async Object.findSession (.next/server/chunks/ssr/_0ys98fa._.js:91:27932)
+    at async (.next/server/chunks/ssr/_0ys98fa._.js:91:54357)
+    at async (.next/server/chunks/ssr/_0ys98fa._.js:476:17304)
+    at async g (.next/server/chunks/ssr/_0ys98fa._.js:447:84553)
+    at async (.next/server/chunks/ssr/_0ys98fa._.js:437:25249) {
+  query: 'select "id", "user_id", "token", "expires_at", "ip_address", "user_agent", "created_at", "updated_at" from "session" where "session"."token" = $1',
+  params: [ '[TOKEN_SINTETICO_REDACTED]' ],
+  [cause]: Error: connect ECONNREFUSED 127.0.0.1:55442
+      at <unknown> (Error: connect ECONNREFUSED 127.0.0.1:55442)
+      at async (.next/server/chunks/ssr/_0ys98fa._.js:486:40590)
+      at async o.queryWithCache (.next/server/chunks/ssr/_0ys98fa._.js:486:36803)
+      at async (.next/server/chunks/ssr/_0ys98fa._.js:486:40375)
+      at async Object.findOne (.next/server/chunks/ssr/_0ys98fa._.js:1:28433)
+      at async Object.findSession (.next/server/chunks/ssr/_0ys98fa._.js:91:27932)
+      at async (.next/server/chunks/ssr/_0ys98fa._.js:91:54357)
+      at async (.next/serve
+[trecho truncado; token sintético removido]
