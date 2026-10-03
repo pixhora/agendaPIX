@@ -11,7 +11,7 @@ Prioridade absoluta: **primeiro cliente pagante**, depois todo o resto.
 - Produto inicial (EDITAR se mudar o nicho): **agenda online + cobrança por Pix para prestadores de serviço** (salões, barbearias, personal trainers, clínicas pequenas, manicures).
 - Cliente-alvo: dono de negócio pequeno no Brasil, usa celular, vive no WhatsApp, não é técnico.
 - Promessa em uma frase: "Seu cliente agenda sozinho, paga o sinal por Pix e você para de perder horário."
-- Modelo de receita: assinatura mensal (R$ 29 plano base, R$ 59 plano completo) + opcionalmente taxa pequena por cobrança.
+- Modelo de receita: assinatura mensal (R$ 49 plano base, R$ 79 plano completo) + opcionalmente taxa pequena por cobrança. Valores aprovados: 4900/7900 centavos; fonte: `/var/home/matheus/projetos/agenda-backend/docs/PRECOS.md`.
 
 ### Regra do escopo
 Se uma tarefa não ajuda a **(a) atrair, (b) converter ou (c) reter** um cliente pagante, ela não é prioridade. Não construa features "legais" antes do primeiro pagamento.

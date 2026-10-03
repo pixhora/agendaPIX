@@ -102,3 +102,10 @@
 - Funcionalidades reais do escopo do dashboard aprovadas por revisão e QA, sem novas correções necessárias nesta rodada. Peso medido e sem desperdício/regressão comprovados; nenhuma dependência ou refatoração adicionada.
 - **MVP de produção ainda bloqueado:** boundary real de auth/Better Call sob T1, hash final aprovado e integração pendentes. f54803f não aprovado/não copiado. Gateway bancário real e onboarding/configuração de negócio não estão presentes nesta entrega; não são telas mock nem operações simuladas do painel.
 - Infraestrutura de teste permanece ativa para continuidade: app 3342, PostgreSQL sintético 55442 e SMTP local 25242; preservar sessões e preview T4. Sem merge/push ou alteração de worktree alheia.
+
+## 2026-10-03 — Preços de assinatura aprovados
+
+- Fonte lida: `/var/home/matheus/projetos/agenda-backend/docs/PRECOS.md`. Humano aprovou Base R$ 49/mês (4900 centavos) e Completo R$ 79/mês (7900 centavos).
+- Única referência com preço antigo nesta área: `AGENTS.md:14`, atualizada. Busca em `app/dashboard`, `components/dashboard`, `lib/dashboard` e `docs` não encontrou preço de assinatura exibido ou configurado no produto.
+- Nenhuma tela de billing criada. Serviços, sinais, fixtures, benefícios, regras e trial de 7 dias preservados. Landing/pricing permanece com Trilha.
+- Verificação: busca de referências e `git diff --check` passaram; somente documentação alterada, sem repetir gates de produto aprovados.
