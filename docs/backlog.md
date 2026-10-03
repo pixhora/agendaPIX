@@ -1,5 +1,11 @@
 # Backlog
 
+## Assinatura aprovada49/79
+
+- **OK T4 `9791651`:** 4/4 pricing/preview/onboarding passaram; 4900/7900 centavos apresentados como49/79; trial7 preservado.
+- **Pendente Trilha:** commit/servidor atualizado para prova de consistência; checkpoint `e1877b4` ainda contém29/59 na landing.
+- Serviços/demo/sinais preservados; nenhuma autorização de cobrança inferida.
+
 ## Régua `6d12ccf` — encerrada no escopo
 
 - **OK:** 4/4 em 375/1280 claro/escuro; foco/Tab íntegros, fades nos extremos, setas/touch, scrollbar oculta e contraste 10,64:1. P1/P2 anteriores da régua encerrados.

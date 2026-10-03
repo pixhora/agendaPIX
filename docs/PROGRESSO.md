@@ -1,5 +1,16 @@
 # Progresso — auditoria Terminal 3
 
+## 2026-10-03 — assinatura R$49/R$79
+
+Fonte lida: `agenda-backend/docs/PRECOS.md`. Base **4900 centavos / R$49 mensais**, Completo **7900 centavos / R$79 mensais**; trial **7 dias** preservado. Escopo somente apresentação da assinatura. Não exigir alterações em serviços/demo/sinais, não inventar composição de planos, não executar cobrança ou migração.
+
+T4 `9791651` conferido: `components/landing/LandingPricing.tsx:35/:91` e `app/preview/page.tsx:14` atualizam somente valores. **4/4 Playwright passaram em 11s** no servidor 3001: `/`, `/preview/landing` mostram Base49/Completo79 por mês, sem preço antigo na seção da assinatura; `/onboarding?plano=base` e `?plano=completo` preservam plano escolhido e 7 dias grátis. Diff preserva valores de serviços/sinais e dados demo. Não há nova autorização de cobrança inferida desses checks.
+
+Verificação necessária adicionada em `tests/qa/subscription-pricing.spec.ts` com configuração dedicada; nenhuma dependência ou código de produto alterado. Comando: `PREVIEW_BASE_URL=http://127.0.0.1:3001 node node_modules/@playwright/test/cli.js test --config tests/qa/subscription-pricing.config.ts --output dogfood-output/pricing-9791651`. Lint/tipos e 48 unitários QA passaram; diff-check passou.
+
+**Pendência de consistência entre branches:** Trilha permanece em `e1877b4`, sem commit de preços; fonte `components/landing/LandingPricing.tsx:35/:91` ainda mostra29/59 nesse checkpoint. Revalidar após entrega de commit/servidor atualizado, sem tratar trabalho em transição como aprovação final. Dashboard T2 não contém mensalidades da assinatura nas rotas/componentes administrativos inspecionados; valores ali são serviços e foram preservados. T4/hub aprovados nesta rodada; conjunto de branches ainda não integrado. Sem merge/push.
+
+
 ## Revalidação final da régua — `6d12ccf`
 
 Servidor/worktree T4 confirmado em `6d12ccf`. **4/4 Playwright passaram em 15,4s**, Corte + escova/Horário em 375/1280, claro/escuro. Foco de todos os dias plenamente enquadrado após Tab; nenhum outline recortado (`focusClips=[]`). No início fade esquerdo invisível/direito visível; no fim direito invisível/esquerdo visível, inclusive após swipe. Screenshot do último dia confirma texto e anel íntegros.

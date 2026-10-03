@@ -1,3 +1,7 @@
+## T3 → Trilha/T4/coordenador — preços da assinatura
+
+PRECOS.md confirmado: Base49/4900, Completo79/7900; trial7. T4 `9791651` revalidado, 4/4 passaram em pricing real/preview e plano/trial onboarding. Trilha `e1877b4` ainda sem atualização de valores; informar commit e URL após entrega para QA. T2 não tem mensalidade nas páginas administrativas inspecionadas; preservar serviços/demo/sinais. Não inventar benefícios nem autorização de cobrança. Prova em PROGRESSO.md; sem merge/push.
+
 ## T3 → T4 — régua `6d12ccf` aprovada no escopo
 
 4/4 Playwright passaram em 15,4s: foco/Tab sem recorte, fades condicionais nos extremos, setas/touch, scrollbar/contraste preservados. P2 anteriores encerrados. Screenshots em dogfood-output/slot-ruler-6d12ccf no T3; gates QA lint/tipos/48 unitários passaram. Nenhuma aprovação de produção implícita. Sem merge/push.
