@@ -17,9 +17,9 @@
   - Garantias de baixo atrito: sem cartão de crédito, ativação em 3 minutos e cancelamento livre.
 - **Seção Problema vs. Solução**: Contraste direto entre a rotina desgastante de mensagens manuais no WhatsApp e o agendamento autônomo com sinal via Pix.
 - **Demonstração Interativa em 4 Passos**: Preview funcional simulando o uso real em celular (375px) com alternância de passos (Serviço → Horário na régua → Dados → Pix).
-- **Tabela de Preços Oficial (AGENTS.md)**:
-  - **Plano Base (R$ 29/mês)**: 1 profissional, agendamentos ilimitados, sinal por Pix automático, lembretes de WhatsApp, 7 dias grátis sem cartão.
-  - **Plano Completo (R$ 59/mês - Destaque)**: Tudo do base + múltiplos serviços, relatórios de faturamento e agendamentos, gestão completa de clientes e suporte prioritário via WhatsApp.
+- **Tabela de Preços Oficial (docs/PRECOS.md)**:
+  - **Plano Base (R$ 49/mês)**: 1 profissional, agendamentos ilimitados, sinal por Pix automático, lembretes de WhatsApp, 7 dias grátis sem cartão.
+  - **Plano Completo (R$ 79/mês - Destaque)**: Tudo do base + múltiplos serviços, relatórios de faturamento e agendamentos, gestão completa de clientes e suporte prioritário via WhatsApp.
 - **Perguntas Frequentes (FAQ)**: Respostas objetivas para as principais dúvidas do prestador de serviços no Brasil.
 - **Rodapé**: Navegação secundária e termos.
 
@@ -113,7 +113,7 @@
 - **Faixa de Credibilidade / Segmentos (`LandingTrustBand`)**: Grid horizontal sóbrio dos segmentos atendidos.
 - **Seção Editorial de Benefícios (`LandingEditorialBenefits`)**: Título amplo e grid de 4 blocos visuais conforme referência.
 - **Banner Largo Verde-Lima (`LandingHighlightBanner`)**: Card dark mode com faturamento do dia (Studio Bella) à esquerda e os 3 passos simples de ativação à direita.
-- **Preços e FAQ Harmonizados**: Cards com bordas arredondadas `rounded-3xl` e botões pill preservando os valores oficiais de R$ 29 e R$ 59.
+- **Preços e FAQ Harmonizados**: Cards com bordas arredondadas `rounded-3xl` e botões pill preservando os valores oficiais de R$ 49 e R$ 79 conforme `docs/PRECOS.md`.
 
 ### F. Rodada de Verificação do Sistema (2026-10-03)
 - **Acessibilidade & Teclado**:
