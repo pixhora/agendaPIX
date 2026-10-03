@@ -14,7 +14,7 @@ test("autenticação rejeita email inválido e não revela sessão inexistente",
   expect(session.ok()).toBe(true);
   expect(await session.json()).toBeNull();
   const invalid = await request.post("/api/auth/sign-in/magic-link", {
-    headers: { origin: "http://localhost:3000" },
+    headers: { origin: "http://127.0.0.1:3103" },
     data: { email: "email-inválido", callbackURL: "/" },
   });
   expect(invalid.status()).toBe(400);

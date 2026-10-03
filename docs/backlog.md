@@ -12,3 +12,10 @@
 - Revisar as entregas dos terminais 4 e 5 em mobile de 375px e desktop: acessibilidade, estados de tela, modo escuro e regressão visual.
 - Validar landing e onboarding após o fluxo crítico; registrar achados como **bloqueia**, **melhorar** ou **ok**, com arquivo e linha, para o autor corrigir.
 - Executar `lint`, `typecheck`, `test` e os testes e2e disponíveis antes de concluir a QA.
+
+## Terminal 3 — Plano de testes Pix (2026-10-02)
+
+- Criar dados isolados no Postgres para exercitar as APIs HTTP reais com Playwright.
+- Cobrir reserva, pagamento fake e confirmação por webhook assinado.
+- Verificar horário ocupado e duplicação de webhook com persistência e auditoria.
+- Documentar execução e validar e2e, lint, typecheck e testes unitários.

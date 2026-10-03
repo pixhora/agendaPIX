@@ -27,3 +27,7 @@ Terminal 3: testar contrato público e disputa de horários quando esta branch f
 Terminal 6: revisar concorrência, isolamento, validação financeira, auditoria e repetição de webhook. Não editar código do terminal 1.
 
 A revisão do fluxo Pix foi solicitada via Maestri ao Antigravidade. Ele confirmou que o terminal 6 continua desconectado; revisão pendente. Terminal 4 recebeu aviso do contrato e da simulação.
+
+## 2026-10-02 — Terminal 3 para humano: revisão dos testes e2e
+
+Os testes em `feat/tests` cobrem as APIs reais de agendamento, Pix fake, confirmação, horário ocupado e webhook duplicado, com dados isolados e limpeza por UUID. A documentação está no README. Solicito revisão antes de qualquer merge; o AGENTS.md não define um revisor para o terminal 3. A cobertura visual do fluxo público depende da entrega do terminal 4.

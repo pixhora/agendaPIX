@@ -35,8 +35,7 @@ pnpm test:db
 ```
 
 `test:db` exige banco iniciado e migrations aplicadas. Os testes de domínio usam transações revertidas ao final. O teste de autenticação remove seus próprios usuários, sessões e verificações ao terminar; o envio SMTP é simulado somente nesse teste.
-`pnpm test:e2e` contém apenas um teste do esqueleto em 375 px. Instale o Chromium do Playwright antes de executá-lo: `pnpm exec playwright install chromium`.
-O terminal 3 adicionará os fluxos reais quando o agendamento e o Pix existirem.
+Os testes Playwright cobrem a página do esqueleto em 375 px, autenticação e o fluxo HTTP real de agendamento com Pix fake. Veja a execução abaixo.
 `/api/health` verifica o processo HTTP, sem afirmar disponibilidade do banco ou do SMTP.
 
 ## Autenticação
@@ -79,3 +78,25 @@ Não exclua reservas antigas para resolver erro de sobreposição: revise os reg
 Os testes Pix removem somente as entidades de teste criadas por eles. Não há gateway real nesta etapa.
 
 Dependência adicional: `qrcode` gera o QR Code PNG padronizado da simulação; evita implementar codificação de QR manualmente.
+
+## Testes e2e de agendamento e Pix
+
+Use um banco PostgreSQL exclusivo para testes, com as migrations aplicadas. Configure `.env` com `DATABASE_URL`, `BETTER_AUTH_SECRET` e `FAKE_WEBHOOK_SECRET` (segredos exclusivos, com pelo menos 32 caracteres; não use os valores `replace-this-` do exemplo). As variáveis exportadas no terminal têm precedência sobre `.env`.
+
+```bash
+pnpm install --frozen-lockfile
+# Na primeira configuração, copie .env.example para .env e ajuste banco e segredos.
+# Configure POSTGRES_PORT livre e a mesma porta em DATABASE_URL.
+pnpm db:up
+pnpm db:migrate
+pnpm exec playwright install chromium
+pnpm test:e2e
+```
+
+O Playwright inicia e encerra seu próprio Next.js em `http://127.0.0.1:3103`, força `PAYMENT_PROVIDER=fake` e configura a origem de autenticação para esse endereço. Deixe a porta 3103 livre; um servidor existente não será reutilizado. O fake funciona somente fora de produção e não movimenta dinheiro real. SMTP não é necessário para os cenários atuais.
+
+`tests/e2e/booking-pix.spec.ts` consulta serviços e disponibilidade, cria reserva, verifica QR Code/copia-e-cola fictícios, envia webhook HMAC e consulta confirmação. Também verifica rejeição de horário ocupado sem nova reserva/cobrança, repetição do mesmo evento e novo evento para um pagamento já pago. As duplicatas preservam o registro de pagamento e cada entrega fica auditada.
+
+Cada teste cria um negócio com UUID exclusivo e remove somente seus próprios dados no encerramento, sem truncar tabelas ou remover volumes. Uma interrupção forçada do processo pode deixar dados de teste; mantenha esse banco separado de dados reais. As rotas HTTP e a persistência são reais; a assinatura do webhook é calculada no teste, sem substituir handlers ou regras de negócio.
+
+A tela pública `/[slug]` ainda não está implementada nesta base. Estes cenários verificam o fluxo pelas APIs usando `APIRequestContext` do Playwright; não comprovam a interação visual de agendamento. A verificação visual atual cobre somente o esqueleto em 375 px.
