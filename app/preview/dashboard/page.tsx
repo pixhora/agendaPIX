@@ -1,4 +1,6 @@
-import React from "react";
+"use client";
+
+import React, { useState } from "react";
 import Link from "next/link";
 import {
   MOCK_BUSINESS_INFO,
@@ -9,6 +11,24 @@ import { formatCurrency, formatDuration } from "@/components/booking/formatters"
 import { Button } from "@/components/ui/button";
 
 export default function PreviewDashboardPage() {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyLink = () => {
+    const url =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/preview/booking`
+        : `https://agenda.com.br/${MOCK_BUSINESS_INFO.slug}`;
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(url).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }).catch(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      });
+    }
+  };
+
   const totalFaturamento = MOCK_BOOKINGS.reduce((acc, b) => acc + b.priceCents, 0);
   const totalSinaisPix = MOCK_BOOKINGS.reduce(
     (acc, b) => acc + (b.status === "confirmed" ? b.depositCents : 0),
@@ -81,8 +101,17 @@ export default function PreviewDashboardPage() {
             <p className="font-mono text-primary font-bold">agenda.com.br/{MOCK_BUSINESS_INFO.slug}</p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            <Button
+              type="button"
+              variant={copied ? "default" : "outline"}
+              onClick={handleCopyLink}
+              className="min-h-9 text-xs font-semibold px-3 transition-all"
+              aria-live="polite"
+            >
+              {copied ? "✓ Copiado!" : "Copiar Link"}
+            </Button>
             <Button asChild className="min-h-9 text-xs font-semibold px-3.5">
-              <Link href="/preview/booking">Abrir página do cliente</Link>
+              <Link href="/preview/booking">Abrir página</Link>
             </Button>
           </div>
         </section>
