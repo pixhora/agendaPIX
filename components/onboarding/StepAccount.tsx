@@ -11,6 +11,73 @@ interface StepAccountProps {
   onComplete: () => void;
 }
 
+type MagicLinkResult =
+  | { ok: true; simulated?: boolean }
+  | { ok: false; code: "auth_unavailable" | "invalid_email" | "unknown"; message: string };
+
+/**
+ * Tenta enviar o magic-link real.
+ *
+ * Em ambiente de desenvolvimento ou em rotas /preview, quando o servidor
+ * responde com 5xx (ex: BETTER_AUTH_URL/SECRET ausentes, banco ou SMTP offline),
+ * simula o sucesso localmente para que o fluxo visual possa ser testado
+ * sem Postgres + SMTP configurados.
+ *
+ * Em produção, erros de infraestrutura exibem mensagem clara ao usuário,
+ * sem culpar o e-mail informado.
+ */
+async function sendMagicLink(email: string): Promise<MagicLinkResult> {
+  const isDevOrPreview =
+    process.env.NODE_ENV === "development" ||
+    (typeof window !== "undefined" && window.location.pathname.startsWith("/preview"));
+
+  try {
+    const res = await fetch("/api/auth/sign-in/magic-link", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: email.trim().toLowerCase(),
+        callbackURL: "/dashboard",
+      }),
+    });
+
+    if (res.ok) return { ok: true };
+
+    // 5xx → problema de infraestrutura (env ausentes, banco ou SMTP offline)
+    if (res.status >= 500) {
+      if (isDevOrPreview) {
+        return { ok: true, simulated: true };
+      }
+      return {
+        ok: false,
+        code: "auth_unavailable",
+        message:
+          "O serviço de envio de e-mail está temporariamente indisponível. Tente novamente em alguns instantes.",
+      };
+    }
+
+    // 4xx → erro de validação (e-mail inválido, domínio bloqueado, etc.)
+    const body = await res.json().catch(() => null);
+    return {
+      ok: false,
+      code: "invalid_email",
+      message:
+        (body?.message as string) ||
+        "Não foi possível enviar o link de acesso. Verifique o e-mail informado.",
+    };
+  } catch {
+    // Falha de rede: sem conexão, DNS, CORS, etc.
+    if (isDevOrPreview) {
+      return { ok: true, simulated: true };
+    }
+    return {
+      ok: false,
+      code: "unknown",
+      message: "Sem conexão com o servidor. Verifique sua internet e tente novamente.",
+    };
+  }
+}
+
 export function StepAccount({
   data,
   email,
@@ -21,6 +88,7 @@ export function StepAccount({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSent, setIsSent] = useState(false);
+  const [wasSimulated, setWasSimulated] = useState(false);
 
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
@@ -31,32 +99,17 @@ export function StepAccount({
     setIsSubmitting(true);
     setErrorMessage(null);
 
-    try {
-      // Chamada real para Better Auth magic link conforme CONTRATOS.md
-      const res = await fetch("/api/auth/sign-in/magic-link", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: email.trim().toLowerCase(),
-          callbackURL: "/dashboard",
-        }),
-      });
+    const result = await sendMagicLink(email.trim());
 
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => null);
-        throw new Error(
-          errorData?.message || "Não foi possível enviar o link de acesso. Verifique o email informado."
-        );
-      }
-
+    if (result.ok) {
+      setWasSimulated(!!result.simulated);
       setIsSent(true);
       onComplete();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Erro ao criar conta.";
-      setErrorMessage(msg);
-    } finally {
-      setIsSubmitting(false);
+    } else {
+      setErrorMessage(result.message);
     }
+
+    setIsSubmitting(false);
   };
 
   if (isSent) {
@@ -82,9 +135,26 @@ export function StepAccount({
           </p>
           <p>
             2. Você será direcionado diretamente para o painel com seu link público{" "}
-            <code className="text-primary font-mono font-bold">agenda.com.br/{data.slug}</code> ativado.
+            <code className="text-primary font-mono font-bold">
+              agenda.com.br/{data.slug}
+            </code>{" "}
+            ativado.
           </p>
         </div>
+
+        {/* Alerta de simulação — só aparece em dev quando o envio foi simulado */}
+        {wasSimulated && (
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-700 dark:text-amber-400 text-left">
+            <p className="font-semibold mb-0.5">⚠ Modo de desenvolvimento — envio simulado</p>
+            <p>
+              Nenhum e-mail foi disparado. Para envio real, configure{" "}
+              <code className="font-mono">BETTER_AUTH_URL</code>,{" "}
+              <code className="font-mono">BETTER_AUTH_SECRET</code> e{" "}
+              <code className="font-mono">DATABASE_URL</code> no{" "}
+              <code className="font-mono">.env</code> e reinicie o servidor.
+            </p>
+          </div>
+        )}
 
         <div className="pt-2">
           <Button
@@ -119,12 +189,15 @@ export function StepAccount({
         </div>
         <div className="flex justify-between items-center pb-2 border-b border-border">
           <span className="text-muted-foreground">Link público:</span>
-          <span className="font-mono text-primary font-semibold">agenda.com.br/{data.slug}</span>
+          <span className="font-mono text-primary font-semibold">
+            agenda.com.br/{data.slug}
+          </span>
         </div>
         <div className="flex justify-between items-center pb-2 border-b border-border">
           <span className="text-muted-foreground">Primeiro serviço:</span>
           <span className="font-medium text-foreground">
-            {data.serviceName} ({formatDuration(data.durationMinutes)}) · {formatCurrency(data.priceCents)}
+            {data.serviceName} ({formatDuration(data.durationMinutes)}) ·{" "}
+            {formatCurrency(data.priceCents)}
           </span>
         </div>
         <div className="flex justify-between items-center">
@@ -137,7 +210,10 @@ export function StepAccount({
 
       <div className="space-y-3">
         <div>
-          <label htmlFor="account-email" className="block text-sm font-medium text-foreground mb-1.5">
+          <label
+            htmlFor="account-email"
+            className="block text-sm font-medium text-foreground mb-1.5"
+          >
             Seu melhor e-mail profissional
           </label>
           <input
@@ -153,15 +229,18 @@ export function StepAccount({
         </div>
 
         {errorMessage && (
-          <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-xs text-destructive">
+          <div
+            role="alert"
+            className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-xs text-destructive"
+          >
             {errorMessage}
           </div>
         )}
 
         <div className="text-xs text-muted-foreground space-y-1">
           <p className="flex items-center gap-1.5">
-            <span className="text-emerald-600 font-bold">✓</span> 7 dias de teste grátis do Plano{" "}
-            {data.plan === "completo" ? "Completo" : "Base"}
+            <span className="text-emerald-600 font-bold">✓</span> 7 dias de teste grátis
+            do Plano {data.plan === "completo" ? "Completo" : "Base"}
           </p>
           <p className="flex items-center gap-1.5">
             <span className="text-emerald-600 font-bold">✓</span> Sem cartão de crédito
