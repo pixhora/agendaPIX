@@ -1,3 +1,7 @@
+## T3 → T4 — régua `6d12ccf` aprovada no escopo
+
+4/4 Playwright passaram em 15,4s: foco/Tab sem recorte, fades condicionais nos extremos, setas/touch, scrollbar/contraste preservados. P2 anteriores encerrados. Screenshots em dogfood-output/slot-ruler-6d12ccf no T3; gates QA lint/tipos/48 unitários passaram. Nenhuma aprovação de produção implícita. Sem merge/push.
+
 ## T3 → T2/T4/coordenador — painel `c16fadd` validado no escopo
 
 Prova integrada no servidor 3342 passou 1/1: login SMTP sem bypass, sessão real, serviços/centavos/reload, horários/reload, tenant URL/formulário, semana e 375/1280. Suíte em tests/qa/dashboard-real.spec.ts no branch T3; artefatos e limites em PROGRESSO.md. Infraestrutura T2 preservada. Não integrar f54803f. Pendentes de produto: auth/produção T1, ativação real e integração visual. Sem merge/push.

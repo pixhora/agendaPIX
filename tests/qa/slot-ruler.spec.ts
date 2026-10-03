@@ -10,7 +10,10 @@ for (const colorScheme of ["light", "dark"] as const) {
       await page.getByRole("button", { name: "Continuar para escolher horário" }).click();
       const ruler = page.getByRole("group", { name: "Selecione uma data" });
       const days = ruler.getByRole("button");
-      const fade = page.getByRole("region", { name: "Régua de datas disponíveis" }).locator('[aria-hidden="true"]');
+      const fades = page.getByRole("region", { name: "Régua de datas disponíveis" }).locator('[aria-hidden="true"]');
+      const leftFade = fades.first(), fade = fades.last();
+      await expect(leftFade).toHaveCSS("opacity", "0");
+      await expect(fade).toHaveCSS("opacity", "1");
       const gradient = await fade.evaluate(element => ({ backgroundImage: getComputedStyle(element).backgroundImage, width: element.getBoundingClientRect().width, pointerEvents: getComputedStyle(element).pointerEvents }));
       expect.soft(gradient.backgroundImage, "overflow exige gradiente renderizado").toContain("gradient");
       expect.soft(gradient.width).toBeGreaterThan(0);
@@ -50,9 +53,10 @@ for (const colorScheme of ["light", "dark"] as const) {
         await expect(days.nth(i)).toBeFocused();
         // Aguarda a rolagem suave nativa antes de medir o recorte de foco.
         await expect.configure({ soft: true }).poll(() => days.nth(i).evaluate(element => {
-          const box = element.getBoundingClientRect(), parent = element.parentElement!.getBoundingClientRect();
-          return box.left >= parent.left - 1 && box.right <= parent.right + 1;
-        }), { timeout: 1000 }).toBe(true);
+          const box = element.getBoundingClientRect(), parent = element.parentElement!.getBoundingClientRect(), style = getComputedStyle(element);
+          const outline = parseFloat(style.outlineWidth) + parseFloat(style.outlineOffset);
+          return box.left - outline >= parent.left - 1 && box.right + outline <= parent.right + 1;
+        }), { timeout: 2500 }).toBe(true);
         const geometry = await days.nth(i).evaluate((element) => {
           const box = element.getBoundingClientRect(), parent = element.parentElement!.getBoundingClientRect(), style = getComputedStyle(element);
           const outline = parseFloat(style.outlineWidth) + parseFloat(style.outlineOffset);
@@ -62,6 +66,8 @@ for (const colorScheme of ["light", "dark"] as const) {
         if (geometry.clipped) focusClips.push(i);
         if (i < await days.count() - 1) await page.keyboard.press("Tab");
       }
+      await expect(fade).toHaveCSS("opacity", "0");
+      await expect(leftFade).toHaveCSS("opacity", "1");
       await page.screenshot({ path: testInfo.outputPath("last-day-focus.png") });
       expect.soft(focusClips, "foco não deve ser recortado pela régua").toEqual([]);
       await ruler.evaluate(element => { element.scrollLeft = 0; });
@@ -81,6 +87,8 @@ for (const colorScheme of ["light", "dark"] as const) {
         await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
       }
       await expect.poll(() => ruler.evaluate(element => element.scrollLeft + element.clientWidth >= element.scrollWidth - 2), { message: "último dia alcançável por swipe" }).toBe(true);
+      await expect(fade).toHaveCSS("opacity", "0");
+      await expect(leftFade).toHaveCSS("opacity", "1");
       await page.evaluate(() => window.scrollTo(0, 0));
       const hub = page.getByRole("link", { name: /Voltar ao Hub/ });
       await expect(hub).toBeVisible();

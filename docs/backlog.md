@@ -1,5 +1,10 @@
 # Backlog
 
+## Régua `6d12ccf` — encerrada no escopo
+
+- **OK:** 4/4 em 375/1280 claro/escuro; foco/Tab íntegros, fades nos extremos, setas/touch, scrollbar oculta e contraste 10,64:1. P1/P2 anteriores da régua encerrados.
+- Provas e screenshots em PROGRESSO.md. Pendências do MVP real permanecem.
+
 ## Painel T2 `c16fadd` — prova T3
 
 - **OK:** login SMTP/sessão reais locais; serviços criar/editar/centavos/reload; horários salvar/reload; tenant por URL/formulário; agenda semanal e quatro rotas 375/1280. Playwright 1/1 passou.

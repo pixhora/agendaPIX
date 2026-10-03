@@ -1,5 +1,16 @@
 # Progresso — auditoria Terminal 3
 
+## Revalidação final da régua — `6d12ccf`
+
+Servidor/worktree T4 confirmado em `6d12ccf`. **4/4 Playwright passaram em 15,4s**, Corte + escova/Horário em 375/1280, claro/escuro. Foco de todos os dias plenamente enquadrado após Tab; nenhum outline recortado (`focusClips=[]`). No início fade esquerdo invisível/direito visível; no fim direito invisível/esquerdo visível, inclusive após swipe. Screenshot do último dia confirma texto e anel íntegros.
+
+Preservados: scrollbar nativa computada `none`, badge ativo **10,6386:1**, ArrowRight/ArrowLeft rolam a régua, touch alcança extremo, topo/Hub íntegros e página sem overflow horizontal. **P2 de foco/enquadramento e fade persistente encerrados** no escopo exercitado. Diff usa listener de scroll e window resize; não possui ResizeObserver, apesar da descrição recebida. Comportamento esperado nos viewports testados foi validado; não exigir implementação específica.
+
+Teste `tests/qa/slot-ruler.spec.ts` adaptado aos dois fades e verifica suas opacidades nos extremos. Medição aguarda enquadramento do outline completo, evitando observar quadro intermediário da rolagem. Gates QA: lint sem warnings, typecheck, 48/48 unitários e diff-check passaram. Nenhuma alteração de frontend/backend.
+
+Comando: `PREVIEW_BASE_URL=http://127.0.0.1:3001 node node_modules/@playwright/test/cli.js test --config tests/qa/preview.config.ts --grep 'régua Corte' --output dogfood-output/slot-ruler-6d12ccf`. Screenshots `initial.png` e `last-day-focus.png` nos quatro diretórios de viewport/tema. Aprovação restrita à régua; não altera pendências de gateway bancário, ativação real, auth/produção e integração descritas na matriz do MVP. Sem merge/push.
+
+
 ## 2026-10-03 — painel T2 integrado `c16fadd`
 
 Entrega recebida: `c16faddb5fdbf3db176b8bd33a3b7c9881c001df`, `feat/dashboard`; servidor Next de produção em 3342, PostgreSQL sintético exclusivo de verificação em 55442, SMTP local em 25242. Worktree T2 passou para `99d15bc`, diferença somente documental; comportamento de produto corresponde a `c16fadd`. T3 não editou T2, não integrou `f54803f`, não interrompeu infraestrutura compartilhada e não revisou novamente o log sensível.
