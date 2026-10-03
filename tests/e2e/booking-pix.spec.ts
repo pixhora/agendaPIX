@@ -113,6 +113,10 @@ test("interface pública agenda e confirma com API, banco e webhook reais", asyn
   await expect(page.getByRole("heading", { name: "Pague o sinal por Pix" })).toBeVisible();
   const [charge] = await business.database.select().from(schema.payments).where(eq(schema.payments.businessId, business.businessId));
   expect(charge.amountCents).toBe(1000);
+  await page.waitForTimeout(4500);
+  await expect(page.getByRole("heading", { name: "Horário confirmado!" })).not.toBeVisible();
+  const [pendingBooking] = await business.database.select().from(schema.bookings).where(eq(schema.bookings.businessId, business.businessId));
+  expect(pendingBooking.status).toBe("pending_payment");
   const delivery = await request.post("/api/webhooks/payments/fake", paidWebhook(charge.externalId!, business));
   expect(delivery.status()).toBe(200);
   await expect(page.getByRole("heading", { name: "Horário confirmado!" })).toBeVisible({ timeout: 8000 });

@@ -1,5 +1,19 @@
 # Progresso — auditoria Terminal 3
 
+## 2026-10-03 — regressão T3 no servidor 3001 (`a134216`)
+
+Última prova: `e8875b4`. Branch atual `feat/booking-ui`: `a134216`; worktree T3 mantido em `feat/tests`. Diff desde a última prova inclui tokens, navegação preview, onboarding e autenticação local. Backend/log sensível de T1 não foi revisado nesta rodada. Nenhuma alteração de produto, dependência, merge ou push.
+
+**OK:** 6/6 preview passaram (1,4min), incluindo 375/768/1280px, teclado, reduced-motion, contraste dos alvos financeiros e ausência de HTTP externo/API no percurso. Booking controlado passou em 18/20 na primeira execução; os dois cenários falhos passaram em repetição focada (2/2, 9,8s). Estados loading/error/empty/success, recuperação, expiração autoritativa e pagamento tardio foram exercitados. Novo teste `tests/qa/booking-ui.spec.ts:232` restaura rascunho salvo, usa Enter, recarrega e verifica ausência de mensagens de hidratação e overflow a 375px; passou.
+
+**OK:** E2E real ampliado em `tests/e2e/booking-pix.spec.ts:116` espera um ciclo de polling antes do webhook, verifica ausência de confirmação e reserva persistida `pending_payment`. Após webhook fake assinado, UI e banco ficam `confirmed`. Passou na repetição isolada (1/1, 16,8s). Usa UI em 3001 e ponte para API/Postgres reais em 3103; não comprova implantação integrada nem pagamento bancário. Nenhum token foi publicado.
+
+**MELHORAR / P2 — T3 + T4/ambiente:** `tests/qa/booking-ui.spec.ts:51/:123` falharam por timeout sob execução concorrente. E2E `tests/e2e/booking-pix.spec.ts:113` voltou à etapa serviço antes do Pix. Reprodução inicial e artefatos preservados; todos passaram em repetição focada. Causa de reset não estabelecida; não atribuir defeito ao produto sem prova. Rodar regressões serialmente no servidor de desenvolvimento e investigar reload/HMR se repetir. Impacto: prova inicial instável; não há bloqueio de produto reproduzível nesta rodada.
+
+Gates do worktree QA: `pnpm lint` sem warnings, `pnpm typecheck`, 48/48 unitários e `git diff --check` passaram. Build/integração ampla não repetidos: nenhum código de produto alterado no QA e escopo desta rodada é regressão afetada. Resultados de build anteriores permanecem históricos, sem aprovação nova.
+
+Artefatos: `dogfood-output/regression-a134216-booking/`, `...-booking-repeat/`, `...-preview/`, `...-webhook/`, `...-webhook-repeat/`. Próxima ação: coordenador integrar entregas e avaliar fluxo integrado; pendências do MVP anteriores permanecem. Revalidação aprovada nos cenários exercitados, com instabilidade inicial registrada.
+
 ## Revalidação final T3 — `e8875b4`
 
 **OK / P1 encerrado:** `components/booking/StepPayment.tsx:43/:67` passa a confirmar somente reserva `confirmed`; `expired` prevalece sobre pagamento `paid`. Diff conferido nos caminhos HTTP e callback local. Esperado: dinheiro tardio não reabre horário; observado: tela de expiração, sem falsa confirmação. Regressão em `tests/qa/booking-ui.spec.ts:160` passou, assim como recuperação após 503 e consulta autoritativa no vencimento (`:137/:146`). Terminal 4 realizou a correção; T3 preservou e reexecutou os testes.

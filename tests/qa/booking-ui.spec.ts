@@ -227,3 +227,26 @@ test("a11y: botão principal atende contraste AA no modo claro", async ({ page }
   });
   expect(ratio).toBeGreaterThanOrEqual(4.5);
 });
+
+
+test("onboarding: restaura rascunho sem erro de hidratação e permite teclado", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") errors.push(message.text());
+  });
+  await page.addInitScript(() => {
+    localStorage.setItem("agenda_onboarding_draft", JSON.stringify({ businessName: "Studio QA", slug: "studio-qa" }));
+  });
+  await page.goto("/onboarding");
+  await expect(page.getByLabel("Nome do estabelecimento ou profissional")).toHaveValue("Studio QA");
+  const next = page.getByRole("button", { name: "Continuar", exact: true });
+  await expect(next).toBeEnabled();
+  await next.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("heading", { name: /serviço/i })).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel("Nome do estabelecimento ou profissional")).toHaveValue("Studio QA");
+  expect(errors.filter((error) => /hydrat|server rendered|didn't match/i.test(error))).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});

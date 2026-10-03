@@ -1,5 +1,13 @@
 # Backlog
 
+## Regressão T3 `a134216`
+
+- **OK:** preview 6/6; booking 18/20 inicialmente, 2/2 repetição; onboarding com rascunho/reload sem erro de hidratação.
+- **OK:** E2E fake comprova estado pendente antes do webhook e confirmado depois (1/1 repetição).
+- **P2 MELHORAR — T3/T4 ambiente:** timeouts e reset inicial sob concorrência; causa não estabelecida, não reproduzidos isoladamente. Evidências em `docs/PROGRESSO.md`.
+- Bloqueios anteriores do MVP não encerrados por esta regressão.
+
+
 ## Revalidação final T3 — `e8875b4`
 
 - **OK / P1 encerrado — T4:** pagamento tardio não confirma reserva expirada (`StepPayment.tsx:43/:67`). Regressão QA `booking-ui.spec.ts:160` passou.
