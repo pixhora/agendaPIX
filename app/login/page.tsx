@@ -173,6 +173,8 @@ export default function LoginPage() {
                     type="email"
                     required
                     autoComplete="email"
+                    aria-invalid={errorMessage ? "true" : undefined}
+                    aria-describedby={errorMessage ? "login-error" : undefined}
                     placeholder="seuemail@exemplo.com.br"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -182,6 +184,7 @@ export default function LoginPage() {
 
                 {errorMessage && (
                   <div
+                    id="login-error"
                     role="alert"
                     className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-xs text-destructive"
                   >

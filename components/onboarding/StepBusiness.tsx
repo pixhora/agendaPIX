@@ -80,7 +80,7 @@ export function StepBusiness({
               placeholder="seu-negocio"
               value={slug}
               onChange={handleSlugChange}
-              className="flex-1 bg-transparent px-3 py-2.5 text-base text-foreground placeholder:text-muted-foreground/60 focus:outline-none min-h-11"
+              className="flex-1 min-w-0 bg-transparent px-3 py-2.5 text-base text-foreground placeholder:text-muted-foreground/60 focus:outline-none min-h-11"
             />
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
