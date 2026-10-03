@@ -185,7 +185,14 @@ export function StepSlot({
 
       {/* Régua Tátil de Dias (Elemento Memorável) */}
       <section aria-label="Régua de datas disponíveis">
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 pt-1 no-scrollbar scroll-smooth">
+      {/* Wrapper relativo para indicador de overflow */}
+        <div className="relative">
+          {/* Fade direita indica mais datas para rolar */}
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent z-10" aria-hidden="true" />
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 pt-1 scrollbar-hide scroll-smooth"
+            role="group"
+            aria-label="Selecione uma data"
+          >
           {days.map((day) => {
             const isCurrent = day.dateString === selectedDate;
             const count = daySlotCounts[day.dateString];
@@ -214,7 +221,7 @@ export function StepSlot({
                 <span
                   className={`text-[10px] mt-1 font-medium px-1.5 py-0.5 rounded-full ${
                     isCurrent
-                      ? "bg-white/20 text-white"
+                      ? "bg-primary-foreground/15 text-primary-foreground"
                       : isZero
                       ? "bg-muted text-muted-foreground/80"
                       : hasSlots
@@ -231,6 +238,7 @@ export function StepSlot({
               </button>
             );
           })}
+          </div>
         </div>
       </section>
 
