@@ -47,11 +47,27 @@ export function OnboardingFlow() {
             setData((prev) => ({ ...prev, ...parsed }));
           }
         }
+        const savedStep = localStorage.getItem("agenda_onboarding_step");
+        if (savedStep) {
+          const stepNum = Number(savedStep);
+          if (stepNum >= 1 && stepNum <= 4) {
+            setStep(stepNum as 1 | 2 | 3 | 4);
+          }
+        }
       } catch {
         // Fallback gracioso se localStorage estiver inacessível ou JSON corrompido
       }
     });
   }, []);
+
+  const goToStep = (nextStep: 1 | 2 | 3 | 4) => {
+    setStep(nextStep);
+    try {
+      localStorage.setItem("agenda_onboarding_step", String(nextStep));
+    } catch {
+      // Fallback
+    }
+  };
 
   const updateDraft = (partial: Partial<OnboardingData>) => {
     setData((prev) => {
@@ -145,7 +161,7 @@ export function OnboardingFlow() {
               slug={data.slug}
               onChangeBusinessName={(businessName) => updateDraft({ businessName })}
               onChangeSlug={(slug) => updateDraft({ slug })}
-              onNext={() => setStep(2)}
+              onNext={() => goToStep(2)}
             />
           )}
 
@@ -159,8 +175,8 @@ export function OnboardingFlow() {
               onChangeDuration={(durationMinutes) => updateDraft({ durationMinutes })}
               onChangePrice={(priceCents) => updateDraft({ priceCents })}
               onChangeDeposit={(depositCents) => updateDraft({ depositCents })}
-              onBack={() => setStep(1)}
-              onNext={() => setStep(3)}
+              onBack={() => goToStep(1)}
+              onNext={() => goToStep(3)}
             />
           )}
 
@@ -172,8 +188,8 @@ export function OnboardingFlow() {
               onChangeOpenDays={(openDays) => updateDraft({ openDays })}
               onChangeOpensAt={(opensAt) => updateDraft({ opensAt })}
               onChangeClosesAt={(closesAt) => updateDraft({ closesAt })}
-              onBack={() => setStep(2)}
-              onNext={() => setStep(4)}
+              onBack={() => goToStep(2)}
+              onNext={() => goToStep(4)}
             />
           )}
 
@@ -182,11 +198,12 @@ export function OnboardingFlow() {
               data={data}
               email={data.email}
               onChangeEmail={(email) => updateDraft({ email })}
-              onBack={() => setStep(3)}
+              onBack={() => goToStep(3)}
               onComplete={() => {
                 try {
                   localStorage.setItem("agenda_completed_onboarding_setup", JSON.stringify(data));
                   localStorage.removeItem("agenda_onboarding_draft");
+                  localStorage.removeItem("agenda_onboarding_step");
                 } catch {
                   // Fallback
                 }

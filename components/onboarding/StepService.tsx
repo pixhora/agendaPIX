@@ -26,12 +26,13 @@ export function StepService({
   onBack,
   onNext,
 }: StepServiceProps) {
+  const isDepositValid = depositCents <= priceCents;
   const isValid =
     serviceName.trim().length >= 2 &&
     durationMinutes > 0 &&
     priceCents > 0 &&
     depositCents >= 0 &&
-    depositCents <= priceCents;
+    isDepositValid;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,13 +115,29 @@ export function StepService({
               type="number"
               min="0"
               step="1"
+              aria-invalid={!isDepositValid ? "true" : undefined}
+              aria-describedby={!isDepositValid ? "deposit-error" : undefined}
               value={depositCents >= 0 ? (depositCents / 100).toString() : ""}
               onChange={(e) => onChangeDeposit(Math.round(Number(e.target.value) * 100))}
               placeholder="Ex: 20"
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-foreground min-h-11 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              className={`w-full rounded-lg border bg-surface px-3 py-2.5 text-sm text-foreground min-h-11 focus-visible:outline-2 focus-visible:outline-offset-2 ${
+                !isDepositValid
+                  ? "border-destructive focus-visible:outline-destructive"
+                  : "border-border focus-visible:outline-primary"
+              }`}
             />
           </div>
         </div>
+
+        {!isDepositValid && (
+          <div
+            id="deposit-error"
+            role="alert"
+            className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-xs text-destructive font-medium"
+          >
+            O sinal no Pix (R$ {(depositCents / 100).toFixed(0)}) não pode ser maior que o valor total do serviço (R$ {(priceCents / 100).toFixed(0)}).
+          </div>
+        )}
 
         <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground space-y-1">
           <p className="font-semibold text-primary">💡 Dica sobre o sinal:</p>

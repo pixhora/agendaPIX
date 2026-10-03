@@ -42,7 +42,9 @@ export function StepHours({
     }
   };
 
-  const isValid = openDays.length > 0 && opensAt < closesAt;
+  const isTimeOrderValid = opensAt < closesAt;
+  const isDaysValid = openDays.length > 0;
+  const isValid = isDaysValid && isTimeOrderValid;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,6 +92,15 @@ export function StepHours({
           <p className="mt-1.5 text-xs text-muted-foreground">
             Toque nos dias para ativar ou desativar.
           </p>
+          {!isDaysValid && (
+            <div
+              id="days-error"
+              role="alert"
+              className="mt-2 rounded-lg border border-destructive/20 bg-destructive/5 p-2.5 text-xs text-destructive font-medium"
+            >
+              Selecione pelo menos um dia de atendimento na semana.
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-3 pt-2">
@@ -101,9 +112,15 @@ export function StepHours({
               id="hours-opens"
               type="time"
               required
+              aria-invalid={!isTimeOrderValid ? "true" : undefined}
+              aria-describedby={!isTimeOrderValid ? "hours-error" : undefined}
               value={opensAt}
               onChange={(e) => onChangeOpensAt(e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm font-medium text-foreground min-h-11 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              className={`w-full rounded-lg border bg-surface px-3 py-2.5 text-sm font-medium text-foreground min-h-11 focus-visible:outline-2 focus-visible:outline-offset-2 ${
+                !isTimeOrderValid
+                  ? "border-destructive focus-visible:outline-destructive"
+                  : "border-border focus-visible:outline-primary"
+              }`}
             />
           </div>
 
@@ -115,12 +132,28 @@ export function StepHours({
               id="hours-closes"
               type="time"
               required
+              aria-invalid={!isTimeOrderValid ? "true" : undefined}
+              aria-describedby={!isTimeOrderValid ? "hours-error" : undefined}
               value={closesAt}
               onChange={(e) => onChangeClosesAt(e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm font-medium text-foreground min-h-11 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              className={`w-full rounded-lg border bg-surface px-3 py-2.5 text-sm font-medium text-foreground min-h-11 focus-visible:outline-2 focus-visible:outline-offset-2 ${
+                !isTimeOrderValid
+                  ? "border-destructive focus-visible:outline-destructive"
+                  : "border-border focus-visible:outline-primary"
+              }`}
             />
           </div>
         </div>
+
+        {!isTimeOrderValid && (
+          <div
+            id="hours-error"
+            role="alert"
+            className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-xs text-destructive font-medium"
+          >
+            O horário de fechamento deve ser posterior ao horário de abertura.
+          </div>
+        )}
       </div>
 
       <div className="flex items-center gap-3 pt-2">
