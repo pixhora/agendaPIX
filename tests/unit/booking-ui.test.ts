@@ -29,12 +29,16 @@ describe("Booking UI formatters and helpers", () => {
     expect(formatPhoneMask("11")).toBe("(11");
     expect(formatPhoneMask("119")).toBe("(11) 9");
     expect(formatPhoneMask("11987654321")).toBe("(11) 98765-4321");
+    expect(formatPhoneMask("+5511987654321")).toBe("(11) 98765-4321");
+    expect(formatPhoneMask("5511987654321")).toBe("(11) 98765-4321");
     expect(formatPhoneMask("1133334444")).toBe("(11) 3333-4444");
     expect(formatPhoneMask("abc11def987654321xyz")).toBe("(11) 98765-4321");
   });
 
   it("validates Brazilian phone numbers", () => {
     expect(isValidBrazilianPhone("(11) 98765-4321")).toBe(true);
+    expect(isValidBrazilianPhone("+5511987654321")).toBe(true);
+    expect(isValidBrazilianPhone("5511987654321")).toBe(true);
     expect(isValidBrazilianPhone("(21) 3333-4444")).toBe(true);
     expect(isValidBrazilianPhone("11987654321")).toBe(true);
     expect(isValidBrazilianPhone("123")).toBe(false);
@@ -45,6 +49,7 @@ describe("Booking UI formatters and helpers", () => {
     expect(normalizePhoneToE164("(11) 98765-4321")).toBe("+5511987654321");
     expect(normalizePhoneToE164("11987654321")).toBe("+5511987654321");
     expect(normalizePhoneToE164("+5511987654321")).toBe("+5511987654321");
+    expect(normalizePhoneToE164("5511987654321")).toBe("+5511987654321");
   });
 
   it("formats time slots and full dates with given timezone", () => {

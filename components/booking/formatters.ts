@@ -13,7 +13,11 @@ export function formatDuration(minutes: number): string {
 }
 
 export function formatPhoneMask(value: string): string {
-  const digits = value.replace(/\D/g, "").slice(0, 11);
+  let cleanDigits = value.replace(/\D/g, "");
+  if (cleanDigits.startsWith("55") && cleanDigits.length >= 12) {
+    cleanDigits = cleanDigits.slice(2);
+  }
+  const digits = cleanDigits.slice(0, 11);
   if (digits.length <= 2) return digits ? `(${digits}` : "";
   if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
   if (digits.length <= 10) {
@@ -23,16 +27,18 @@ export function formatPhoneMask(value: string): string {
 }
 
 export function normalizePhoneToE164(formattedOrRaw: string): string {
-  const digits = formattedOrRaw.replace(/\D/g, "");
+  let digits = formattedOrRaw.replace(/\D/g, "");
   if (digits.startsWith("55") && digits.length >= 12) {
-    return `+${digits}`;
+    digits = digits.slice(2);
   }
   return `+55${digits}`;
 }
 
 export function isValidBrazilianPhone(value: string): boolean {
-  const digits = value.replace(/\D/g, "");
-  // DDD (2 dígitos) + 9 dígitos (celular) ou 8 dígitos (fixo)
+  let digits = value.replace(/\D/g, "");
+  if (digits.startsWith("55") && digits.length >= 12) {
+    digits = digits.slice(2);
+  }
   return digits.length === 10 || digits.length === 11;
 }
 

@@ -83,6 +83,8 @@ export function StepSlot({
   const [isLoadingSlots, setIsLoadingSlots] = useState<boolean>(true);
   const [errorSlots, setErrorSlots] = useState<string | null>(null);
 
+  const [slotsRetryCount, setSlotsRetryCount] = useState<number>(0);
+
   // Carrega contagens de vagas para todos os 7 dias em background
   useEffect(() => {
     let isCancelled = false;
@@ -136,11 +138,18 @@ export function StepSlot({
     return () => {
       isCancelled = true;
     };
-  }, [slug, service.id, selectedDate]);
+  }, [slug, service.id, selectedDate, slotsRetryCount]);
 
   const handleSelectDay = (dateStr: string) => {
+    if (dateStr === selectedDate) return;
     setIsLoadingSlots(true);
     setSelectedDate(dateStr);
+  };
+
+  const handleRetrySlots = () => {
+    setIsLoadingSlots(true);
+    setErrorSlots(null);
+    setSlotsRetryCount((c) => c + 1);
   };
 
   const selectedSlot = slots.find((s) => s.startsAt === selectedStartsAt);
@@ -217,10 +226,7 @@ export function StepSlot({
             <p className="text-sm font-medium text-destructive">{errorSlots}</p>
             <Button
               variant="outline"
-              onClick={() => {
-                setIsLoadingSlots(true);
-                setSelectedDate((prev) => prev);
-              }}
+              onClick={handleRetrySlots}
               className="mt-3 min-h-11"
             >
               Tentar novamente
