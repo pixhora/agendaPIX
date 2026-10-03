@@ -19,14 +19,21 @@ describe("Onboarding business slug generation", () => {
     expect(slugify("---Corte---Fácil---")).toBe("corte-facil");
   });
 
-  it("validates that business name and slug must have at least 2 characters", () => {
-    const isStep1Valid = (name: string, slug: string) =>
-      name.trim().length >= 2 && slug.length >= 2;
+  it("validates that business name and slug must have at least 2 characters and clean kebab-case", () => {
+    const isNameValid = (name: string) => name.trim().length >= 2;
+    const isSlugValid = (slug: string) =>
+      slug.length >= 2 && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug);
 
-    expect(isStep1Valid("", "")).toBe(false);
-    expect(isStep1Valid("A", "a")).toBe(false);
-    expect(isStep1Valid("Studio Bella", "studio-bella")).toBe(true);
-    expect(isStep1Valid("Barbearia", "")).toBe(false);
+    expect(isNameValid("")).toBe(false);
+    expect(isNameValid("A")).toBe(false);
+    expect(isNameValid("Studio Bella")).toBe(true);
+
+    expect(isSlugValid("")).toBe(false);
+    expect(isSlugValid("a")).toBe(false);
+    expect(isSlugValid("studio-bella")).toBe(true);
+    expect(isSlugValid("studio--bella")).toBe(false); // Hífen duplo
+    expect(isSlugValid("studio_bella")).toBe(false);  // Underscore
+    expect(isSlugValid("barbearia-")).toBe(false);    // Hífen final
   });
 
   it("validates professional email format for login and onboarding step 4", () => {
