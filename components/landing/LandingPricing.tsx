@@ -32,7 +32,7 @@ export function LandingPricing() {
               </div>
 
               <div className="flex items-baseline gap-1.5 pt-2">
-                <span className="text-4xl sm:text-5xl font-black text-foreground">R$ 29</span>
+                <span className="text-4xl sm:text-5xl font-black text-foreground">R$ 49</span>
                 <span className="text-sm font-semibold text-muted-foreground">/ mês</span>
               </div>
 
@@ -88,7 +88,7 @@ export function LandingPricing() {
               </div>
 
               <div className="flex items-baseline gap-1.5 pt-2">
-                <span className="text-4xl sm:text-5xl font-black text-foreground">R$ 59</span>
+                <span className="text-4xl sm:text-5xl font-black text-foreground">R$ 79</span>
                 <span className="text-sm font-semibold text-muted-foreground">/ mês</span>
               </div>
 
