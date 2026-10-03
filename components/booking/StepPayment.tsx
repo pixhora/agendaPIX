@@ -40,10 +40,10 @@ export function StepPayment({
     try {
       if (checkStatusFn) {
         const data = await checkStatusFn();
-        if (data?.status === "confirmed" || data?.payment?.status === "paid") {
-          onPaymentConfirmed(data);
-        } else if (data?.status === "expired" || data?.payment?.status === "expired") {
+        if (data?.status === "expired" || data?.payment?.status === "expired") {
           setIsExpired(true);
+        } else if (data?.status === "confirmed") {
+          onPaymentConfirmed(data);
         }
         return;
       }
@@ -64,10 +64,10 @@ export function StepPayment({
       }
 
       const data: PaymentStatusResponse = await res.json();
-      if (data.status === "confirmed" || data?.payment?.status === "paid") {
-        onPaymentConfirmed(data);
-      } else if (data.status === "expired" || data?.payment?.status === "expired") {
+      if (data.status === "expired" || data?.payment?.status === "expired") {
         setIsExpired(true);
+      } else if (data.status === "confirmed") {
+        onPaymentConfirmed(data);
       }
     } catch {
       setCheckError("Não foi possível verificar no momento. Tentaremos novamente.");
