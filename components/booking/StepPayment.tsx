@@ -8,6 +8,7 @@ interface StepPaymentProps {
   booking: BookingResponse;
   onPaymentConfirmed: (updatedBooking: PaymentStatusResponse) => void;
   onRestart: () => void;
+  checkStatusFn?: () => Promise<PaymentStatusResponse | null>;
 }
 
 export function StepPayment({
@@ -15,6 +16,7 @@ export function StepPayment({
   booking,
   onPaymentConfirmed,
   onRestart,
+  checkStatusFn,
 }: StepPaymentProps) {
   const [copied, setCopied] = useState(false);
   const [timeLeft, setTimeLeft] = useState<string>("");
@@ -54,13 +56,24 @@ export function StepPayment({
     return () => clearInterval(interval);
   }, [expiresAt]);
 
-  // Função para verificar status do pagamento via API pública
+  // Função para verificar status do pagamento via API pública ou mock
   const checkStatus = useCallback(async () => {
-    if (!booking.accessToken) return;
     setIsChecking(true);
     setCheckError(null);
 
     try {
+      if (checkStatusFn) {
+        const data = await checkStatusFn();
+        if (data?.status === "confirmed") {
+          onPaymentConfirmed(data);
+        } else if (data?.status === "expired") {
+          setIsExpired(true);
+        }
+        return;
+      }
+
+      if (!booking.accessToken) return;
+
       const res = await fetch(
         `/api/public/${slug}/bookings/${booking.bookingId}/payment`,
         {
@@ -85,7 +98,7 @@ export function StepPayment({
     } finally {
       setIsChecking(false);
     }
-  }, [slug, booking.bookingId, booking.accessToken, onPaymentConfirmed]);
+  }, [slug, booking.bookingId, booking.accessToken, onPaymentConfirmed, checkStatusFn]);
 
   // Polling automático a cada 4 segundos
   useEffect(() => {

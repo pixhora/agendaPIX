@@ -94,7 +94,11 @@
 - **Lint**: `pnpm lint` passando sem erros e com 0 warnings (`eslint . --max-warnings=0`).
 - **Tipagem**: `pnpm typecheck` passando sem inconsistências.
 - **Design Tokens**: Cores WCAG AA/AAA, fontes Google Fonts (`Plus Jakarta Sans` e `Inter`) aplicadas no `app/layout.tsx`.
-- **Responsividade**: Layouts construídos e validados para mobile-first (375px), tablets (768px) e desktop (1024px+).
+- **Responsividade e Refinamentos de QA (Terminal 3)**:
+  - Layouts construídos e validados para mobile-first (375px), tablets (768px) e desktop (1024px+).
+  - Eliminado qualquer overflow horizontal em 375px no header e no mockup da Landing page.
+  - Desacoplamento completo do modo preview via injeção de `getSlotsForDate` e `checkStatusFn` em `StepSlot` e `StepPayment`, operando 100% offline sem chamadas HTTP bloqueantes.
+  - Slots de disponibilidade gerados com respeito estrito a `America/Sao_Paulo` e duração do serviço.
 
 ---
 

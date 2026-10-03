@@ -10,16 +10,16 @@ import { Button } from "@/components/ui/button";
 
 export default function PreviewLandingPage() {
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground">
+    <div className="min-h-screen flex flex-col bg-background text-foreground w-full max-w-full overflow-x-hidden">
       {/* Header com Navegação do Preview */}
       <header className="sticky top-0 z-40 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-          <Link href="/preview" className="flex items-center gap-2 font-display text-xl font-bold tracking-tight text-foreground">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-sm font-black text-primary-foreground">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-3.5 sm:px-6">
+          <Link href="/preview" className="flex items-center gap-1.5 sm:gap-2 font-display text-lg sm:text-xl font-bold tracking-tight text-foreground shrink-0">
+            <span className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg bg-primary text-xs sm:text-sm font-black text-primary-foreground">
               A
             </span>
             <span>Agenda</span>
-            <span className="rounded-md bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+            <span className="rounded-md bg-emerald-500/10 px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
               Preview
             </span>
           </Link>
@@ -39,12 +39,12 @@ export default function PreviewLandingPage() {
             </a>
           </nav>
 
-          <div className="flex items-center gap-2.5">
-            <Button asChild variant="outline" className="min-h-10 text-xs font-semibold px-3.5">
+          <div className="flex items-center gap-2">
+            <Button asChild variant="outline" className="hidden sm:inline-flex min-h-9 sm:min-h-10 text-xs font-semibold px-3">
               <Link href="/preview/dashboard">Ver Painel</Link>
             </Button>
-            <Button asChild className="min-h-10 text-xs font-semibold px-4 shadow-sm">
-              <Link href="/preview/booking">Testar Agendamento</Link>
+            <Button asChild className="min-h-9 sm:min-h-10 text-xs font-semibold px-3 sm:px-4 shadow-sm">
+              <Link href="/preview/booking">Testar Booking</Link>
             </Button>
           </div>
         </div>

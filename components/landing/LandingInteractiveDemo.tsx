@@ -96,10 +96,10 @@ export function LandingInteractiveDemo() {
           </div>
 
           {/* Coluna da Direita: Mockup do Celular 375px */}
-          <div className="lg:col-span-6 flex justify-center">
-            <div className="w-full max-w-[340px] rounded-3xl border-4 border-foreground/10 bg-surface p-4 shadow-xl">
+          <div className="lg:col-span-6 flex justify-center overflow-hidden">
+            <div className="w-full max-w-[310px] sm:max-w-[340px] rounded-2xl sm:rounded-3xl border-2 sm:border-4 border-foreground/10 bg-surface p-3.5 sm:p-4 shadow-xl">
               {/* Notch / Speaker simulado */}
-              <div className="mx-auto h-4 w-28 rounded-full bg-muted mb-4" />
+              <div className="mx-auto h-3.5 sm:h-4 w-24 sm:w-28 rounded-full bg-muted mb-3 sm:mb-4" />
 
               {/* Cabeçalho do Mockup */}
               <div className="text-center pb-3 border-b border-border">

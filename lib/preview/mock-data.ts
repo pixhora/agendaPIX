@@ -58,27 +58,39 @@ export const MOCK_PUBLIC_BUSINESS: PublicBusinessData = {
   services: MOCK_SERVICES,
 };
 
-// Gera slots de disponibilidade mockados para uma data
-export function getMockAvailabilitySlots(dateString: string): AvailabilitySlot[] {
-  // Gera horários determinísticos entre 09:00 e 18:00
-  // Algumas vagas já ocupadas para parecer real
+// Gera slots de disponibilidade mockados para uma data e duração de serviço
+export function getMockAvailabilitySlots(
+  dateString: string,
+  durationMinutes: number = 60
+): AvailabilitySlot[] {
+  // Horários de atendimento locais no fuso America/Sao_Paulo (UTC-3)
   const baseSlots = [
-    { start: "09:00", end: "10:00", occupied: true },
-    { start: "10:30", end: "11:30", occupied: true },
-    { start: "11:30", end: "12:30", occupied: false },
-    { start: "13:30", end: "14:30", occupied: false },
-    { start: "14:30", end: "15:30", occupied: true },
-    { start: "15:30", end: "16:30", occupied: false },
-    { start: "16:30", end: "17:30", occupied: false },
-    { start: "17:30", end: "18:30", occupied: false },
+    { hour: 9, minute: 0, occupied: true },
+    { hour: 10, minute: 30, occupied: true },
+    { hour: 11, minute: 30, occupied: false },
+    { hour: 13, minute: 30, occupied: false },
+    { hour: 14, minute: 30, occupied: true },
+    { hour: 15, minute: 30, occupied: false },
+    { hour: 16, minute: 30, occupied: false },
+    { hour: 17, minute: 30, occupied: false },
   ];
 
   return baseSlots
     .filter((s) => !s.occupied)
-    .map((s) => ({
-      startsAt: `${dateString}T${s.start}:00.000Z`,
-      endsAt: `${dateString}T${s.end}:00.000Z`,
-    }));
+    .map((s) => {
+      // Converte hora local de São Paulo para ISO UTC (+3h)
+      const utcHour = s.hour + 3;
+      const startIso = `${dateString}T${String(utcHour).padStart(2, "0")}:${String(
+        s.minute
+      ).padStart(2, "0")}:00.000Z`;
+      const startDate = new Date(startIso);
+      const endDate = new Date(startDate.getTime() + durationMinutes * 60000);
+
+      return {
+        startsAt: startIso,
+        endsAt: endDate.toISOString(),
+      };
+    });
 }
 
 // Reservas fictícias do dia para o painel / dashboard

@@ -152,6 +152,9 @@ export function PreviewBookingFlow() {
                   service={selectedService}
                   timezone={MOCK_PUBLIC_BUSINESS.timezone}
                   selectedStartsAt={selectedSlot?.startsAt ?? null}
+                  getSlotsForDate={async (dateStr) =>
+                    getMockAvailabilitySlots(dateStr, selectedService.durationMinutes)
+                  }
                   onSelectSlot={(slot) => setSelectedSlot(slot)}
                   onBack={() => setStep(1)}
                   onNext={() => setStep(3)}
@@ -179,6 +182,20 @@ export function PreviewBookingFlow() {
                   <StepPayment
                     slug="studio-bella"
                     booking={bookingResponse}
+                    checkStatusFn={async () => {
+                      if (bookingResponse.status === "confirmed") {
+                        return {
+                          bookingId: bookingResponse.bookingId,
+                          status: "confirmed",
+                          expiresAt: null,
+                          payment: {
+                            ...bookingResponse.payment!,
+                            status: "paid",
+                          },
+                        };
+                      }
+                      return null;
+                    }}
                     onPaymentConfirmed={() => {
                       setIsCompleted(true);
                     }}
