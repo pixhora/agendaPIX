@@ -185,6 +185,7 @@ export function OnboardingFlow() {
               onBack={() => setStep(3)}
               onComplete={() => {
                 try {
+                  localStorage.setItem("agenda_completed_onboarding_setup", JSON.stringify(data));
                   localStorage.removeItem("agenda_onboarding_draft");
                 } catch {
                   // Fallback

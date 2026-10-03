@@ -33,5 +33,40 @@ A revisão do fluxo Pix foi solicitada via Maestri ao Antigravidade. Ele confirm
 O Terminal 4 implementou o **Modo Preview** (`/preview`, `/preview/landing`, `/preview/booking`, `/preview/dashboard`, `/preview/reservas`, `/preview/servicos`, `/preview/configuracoes`) com dados determinísticos fictícios do Studio Bella (São Paulo SP), sem depender de banco de dados, Better Auth ou provedores de pagamento.
 Para respeitar estritamente a divisão de papéis (o dashboard real e rotas autenticadas pertencem ao Terminal 2 em `agenda-dashboard`):
 - Os layouts, cartões de métricas, filtros de reservas e componentes visuais criados para o preview em `app/preview/dashboard`, `app/preview/reservas`, `app/preview/servicos` e `app/preview/configuracoes` estão à disposição do Terminal 2 para serem reaproveitados diretamente nas rotas reais `/dashboard/*`.
-- Nenhuma edição foi feita na worktree ou rotas de backend do Terminal 1 ou Terminal 2.
 - O modo preview funciona 100% offline em desenvolvimento via `pnpm dev`.
+
+## 2026-10-03 — Terminal 5 (Trilha) para Terminal 1 (Codex): Endpoint de Criação de Negócio (Onboarding)
+
+O fluxo de Onboarding (`/onboarding`) coleta os dados essenciais para o primeiro negócio do usuário:
+1. Negócio: `businessName` e `slug` (sanitizado em kebab-case).
+2. Primeiro serviço: `serviceName`, `durationMinutes`, `priceCents` e `depositCents`.
+3. Horários de funcionamento: `openDays` (array de inteiros 0-6), `opensAt` (HH:mm) e `closesAt` (HH:mm).
+4. Conta do proprietário: `email` (autenticado via Better Auth Magic Link).
+
+### Requisito Concreto para T1:
+- **Rota proposta**: `POST /api/onboarding` (autenticado pela sessão do Better Auth)
+- **Request Body**:
+```json
+{
+  "businessName": "Barbearia do Silva",
+  "slug": "barbearia-do-silva",
+  "service": {
+    "name": "Corte de Cabelo",
+    "durationMinutes": 45,
+    "priceCents": 5000,
+    "depositCents": 2000
+  },
+  "hours": {
+    "openDays": [1, 2, 3, 4, 5, 6],
+    "opensAt": "09:00",
+    "closesAt": "19:00"
+  }
+}
+```
+- **Response**:
+  - `201 Created`: `{ "businessId": "uuid", "slug": "barbearia-do-silva", "status": "active" }`
+  - `400 Bad Request`: validação Zod (slug inválido, horários inconsistentes, etc.)
+  - `401 Unauthorized`: sem sessão Better Auth ativa
+  - `409 Conflict`: slug já em uso por outro negócio
+- **Impacto no Frontend (T5)**: Enquanto o endpoint não for disponibilizado, o frontend preserva os dados em `agenda_completed_onboarding_setup` no storage do cliente e exibe estados de espera honestos sem simular ativação inexistente.
+

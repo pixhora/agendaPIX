@@ -134,11 +134,10 @@ export function StepAccount({
             1. Abra seu e-mail e clique no botão <strong>Entrar na Agenda</strong>.
           </p>
           <p>
-            2. Você será direcionado diretamente para o painel com seu link público{" "}
+            2. Você entrará no seu painel para confirmar a ativação do seu link personalizado{" "}
             <code className="text-primary font-mono font-bold">
               agenda.com.br/{data.slug}
-            </code>{" "}
-            ativado.
+            </code>.
           </p>
         </div>
 

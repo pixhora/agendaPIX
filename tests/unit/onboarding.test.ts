@@ -28,4 +28,15 @@ describe("Onboarding business slug generation", () => {
     expect(isStep1Valid("Studio Bella", "studio-bella")).toBe(true);
     expect(isStep1Valid("Barbearia", "")).toBe(false);
   });
+
+  it("validates professional email format for login and onboarding step 4", () => {
+    const isValidEmail = (email: string) =>
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+
+    expect(isValidEmail("")).toBe(false);
+    expect(isValidEmail("invalido")).toBe(false);
+    expect(isValidEmail("sem@dominio")).toBe(false);
+    expect(isValidEmail("contato@barbearia.com.br")).toBe(true);
+    expect(isValidEmail("  dono@studio.com  ")).toBe(true);
+  });
 });

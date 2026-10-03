@@ -38,16 +38,16 @@ export function LandingHeader() {
         </nav>
 
         {/* Ações Rápidas em Pill */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2 sm:gap-2.5">
           <Link
-            href="/onboarding"
-            className="hidden sm:inline-flex items-center justify-center rounded-full border border-border bg-surface hover:bg-muted px-4 py-2 text-xs font-bold text-foreground transition-colors min-h-9"
+            href="/login"
+            className="inline-flex items-center justify-center rounded-full border border-border bg-surface hover:bg-muted px-3 sm:px-4 py-2 text-xs font-bold text-foreground transition-colors min-h-9"
           >
             Entrar
           </Link>
           <Link
             href="/onboarding"
-            className="inline-flex items-center justify-center rounded-full bg-primary hover:bg-primary-hover px-4 sm:px-5 py-2 text-xs font-extrabold text-primary-foreground shadow-xs transition-transform active:scale-95 min-h-9"
+            className="inline-flex items-center justify-center rounded-full bg-primary hover:bg-primary-hover px-3.5 sm:px-5 py-2 text-xs font-extrabold text-primary-foreground shadow-xs transition-transform active:scale-95 min-h-9"
           >
             Começar grátis
           </Link>
