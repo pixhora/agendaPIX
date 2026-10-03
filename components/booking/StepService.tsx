@@ -29,6 +29,24 @@ export function StepService({
 
   const selectedService = services.find((s) => s.id === selectedServiceId);
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+    if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+      e.preventDefault();
+      const nextIndex = (index + 1) % services.length;
+      const nextService = services[nextIndex];
+      onSelectService(nextService);
+      const buttons = document.querySelectorAll<HTMLButtonElement>('[role="radiogroup"] [role="radio"]');
+      buttons[nextIndex]?.focus();
+    } else if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
+      e.preventDefault();
+      const prevIndex = (index - 1 + services.length) % services.length;
+      const prevService = services[prevIndex];
+      onSelectService(prevService);
+      const buttons = document.querySelectorAll<HTMLButtonElement>('[role="radiogroup"] [role="radio"]');
+      buttons[prevIndex]?.focus();
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div>
@@ -39,7 +57,7 @@ export function StepService({
       </div>
 
       <div className="space-y-3" role="radiogroup" aria-label="Serviços disponíveis">
-        {services.map((service) => {
+        {services.map((service, index) => {
           const isSelected = service.id === selectedServiceId;
 
           return (
@@ -49,6 +67,7 @@ export function StepService({
               role="radio"
               aria-checked={isSelected}
               onClick={() => onSelectService(service)}
+              onKeyDown={(e) => handleKeyDown(e, index)}
               className={`w-full text-left p-4 rounded-xl border transition-all min-h-11 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
                 isSelected
                   ? "border-primary bg-primary/5 ring-1 ring-primary shadow-sm"

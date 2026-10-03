@@ -164,7 +164,7 @@ export function StepPayment({
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
             Valor do sinal
           </span>
-          <p className="text-3xl font-extrabold text-primary">
+          <p className="text-3xl font-extrabold text-foreground">
             {formatCurrency(payment?.amountCents ?? 0)}
           </p>
           {timeLeft && (

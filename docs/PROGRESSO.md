@@ -115,6 +115,18 @@
 - **Banner Largo Verde-Lima (`LandingHighlightBanner`)**: Card dark mode com faturamento do dia (Studio Bella) à esquerda e os 3 passos simples de ativação à direita.
 - **Preços e FAQ Harmonizados**: Cards com bordas arredondadas `rounded-3xl` e botões pill preservando os valores oficiais de R$ 29 e R$ 59.
 
+### F. Rodada de Verificação do Sistema (2026-10-03)
+- **Acessibilidade & Teclado**:
+  - Implementada navegação completa por teclado (WAI-ARIA) no radiogroup de serviços em `StepService.tsx` com setas (`ArrowDown`, `ArrowRight`, `ArrowUp`, `ArrowLeft`).
+  - Ajustado `prefers-reduced-motion` no `app/globals.css` para `transition-duration: 0s !important` e `animation-duration: 0s !important`.
+  - Contraste do valor Pix em `StepPayment.tsx` ajustado com `text-foreground` para contraste AAA (>= 16:1) em superfícies claras e escuras.
+- **Resultados de Verificação e Gates**:
+  - `pnpm lint`: 0 warnings (`eslint . --max-warnings=0`).
+  - `pnpm typecheck`: 0 erros (`next typegen && tsc --noEmit`).
+  - `pnpm test`: 8 arquivos / 61 testes unitários aprovados (100%).
+  - `pnpm build`: build Turbopack concluído com sucesso em 1.2s.
+  - `Playwright E2E`: 6/6 testes passando em 43.8s (contraste claro, hero escuro, teclado/reduced-motion, valor Pix legível, ausência de requests externos/backend em preview e 21 combinações de rota/largura sem overflow).
+
 ---
 
 ## 5. Pendências e Próximos Passos (Outros Terminais)
@@ -126,6 +138,4 @@
 
 ## 6. Status de Entrega
 
-O fluxo de agendamento público (`/[slug]`), a landing page (`/`), o onboarding (`/onboarding`), o Modo Preview completo (`/preview/*`) e a nova Direção Visual Verde-Lima & Editorial estão totalmente implementados, integrados e testados.
-
-O projeto está **pronto para auditoria do Terminal 3 (Testes e2e / QA)**.
+O fluxo de agendamento público (`/[slug]`), a landing page (`/`), o onboarding (`/onboarding`), o Modo Preview completo (`/preview/*`) e todas as verificações de acessibilidade, responsividade e isolamento estão 100% aprovados e validados.
