@@ -158,3 +158,24 @@ Aplicar migrations antes do novo código. Reversão: voltar ao código anterior,
 A chave enviada ao provider é derivada da identidade do negócio e da chave do pedido, em formato UUID. Assim, a mesma chave pública usada em negócios diferentes não cruza cobranças.
 O endpoint público não altera o nome de um cliente já cadastrado ao encontrar o mesmo telefone; atualização de cadastro fica a cargo do painel autenticado.
 QR Code e copia-e-cola são retornados somente enquanto a cobrança está pendente e válida; tornam-se `null` após vencimento ou pagamento.
+
+
+## Dados de demonstração
+
+Execute `pnpm db:seed` após `pnpm db:up` e `pnpm db:migrate`. O comando usa o driver Postgres já instalado, sem nova dependência.
+O seed é transacional e idempotente: repetir não duplica dono, negócio, serviços ou horários. Execuções simultâneas são serializadas.
+Não redefine cadastros já existentes, não troca o dono de um slug ocupado e não cria reservas ou pagamentos. Fica bloqueado em produção.
+
+- Negócio: **Barbearia Demo**.
+- Slug: **`barbearia-demo`**. API de serviços: `/api/public/barbearia-demo/services`; página prevista: `/barbearia-demo`.
+- Dono de teste: **`dono-demo@example.com`**.
+- Login: **link mágico, sem senha**. Configure SMTP de testes para capturar o email e solicite `POST /api/auth/sign-in/magic-link` com `{ "email": "dono-demo@example.com", "callbackURL": "/" }`. Abra o link recebido. O domínio `example.com` é fictício; não há caixa de email real nem senha padrão.
+- Funcionamento: segunda a sábado, **09:00–18:00**, no fuso **America/Sao_Paulo**. Domingo fechado.
+
+| Serviço fictício | Duração | Preço em centavos | Sinal em centavos |
+| --- | --- | --- | --- |
+| Corte | 30 minutos | 3500 | 1000 |
+| Barba | 30 minutos | 2500 | 500 |
+| Corte e barba | 60 minutos | 5500 | 1500 |
+
+Preços e horários acima são dados de teste, não uma definição comercial do produto.

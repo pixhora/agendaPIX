@@ -27,3 +27,9 @@ Terminal 3: testar contrato público e disputa de horários quando esta branch f
 Terminal 6: revisar concorrência, isolamento, validação financeira, auditoria e repetição de webhook. Não editar código do terminal 1.
 
 A revisão do fluxo Pix foi solicitada via Maestri ao Antigravidade. Ele confirmou que o terminal 6 continua desconectado; revisão pendente. Terminal 4 recebeu aviso do contrato e da simulação.
+
+
+## 2026-10-02 — Terminal 1 para terminais 2, 3, 4 e 6: seed demo
+
+`pnpm db:seed` prepara `barbearia-demo`, três serviços, horários de segunda a sábado e dono `dono-demo@example.com` com login por link mágico no SMTP de testes.
+Dados e acesso estão em `docs/CONTRATOS.md`. Terminal 6: revisar idempotência e preservação de cadastros existentes; a revisão permanece pendente enquanto o terminal estiver desconectado.
