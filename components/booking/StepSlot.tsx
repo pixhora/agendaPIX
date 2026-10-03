@@ -87,6 +87,30 @@ export function StepSlot({
 
   const [slotsRetryCount, setSlotsRetryCount] = useState<number>(0);
 
+  const rulerRef = React.useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState<boolean>(false);
+  const [canScrollRight, setCanScrollRight] = useState<boolean>(false);
+
+  const updateScrollIndicators = React.useCallback(() => {
+    const el = rulerRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    setCanScrollLeft(scrollLeft > 2);
+    setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 2);
+  }, []);
+
+  useEffect(() => {
+    const el = rulerRef.current;
+    if (!el) return;
+    updateScrollIndicators();
+    el.addEventListener("scroll", updateScrollIndicators, { passive: true });
+    window.addEventListener("resize", updateScrollIndicators);
+    return () => {
+      el.removeEventListener("scroll", updateScrollIndicators);
+      window.removeEventListener("resize", updateScrollIndicators);
+    };
+  }, [updateScrollIndicators, days]);
+
   const getSlotsRef = React.useRef(getSlotsForDate);
   React.useEffect(() => {
     getSlotsRef.current = getSlotsForDate;
@@ -185,59 +209,79 @@ export function StepSlot({
 
       {/* Régua Tátil de Dias (Elemento Memorável) */}
       <section aria-label="Régua de datas disponíveis">
-      {/* Wrapper relativo para indicador de overflow */}
         <div className="relative">
-          {/* Fade direita indica mais datas para rolar */}
-          <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent z-10" aria-hidden="true" />
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 pt-1 scrollbar-hide scroll-smooth"
+          {/* Fade esquerdo indica mais datas para rolar à esquerda */}
+          <div
+            className={`pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-background to-transparent z-10 transition-opacity duration-200 ${
+              canScrollLeft ? "opacity-100" : "opacity-0"
+            }`}
+            aria-hidden="true"
+          />
+          {/* Fade direito indica mais datas para rolar à direita */}
+          <div
+            className={`pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent z-10 transition-opacity duration-200 ${
+              canScrollRight ? "opacity-100" : "opacity-0"
+            }`}
+            aria-hidden="true"
+          />
+          <div
+            ref={rulerRef}
+            className="flex items-center gap-2 overflow-x-auto p-1.5 scroll-p-2 scrollbar-hide scroll-smooth"
             role="group"
             aria-label="Selecione uma data"
           >
-          {days.map((day) => {
-            const isCurrent = day.dateString === selectedDate;
-            const count = daySlotCounts[day.dateString];
-            const hasSlots = count !== undefined && count !== null && count > 0;
-            const isZero = count === 0;
+            {days.map((day) => {
+              const isCurrent = day.dateString === selectedDate;
+              const count = daySlotCounts[day.dateString];
+              const hasSlots = count !== undefined && count !== null && count > 0;
+              const isZero = count === 0;
 
-            return (
-              <button
-                key={day.dateString}
-                type="button"
-                aria-pressed={isCurrent}
-                aria-current={isCurrent ? "date" : undefined}
-                onClick={() => handleSelectDay(day.dateString)}
-                className={`flex flex-col items-center justify-center min-w-[76px] py-2 px-2.5 rounded-xl border text-center transition-all min-h-11 shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
-                  isCurrent
-                    ? "border-primary bg-primary text-primary-foreground shadow-sm"
-                    : "border-border bg-surface text-foreground hover:bg-muted/60"
-                }`}
-              >
-                <span className={`text-xs font-semibold ${isCurrent ? "text-primary-foreground" : "text-foreground"}`}>
-                  {day.dayLabel}
-                </span>
-                <span className={`text-[11px] mt-0.5 ${isCurrent ? "text-primary-foreground/90" : "text-muted-foreground"}`}>
-                  {day.dateNumber}
-                </span>
-                <span
-                  className={`text-[10px] mt-1 font-medium px-1.5 py-0.5 rounded-full ${
+              return (
+                <button
+                  key={day.dateString}
+                  type="button"
+                  aria-pressed={isCurrent}
+                  aria-current={isCurrent ? "date" : undefined}
+                  onClick={() => handleSelectDay(day.dateString)}
+                  onFocus={(e) => {
+                    e.currentTarget.scrollIntoView({
+                      behavior: "smooth",
+                      block: "nearest",
+                      inline: "nearest",
+                    });
+                  }}
+                  className={`flex flex-col items-center justify-center min-w-[76px] py-2 px-2.5 rounded-xl border text-center transition-all min-h-11 shrink-0 scroll-mx-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
                     isCurrent
-                      ? "bg-primary-foreground/15 text-primary-foreground"
-                      : isZero
-                      ? "bg-muted text-muted-foreground/80"
-                      : hasSlots
-                      ? "bg-primary/10 text-primary font-semibold"
-                      : "bg-muted text-muted-foreground"
+                      ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                      : "border-border bg-surface text-foreground hover:bg-muted/60"
                   }`}
                 >
-                  {count === undefined || count === null
-                    ? "..."
-                    : isZero
-                    ? "Sem vagas"
-                    : `${count} vaga${count > 1 ? "s" : ""}`}
-                </span>
-              </button>
-            );
-          })}
+                  <span className={`text-xs font-semibold ${isCurrent ? "text-primary-foreground" : "text-foreground"}`}>
+                    {day.dayLabel}
+                  </span>
+                  <span className={`text-[11px] mt-0.5 ${isCurrent ? "text-primary-foreground/90" : "text-muted-foreground"}`}>
+                    {day.dateNumber}
+                  </span>
+                  <span
+                    className={`text-[10px] mt-1 font-medium px-1.5 py-0.5 rounded-full ${
+                      isCurrent
+                        ? "bg-primary-foreground/15 text-primary-foreground"
+                        : isZero
+                        ? "bg-muted text-muted-foreground/80"
+                        : hasSlots
+                        ? "bg-primary/10 text-primary font-semibold"
+                        : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    {count === undefined || count === null
+                      ? "..."
+                      : isZero
+                      ? "Sem vagas"
+                      : `${count} vaga${count > 1 ? "s" : ""}`}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
       </section>
