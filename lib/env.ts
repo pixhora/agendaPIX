@@ -6,6 +6,8 @@ export const databaseEnvSchema = z.object({ DATABASE_URL: postgresUrl });
 export const authEnvSchema = z.object({
   BETTER_AUTH_URL: z.url().refine((value) => ["http:", "https:"].includes(new URL(value).protocol), "Use uma URL HTTP ou HTTPS."),
   BETTER_AUTH_SECRET: z.string().min(32).refine((value) => !value.startsWith("replace-this-"), "Substitua o segredo de exemplo."),
+  // Origens extras separadas por vírgula (ex: http://localhost:3001 quando BETTER_AUTH_URL for o tunnel)
+  BETTER_AUTH_TRUSTED_ORIGINS: z.string().optional(),
 });
 export const smtpEnvSchema = z.object({
   SMTP_HOST: z.string().min(1),
