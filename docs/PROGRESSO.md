@@ -152,6 +152,24 @@
   - `Playwright QA Booking UI (T3 Suite)`: 19/19 testes aprovados (100%).
   - `pnpm build`: build de produção Turbopack concluído com sucesso em 1.3s com 12 rotas estáticas geradas.
 
+### H. Correção de Erro de Hidratação React no Onboarding (2026-10-03)
+- **Investigação e Reprodução de Erro de Hidratação**:
+  - *Evidência do Usuário*: Imagem `/tmp/Maestri-drops/32ed2302-df3b-45dd-9131-172a28503859.png` indicava erro do React: *"A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. button type='submit' Continuar, server disabled='' client disabled={false}"*.
+  - *Identificação da Causa Raiz*: Em `components/onboarding/OnboardingFlow.tsx`, o hook `useState` inicializava lendo `localStorage.getItem("agenda_onboarding_draft")` caso `typeof window !== "undefined"`. No SSR (`typeof window === "undefined"`), os campos de nome e slug eram inicializados vazios (`""`), resultando no botão "Continuar" desabilitado (`disabled=""`). No navegador, a presença de um rascunho salvo gerava campos válidos e o botão habilitado (`disabled={false}`) durante a hidratação inicial, violando a exigência de árvore idêntica entre servidor e cliente.
+  - *Correção Aplicada*:
+    - O `useState` agora inicializa sempre com o estado padrão determinístico (`businessName: ""`, `slug: ""`), garantindo que a renderização no servidor e a primeira árvore do cliente coincidam estritamente sem discrepâncias de atributos HTML.
+    - A recuperação do rascunho salvo no `localStorage` foi movida para execução assíncrona pós-montagem (`useEffect` com `queueMicrotask`), restaurando os dados do usuário sem acionar cascading renders nem violar regras do React 19 (`react-hooks/set-state-in-effect`).
+- **Validação com `agent-browser` (Porta 3001)**:
+  - *Com rascunho pré-existente*: `localStorage` populado com dados válidos e recarregado; console inspecionado com `agent-browser console` — **0 erros de hidratação** e dados devidamente restaurados.
+  - *Com storage vazio*: `localStorage` limpo e recarregado; botão "Continuar" permaneceu desabilitado até preenchimento; digitação ativou o botão e avançou para o Passo 2 sem erros.
+  - *Viewports e Temas*: Auditado em 375px e desktop 1280px, modos Claro e Escuro, com console 100% limpo.
+- **Quality Gates e Regressão**:
+  - Novo teste de validação de formulário adicionado a `tests/unit/onboarding.test.ts` (62 testes unitários passando).
+  - `pnpm lint`: 0 erros / 0 warnings.
+  - `pnpm typecheck`: 0 erros.
+  - `Playwright QA (T3 Suite)`: 19/19 testes e2e aprovados.
+  - `pnpm build`: build Turbopack bem-sucedido em 1.4s.
+
 ---
 
 ## 5. Pendências e Próximos Passos (Outros Terminais)

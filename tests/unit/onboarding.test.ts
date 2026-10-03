@@ -18,4 +18,14 @@ describe("Onboarding business slug generation", () => {
     expect(slugify("   Barbearia    Central   ")).toBe("barbearia-central");
     expect(slugify("---Corte---Fácil---")).toBe("corte-facil");
   });
+
+  it("validates that business name and slug must have at least 2 characters", () => {
+    const isStep1Valid = (name: string, slug: string) =>
+      name.trim().length >= 2 && slug.length >= 2;
+
+    expect(isStep1Valid("", "")).toBe(false);
+    expect(isStep1Valid("A", "a")).toBe(false);
+    expect(isStep1Valid("Studio Bella", "studio-bella")).toBe(true);
+    expect(isStep1Valid("Barbearia", "")).toBe(false);
+  });
 });

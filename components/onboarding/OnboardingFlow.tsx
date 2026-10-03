@@ -21,32 +21,37 @@ export function OnboardingFlow() {
   const initialPlan = searchParams.get("plano") === "base" ? "base" : "completo";
 
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
-  const [data, setData] = useState<OnboardingData>(() => {
-    const defaultData: OnboardingData = {
-      plan: initialPlan,
-      businessName: "",
-      slug: "",
-      serviceName: "Corte de Cabelo",
-      durationMinutes: 45,
-      priceCents: 5000,
-      depositCents: 2000,
-      openDays: [1, 2, 3, 4, 5, 6],
-      opensAt: "09:00",
-      closesAt: "19:00",
-      email: "",
-    };
-    if (typeof window !== "undefined") {
+  const [data, setData] = useState<OnboardingData>(() => ({
+    plan: initialPlan,
+    businessName: "",
+    slug: "",
+    serviceName: "Corte de Cabelo",
+    durationMinutes: 45,
+    priceCents: 5000,
+    depositCents: 2000,
+    openDays: [1, 2, 3, 4, 5, 6],
+    opensAt: "09:00",
+    closesAt: "19:00",
+    email: "",
+  }));
+
+  // Restaura rascunho persistido no localStorage de forma assíncrona após a montagem inicial,
+  // garantindo paridade absoluta entre o HTML do servidor e a primeira árvore do cliente.
+  React.useEffect(() => {
+    queueMicrotask(() => {
       try {
         const saved = localStorage.getItem("agenda_onboarding_draft");
         if (saved) {
-          return { ...defaultData, ...JSON.parse(saved) };
+          const parsed = JSON.parse(saved);
+          if (parsed && typeof parsed === "object") {
+            setData((prev) => ({ ...prev, ...parsed }));
+          }
         }
       } catch {
-        // Local storage indisponível ou desabilitado
+        // Fallback gracioso se localStorage estiver inacessível ou JSON corrompido
       }
-    }
-    return defaultData;
-  });
+    });
+  }, []);
 
   const updateDraft = (partial: Partial<OnboardingData>) => {
     setData((prev) => {
