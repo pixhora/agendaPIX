@@ -15,22 +15,22 @@ export function LandingHeroVisual() {
       {/* Composição em camadas sobrepostas */}
       <div className="relative w-full max-w-[350px] sm:max-w-[390px] h-[360px] sm:h-[400px]">
         {/* Card 1: Estatísticas do Topo (Branco puro) */}
-        <div className="absolute top-0 right-2 sm:right-4 z-20 w-[190px] sm:w-[210px] rounded-2xl bg-white p-3.5 shadow-md border border-[#E2E6DF]">
-          <div className="flex items-center justify-between text-[11px] font-semibold text-[#5A645C] mb-2">
+        <div className="absolute top-0 right-2 sm:right-4 z-20 w-[190px] sm:w-[210px] rounded-2xl bg-surface p-3.5 shadow-md border border-border">
+          <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground mb-2">
             <span>Sinais no Pix</span>
-            <span className="text-[#0F3B2E] font-bold">+100% pago</span>
+            <span className="text-accent-forest dark:text-primary font-bold">+100% pago</span>
           </div>
           {/* Mini gráfico de barras estilizado */}
           <div className="flex items-end gap-1.5 h-10 pb-1">
-            <div className="flex-1 bg-lime-100 rounded-sm h-[40%]" />
-            <div className="flex-1 bg-lime-200 rounded-sm h-[65%]" />
-            <div className="flex-1 bg-lime-300 rounded-sm h-[50%]" />
-            <div className="flex-1 bg-lime-400 rounded-sm h-[80%]" />
-            <div className="flex-1 bg-[#C0F739] rounded-sm h-[100%]" />
+            <div className="flex-1 bg-lime-100 dark:bg-lime-900/40 rounded-sm h-[40%]" />
+            <div className="flex-1 bg-lime-200 dark:bg-lime-800/50 rounded-sm h-[65%]" />
+            <div className="flex-1 bg-lime-300 dark:bg-lime-700/60 rounded-sm h-[50%]" />
+            <div className="flex-1 bg-lime-400 dark:bg-lime-600/70 rounded-sm h-[80%]" />
+            <div className="flex-1 bg-primary rounded-sm h-[100%]" />
           </div>
-          <div className="mt-1.5 pt-1.5 border-t border-[#E2E6DF]/60 flex items-center justify-between">
-            <span className="text-[10px] text-[#5A645C]">Hoje</span>
-            <span className="text-xs font-bold text-[#111613]">R$ 105,00</span>
+          <div className="mt-1.5 pt-1.5 border-t border-border/60 flex items-center justify-between">
+            <span className="text-[10px] text-muted-foreground">Hoje</span>
+            <span className="text-xs font-bold text-foreground">R$ 105,00</span>
           </div>
         </div>
 
@@ -93,9 +93,9 @@ export function LandingHeroVisual() {
         </div>
 
         {/* Pílula Flutuante: Badge de Entrada */}
-        <div className="absolute bottom-0 right-2 z-40 bg-white border border-[#E2E6DF] rounded-full px-3.5 py-1.5 shadow-lg flex items-center gap-2">
+        <div className="absolute bottom-0 right-2 z-40 bg-surface border border-border rounded-full px-3.5 py-1.5 shadow-lg flex items-center gap-2">
           <span className="flex h-2 w-2 rounded-full bg-emerald-500" />
-          <span className="text-xs font-bold text-[#111613]">Vaga confirmada</span>
+          <span className="text-xs font-bold text-foreground">Vaga confirmada</span>
         </div>
       </div>
     </div>

@@ -14,32 +14,32 @@ export default function PreviewLandingPage() {
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground w-full max-w-full overflow-x-hidden">
       {/* Header com Navegação do Preview */}
-      <header className="sticky top-0 z-40 w-full border-b border-[#E2E6DF] bg-[#F5F6F2]/90 backdrop-blur-md">
+      <header className="sticky top-0 z-40 w-full border-b border-border bg-background/90 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-3.5 sm:px-6 lg:px-8">
-          <Link href="/preview" className="flex items-center gap-2 font-display text-lg sm:text-xl font-bold tracking-tight text-[#111613] shrink-0">
-            <span className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-xl bg-[#0F3B2E] text-xs sm:text-sm font-black text-[#C0F739]">
+          <Link href="/preview" className="flex items-center gap-2 font-display text-lg sm:text-xl font-bold tracking-tight text-foreground shrink-0">
+            <span className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-xl bg-accent-forest text-xs sm:text-sm font-black text-primary">
               A
             </span>
             <span>AgendaPix</span>
-            <span className="rounded-full bg-[#C0F739] px-2 py-0.5 text-[10px] font-extrabold uppercase text-[#111613]">
+            <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-extrabold uppercase text-primary-foreground">
               Preview
             </span>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-6 text-sm font-semibold text-[#5A645C]" aria-label="Navegação da landing">
-            <a href="#como-funciona" className="hover:text-[#111613] transition-colors">
+          <nav className="hidden md:flex items-center gap-6 text-sm font-semibold text-muted-foreground" aria-label="Navegação da landing">
+            <a href="#como-funciona" className="hover:text-foreground transition-colors">
               Como funciona
             </a>
-            <a href="#recursos" className="hover:text-[#111613] transition-colors">
+            <a href="#recursos" className="hover:text-foreground transition-colors">
               Vantagens
             </a>
-            <a href="#demonstracao" className="hover:text-[#111613] transition-colors">
+            <a href="#demonstracao" className="hover:text-foreground transition-colors">
               Demonstração
             </a>
-            <a href="#precos" className="hover:text-[#111613] transition-colors">
+            <a href="#precos" className="hover:text-foreground transition-colors">
               Preços
             </a>
-            <a href="#perguntas-frequentes" className="hover:text-[#111613] transition-colors">
+            <a href="#perguntas-frequentes" className="hover:text-foreground transition-colors">
               Dúvidas
             </a>
           </nav>
@@ -47,13 +47,13 @@ export default function PreviewLandingPage() {
           <div className="flex items-center gap-2">
             <Link
               href="/preview/dashboard"
-              className="hidden sm:inline-flex items-center justify-center rounded-full border border-[#E2E6DF] bg-white hover:bg-neutral-50 min-h-9 sm:min-h-10 text-xs font-bold text-[#111613] px-3.5 transition-colors"
+              className="hidden sm:inline-flex items-center justify-center rounded-full border border-border bg-surface hover:bg-muted min-h-9 sm:min-h-10 text-xs font-bold text-foreground px-3.5 transition-colors"
             >
               Ver Painel
             </Link>
             <Link
               href="/preview/booking"
-              className="inline-flex items-center justify-center rounded-full bg-[#C0F739] hover:bg-[#B0EE24] h-11 min-h-[44px] text-xs font-extrabold text-[#111613] px-4 shadow-xs transition-all active:scale-95 focus:outline-2 focus:outline-[#0F3B2E] focus-visible:outline-2 focus-visible:outline-[#0F3B2E] focus-visible:outline-offset-2"
+              className="inline-flex items-center justify-center rounded-full bg-primary hover:bg-primary-hover h-11 min-h-[44px] text-xs font-extrabold text-primary-foreground px-4 shadow-xs transition-all active:scale-95 focus:outline-2 focus:outline-accent-forest focus-visible:outline-2 focus-visible:outline-accent-forest focus-visible:outline-offset-2"
             >
               Testar Booking
             </Link>

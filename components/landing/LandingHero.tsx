@@ -19,15 +19,15 @@ export function LandingHero() {
           {/* Coluna Esquerda: Narrativa Editorial e CTAs */}
           <div className="lg:col-span-7 text-left max-w-2xl mx-auto lg:mx-0">
             {/* Badge de Contexto */}
-            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-900/15 bg-white px-3.5 py-1 text-xs font-semibold text-[#0F3B2E] mb-5 shadow-xs">
-              <span className="flex h-2 w-2 rounded-full bg-[#C0F739]" />
+            <div className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3.5 py-1 text-xs font-semibold text-foreground mb-5 shadow-xs">
+              <span className="flex h-2 w-2 rounded-full bg-primary" />
               <span>Agenda online com cobrança de sinal por Pix</span>
             </div>
 
             {/* Título Principal Editorial */}
             <h1 className="font-display text-3xl font-extrabold tracking-tight text-foreground sm:text-5xl lg:text-6xl leading-[1.12]">
               Sua agenda no piloto automático com{" "}
-              <span className="text-foreground underline decoration-[#C0F739] decoration-4 underline-offset-4">
+              <span className="text-foreground underline decoration-primary decoration-4 underline-offset-4">
                 sinal por Pix
               </span>
               .
@@ -42,16 +42,16 @@ export function LandingHero() {
             <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3.5">
               <Link
                 href="/onboarding"
-                className="inline-flex items-center justify-center rounded-full bg-[#C0F739] hover:bg-[#B0EE24] text-[#111613] px-7 py-3.5 text-base font-bold shadow-sm transition-all focus:outline-hidden focus:ring-2 focus:ring-[#0F3B2E] focus:ring-offset-2 text-center"
+                className="inline-flex items-center justify-center rounded-full bg-primary hover:bg-primary-hover text-primary-foreground px-7 py-3.5 text-base font-bold shadow-sm transition-all focus:outline-hidden focus:ring-2 focus:ring-accent-forest focus:ring-offset-2 text-center"
               >
                 Começar teste grátis de 7 dias
               </Link>
 
               <a
                 href="#demonstracao"
-                className="inline-flex items-center justify-center gap-2 rounded-full border border-[#E2E6DF] bg-white hover:bg-neutral-50 text-[#111613] px-5 py-3.5 text-sm font-semibold transition-all focus:outline-hidden text-center"
+                className="inline-flex items-center justify-center gap-2 rounded-full border border-border bg-surface hover:bg-muted text-foreground px-5 py-3.5 text-sm font-semibold transition-all focus:outline-hidden text-center"
               >
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#0F3B2E] text-[#C0F739] text-xs">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent-forest text-primary text-xs">
                   ▶
                 </span>
                 Ver demonstração ao vivo
@@ -59,28 +59,28 @@ export function LandingHero() {
             </div>
 
             {/* Garantias de Baixo Atrito */}
-            <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-[#5A645C]">
+            <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-muted-foreground">
               <span className="flex items-center gap-1.5">
-                <strong className="text-[#0F3B2E]">✓</strong> Sem cartão de crédito
+                <strong className="text-accent-forest dark:text-primary">✓</strong> Sem cartão de crédito
               </span>
               <span className="flex items-center gap-1.5">
-                <strong className="text-[#0F3B2E]">✓</strong> Ativação em 3 minutos
+                <strong className="text-accent-forest dark:text-primary">✓</strong> Ativação em 3 minutos
               </span>
               <span className="flex items-center gap-1.5">
-                <strong className="text-[#0F3B2E]">✓</strong> Cancele quando quiser
+                <strong className="text-accent-forest dark:text-primary">✓</strong> Cancele quando quiser
               </span>
             </div>
 
             {/* Divisor Fino e Badges de Nichos */}
-            <div className="mt-8 pt-6 border-t border-[#E2E6DF]">
-              <p className="text-[11px] font-semibold text-[#5A645C] uppercase tracking-wider mb-2.5">
+            <div className="mt-8 pt-6 border-t border-border">
+              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2.5">
                 Feito para quem vive de atendimento:
               </p>
               <div className="flex flex-wrap gap-2">
                 {NICHES.map((niche) => (
                   <span
                     key={niche}
-                    className="inline-block rounded-full border border-[#E2E6DF] bg-white/80 px-3 py-1 text-xs font-medium text-[#5A645C]"
+                    className="inline-block rounded-full border border-border bg-surface/80 px-3 py-1 text-xs font-medium text-muted-foreground"
                   >
                     {niche}
                   </span>

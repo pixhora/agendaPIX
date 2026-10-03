@@ -3,7 +3,7 @@ import Link from "next/link";
 
 export function LandingFooter() {
   return (
-    <footer className="border-t border-[#E2E6DF] bg-[#0E1612] text-white py-12 sm:py-16 text-xs text-white/70">
+    <footer className="border-t border-border bg-[#0E1612] text-white py-12 sm:py-16 text-xs text-white/70">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-8">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
           <div className="flex items-center gap-2.5">

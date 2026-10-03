@@ -25,13 +25,13 @@ const FAQS = [
 
 export function LandingFaq() {
   return (
-    <section id="perguntas-frequentes" className="py-16 sm:py-24 border-t border-[#E2E6DF] bg-[#F5F6F2]">
+    <section id="perguntas-frequentes" className="py-16 sm:py-24 border-t border-border bg-background">
       <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-2xl mx-auto mb-14">
-          <span className="inline-block rounded-full bg-[#0F3B2E] text-[#C0F739] px-3.5 py-1 text-xs font-bold uppercase tracking-wider mb-4">
+          <span className="inline-block rounded-full bg-accent-forest text-primary px-3.5 py-1 text-xs font-bold uppercase tracking-wider mb-4">
             Tire Suas Dúvidas
           </span>
-          <h2 className="font-display text-3xl sm:text-4xl font-extrabold tracking-tight text-[#111613]">
+          <h2 className="font-display text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground">
             Perguntas frequentes
           </h2>
         </div>
@@ -40,12 +40,12 @@ export function LandingFaq() {
           {FAQS.map((item, index) => (
             <div
               key={index}
-              className="rounded-3xl border border-[#E2E6DF] bg-white p-6 sm:p-7 shadow-xs space-y-2.5"
+              className="rounded-3xl border border-border bg-surface p-6 sm:p-7 shadow-xs space-y-2.5"
             >
-              <h3 className="font-display text-base sm:text-lg font-bold text-[#111613]">
+              <h3 className="font-display text-base sm:text-lg font-bold text-foreground">
                 {item.q}
               </h3>
-              <p className="text-xs sm:text-sm text-[#5A645C] leading-relaxed">
+              <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
                 {item.a}
               </p>
             </div>

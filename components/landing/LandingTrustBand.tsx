@@ -10,19 +10,19 @@ export function LandingTrustBand() {
   ];
 
   return (
-    <section className="border-y border-[#E2E6DF] bg-white/60 py-6 sm:py-8">
+    <section className="border-y border-border bg-surface/50 py-6 sm:py-8">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
-        <p className="text-[11px] font-bold uppercase tracking-widest text-[#5A645C] mb-5">
+        <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-5">
           Concebido para profissionais e pequenos negócios em todo o Brasil
         </p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 items-center">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 items-center">
           {categories.map((cat) => (
             <div
               key={cat.title}
-              className="px-3 py-2 rounded-xl bg-[#F5F6F2]/70 border border-[#E2E6DF]/80 text-center"
+              className="px-3 py-2.5 rounded-xl bg-surface border border-border text-center shadow-xs"
             >
-              <p className="text-sm font-bold text-[#111613]">{cat.title}</p>
-              <p className="text-[11px] text-[#5A645C]">{cat.desc}</p>
+              <p className="text-sm font-bold text-foreground">{cat.title}</p>
+              <p className="text-[11px] text-muted-foreground">{cat.desc}</p>
             </div>
           ))}
         </div>

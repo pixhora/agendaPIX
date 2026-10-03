@@ -132,6 +132,26 @@
   - `Playwright Preview E2E`: 6/6 testes aprovados em 42.2s.
   - `Playwright QA Booking UI (T3 Suite)`: 19/19 testes aprovados (100%), cobrindo consulta antes de expirar, recuperação de falha perto do vencimento e rejeição de pagamento tardio para horário liberado.
 
+### G. Auditoria Visual Completa com agent-browser e Resolução do Bug de Tema Escuro (2026-10-03)
+- **Investigação e Reprodução de Bug Visual**:
+  - *Evidência do Usuário*: Imagem `/tmp/Maestri-drops/cbf49dad-3e94-495c-8fc9-dcce9b21786d.png` reportou seção "Vantagens" com título desaparecido (preto sobre fundo escuro), palavras "horários vazios" em verde escuro ilegível e excesso de espaçamento vertical.
+  - *Causa Raiz Identificada*: Componentes `LandingEditorialBenefits.tsx`, `LandingTrustBand.tsx`, `LandingPainSolution.tsx`, `LandingPricing.tsx`, `LandingFaq.tsx` e `app/preview/page.tsx` herdavam `bg-background` (`#0E1612` no escuro) mas continham classes utilitárias com cores fixas estáticas (`text-[#111613]`, `text-[#0F3B2E]`, `border-[#E2E6DF]`, `bg-white`).
+  - *Correção*: Substituição sistemática por tokens semânticos de `@theme inline` (`text-foreground`, `text-muted-foreground`, `border-border`, `bg-surface`, `bg-background`, `text-primary`, `bg-primary`). "horários vazios" agora renderiza em verde-lima vibrante (`text-primary`) no modo escuro e verde-petróleo no modo claro, ambos com contraste WCAG AA/AAA.
+  - *Ajuste de Ergonomia no Preview*: `PreviewBadge` flutuante reposicionado no mobile para `fixed top-2.5 right-2.5 sm:top-auto sm:bottom-3 sm:right-3` com backdrop e listener de clique fora/Escape, evitando sobreposição com o botão de submissão do formulário de agendamento em viewports estreitas de 375px.
+- **Auditoria de Todas as Telas no Navegador Real (`agent-browser`)**:
+  - `http://127.0.0.1:3001/` (Landing): testada em 1359x800 e 375x812, temas Claro e Escuro, com captura de todas as seções (Hero, Vantagens, Como Funciona, Demonstração, Comparativo Real, Planos e FAQ).
+  - `http://127.0.0.1:3001/preview` (Hub): navegação para as 6 rotas determinísticas, cards com contraste adaptativo.
+  - `http://127.0.0.1:3001/preview/booking`: fluxo completo do cliente testado passo a passo em 375px (Passo 1: Serviço → Passo 2: Horário na régua → Passo 3: Dados → Passo 4: QR Code Pix + Simulador de confirmação → Tela final com WhatsApp).
+  - `http://127.0.0.1:3001/preview/dashboard`, `/preview/reservas`, `/preview/servicos`, `/preview/configuracoes`: auditados e aprovados.
+  - `http://127.0.0.1:3001/onboarding`: 4 passos auditados no mobile e desktop.
+  - `http://127.0.0.1:3001/[slug]`: estado de carregamento skeleton e estado de erro amigável validados.
+- **Resultados de Verificação e Gates**:
+  - `pnpm lint`: 0 warnings (`eslint . --max-warnings=0`).
+  - `pnpm typecheck`: 0 erros (`next typegen && tsc --noEmit`).
+  - `pnpm test`: 8 arquivos / 61 testes unitários aprovados (100%).
+  - `Playwright QA Booking UI (T3 Suite)`: 19/19 testes aprovados (100%).
+  - `pnpm build`: build de produção Turbopack concluído com sucesso em 1.3s com 12 rotas estáticas geradas.
+
 ---
 
 ## 5. Pendências e Próximos Passos (Outros Terminais)

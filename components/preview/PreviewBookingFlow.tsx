@@ -104,7 +104,7 @@ export function PreviewBookingFlow() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground py-8 px-4 sm:px-6">
+    <div className="min-h-screen bg-background text-foreground pt-6 pb-24 sm:py-8 px-4 sm:px-6">
       <div className="w-full max-w-md mx-auto space-y-6">
         {/* Barra Superior do Preview */}
         <div className="flex items-center justify-between text-xs text-muted-foreground pb-2 border-b border-border">
