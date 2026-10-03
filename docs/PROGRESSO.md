@@ -1,5 +1,38 @@
 # Progresso — auditoria Terminal 3
 
+## 2026-10-03 — celular lento: comparação dev/produção `9791651`
+
+**Resultado:** produção isolada reduz o evento `load` em aproximadamente **91%** e JS HTTP transferido em **95%**, usando o mesmo frontend e perfil. O dev envia bundles muito maiores; renderiza texto cedo, mas termina o carregamento cerca de18s depois. Isso sustenta usar a versão de produção no acesso externo, antes de alterações especulativas de componentes. Não mede ainda o túnel público nem o tempo de interação/hidratação.
+
+Origem dev: `http://127.0.0.1:3001`, worktree T4 commit `9791651`. Produção: `http://127.0.0.1:3006`, snapshot isolado `/tmp/agenda-mobile-production` informado por T1 no mesmo commit, build Webpack informado como aprovado. T3 verificou o HTTP e comportamento, não reexecutou build. Nenhum `.next` do dev alterado, nenhum servidor parado.
+
+Perfil idêntico, verificado no JSON: Chromium, viewport375×812, contexto novo por amostra, cache HTTP desativado, Service Worker bloqueado, download **1.600.000 bit/s**, upload **750.000 bit/s**, parâmetro de latência CDP **150ms**, sem limitação de CPU. Três amostras sequenciais por rota/origem, dev seguido de produção. Janela de coleta até `load +3s`; WebSocket/HMR contado separadamente e bytes de seus frames excluídos. São medições locais com emulação, não hardware/rede reais do celular.
+
+Valores medianos, MB decimal (1MB=1.000.000bytes); coluna dev/produção:
+
+| Rota | TTFB ms | Requests HTTP | Total MB | JS MB | DOMContentLoaded s | FCP/LCP observado s | Load s |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `/preview` | 85,1 /3,1 | 11 /22 | 3,496 /0,276 | 3,322 /0,165 | 0,692 /0,623 | 0,852 /0,776 | **18,150 /1,548** |
+| `/preview/landing` | 78,5 /4,3 | 11 /23 | 3,594 /0,286 | 3,407 /0,171 | 0,678 /0,609 | 0,856 /0,828 | **18,505 /1,596** |
+| `/` | 65,9 /4,0 | 10 /17 | 3,523 /0,274 | 3,337 /0,157 | 0,687 /0,609 | 0,848 /0,804 | **18,143 /1,587** |
+
+TTFB usa `PerformanceNavigationTiming.responseStart-requestStart`, como registrado pelo Chromium local; não interpretar esses valores como RTT do túnel ou do celular. Bytes usam `Network.loadingFinished.encodedDataLength` (transferência HTTP), não código descomprimido. Os **14,46MB descomprimidos** informados pelo T1 e ~13,5MB de `main-app.js` informados pelo T4 são diagnósticos externos distintos, não valores recontados nesta medição. Mais requests na produção correspondem a chunks menores; não usar quantidade isolada como causa da lentidão.
+
+**OK:** dezoito amostras HTTP200, nenhum erro de console/página/HTTP/request no período observado. HMR:1 WebSocket por amostra dev, zero em produção. Navegação em produção, mesma rede375px: **1/1 Playwright passou em3,6s** (Hub, Booking, Corte+escova/Horário, Landing, retorno Hub), sem erro de navegador e sem requests `/api/` no percurso. Preview permanece local/simulado.
+
+Arquivos QA: `tests/qa/mobile-baseline.mjs`, `mobile-smoke.spec.ts`, `mobile-smoke.config.ts`. Checks aplicáveis: sintaxe Node, ESLint somente desses arquivos sem warnings, smoke específico e diff-check. Suíte geral não repetida. Dados brutos versionados em `docs/evidencias/mobile-dev-9791651.json`, `mobile-production-9791651.json`; agregados em `mobile-comparison-9791651.json`. Screenshots das dezoito amostras em `dogfood-output/mobile-dev-9791651/` e `mobile-production-9791651/`.
+
+Reprodução:
+
+```bash
+QA_PERF_URL=http://127.0.0.1:3001 QA_PERF_COMMIT=9791651 QA_PERF_OUTPUT=dogfood-output/mobile-dev-9791651/baseline.json node tests/qa/mobile-baseline.mjs
+QA_PERF_URL=http://127.0.0.1:3006 QA_PERF_COMMIT=9791651 QA_PERF_OUTPUT=dogfood-output/mobile-production-9791651/baseline.json node tests/qa/mobile-baseline.mjs
+PREVIEW_BASE_URL=http://127.0.0.1:3006 node node_modules/@playwright/test/cli.js test --config tests/qa/mobile-smoke.config.ts
+```
+
+T4 confirmou URL pública atual `https://removed-keyword-solutions-resist.trycloudflare.com`, ainda ligada a dev3001. Rotas usadas pelo humano incluem landing, onboarding e booking; onboarding e gateway real não foram benchmarkados nesta rodada. **MELHORAR/P1 ambiente:** acesso público ao dev mantém peso desnecessário; T1 coordena túnel para produção isolada já pronta. Não houve mudança de túnel por T3. Próxima prova após URL otimizada: repetir mesmo perfil no acesso público e verificar navegação, mantendo resultados locais como referência. Sem cobrança, merge ou push.
+
+
 ## 2026-10-03 — assinatura R$49/R$79
 
 Fonte lida: `agenda-backend/docs/PRECOS.md`. Base **4900 centavos / R$49 mensais**, Completo **7900 centavos / R$79 mensais**; trial **7 dias** preservado. Escopo somente apresentação da assinatura. Não exigir alterações em serviços/demo/sinais, não inventar composição de planos, não executar cobrança ou migração.

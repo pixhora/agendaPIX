@@ -1,0 +1,111 @@
+{
+  "profile": {
+    "width": 375,
+    "height": 812,
+    "latencyMs": 150,
+    "downloadBitsPerSecond": 1600000,
+    "uploadBitsPerSecond": 750000,
+    "cpuThrottle": 1
+  },
+  "rows": [
+    {
+      "route": "/preview",
+      "dev": {
+        "ttfbMs": 85.09999999962747,
+        "domContentLoadedMs": 692.0999999996275,
+        "loadMs": 18149.5,
+        "fcpMs": 852,
+        "lcpObservedMs": 852,
+        "requests": 11,
+        "transferBytes": 3496381,
+        "javascriptRequests": 5,
+        "javascriptTransferBytes": 3322331,
+        "websocketCount": 1,
+        "errors": 0,
+        "samples": 3
+      },
+      "production": {
+        "ttfbMs": 3.099999999627471,
+        "domContentLoadedMs": 623.1000000014901,
+        "loadMs": 1547.5,
+        "fcpMs": 776,
+        "lcpObservedMs": 776,
+        "requests": 22,
+        "transferBytes": 275743,
+        "javascriptRequests": 12,
+        "javascriptTransferBytes": 164589,
+        "websocketCount": 0,
+        "errors": 0,
+        "samples": 3
+      },
+      "loadReductionPercent": 91.47359431389295,
+      "jsReductionPercent": 95.04597826044426
+    },
+    {
+      "route": "/preview/landing",
+      "dev": {
+        "ttfbMs": 78.5,
+        "domContentLoadedMs": 677.5,
+        "loadMs": 18504.800000000745,
+        "fcpMs": 856,
+        "lcpObservedMs": 856,
+        "requests": 11,
+        "transferBytes": 3593836,
+        "javascriptRequests": 5,
+        "javascriptTransferBytes": 3407197,
+        "websocketCount": 1,
+        "errors": 0,
+        "samples": 3
+      },
+      "production": {
+        "ttfbMs": 4.299999998882413,
+        "domContentLoadedMs": 608.5999999996275,
+        "loadMs": 1596.4000000003725,
+        "fcpMs": 828,
+        "lcpObservedMs": 828,
+        "requests": 23,
+        "transferBytes": 286000,
+        "javascriptRequests": 13,
+        "javascriptTransferBytes": 170919,
+        "websocketCount": 0,
+        "errors": 0,
+        "samples": 3
+      },
+      "loadReductionPercent": 91.37304915481222,
+      "jsReductionPercent": 94.98358914967348
+    },
+    {
+      "route": "/",
+      "dev": {
+        "ttfbMs": 65.90000000037253,
+        "domContentLoadedMs": 686.5999999996275,
+        "loadMs": 18143.199999999255,
+        "fcpMs": 848,
+        "lcpObservedMs": 848,
+        "requests": 10,
+        "transferBytes": 3523113,
+        "javascriptRequests": 4,
+        "javascriptTransferBytes": 3337122,
+        "websocketCount": 1,
+        "errors": 0,
+        "samples": 3
+      },
+      "production": {
+        "ttfbMs": 4,
+        "domContentLoadedMs": 608.5,
+        "loadMs": 1587,
+        "fcpMs": 804,
+        "lcpObservedMs": 804,
+        "requests": 17,
+        "transferBytes": 274419,
+        "javascriptRequests": 9,
+        "javascriptTransferBytes": 157321,
+        "websocketCount": 0,
+        "errors": 0,
+        "samples": 3
+      },
+      "loadReductionPercent": 91.2529212046383,
+      "jsReductionPercent": 95.28572824128096
+    }
+  ]
+}

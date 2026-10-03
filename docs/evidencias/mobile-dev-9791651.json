@@ -1,0 +1,1053 @@
+{
+  "baseURL": "http://127.0.0.1:3001",
+  "commit": "9791651",
+  "profile": {
+    "width": 375,
+    "height": 812,
+    "latencyMs": 150,
+    "downloadBitsPerSecond": 1600000,
+    "uploadBitsPerSecond": 750000,
+    "cpuThrottle": 1
+  },
+  "observationWindow": "load + 3000ms; cache disabled; fresh browser context; HTTP encoded transfer, WebSocket payload excluded",
+  "results": [
+    {
+      "route": "/preview",
+      "sample": 1,
+      "status": 200,
+      "timing": {
+        "ttfbMs": 162.80000000074506,
+        "firstByteFromNavigationMs": 167.80000000074506,
+        "domContentLoadedMs": 748.8000000007451,
+        "loadMs": 18149.5,
+        "fcpMs": 968,
+        "lcpObservedMs": 968,
+        "documentTransferBytes": 8520
+      },
+      "requests": 11,
+      "transferBytes": 3496379,
+      "javascriptRequests": 5,
+      "javascriptTransferBytes": 3322331,
+      "unfinishedRequests": 0,
+      "externalRequests": 0,
+      "websocketCount": 1,
+      "navigationError": null,
+      "errors": {
+        "console": [],
+        "page": [],
+        "http": [],
+        "failedRequests": []
+      },
+      "resources": [
+        {
+          "path": "/preview",
+          "external": false,
+          "type": "Document",
+          "bytes": 8848,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/636a5ac981f94f8b-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 27572,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/e4af272ccee01ff0-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 48732,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/css/app/layout.css",
+          "external": false,
+          "type": "Stylesheet",
+          "bytes": 12592,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/webpack.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 29017,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/main-app.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 3105300,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app-pages-internals.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 67191,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/preview/layout.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 70068,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/preview/page.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 50755,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/e4af272ccee01ff0-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 48732,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/636a5ac981f94f8b-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 27572,
+          "finished": true,
+          "status": 200
+        }
+      ]
+    },
+    {
+      "route": "/preview",
+      "sample": 2,
+      "status": 200,
+      "timing": {
+        "ttfbMs": 77,
+        "firstByteFromNavigationMs": 78,
+        "domContentLoadedMs": 691.3000000007451,
+        "loadMs": 18388.300000000745,
+        "fcpMs": 848,
+        "lcpObservedMs": 848,
+        "documentTransferBytes": 8522
+      },
+      "requests": 11,
+      "transferBytes": 3496381,
+      "javascriptRequests": 5,
+      "javascriptTransferBytes": 3322331,
+      "unfinishedRequests": 0,
+      "externalRequests": 0,
+      "websocketCount": 1,
+      "navigationError": null,
+      "errors": {
+        "console": [],
+        "page": [],
+        "http": [],
+        "failedRequests": []
+      },
+      "resources": [
+        {
+          "path": "/preview",
+          "external": false,
+          "type": "Document",
+          "bytes": 8850,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/636a5ac981f94f8b-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 27572,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/e4af272ccee01ff0-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 48732,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/css/app/layout.css",
+          "external": false,
+          "type": "Stylesheet",
+          "bytes": 12592,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/webpack.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 29017,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/main-app.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 3105300,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app-pages-internals.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 67191,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/preview/layout.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 70068,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/preview/page.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 50755,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/e4af272ccee01ff0-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 48732,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/636a5ac981f94f8b-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 27572,
+          "finished": true,
+          "status": 200
+        }
+      ]
+    },
+    {
+      "route": "/preview",
+      "sample": 3,
+      "status": 200,
+      "timing": {
+        "ttfbMs": 85.09999999962747,
+        "firstByteFromNavigationMs": 86.09999999962747,
+        "domContentLoadedMs": 692.0999999996275,
+        "loadMs": 18069.599999999627,
+        "fcpMs": 852,
+        "lcpObservedMs": 852,
+        "documentTransferBytes": 8524
+      },
+      "requests": 11,
+      "transferBytes": 3496383,
+      "javascriptRequests": 5,
+      "javascriptTransferBytes": 3322331,
+      "unfinishedRequests": 0,
+      "externalRequests": 0,
+      "websocketCount": 1,
+      "navigationError": null,
+      "errors": {
+        "console": [],
+        "page": [],
+        "http": [],
+        "failedRequests": []
+      },
+      "resources": [
+        {
+          "path": "/preview",
+          "external": false,
+          "type": "Document",
+          "bytes": 8852,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/636a5ac981f94f8b-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 27572,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/e4af272ccee01ff0-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 48732,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/css/app/layout.css",
+          "external": false,
+          "type": "Stylesheet",
+          "bytes": 12592,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/webpack.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 29017,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/main-app.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 3105300,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app-pages-internals.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 67191,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/preview/layout.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 70068,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/preview/page.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 50755,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/e4af272ccee01ff0-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 48732,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/636a5ac981f94f8b-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 27572,
+          "finished": true,
+          "status": 200
+        }
+      ]
+    },
+    {
+      "route": "/preview/landing",
+      "sample": 1,
+      "status": 200,
+      "timing": {
+        "ttfbMs": 111,
+        "firstByteFromNavigationMs": 112.19999999925494,
+        "domContentLoadedMs": 678,
+        "loadMs": 18489.800000000745,
+        "fcpMs": 868,
+        "lcpObservedMs": 868,
+        "documentTransferBytes": 21102
+      },
+      "requests": 11,
+      "transferBytes": 3593836,
+      "javascriptRequests": 5,
+      "javascriptTransferBytes": 3407197,
+      "unfinishedRequests": 0,
+      "externalRequests": 0,
+      "websocketCount": 1,
+      "navigationError": null,
+      "errors": {
+        "console": [],
+        "page": [],
+        "http": [],
+        "failedRequests": []
+      },
+      "resources": [
+        {
+          "path": "/preview/landing",
+          "external": false,
+          "type": "Document",
+          "bytes": 21439,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/636a5ac981f94f8b-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 27572,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/e4af272ccee01ff0-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 48732,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/css/app/layout.css",
+          "external": false,
+          "type": "Stylesheet",
+          "bytes": 12592,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/webpack.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 29017,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/main-app.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 3105300,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app-pages-internals.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 67191,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/preview/layout.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 70068,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/preview/landing/page.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 135621,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/636a5ac981f94f8b-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 27572,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/e4af272ccee01ff0-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 48732,
+          "finished": true,
+          "status": 200
+        }
+      ]
+    },
+    {
+      "route": "/preview/landing",
+      "sample": 2,
+      "status": 200,
+      "timing": {
+        "ttfbMs": 78.5,
+        "firstByteFromNavigationMs": 79.40000000037253,
+        "domContentLoadedMs": 677.2000000011176,
+        "loadMs": 18513.700000001118,
+        "fcpMs": 856,
+        "lcpObservedMs": 856,
+        "documentTransferBytes": 21100
+      },
+      "requests": 11,
+      "transferBytes": 3593834,
+      "javascriptRequests": 5,
+      "javascriptTransferBytes": 3407197,
+      "unfinishedRequests": 0,
+      "externalRequests": 0,
+      "websocketCount": 1,
+      "navigationError": null,
+      "errors": {
+        "console": [],
+        "page": [],
+        "http": [],
+        "failedRequests": []
+      },
+      "resources": [
+        {
+          "path": "/preview/landing",
+          "external": false,
+          "type": "Document",
+          "bytes": 21437,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/636a5ac981f94f8b-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 27572,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/e4af272ccee01ff0-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 48732,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/css/app/layout.css",
+          "external": false,
+          "type": "Stylesheet",
+          "bytes": 12592,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/webpack.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 29017,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/main-app.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 3105300,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app-pages-internals.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 67191,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/preview/layout.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 70068,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/preview/landing/page.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 135621,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/636a5ac981f94f8b-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 27572,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/e4af272ccee01ff0-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 48732,
+          "finished": true,
+          "status": 200
+        }
+      ]
+    },
+    {
+      "route": "/preview/landing",
+      "sample": 3,
+      "status": 200,
+      "timing": {
+        "ttfbMs": 72,
+        "firstByteFromNavigationMs": 73.19999999925494,
+        "domContentLoadedMs": 677.5,
+        "loadMs": 18504.800000000745,
+        "fcpMs": 852,
+        "lcpObservedMs": 852,
+        "documentTransferBytes": 21102
+      },
+      "requests": 11,
+      "transferBytes": 3593836,
+      "javascriptRequests": 5,
+      "javascriptTransferBytes": 3407197,
+      "unfinishedRequests": 0,
+      "externalRequests": 0,
+      "websocketCount": 1,
+      "navigationError": null,
+      "errors": {
+        "console": [],
+        "page": [],
+        "http": [],
+        "failedRequests": []
+      },
+      "resources": [
+        {
+          "path": "/preview/landing",
+          "external": false,
+          "type": "Document",
+          "bytes": 21439,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/636a5ac981f94f8b-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 27572,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/e4af272ccee01ff0-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 48732,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/css/app/layout.css",
+          "external": false,
+          "type": "Stylesheet",
+          "bytes": 12592,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/webpack.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 29017,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/main-app.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 3105300,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app-pages-internals.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 67191,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/preview/layout.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 70068,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/preview/landing/page.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 135621,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/636a5ac981f94f8b-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 27572,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/e4af272ccee01ff0-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 48732,
+          "finished": true,
+          "status": 200
+        }
+      ]
+    },
+    {
+      "route": "/",
+      "sample": 1,
+      "status": 200,
+      "timing": {
+        "ttfbMs": 75.09999999962747,
+        "firstByteFromNavigationMs": 76.29999999888241,
+        "domContentLoadedMs": 686.5999999996275,
+        "loadMs": 18143.199999999255,
+        "fcpMs": 868,
+        "lcpObservedMs": 868,
+        "documentTransferBytes": 20456
+      },
+      "requests": 10,
+      "transferBytes": 3523114,
+      "javascriptRequests": 4,
+      "javascriptTransferBytes": 3337122,
+      "unfinishedRequests": 0,
+      "externalRequests": 0,
+      "websocketCount": 1,
+      "navigationError": null,
+      "errors": {
+        "console": [],
+        "page": [],
+        "http": [],
+        "failedRequests": []
+      },
+      "resources": [
+        {
+          "path": "/",
+          "external": false,
+          "type": "Document",
+          "bytes": 20792,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/636a5ac981f94f8b-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 27572,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/e4af272ccee01ff0-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 48732,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/css/app/layout.css",
+          "external": false,
+          "type": "Stylesheet",
+          "bytes": 12592,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/webpack.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 29017,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/main-app.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 3105300,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app-pages-internals.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 67191,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/page.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 135614,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/636a5ac981f94f8b-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 27572,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/e4af272ccee01ff0-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 48732,
+          "finished": true,
+          "status": 200
+        }
+      ]
+    },
+    {
+      "route": "/",
+      "sample": 2,
+      "status": 200,
+      "timing": {
+        "ttfbMs": 65.90000000037253,
+        "firstByteFromNavigationMs": 66.80000000074506,
+        "domContentLoadedMs": 692.2000000011176,
+        "loadMs": 18119.5,
+        "fcpMs": 848,
+        "lcpObservedMs": 848,
+        "documentTransferBytes": 20455
+      },
+      "requests": 10,
+      "transferBytes": 3523113,
+      "javascriptRequests": 4,
+      "javascriptTransferBytes": 3337122,
+      "unfinishedRequests": 0,
+      "externalRequests": 0,
+      "websocketCount": 1,
+      "navigationError": null,
+      "errors": {
+        "console": [],
+        "page": [],
+        "http": [],
+        "failedRequests": []
+      },
+      "resources": [
+        {
+          "path": "/",
+          "external": false,
+          "type": "Document",
+          "bytes": 20791,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/636a5ac981f94f8b-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 27572,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/e4af272ccee01ff0-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 48732,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/css/app/layout.css",
+          "external": false,
+          "type": "Stylesheet",
+          "bytes": 12592,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/webpack.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 29017,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/main-app.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 3105300,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app-pages-internals.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 67191,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/page.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 135614,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/636a5ac981f94f8b-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 27572,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/e4af272ccee01ff0-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 48732,
+          "finished": true,
+          "status": 200
+        }
+      ]
+    },
+    {
+      "route": "/",
+      "sample": 3,
+      "status": 200,
+      "timing": {
+        "ttfbMs": 55.29999999888241,
+        "firstByteFromNavigationMs": 56.19999999925494,
+        "domContentLoadedMs": 670.6999999992549,
+        "loadMs": 18196.699999999255,
+        "fcpMs": 828,
+        "lcpObservedMs": 828,
+        "documentTransferBytes": 20455
+      },
+      "requests": 10,
+      "transferBytes": 3523113,
+      "javascriptRequests": 4,
+      "javascriptTransferBytes": 3337122,
+      "unfinishedRequests": 0,
+      "externalRequests": 0,
+      "websocketCount": 1,
+      "navigationError": null,
+      "errors": {
+        "console": [],
+        "page": [],
+        "http": [],
+        "failedRequests": []
+      },
+      "resources": [
+        {
+          "path": "/",
+          "external": false,
+          "type": "Document",
+          "bytes": 20791,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/636a5ac981f94f8b-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 27572,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/e4af272ccee01ff0-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 48732,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/css/app/layout.css",
+          "external": false,
+          "type": "Stylesheet",
+          "bytes": 12592,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/webpack.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 29017,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/main-app.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 3105300,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app-pages-internals.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 67191,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/page.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 135614,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/636a5ac981f94f8b-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 27572,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/e4af272ccee01ff0-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 48732,
+          "finished": true,
+          "status": 200
+        }
+      ]
+    }
+  ]
+}

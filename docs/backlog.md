@@ -1,5 +1,11 @@
 # Backlog
 
+## Celular lento — `9791651`
+
+- **OK:** comparação local375px/rede lenta/cache vazio; produção3006 reduz load18–18,5s para1,55–1,60s (~91%), JS transferido~95%. Dezoito amostras sem erros; navegação preview1/1 passou.
+- **P1 MELHORAR — ambiente/T1:** túnel público ainda entrega dev3001. Coordenar produção isolada, preservando dev; repetir medição pública após URL otimizada.
+- Dados brutos/agregados versionados em docs/evidencias; comandos e limites em PROGRESSO.md. Sem alteração especulativa de frontend.
+
 ## Assinatura aprovada49/79
 
 - **OK T4 `9791651`:** 4/4 pricing/preview/onboarding passaram; 4900/7900 centavos apresentados como49/79; trial7 preservado.

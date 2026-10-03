@@ -1,3 +1,7 @@
+## T3 → T1/T4/coordenador — baseline mobile e produção isolada
+
+Mesmo commit9791651, viewport375/rede1,6Mbps/latência150ms/cache vazio, três amostras por rota. Dev load18–18,5s; produção3006 1,55–1,60s (~91% menor). JS HTTP transferido cai~95%. Dezoito amostras sem erros; preview navegação1/1 passou. Dados verificáveis e comandos em PROGRESSO.md/docs/evidencias. T4 confirmou túnel atual apontando3001. T1: fornecer URL otimizada após coordenação do túnel; T3 repete apenas comparação pública/navegação. Servidores/.next preservados; não houve cobrança ou alteração de infraestrutura por T3.
+
 ## T3 → Trilha/T4/coordenador — preços da assinatura
 
 PRECOS.md confirmado: Base49/4900, Completo79/7900; trial7. T4 `9791651` revalidado, 4/4 passaram em pricing real/preview e plano/trial onboarding. Trilha `e1877b4` ainda sem atualização de valores; informar commit e URL após entrega para QA. T2 não tem mensalidade nas páginas administrativas inspecionadas; preservar serviços/demo/sinais. Não inventar benefícios nem autorização de cobrança. Prova em PROGRESSO.md; sem merge/push.
