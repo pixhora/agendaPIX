@@ -5,21 +5,23 @@
 
 ---
 
-## 1. Paleta de Cores (6 cores nomeadas)
+## 1. Paleta de Cores (Direção Visual Verde-Lima & Editorial)
 
-Projetada para legibilidade máxima sob luz solar (rua/celular), sem clichês de templates de estética (nada de terracota/creme nem verde neon sobre preto).
+Inspirada na referência de design de alta conversão (`ee905469-4d39-45c2-a095-6af185533ae1.png`): fundo off-white mineral, títulos sans-serif pretos marcantes, acentos em verde-lima vibrante e verde-petróleo profundo.
 
 | Nome do Token | Hex | Função / Aplicação | Contraste (WCAG) |
 |---|---|---|---|
-| `color-bg-canvas` | `#F8FAFC` | Fundo principal da aplicação (Slate 50, neutro limpo) | Base |
-| `color-surface` | `#FFFFFF` | Superfície de cartões, formulários e bottom sheets | 1.05:1 vs canvas |
-| `color-text-main` | `#0F172A` | Títulos, valores e textos principais (Slate 900) | 16.2:1 vs surface (AAA) |
-| `color-text-muted` | `#64748B` | Textos de apoio, durações, etiquetas secundárias (Slate 500) | 4.6:1 vs surface (AA) |
-| `color-border` | `#E2E8F0` | Divisores, contorno de inputs e cards desmarcados (Slate 200) | Estrutural |
-| `color-brand-action` | `#0284C7` | **Ação primária disciplinada**: botões de avanço e slot selecionado (Sky 600) | 4.8:1 vs surface (AA) |
+| `color-bg-canvas` | `#F5F6F2` | Fundo principal da aplicação (off-white mineral contemporâneo) | Base |
+| `color-surface` | `#FFFFFF` | Superfície de cartões, formulários e painéis | 1.05:1 vs canvas |
+| `color-dark-card` | `#0E1612` | Fundo de cards escuros de alta sofisticação e mockups | 15.5:1 vs canvas |
+| `color-text-main` | `#111613` | Títulos editoriais, valores e textos principais (preto carvão) | 16.5:1 vs surface (AAA) |
+| `color-text-muted` | `#5A645C` | Textos de apoio, durações, etiquetas secundárias (cinza neutro) | 4.8:1 vs surface (AA) |
+| `color-border` | `#E2E6DF` | Divisores, contorno de inputs e cards desmarcados | Estrutural |
+| `color-accent-lime` | `#C0F739` | **Ação primária de energia**: botões pill de conversão com texto preto | 13.8:1 vs texto `#111613` (AAA) |
+| `color-accent-forest` | `#0F3B2E` | **Acento profundo de solidez**: badges de nicho, cards sobrepostos e títulos | 9.2:1 vs branco (AAA) |
 
-### Cor funcional de apoio (transacional Pix)
-- `color-pix-confirm`: `#059669` (Emerald 600) — usado com exclusividade na tela de pagamento Pix confirmado e cópia bem-sucedida.
+### Formato de Botões e Badges
+- Botões de conversão e badges de categoria utilizam estritamente o formato **Pill** (`rounded-full` / `radius-pill`).
 
 ---
 

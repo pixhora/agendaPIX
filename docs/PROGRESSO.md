@@ -100,6 +100,21 @@
   - Desacoplamento completo do modo preview via injeção de `getSlotsForDate` e `checkStatusFn` em `StepSlot` e `StepPayment`, operando 100% offline sem chamadas HTTP bloqueantes.
   - Slots de disponibilidade gerados com respeito estrito a `America/Sao_Paulo` e duração do serviço.
 
+### E. Nova Direção Visual Verde-Lima & Editorial (Referência Visual)
+- **Design Tokens**: Paleta de alto contraste inspirada em neo-editorial fintech:
+  - Fundo Canvas Off-white (`#F5F6F2`)
+  - Títulos e textos principais em Preto Carvão (`#111613`)
+  - Acento Primário em Verde-Lima vibrante (`#C0F739`) para botões de conversão e badges de alta energia
+  - Acento Secundário em Verde Petróleo profundo (`#0F3B2E`) para solidez e títulos
+  - Formato **Pill** (`rounded-full`) em todos os botões de ação e tags de categoria
+- **Hero em Duas Colunas**:
+  - *Esquerda*: Título editorial, subtítulo espaçado, CTAs pill e badges de nichos atendidos (`[Barbearias]`, `[Salões]`, `[Clínicas]`, etc.).
+  - *Direita*: Composição com círculos concêntricos e 3 cards em sobreposição (Card de faturamento com gráfico de barras, Card central verde-lima de Pix instantâneo, e Card escuro do próximo horário agendado).
+- **Faixa de Credibilidade / Segmentos (`LandingTrustBand`)**: Grid horizontal sóbrio dos segmentos atendidos.
+- **Seção Editorial de Benefícios (`LandingEditorialBenefits`)**: Título amplo e grid de 4 blocos visuais conforme referência.
+- **Banner Largo Verde-Lima (`LandingHighlightBanner`)**: Card dark mode com faturamento do dia (Studio Bella) à esquerda e os 3 passos simples de ativação à direita.
+- **Preços e FAQ Harmonizados**: Cards com bordas arredondadas `rounded-3xl` e botões pill preservando os valores oficiais de R$ 29 e R$ 59.
+
 ---
 
 ## 5. Pendências e Próximos Passos (Outros Terminais)
@@ -111,6 +126,6 @@
 
 ## 6. Status de Entrega
 
-O fluxo de agendamento público (`/[slug]`), a landing page (`/`), o onboarding (`/onboarding`) e o Modo Preview completo (`/preview/*`) estão totalmente implementados, integrados e testados.
+O fluxo de agendamento público (`/[slug]`), a landing page (`/`), o onboarding (`/onboarding`), o Modo Preview completo (`/preview/*`) e a nova Direção Visual Verde-Lima & Editorial estão totalmente implementados, integrados e testados.
 
 O projeto está **pronto para auditoria do Terminal 3 (Testes e2e / QA)**.

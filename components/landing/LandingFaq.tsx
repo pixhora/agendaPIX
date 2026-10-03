@@ -7,7 +7,7 @@ const FAQS = [
   },
   {
     q: "Como o cliente paga o sinal?",
-    a: "Assim que ele escolhe o horário e digita o telefone, a tela gera um QR Code Pix instantâneo com código Copia e Cola e prazo de 15 minutos. Quando ele paga no aplicativo do banco dele, a reserva é confirmada.",
+    a: "Assim que ele escolhe o horário e digita o telefone, a tela gera um QR Code Pix instantâneo com código Copia e Cola e prazo de 15 minutos. Quando ele paga no aplicativo do banco dele, a reserva é confirmada imediatamente.",
   },
   {
     q: "E se o cliente não pagar o Pix a tempo?",
@@ -25,13 +25,13 @@ const FAQS = [
 
 export function LandingFaq() {
   return (
-    <section id="perguntas-frequentes" className="py-14 sm:py-20 border-t border-border bg-background">
-      <div className="mx-auto max-w-4xl px-4 sm:px-6">
-        <div className="text-center max-w-2xl mx-auto mb-12">
-          <span className="text-xs font-bold uppercase tracking-wider text-primary">
-            Tire suas dúvidas
+    <section id="perguntas-frequentes" className="py-16 sm:py-24 border-t border-[#E2E6DF] bg-[#F5F6F2]">
+      <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+        <div className="text-center max-w-2xl mx-auto mb-14">
+          <span className="inline-block rounded-full bg-[#0F3B2E] text-[#C0F739] px-3.5 py-1 text-xs font-bold uppercase tracking-wider mb-4">
+            Tire Suas Dúvidas
           </span>
-          <h2 className="mt-2 font-display text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+          <h2 className="font-display text-3xl sm:text-4xl font-extrabold tracking-tight text-[#111613]">
             Perguntas frequentes
           </h2>
         </div>
@@ -40,12 +40,12 @@ export function LandingFaq() {
           {FAQS.map((item, index) => (
             <div
               key={index}
-              className="rounded-2xl border border-border bg-surface p-5 sm:p-6 shadow-sm space-y-2"
+              className="rounded-3xl border border-[#E2E6DF] bg-white p-6 sm:p-7 shadow-xs space-y-2.5"
             >
-              <h3 className="font-display text-base font-bold text-foreground">
+              <h3 className="font-display text-base sm:text-lg font-bold text-[#111613]">
                 {item.q}
               </h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">
+              <p className="text-xs sm:text-sm text-[#5A645C] leading-relaxed">
                 {item.a}
               </p>
             </div>
