@@ -61,3 +61,21 @@ Next.js, React, TypeScript, Tailwind, Radix, Drizzle, Better Auth, Zod, Vitest e
 `clsx`, `tailwind-merge` e `class-variance-authority` compõem as classes e variantes do botão shadcn/ui.
 ESLint 9.39.5 está fixado porque o plugin React do Next.js ainda usa APIs removidas no ESLint 10.
 Os scripts de instalação permitidos estão limitados a `esbuild` e `unrs-resolver`, necessários às ferramentas nativas.
+
+
+## Fluxo Pix simulado
+
+As rotas públicas agora oferecem serviços, disponibilidade, reserva e consulta do pagamento.
+Veja os formatos, headers e exemplos em [docs/CONTRATOS.md](docs/CONTRATOS.md).
+Atualize `.env` com `PAYMENT_PROVIDER=fake` e um `FAKE_WEBHOOK_SECRET` exclusivo de pelo menos 32 caracteres.
+A simulação funciona em desenvolvimento/testes; fica bloqueada em produção. QR Code e copia-e-cola são fictícios e não pagam em banco.
+
+Após atualizar a branch, execute `pnpm install` e `pnpm db:migrate` antes de iniciar `pnpm dev`.
+A migration de concorrência exige a extensão Postgres `btree_gist`; a imagem local de Postgres já a disponibiliza.
+Não exclua reservas antigas para resolver erro de sobreposição: revise os registros antes de tentar a migration novamente.
+
+`pnpm test` verifica centavos, assinaturas HMAC, estados de pagamento e geração de horários.
+`pnpm test:db` verifica disputa de horário, repetição de cobrança, auditoria, rollback, isolamento e pagamento tardio com Postgres real.
+Os testes Pix removem somente as entidades de teste criadas por eles. Não há gateway real nesta etapa.
+
+Dependência adicional: `qrcode` gera o QR Code PNG padronizado da simulação; evita implementar codificação de QR manualmente.
