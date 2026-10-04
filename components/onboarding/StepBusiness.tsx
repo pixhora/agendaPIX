@@ -71,7 +71,7 @@ export function StepBusiness({
             placeholder="Ex: Barbearia do Silva, Studio Ana Lash..."
             value={businessName}
             onChange={handleNameChange}
-            className={`w-full rounded-lg border bg-surface px-3.5 py-2.5 text-base text-foreground placeholder:text-muted-foreground/60 min-h-11 focus-visible:outline-2 focus-visible:outline-offset-2 ${
+            className={`w-full rounded-lg border bg-surface px-3.5 py-3 text-base text-foreground placeholder:text-muted-foreground/60 min-h-12 focus-visible:outline-2 focus-visible:outline-offset-2 ${
               showNameError
                 ? "border-destructive focus-visible:outline-destructive"
                 : "border-border focus-visible:outline-primary"
@@ -99,7 +99,7 @@ export function StepBusiness({
                 : "border-border focus-within:ring-primary"
             }`}
           >
-            <span className="bg-muted px-3 py-2.5 text-xs sm:text-sm font-medium text-muted-foreground select-none">
+            <span className="bg-muted px-3 py-3 text-xs sm:text-sm font-medium text-muted-foreground select-none">
               agenda.com.br/
             </span>
             <input
@@ -111,7 +111,7 @@ export function StepBusiness({
               placeholder="seu-negocio"
               value={slug}
               onChange={handleSlugChange}
-              className="flex-1 min-w-0 bg-transparent px-3 py-2.5 text-base text-foreground placeholder:text-muted-foreground/60 focus:outline-none min-h-11"
+              className="flex-1 min-w-0 bg-transparent px-3 py-3 text-base text-foreground placeholder:text-muted-foreground/60 focus:outline-none min-h-12"
             />
           </div>
           {showSlugError ? (
@@ -136,7 +136,7 @@ export function StepBusiness({
         <Button
           type="submit"
           disabled={!isValid}
-          className="w-full min-h-11 text-base font-semibold"
+          className="w-full min-h-12 text-base font-semibold rounded-full"
         >
           Continuar
         </Button>

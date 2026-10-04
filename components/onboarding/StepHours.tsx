@@ -116,7 +116,7 @@ export function StepHours({
               aria-describedby={!isTimeOrderValid ? "hours-error" : undefined}
               value={opensAt}
               onChange={(e) => onChangeOpensAt(e.target.value)}
-              className={`w-full rounded-lg border bg-surface px-3 py-2.5 text-sm font-medium text-foreground min-h-11 focus-visible:outline-2 focus-visible:outline-offset-2 ${
+              className={`w-full rounded-lg border bg-surface px-3 py-3 text-sm font-medium text-foreground min-h-12 focus-visible:outline-2 focus-visible:outline-offset-2 ${
                 !isTimeOrderValid
                   ? "border-destructive focus-visible:outline-destructive"
                   : "border-border focus-visible:outline-primary"
@@ -136,7 +136,7 @@ export function StepHours({
               aria-describedby={!isTimeOrderValid ? "hours-error" : undefined}
               value={closesAt}
               onChange={(e) => onChangeClosesAt(e.target.value)}
-              className={`w-full rounded-lg border bg-surface px-3 py-2.5 text-sm font-medium text-foreground min-h-11 focus-visible:outline-2 focus-visible:outline-offset-2 ${
+              className={`w-full rounded-lg border bg-surface px-3 py-3 text-sm font-medium text-foreground min-h-12 focus-visible:outline-2 focus-visible:outline-offset-2 ${
                 !isTimeOrderValid
                   ? "border-destructive focus-visible:outline-destructive"
                   : "border-border focus-visible:outline-primary"
@@ -157,10 +157,10 @@ export function StepHours({
       </div>
 
       <div className="flex items-center gap-3 pt-2">
-        <Button type="button" variant="outline" onClick={onBack} className="flex-1 min-h-11 font-medium">
+        <Button type="button" variant="outline" onClick={onBack} className="flex-1 min-h-12 font-medium rounded-full">
           Voltar
         </Button>
-        <Button type="submit" disabled={!isValid} className="flex-[2] min-h-11 font-semibold">
+        <Button type="submit" disabled={!isValid} className="flex-[2] min-h-12 font-semibold rounded-full">
           Continuar
         </Button>
       </div>

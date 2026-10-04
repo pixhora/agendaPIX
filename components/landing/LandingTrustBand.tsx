@@ -16,10 +16,12 @@ export function LandingTrustBand() {
           Concebido para profissionais e pequenos negócios em todo o Brasil
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 items-center">
-          {categories.map((cat) => (
+          {categories.map((cat, idx) => (
             <div
               key={cat.title}
-              className="px-3 py-2.5 rounded-xl bg-surface border border-border text-center shadow-xs"
+              className={`px-3 py-2.5 rounded-xl bg-surface border border-border text-center shadow-xs ${
+                idx === 4 ? "col-span-2 sm:col-span-1" : ""
+              }`}
             >
               <p className="text-sm font-bold text-foreground">{cat.title}</p>
               <p className="text-[11px] text-muted-foreground">{cat.desc}</p>

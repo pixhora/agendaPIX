@@ -64,7 +64,7 @@ export function StepService({
             placeholder="Ex: Corte de Cabelo, Barba Terapia, Manicure..."
             value={serviceName}
             onChange={(e) => onChangeServiceName(e.target.value)}
-            className="w-full rounded-lg border border-border bg-surface px-3.5 py-2.5 text-base text-foreground placeholder:text-muted-foreground/60 min-h-11 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            className="w-full rounded-lg border border-border bg-surface px-3.5 py-3 text-base text-foreground placeholder:text-muted-foreground/60 min-h-12 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           />
         </div>
 
@@ -77,7 +77,7 @@ export function StepService({
               id="service-duration"
               value={durationMinutes}
               onChange={(e) => onChangeDuration(Number(e.target.value))}
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm font-medium text-foreground min-h-11 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              className="w-full rounded-lg border border-border bg-surface px-3 py-3 text-sm font-medium text-foreground min-h-12 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
               <option value={15}>15 minutos</option>
               <option value={30}>30 minutos</option>
@@ -102,7 +102,7 @@ export function StepService({
               value={priceCents > 0 ? (priceCents / 100).toString() : ""}
               onChange={(e) => onChangePrice(Math.round(Number(e.target.value) * 100))}
               placeholder="Ex: 50"
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-foreground min-h-11 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              className="w-full rounded-lg border border-border bg-surface px-3 py-3 text-sm text-foreground min-h-12 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             />
           </div>
 
@@ -120,7 +120,7 @@ export function StepService({
               value={depositCents >= 0 ? (depositCents / 100).toString() : ""}
               onChange={(e) => onChangeDeposit(Math.round(Number(e.target.value) * 100))}
               placeholder="Ex: 20"
-              className={`w-full rounded-lg border bg-surface px-3 py-2.5 text-sm text-foreground min-h-11 focus-visible:outline-2 focus-visible:outline-offset-2 ${
+              className={`w-full rounded-lg border bg-surface px-3 py-3 text-sm text-foreground min-h-12 focus-visible:outline-2 focus-visible:outline-offset-2 ${
                 !isDepositValid
                   ? "border-destructive focus-visible:outline-destructive"
                   : "border-border focus-visible:outline-primary"
@@ -151,10 +151,10 @@ export function StepService({
       </div>
 
       <div className="flex items-center gap-3 pt-2">
-        <Button type="button" variant="outline" onClick={onBack} className="flex-1 min-h-11 font-medium">
+        <Button type="button" variant="outline" onClick={onBack} className="flex-1 min-h-12 font-medium rounded-full">
           Voltar
         </Button>
-        <Button type="submit" disabled={!isValid} className="flex-[2] min-h-11 font-semibold">
+        <Button type="submit" disabled={!isValid} className="flex-[2] min-h-12 font-semibold rounded-full">
           Continuar
         </Button>
       </div>

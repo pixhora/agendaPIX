@@ -19,7 +19,7 @@ export function LandingPricing() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto items-stretch">
           {/* Plano Base */}
-          <div className="flex flex-col justify-between rounded-3xl border border-border bg-surface p-7 sm:p-9 shadow-sm hover:shadow-md transition-shadow">
+          <div className="flex flex-col justify-between rounded-3xl border border-border bg-surface p-5 sm:p-9 shadow-sm hover:shadow-md transition-shadow">
             <div className="space-y-4">
               <div>
                 <span className="inline-block rounded-full bg-muted px-3 py-1 text-xs font-bold text-muted-foreground">
@@ -63,7 +63,7 @@ export function LandingPricing() {
             <div className="pt-8">
               <Link
                 href="/onboarding?plano=base"
-                className="w-full inline-flex items-center justify-center rounded-full border-2 border-foreground bg-surface hover:bg-muted px-6 py-3.5 text-sm font-bold text-foreground transition-colors text-center"
+                className="w-full min-h-12 inline-flex items-center justify-center rounded-full border-2 border-foreground bg-surface hover:bg-muted px-6 py-3 text-sm font-bold text-foreground transition-colors text-center"
               >
                 Começar teste de 7 dias
               </Link>
@@ -71,7 +71,7 @@ export function LandingPricing() {
           </div>
 
           {/* Plano Completo (Destaque Verde-Petróleo & Lima) */}
-          <div className="relative flex flex-col justify-between rounded-3xl border-2 border-accent-forest dark:border-primary bg-surface p-7 sm:p-9 shadow-xl">
+          <div className="relative flex flex-col justify-between rounded-3xl border-2 border-accent-forest dark:border-primary bg-surface p-5 sm:p-9 shadow-xl">
             <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-accent-forest px-4 py-1 text-[11px] font-extrabold uppercase tracking-wider text-primary shadow-sm">
               Mais Escolhido
             </div>
@@ -119,7 +119,7 @@ export function LandingPricing() {
             <div className="pt-8">
               <Link
                 href="/onboarding?plano=completo"
-                className="w-full inline-flex items-center justify-center rounded-full bg-primary hover:bg-primary-hover px-6 py-3.5 text-sm font-extrabold text-primary-foreground shadow-md transition-all text-center"
+                className="w-full min-h-12 inline-flex items-center justify-center rounded-full bg-primary hover:bg-primary-hover px-6 py-3 text-sm font-extrabold text-primary-foreground shadow-md transition-all text-center"
               >
                 Começar teste de 7 dias grátis
               </Link>

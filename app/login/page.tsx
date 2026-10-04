@@ -178,7 +178,7 @@ export default function LoginPage() {
                     placeholder="seuemail@exemplo.com.br"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full rounded-lg border border-border bg-surface px-3.5 py-2.5 text-base text-foreground placeholder:text-muted-foreground/60 min-h-11 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                    className="w-full rounded-lg border border-border bg-surface px-3.5 py-3 text-base text-foreground placeholder:text-muted-foreground/60 min-h-12 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                   />
                 </div>
 
@@ -196,7 +196,7 @@ export default function LoginPage() {
               <Button
                 type="submit"
                 disabled={!isEmailValid || isSubmitting}
-                className="w-full min-h-11 font-semibold rounded-full bg-primary hover:bg-primary-hover text-primary-foreground"
+                className="w-full min-h-12 font-semibold rounded-full bg-primary hover:bg-primary-hover text-primary-foreground text-base shadow-sm"
               >
                 {isSubmitting ? "Enviando link..." : "Receber link de acesso"}
               </Button>

@@ -15,7 +15,7 @@ export function LandingPainSolution() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
           {/* O Jeito Antigo */}
-          <div className="rounded-3xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/50 dark:bg-rose-950/20 p-7 sm:p-9 space-y-5">
+          <div className="rounded-3xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/50 dark:bg-rose-950/20 p-5 sm:p-8 space-y-5">
             <div className="flex items-center gap-3">
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-400 text-lg font-bold">
                 ✕
@@ -48,7 +48,7 @@ export function LandingPainSolution() {
           </div>
 
           {/* O Jeito com a Agenda Pix */}
-          <div className="rounded-3xl border-2 border-accent-forest dark:border-primary/60 bg-surface p-7 sm:p-9 space-y-5 shadow-lg">
+          <div className="rounded-3xl border-2 border-accent-forest dark:border-primary/60 bg-surface p-5 sm:p-8 space-y-5 shadow-lg">
             <div className="flex items-center gap-3">
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-accent-forest text-primary text-lg font-bold">
                 ✓

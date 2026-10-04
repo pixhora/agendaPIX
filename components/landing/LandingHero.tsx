@@ -38,20 +38,20 @@ export function LandingHero() {
               Envie seu link no WhatsApp ou Instagram. Seu cliente escolhe o serviço e o horário sozinho e garante a vaga pagando o sinal no Pix. Acabe com o prejuízo de horários vazios.
             </p>
 
-            {/* Botões Pill de Conversão */}
-            <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3.5">
+            {/* Botões Pill de Conversão com Ergonomia Mobile (48px) */}
+            <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               <Link
                 href="/onboarding"
-                className="inline-flex items-center justify-center rounded-full bg-primary hover:bg-primary-hover text-primary-foreground px-7 py-3.5 text-base font-bold shadow-sm transition-all focus:outline-hidden focus:ring-2 focus:ring-accent-forest focus:ring-offset-2 text-center"
+                className="w-full sm:w-auto min-h-12 inline-flex items-center justify-center rounded-full bg-primary hover:bg-primary-hover text-primary-foreground px-7 py-3 text-base font-bold shadow-sm transition-all focus:outline-hidden focus:ring-2 focus:ring-accent-forest focus:ring-offset-2 text-center"
               >
                 Começar teste grátis de 7 dias
               </Link>
 
               <a
                 href="#demonstracao"
-                className="inline-flex items-center justify-center gap-2 rounded-full border border-border bg-surface hover:bg-muted text-foreground px-5 py-3.5 text-sm font-semibold transition-all focus:outline-hidden text-center"
+                className="w-full sm:w-auto min-h-12 inline-flex items-center justify-center gap-2 rounded-full border border-border bg-surface hover:bg-muted text-foreground px-5 py-3 text-sm font-semibold transition-all focus:outline-hidden text-center"
               >
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent-forest text-primary text-xs">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent-forest text-primary text-xs shrink-0">
                   ▶
                 </span>
                 Ver demonstração ao vivo
@@ -59,7 +59,7 @@ export function LandingHero() {
             </div>
 
             {/* Garantias de Baixo Atrito */}
-            <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-muted-foreground">
+            <div className="mt-4 flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-2 sm:gap-x-5 text-xs text-muted-foreground">
               <span className="flex items-center gap-1.5">
                 <strong className="text-accent-forest dark:text-primary">✓</strong> Sem cartão de crédito
               </span>
