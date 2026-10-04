@@ -70,7 +70,7 @@ export function StepBusiness({
             Seu link personalizado
           </label>
           <div className="flex items-center rounded-lg border border-border bg-surface overflow-hidden focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2">
-            <span className="bg-muted px-3 py-2.5 text-xs sm:text-sm font-medium text-muted-foreground select-none">
+            <span className="bg-muted px-3 py-2.5 text-xs sm:text-sm font-medium text-muted-foreground select-none shrink-0">
               agenda.com.br/
             </span>
             <input
@@ -80,7 +80,7 @@ export function StepBusiness({
               placeholder="seu-negocio"
               value={slug}
               onChange={handleSlugChange}
-              className="flex-1 bg-transparent px-3 py-2.5 text-base text-foreground placeholder:text-muted-foreground/60 focus:outline-none min-h-11"
+              className="flex-1 min-w-0 bg-transparent px-3 py-2.5 text-base text-foreground placeholder:text-muted-foreground/60 focus:outline-none min-h-11"
             />
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
