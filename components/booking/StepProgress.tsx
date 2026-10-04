@@ -28,13 +28,13 @@ export function StepProgress({ currentStep }: StepProgressProps) {
               <div className="w-full flex items-center">
                 {idx > 0 && (
                   <div
-                    className={`h-1 flex-1 transition-colors ${
+                    className={`h-1 flex-1 transition-step ${
                       isDone ? "bg-primary" : "bg-border"
                     }`}
                   />
                 )}
                 <div
-                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 transition-colors ${
+                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 transition-step ${
                     isCurrent
                       ? "bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2 ring-offset-background"
                       : isDone
@@ -46,15 +46,17 @@ export function StepProgress({ currentStep }: StepProgressProps) {
                 </div>
                 {idx < STEPS.length - 1 && (
                   <div
-                    className={`h-1 flex-1 transition-colors ${
+                    className={`h-1 flex-1 transition-step ${
                       isDone && currentStep > s.step + 1 ? "bg-primary" : "bg-border"
                     }`}
                   />
                 )}
               </div>
               <span
-                className={`mt-1.5 text-xs font-medium ${
-                  isCurrent ? "text-primary font-semibold" : "text-muted-foreground"
+                className={`mt-1.5 text-xs transition-step ${
+                  isCurrent
+                    ? "text-accent-forest dark:text-primary font-bold"
+                    : "text-muted-foreground font-medium"
                 }`}
               >
                 {s.label}

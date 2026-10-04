@@ -1,3 +1,5 @@
+"use client";
+
 import React from "react";
 import type { PublicService } from "./types";
 import { formatCurrency, formatDuration } from "./formatters";
@@ -68,27 +70,41 @@ export function StepService({
               aria-checked={isSelected}
               onClick={() => onSelectService(service)}
               onKeyDown={(e) => handleKeyDown(e, index)}
-              className={`w-full text-left p-4 rounded-xl border transition-all min-h-11 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
+              className={`w-full text-left p-4 rounded-2xl border transition-feedback active:scale-[0.99] min-h-12 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
                 isSelected
-                  ? "border-primary bg-primary/5 ring-1 ring-primary shadow-sm"
-                  : "border-border bg-surface hover:border-muted-foreground/40 hover:bg-muted/50"
+                  ? "border-2 border-primary bg-primary/5 shadow-xs"
+                  : "border-border bg-surface hover:border-muted-foreground/40 hover:bg-muted/40"
               }`}
             >
               <div className="flex items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <h3 className="text-base font-semibold text-foreground">{service.name}</h3>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>⏱ {formatDuration(service.durationMinutes)}</span>
-                    <span>•</span>
-                    <span className="font-medium text-foreground">
-                      Total: {formatCurrency(service.priceCents)}
-                    </span>
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`mt-0.5 h-4 w-4 rounded-full border flex items-center justify-center shrink-0 transition-feedback ${
+                      isSelected
+                        ? "border-primary bg-primary"
+                        : "border-muted-foreground/50 bg-surface"
+                    }`}
+                    aria-hidden="true"
+                  >
+                    {isSelected && (
+                      <div className="h-1.5 w-1.5 rounded-full bg-primary-foreground" />
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-base font-bold text-foreground">{service.name}</h3>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>⏱ {formatDuration(service.durationMinutes)}</span>
+                      <span>•</span>
+                      <span className="font-semibold text-foreground">
+                        Total: {formatCurrency(service.priceCents)}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
                 <div className="text-right shrink-0">
                   {service.depositCents > 0 ? (
-                    <span className="inline-block rounded-full bg-[#0F3B2E] px-2.5 py-1 text-xs font-bold text-[#C0F739]">
+                    <span className="inline-block rounded-full bg-accent-forest text-accent-lime px-2.5 py-1 text-xs font-bold shadow-xs">
                       Sinal: {formatCurrency(service.depositCents)}
                     </span>
                   ) : (
@@ -108,7 +124,7 @@ export function StepService({
           type="button"
           disabled={!selectedService}
           onClick={onNext}
-          className="w-full text-base font-semibold py-3 min-h-11"
+          className="w-full text-base font-bold py-3.5 min-h-12 rounded-full transition-feedback active:scale-[0.99]"
         >
           {selectedService ? "Continuar para escolher horário" : "Selecione um serviço"}
         </Button>

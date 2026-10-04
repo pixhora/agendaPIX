@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import type { BookingResponse, PaymentStatusResponse } from "./types";
 import { formatCurrency } from "./formatters";
@@ -233,7 +235,9 @@ export function StepPayment({
       </div>
 
       {checkError && (
-        <p className="text-xs text-destructive text-center">{checkError}</p>
+        <p role="alert" aria-live="polite" className="text-xs text-destructive text-center">
+          {checkError}
+        </p>
       )}
 
       {/* Botão de Verificação Manual */}
@@ -247,7 +251,7 @@ export function StepPayment({
           {isChecking ? "Verificando confirmação..." : "Já fiz o pagamento no banco"}
         </Button>
         <p className="text-[11px] text-center text-muted-foreground">
-          A confirmação é automática em poucos segundos após o pagamento.
+          Após efetuar o Pix do sinal, a vaga é confirmada pelo estabelecimento. Guarde seu comprovante.
         </p>
       </div>
     </div>
