@@ -15,7 +15,7 @@ export function LandingHighlightBanner() {
     },
     {
       num: "03",
-      title: "O cliente agenda e o Pix cai direto",
+      title: "O cliente agenda e paga o sinal no Pix",
       desc: "O horário só é bloqueado após o Pix ser confirmado. Menos mensagens, zero calote.",
     },
   ];

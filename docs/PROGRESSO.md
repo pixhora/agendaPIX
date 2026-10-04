@@ -18,7 +18,7 @@
 - **Seção Problema vs. Solução**: Contraste direto entre a rotina desgastante de mensagens manuais no WhatsApp e o agendamento autônomo com sinal via Pix.
 - **Demonstração Interativa em 4 Passos**: Preview funcional simulando o uso real em celular (375px) com alternância de passos (Serviço → Horário na régua → Dados → Pix).
 - **Tabela de Preços Oficial (docs/PRECOS.md)**:
-  - **Plano Base (R$ 49/mês)**: 1 profissional, agendamentos ilimitados, sinal por Pix automático, lembretes de WhatsApp, 7 dias grátis sem cartão.
+  - **Plano Base (R$ 49/mês)**: 1 profissional, agendamentos ilimitados, cobrança de sinal no Pix com confirmação imediata, lembretes de WhatsApp, 7 dias grátis sem cartão.
   - **Plano Completo (R$ 79/mês - Destaque)**: Tudo do base + múltiplos serviços, relatórios de faturamento e agendamentos, gestão completa de clientes e suporte prioritário via WhatsApp.
 - **Perguntas Frequentes (FAQ)**: Respostas objetivas para as principais dúvidas do prestador de serviços no Brasil.
 - **Rodapé**: Navegação secundária e termos.

@@ -54,7 +54,7 @@ export function LandingEditorialBenefits() {
             </div>
             <div>
               <h3 className="text-xl font-extrabold text-primary-foreground leading-snug">
-                Sinal Automático no Pix
+                Sinal de Entrada no Pix
               </h3>
               <p className="mt-2 text-xs font-medium text-primary-foreground/80 leading-relaxed">
                 O cliente paga uma entrada no ato do agendamento. Se ele comparecer, abate do total. Se ele faltar sem avisar, seu horário já está pago.
@@ -63,9 +63,9 @@ export function LandingEditorialBenefits() {
           </div>
 
           {/* Bloco 3: Verde-Lima Claro com Agenda Autônoma */}
-          <div className="rounded-3xl bg-[#D6FA75] dark:bg-surface dark:border dark:border-border p-6 shadow-sm flex flex-col justify-between min-h-[260px] sm:min-h-[280px] text-[#111613] dark:text-foreground">
+          <div className="rounded-3xl bg-surface border border-border p-6 shadow-sm flex flex-col justify-between min-h-[260px] sm:min-h-[280px] text-foreground">
             <div className="flex items-center justify-between">
-              <span className="h-10 w-10 rounded-full bg-black/10 dark:bg-muted flex items-center justify-center font-extrabold text-sm">
+              <span className="h-10 w-10 rounded-full bg-muted flex items-center justify-center font-extrabold text-sm">
                 02
               </span>
               <span className="text-[11px] font-bold uppercase tracking-wider bg-black/10 dark:bg-muted px-2.5 py-0.5 rounded-full">

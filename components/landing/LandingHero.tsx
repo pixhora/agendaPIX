@@ -26,7 +26,7 @@ export function LandingHero() {
 
             {/* Título Principal Editorial */}
             <h1 className="font-display text-3xl font-extrabold tracking-tight text-foreground sm:text-5xl lg:text-6xl leading-[1.12]">
-              Sua agenda no piloto automático com{" "}
+              Seu cliente agenda sozinho e paga o{" "}
               <span className="text-foreground underline decoration-primary decoration-4 underline-offset-4">
                 sinal por Pix
               </span>

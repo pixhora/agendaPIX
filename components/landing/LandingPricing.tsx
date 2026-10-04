@@ -47,7 +47,7 @@ export function LandingPricing() {
                 </li>
                 <li className="flex items-center gap-2.5">
                   <span className="text-accent-forest dark:text-primary font-bold text-sm">✓</span>
-                  <span className="text-foreground font-semibold">Cobrança de sinal Pix automático</span>
+                  <span className="text-foreground font-semibold">Cobrança de sinal no Pix com confirmação imediata</span>
                 </li>
                 <li className="flex items-center gap-2.5">
                   <span className="text-accent-forest dark:text-primary font-bold text-sm">✓</span>

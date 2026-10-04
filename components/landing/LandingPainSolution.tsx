@@ -54,7 +54,7 @@ export function LandingPainSolution() {
                 ✓
               </span>
               <h3 className="font-display text-xl font-bold text-foreground">
-                Com a Agenda Pix no Piloto Automático
+                Com a Agenda Pix e Sinal Garantido
               </h3>
             </div>
 
@@ -74,7 +74,7 @@ export function LandingPainSolution() {
               <li className="flex items-start gap-3">
                 <span className="text-accent-forest dark:text-primary font-bold shrink-0 mt-0.5">•</span>
                 <span>
-                  <strong className="text-foreground">Confirmação 100% automática:</strong> sistema gera o QR Code com 15 min de prazo e libera a vaga se não for pago.
+                  <strong className="text-foreground">Confirmação instantânea do sinal:</strong> sistema gera o QR Code Pix com 15 min de prazo e libera o horário se não houver pagamento.
                 </span>
               </li>
             </ul>

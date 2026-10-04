@@ -193,7 +193,7 @@ export function LandingInteractiveDemo() {
 
               {/* Botão de Rodapé Simulado */}
               <div className="pt-2 border-t border-border text-center">
-                <span className="text-[10px] text-emerald-600 font-medium">🔒 Confirmação automática via Pix</span>
+                <span className="text-[10px] text-emerald-600 font-medium">🔒 Confirmação imediata após pagamento</span>
               </div>
             </div>
           </div>
