@@ -40,7 +40,7 @@ export default function PreviewDashboardPage() {
     <div className="min-h-screen bg-background text-foreground pb-20">
       {/* Topo do Painel */}
       <header className="border-b border-border bg-surface py-4 px-4 sm:px-6">
-        <div className="mx-auto max-w-6xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="mx-auto max-w-6xl flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-sm font-bold text-primary-foreground">
               SB
@@ -60,7 +60,7 @@ export default function PreviewDashboardPage() {
             </div>
           </div>
 
-          <nav className="grid grid-cols-2 gap-2 text-xs font-semibold sm:flex sm:items-center" aria-label="Navegação do painel">
+          <nav className="grid grid-cols-2 sm:flex sm:flex-wrap sm:items-center gap-2 text-xs font-semibold" aria-label="Navegação do painel">
             <Link
               href="/preview/dashboard"
               className="flex min-h-11 items-center justify-center rounded-lg bg-primary text-primary-foreground px-3 py-1.5 sm:min-h-0 sm:shrink-0"
@@ -105,12 +105,12 @@ export default function PreviewDashboardPage() {
               type="button"
               variant={copied ? "default" : "outline"}
               onClick={handleCopyLink}
-              className="min-h-9 text-xs font-semibold px-3 transition-all"
+              className="min-h-11 text-xs font-semibold px-3.5 transition-all cursor-pointer"
               aria-live="polite"
             >
               {copied ? "✓ Copiado!" : "Copiar Link"}
             </Button>
-            <Button asChild className="min-h-9 text-xs font-semibold px-3.5">
+            <Button asChild className="min-h-11 text-xs font-semibold px-4 cursor-pointer">
               <Link href="/preview/booking">Abrir página</Link>
             </Button>
           </div>
@@ -170,7 +170,7 @@ export default function PreviewDashboardPage() {
                 </h2>
                 <p className="text-xs text-muted-foreground">Expediente das 09:00 às 19:00</p>
               </div>
-              <Button asChild variant="outline" className="min-h-9 text-xs font-semibold px-3">
+              <Button asChild variant="outline" className="min-h-11 text-xs font-semibold px-3.5 cursor-pointer">
                 <Link href="/preview/reservas">Ver todas</Link>
               </Button>
             </div>
@@ -231,7 +231,7 @@ export default function PreviewDashboardPage() {
                         href={waLink}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex min-h-9 items-center justify-center rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20"
+                        className="inline-flex min-h-11 items-center justify-center rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20 cursor-pointer"
                       >
                         💬 WhatsApp
                       </a>

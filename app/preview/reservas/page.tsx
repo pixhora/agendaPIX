@@ -17,7 +17,7 @@ export default function PreviewReservasPage() {
     <div className="min-h-screen bg-background text-foreground pb-20">
       {/* Header do Painel */}
       <header className="border-b border-border bg-surface py-4 px-4 sm:px-6">
-        <div className="mx-auto max-w-6xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="mx-auto max-w-6xl flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-sm font-bold text-primary-foreground">
               SB
@@ -37,7 +37,7 @@ export default function PreviewReservasPage() {
             </div>
           </div>
 
-          <nav className="grid grid-cols-2 gap-2 text-xs font-semibold sm:flex sm:items-center" aria-label="Navegação do painel">
+          <nav className="grid grid-cols-2 sm:flex sm:flex-wrap sm:items-center gap-2 text-xs font-semibold" aria-label="Navegação do painel">
             <Link
               href="/preview/dashboard"
               className="flex min-h-11 items-center justify-center rounded-lg border border-border bg-surface px-3 py-1.5 text-muted-foreground hover:text-foreground sm:min-h-0 sm:shrink-0"
@@ -80,7 +80,7 @@ export default function PreviewReservasPage() {
               role="tab"
               aria-selected={filter === "all"}
               onClick={() => setFilter("all")}
-              className={`shrink-0 min-h-10 rounded-lg px-3.5 py-1.5 transition-colors ${
+              className={`shrink-0 min-h-11 rounded-lg px-3.5 py-2 transition-colors cursor-pointer ${
                 filter === "all"
                   ? "bg-foreground text-background"
                   : "bg-surface text-muted-foreground border border-border hover:bg-muted"
@@ -93,7 +93,7 @@ export default function PreviewReservasPage() {
               role="tab"
               aria-selected={filter === "confirmed"}
               onClick={() => setFilter("confirmed")}
-              className={`shrink-0 min-h-10 rounded-lg px-3.5 py-1.5 transition-colors ${
+              className={`shrink-0 min-h-11 rounded-lg px-3.5 py-2 transition-colors cursor-pointer ${
                 filter === "confirmed"
                   ? "bg-foreground text-background"
                   : "bg-surface text-muted-foreground border border-border hover:bg-muted"
@@ -106,7 +106,7 @@ export default function PreviewReservasPage() {
               role="tab"
               aria-selected={filter === "pending_payment"}
               onClick={() => setFilter("pending_payment")}
-              className={`shrink-0 min-h-10 rounded-lg px-3.5 py-1.5 transition-colors ${
+              className={`shrink-0 min-h-11 rounded-lg px-3.5 py-2 transition-colors cursor-pointer ${
                 filter === "pending_payment"
                   ? "bg-foreground text-background"
                   : "bg-surface text-muted-foreground border border-border hover:bg-muted"

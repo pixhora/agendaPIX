@@ -8,7 +8,7 @@ export default function PreviewConfiguracoesPage() {
     <div className="min-h-screen bg-background text-foreground pb-20">
       {/* Header do Painel */}
       <header className="border-b border-border bg-surface py-4 px-4 sm:px-6">
-        <div className="mx-auto max-w-6xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="mx-auto max-w-6xl flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-sm font-bold text-primary-foreground">
               SB
@@ -28,7 +28,7 @@ export default function PreviewConfiguracoesPage() {
             </div>
           </div>
 
-          <nav className="grid grid-cols-2 gap-2 text-xs font-semibold sm:flex sm:items-center" aria-label="Navegação do painel">
+          <nav className="grid grid-cols-2 sm:flex sm:flex-wrap sm:items-center gap-2 text-xs font-semibold" aria-label="Navegação do painel">
             <Link
               href="/preview/dashboard"
               className="flex min-h-11 items-center justify-center rounded-lg border border-border bg-surface px-3 py-1.5 text-muted-foreground hover:text-foreground sm:min-h-0 sm:shrink-0"

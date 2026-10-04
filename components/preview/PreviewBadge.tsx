@@ -91,12 +91,12 @@ export function PreviewBadge() {
           </div>
         )}
 
-        {/* Pílula Discreta e Elegante */}
+        {/* Pílula Discreta e Elegante com alvo mínimo de 44px */}
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
           aria-expanded={isOpen}
-          className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/90 px-3 py-1.5 text-xs font-semibold text-foreground shadow-md backdrop-blur hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-all"
+          className="inline-flex min-h-11 items-center gap-2 rounded-full border border-border bg-surface/90 px-3.5 py-2 text-xs font-semibold text-foreground shadow-md backdrop-blur hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-all cursor-pointer"
         >
           <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
           <span className="tracking-wide">MODO PREVIEW</span>

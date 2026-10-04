@@ -242,7 +242,7 @@ export function PreviewBookingFlow() {
                         );
                         setIsCompleted(true);
                       }}
-                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white min-h-10 text-xs font-bold shadow-sm"
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white min-h-11 text-xs font-bold shadow-sm cursor-pointer"
                     >
                       ⚡ Simular Pix Pago no Banco
                     </Button>

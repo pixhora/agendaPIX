@@ -16,20 +16,20 @@ export function LandingFooter() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-6 text-xs font-medium">
-            <Link href="/onboarding" className="hover:text-[#C0F739] transition-colors">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs font-medium">
+            <Link href="/onboarding" className="inline-flex min-h-11 items-center hover:text-[#C0F739] transition-colors">
               Criar conta
             </Link>
-            <a href="#como-funciona" className="hover:text-[#C0F739] transition-colors">
+            <a href="#como-funciona" className="inline-flex min-h-11 items-center hover:text-[#C0F739] transition-colors">
               Como funciona
             </a>
-            <a href="#recursos" className="hover:text-[#C0F739] transition-colors">
+            <a href="#recursos" className="inline-flex min-h-11 items-center hover:text-[#C0F739] transition-colors">
               Vantagens
             </a>
-            <a href="#precos" className="hover:text-[#C0F739] transition-colors">
+            <a href="#precos" className="inline-flex min-h-11 items-center hover:text-[#C0F739] transition-colors">
               Planos & Preços
             </a>
-            <a href="#perguntas-frequentes" className="hover:text-[#C0F739] transition-colors">
+            <a href="#perguntas-frequentes" className="inline-flex min-h-11 items-center hover:text-[#C0F739] transition-colors">
               Dúvidas
             </a>
           </div>

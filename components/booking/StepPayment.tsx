@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import type { BookingResponse, PaymentStatusResponse } from "./types";
 import { formatCurrency } from "./formatters";

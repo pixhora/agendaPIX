@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useEffect, useState, useMemo } from "react";
 import type { PublicService, AvailabilitySlot } from "./types";
 import { formatTimeSlot, formatCurrency } from "./formatters";

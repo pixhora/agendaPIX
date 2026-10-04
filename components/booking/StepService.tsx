@@ -1,3 +1,5 @@
+"use client";
+
 import React from "react";
 import type { PublicService } from "./types";
 import { formatCurrency, formatDuration } from "./formatters";
