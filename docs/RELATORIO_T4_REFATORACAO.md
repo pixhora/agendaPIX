@@ -18,8 +18,9 @@ Escopo: Planos T4-A, T4-B e T4-C conforme `/var/home/matheus/projetos/agenda-bac
    - Implementação de `lib/backend.ts` direcionando endpoints públicos de booking para o backend autoridade (`http://localhost:3000`).
    - Rotas de API públicas (`services`, `availability`, `bookings`, `payment`) integradas à autoridade com preservação de `Idempotency-Key` e `Authorization: Bearer`.
 
-3. **`d61f7eb`** (commit da entrega de T4-B/T4-C):
-   - Evidências visuais consolidadas em `docs/evidencias/t4/`.
+3. **`1edfcfe`** e **`4269d51`** (commits de evidências e autoridade B-02):
+   - Evidências visuais consolidadas e versionadas em `docs/evidencias/t4/`.
+   - Remoção de cópias locais de `app/api/auth`, `lib/auth.ts` e `app/api/webhooks`, delegando ao backend.
    - Medição de peso de JavaScript por rota documentada.
 
 ---
