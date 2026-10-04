@@ -1,61 +1,16 @@
 import React from "react";
-import Link from "next/link";
-import { MOCK_BUSINESS_INFO, MOCK_SERVICES, MOCK_BOOKINGS } from "@/lib/preview/mock-data";
+import { MOCK_SERVICES } from "@/lib/preview/mock-data";
 import { formatCurrency, formatDuration } from "@/components/booking/formatters";
+import { PreviewHeader } from "@/components/preview/PreviewNav";
 
 export default function PreviewServicosPage() {
   return (
     <div className="min-h-screen bg-background text-foreground pb-20">
-      {/* Header do Painel */}
-      <header className="border-b border-border bg-surface py-4 px-4 sm:px-6">
-        <div className="mx-auto max-w-6xl flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-sm font-bold text-primary-foreground">
-              SB
-            </span>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="font-display text-lg font-bold text-foreground">
-                  Serviços e Preços
-                </h1>
-                <span className="rounded bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
-                  {MOCK_BUSINESS_INFO.name}
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Procedimentos oferecidos aos clientes com cobrança de sinal no Pix
-              </p>
-            </div>
-          </div>
-
-          <nav className="grid grid-cols-2 sm:flex sm:flex-wrap sm:items-center gap-2 text-xs font-semibold" aria-label="Navegação do painel">
-            <Link
-              href="/preview/dashboard"
-              className="flex min-h-11 items-center justify-center rounded-lg border border-border bg-surface px-3 py-1.5 text-muted-foreground hover:text-foreground sm:min-h-0 sm:shrink-0"
-            >
-              Visão Geral
-            </Link>
-            <Link
-              href="/preview/reservas"
-              className="flex min-h-11 items-center justify-center rounded-lg border border-border bg-surface px-3 py-1.5 text-muted-foreground hover:text-foreground sm:min-h-0 sm:shrink-0"
-            >
-              Reservas ({MOCK_BOOKINGS.length})
-            </Link>
-            <Link
-              href="/preview/servicos"
-              className="flex min-h-11 items-center justify-center rounded-lg bg-primary text-primary-foreground px-3 py-1.5 sm:min-h-0 sm:shrink-0"
-            >
-              Serviços ({MOCK_SERVICES.length})
-            </Link>
-            <Link
-              href="/preview/configuracoes"
-              className="flex min-h-11 items-center justify-center rounded-lg border border-border bg-surface px-3 py-1.5 text-muted-foreground hover:text-foreground sm:min-h-0 sm:shrink-0"
-            >
-              Configurações
-            </Link>
-          </nav>
-        </div>
-      </header>
+      <PreviewHeader
+        title="Serviços e Preços"
+        subtitle="Procedimentos oferecidos aos clientes com cobrança de sinal no Pix"
+        currentPath="/preview/servicos"
+      />
 
       {/* Conteúdo */}
       <main className="mx-auto max-w-6xl px-4 sm:px-6 pt-6 space-y-6">

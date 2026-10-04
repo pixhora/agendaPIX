@@ -131,7 +131,11 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
       return;
     }
 
-    if (initialBookingId && stored.bookingId !== initialBookingId) {
+    // Retoma se houver initialBookingId na URL ou se o usuário reabriu com bookingId explícito
+    if (initialBookingId) {
+      if (stored.bookingId !== initialBookingId) return;
+    } else {
+      // Se não há bookingId na URL, não sequestra o fluxo inicial
       return;
     }
 

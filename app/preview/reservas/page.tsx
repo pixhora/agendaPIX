@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
-import Link from "next/link";
-import { MOCK_BUSINESS_INFO, MOCK_BOOKINGS, MOCK_SERVICES } from "@/lib/preview/mock-data";
+import { MOCK_BOOKINGS } from "@/lib/preview/mock-data";
 import { formatCurrency, formatDuration } from "@/components/booking/formatters";
+import { PreviewHeader } from "@/components/preview/PreviewNav";
 
 export default function PreviewReservasPage() {
   const [filter, setFilter] = useState<"all" | "confirmed" | "pending_payment">("all");
@@ -15,105 +15,62 @@ export default function PreviewReservasPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground pb-20">
-      {/* Header do Painel */}
-      <header className="border-b border-border bg-surface py-4 px-4 sm:px-6">
-        <div className="mx-auto max-w-6xl flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-sm font-bold text-primary-foreground">
-              SB
-            </span>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="font-display text-lg font-bold text-foreground">
-                  Reservas do Dia
-                </h1>
-                <span className="rounded bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
-                  {MOCK_BUSINESS_INFO.name}
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Lista de clientes e confirmação de pagamento de sinal Pix
-              </p>
-            </div>
-          </div>
-
-          <nav className="grid grid-cols-2 sm:flex sm:flex-wrap sm:items-center gap-2 text-xs font-semibold" aria-label="Navegação do painel">
-            <Link
-              href="/preview/dashboard"
-              className="flex min-h-11 items-center justify-center rounded-lg border border-border bg-surface px-3 py-1.5 text-muted-foreground hover:text-foreground sm:min-h-0 sm:shrink-0"
-            >
-              Visão Geral
-            </Link>
-            <Link
-              href="/preview/reservas"
-              className="flex min-h-11 items-center justify-center rounded-lg bg-primary text-primary-foreground px-3 py-1.5 sm:min-h-0 sm:shrink-0"
-            >
-              Reservas ({MOCK_BOOKINGS.length})
-            </Link>
-            <Link
-              href="/preview/servicos"
-              className="flex min-h-11 items-center justify-center rounded-lg border border-border bg-surface px-3 py-1.5 text-muted-foreground hover:text-foreground sm:min-h-0 sm:shrink-0"
-            >
-              Serviços ({MOCK_SERVICES.length})
-            </Link>
-            <Link
-              href="/preview/configuracoes"
-              className="flex min-h-11 items-center justify-center rounded-lg border border-border bg-surface px-3 py-1.5 text-muted-foreground hover:text-foreground sm:min-h-0 sm:shrink-0"
-            >
-              Configurações
-            </Link>
-          </nav>
-        </div>
-      </header>
+      <PreviewHeader
+        title="Reservas do Dia"
+        subtitle="Lista de clientes e confirmação de pagamento de sinal Pix"
+        currentPath="/preview/reservas"
+      />
 
       {/* Conteúdo */}
       <main className="mx-auto max-w-6xl px-4 sm:px-6 pt-6 space-y-6">
         {/* Barra de Filtros */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div
-            className="flex items-center gap-1.5 text-xs font-semibold overflow-x-auto pb-1 scrollbar-hide w-full sm:w-auto"
-            role="tablist"
-            aria-label="Filtro de reservas"
-          >
-            <button
-              type="button"
-              role="tab"
-              aria-selected={filter === "all"}
-              onClick={() => setFilter("all")}
-              className={`shrink-0 min-h-11 rounded-lg px-3.5 py-2 transition-colors cursor-pointer ${
-                filter === "all"
-                  ? "bg-foreground text-background"
-                  : "bg-surface text-muted-foreground border border-border hover:bg-muted"
-              }`}
+          <div className="relative w-full sm:w-auto">
+            <div
+              className="grid grid-cols-3 sm:flex sm:items-center gap-1.5 text-xs font-semibold overflow-x-auto pb-1 scrollbar-hide w-full"
+              role="tablist"
+              aria-label="Filtro de reservas"
             >
-              Todas ({MOCK_BOOKINGS.length})
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={filter === "confirmed"}
-              onClick={() => setFilter("confirmed")}
-              className={`shrink-0 min-h-11 rounded-lg px-3.5 py-2 transition-colors cursor-pointer ${
-                filter === "confirmed"
-                  ? "bg-foreground text-background"
-                  : "bg-surface text-muted-foreground border border-border hover:bg-muted"
-              }`}
-            >
-              Confirmadas ({MOCK_BOOKINGS.filter((b) => b.status === "confirmed").length})
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={filter === "pending_payment"}
-              onClick={() => setFilter("pending_payment")}
-              className={`shrink-0 min-h-11 rounded-lg px-3.5 py-2 transition-colors cursor-pointer ${
-                filter === "pending_payment"
-                  ? "bg-foreground text-background"
-                  : "bg-surface text-muted-foreground border border-border hover:bg-muted"
-              }`}
-            >
-              Aguardando Sinal ({MOCK_BOOKINGS.filter((b) => b.status === "pending_payment").length})
-            </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={filter === "all"}
+                onClick={() => setFilter("all")}
+                className={`flex items-center justify-center min-h-11 rounded-lg px-2.5 sm:px-3.5 py-2 text-center transition-colors cursor-pointer text-[11px] sm:text-xs ${
+                  filter === "all"
+                    ? "bg-foreground text-background font-bold shadow-xs"
+                    : "bg-surface text-muted-foreground border border-border hover:bg-muted"
+                }`}
+              >
+                Todas ({MOCK_BOOKINGS.length})
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={filter === "confirmed"}
+                onClick={() => setFilter("confirmed")}
+                className={`flex items-center justify-center min-h-11 rounded-lg px-2.5 sm:px-3.5 py-2 text-center transition-colors cursor-pointer text-[11px] sm:text-xs ${
+                  filter === "confirmed"
+                    ? "bg-foreground text-background font-bold shadow-xs"
+                    : "bg-surface text-muted-foreground border border-border hover:bg-muted"
+                }`}
+              >
+                Confirmadas ({MOCK_BOOKINGS.filter((b) => b.status === "confirmed").length})
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={filter === "pending_payment"}
+                onClick={() => setFilter("pending_payment")}
+                className={`flex items-center justify-center min-h-11 rounded-lg px-2.5 sm:px-3.5 py-2 text-center transition-colors cursor-pointer text-[11px] sm:text-xs ${
+                  filter === "pending_payment"
+                    ? "bg-foreground text-background font-bold shadow-xs"
+                    : "bg-surface text-muted-foreground border border-border hover:bg-muted"
+                }`}
+              >
+                Sinal Pendente ({MOCK_BOOKINGS.filter((b) => b.status === "pending_payment").length})
+              </button>
+            </div>
           </div>
 
           <span className="text-xs text-muted-foreground">

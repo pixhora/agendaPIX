@@ -9,15 +9,16 @@ import {
 } from "@/lib/preview/mock-data";
 import { formatCurrency, formatDuration } from "@/components/booking/formatters";
 import { Button } from "@/components/ui/button";
+import { PreviewHeader } from "@/components/preview/PreviewNav";
 
 export default function PreviewDashboardPage() {
   const [copied, setCopied] = useState(false);
 
   const handleCopyLink = () => {
     const url =
-      typeof window !== "undefined"
+      typeof window !== "undefined" && window.location.origin
         ? `${window.location.origin}/preview/booking`
-        : `https://agenda.com.br/${MOCK_BUSINESS_INFO.slug}`;
+        : `http://localhost:3001/preview/booking`;
     if (typeof navigator !== "undefined" && navigator.clipboard) {
       navigator.clipboard.writeText(url).then(() => {
         setCopied(true);
@@ -38,56 +39,7 @@ export default function PreviewDashboardPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground pb-20">
-      {/* Topo do Painel */}
-      <header className="border-b border-border bg-surface py-4 px-4 sm:px-6">
-        <div className="mx-auto max-w-6xl flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-sm font-bold text-primary-foreground">
-              SB
-            </span>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="font-display text-lg font-bold text-foreground">
-                  {MOCK_BUSINESS_INFO.name}
-                </h1>
-                <span className="rounded bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
-                  Painel do Dono
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                São Paulo, SP · Horário de Brasília ({MOCK_BUSINESS_INFO.timezone})
-              </p>
-            </div>
-          </div>
-
-          <nav className="grid grid-cols-2 sm:flex sm:flex-wrap sm:items-center gap-2 text-xs font-semibold" aria-label="Navegação do painel">
-            <Link
-              href="/preview/dashboard"
-              className="flex min-h-11 items-center justify-center rounded-lg bg-primary text-primary-foreground px-3 py-1.5 sm:min-h-0 sm:shrink-0"
-            >
-              Visão Geral
-            </Link>
-            <Link
-              href="/preview/reservas"
-              className="flex min-h-11 items-center justify-center rounded-lg border border-border bg-surface px-3 py-1.5 text-muted-foreground hover:text-foreground sm:min-h-0 sm:shrink-0"
-            >
-              Reservas ({MOCK_BOOKINGS.length})
-            </Link>
-            <Link
-              href="/preview/servicos"
-              className="flex min-h-11 items-center justify-center rounded-lg border border-border bg-surface px-3 py-1.5 text-muted-foreground hover:text-foreground sm:min-h-0 sm:shrink-0"
-            >
-              Serviços ({MOCK_SERVICES.length})
-            </Link>
-            <Link
-              href="/preview/configuracoes"
-              className="flex min-h-11 items-center justify-center rounded-lg border border-border bg-surface px-3 py-1.5 text-muted-foreground hover:text-foreground sm:min-h-0 sm:shrink-0"
-            >
-              Configurações
-            </Link>
-          </nav>
-        </div>
-      </header>
+      <PreviewHeader currentPath="/preview/dashboard" />
 
       {/* Conteúdo Principal */}
       <main className="mx-auto max-w-6xl px-4 sm:px-6 pt-6 space-y-6">

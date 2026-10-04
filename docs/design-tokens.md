@@ -1,215 +1,96 @@
-# Design Tokens e Direção Visual
+# Design Tokens e Direção Visual (Definitivo)
 
-> Documento de referência visual para a interface pública de agendamento e design system.
-> Foco: mobile-first (375px), velocidade operacional, contraste alto e conversão imediata de agendamentos com Pix.
+> Documento normativo de design system para toda a interface pública de agendamento (Booking), telas de Onboarding/Landing e Painel do Dono.
+> Status: **FINAL / HOMOLOGADO (T4)**
+> Foco: mobile-first (375px), velocidade operacional, contraste alto (WCAG AA/AAA) e conversão imediata de agendamentos com Pix.
 
 ---
 
-## 1. Paleta de Cores (Direção Visual Verde-Lima & Editorial)
+## 1. Identidade e Paleta de Cores (Verde-Lima & Floresta Mineral)
 
-Inspirada na referência de design de alta conversão (`ee905469-4d39-45c2-a095-6af185533ae1.png`): fundo off-white mineral, títulos sans-serif pretos marcantes, acentos em verde-lima vibrante e verde-petróleo profundo.
+Uma direção visual editorial, limpa e funcional, que afasta qualquer cara de template genérico (sem fundo creme/terracota e sem fundo preto com verde neon).
 
-| Nome do Token | Hex | Função / Aplicação | Contraste (WCAG) |
-|---|---|---|---|
-| `color-bg-canvas` | `#F5F6F2` | Fundo principal da aplicação (off-white mineral contemporâneo) | Base |
-| `color-surface` | `#FFFFFF` | Superfície de cartões, formulários e painéis | 1.05:1 vs canvas |
-| `color-dark-card` | `#0E1612` | Fundo de cards escuros de alta sofisticação e mockups | 15.5:1 vs canvas |
-| `color-text-main` | `#111613` | Títulos editoriais, valores e textos principais (preto carvão) | 16.5:1 vs surface (AAA) |
-| `color-text-muted` | `#5A645C` | Textos de apoio, durações, etiquetas secundárias (cinza neutro) | 4.8:1 vs surface (AA) |
-| `color-border` | `#E2E6DF` | Divisores, contorno de inputs e cards desmarcados | Estrutural |
-| `color-accent-lime` | `#C0F739` | **Ação primária de energia**: botões pill de conversão com texto preto | 13.8:1 vs texto `#111613` (AAA) |
-| `color-accent-forest` | `#0F3B2E` | **Acento profundo de solidez**: badges de nicho, cards sobrepostos e títulos | 9.2:1 vs branco (AAA) |
+### 1.1 Cores Nomeadas (6 Cores Principais)
 
-### Formato de Botões e Badges
-- Botões de conversão e badges de categoria utilizam estritamente o formato **Pill** (`rounded-full` / `radius-pill`).
+| Token Semântico | Hex (Claro) | Hex (Escuro / `.dark`) | Função / Aplicação | WCAG Contraste Mínimo |
+|---|---|---|---|---|
+| `--color-background` | `#F5F6F2` | `#0E1612` | Fundo principal da página (canvas mineral) | Base |
+| `--color-surface` | `#FFFFFF` | `#141F1A` | Superfície de cartões, formulários, modais | 1.05:1 vs canvas |
+| `--color-foreground` | `#111613` | `#F5F6F2` | Texto principal, títulos e números tabulares | 16.5:1 vs surface (AAA) |
+| `--color-muted-foreground` | `#5A645C` | `#8A968C` | Textos de apoio, durações, etiquetas secundárias | 4.8:1 vs surface (AA) |
+| `--color-border` | `#E2E6DF` | `#23352C` | Divisores, contorno de inputs e cards desmarcados | Estrutural |
+| `--color-primary` (Acento Lima) | `#C0F739` | `#C0F739` | Ação primária de conversão (botão pill com texto preto) | 13.8:1 vs texto `#111613` (AAA) |
+| `--color-accent-forest` | `#0F3B2E` | `#175442` | Acento sólido para badges, estados selecionados e anéis | 9.2:1 vs branco (AAA) |
+| `--color-dark-card` | `#0E1612` | `#080D0A` | Fundo de cards de destaque escuros | Alto contraste |
+
+### 1.2 Regras de Aplicação
+- **Modo Escuro**: ativado via seletor de classe `.dark` explícito no `<html>` (ou `@media (prefers-color-scheme: dark)` como fallback nativo do sistema).
+- **Botões de Ação Principal**: fundo `--color-primary` (`#C0F739`), texto `--color-primary-foreground` (`#111613`), formato pill (`rounded-full`), nunca texto branco sobre verde-lima.
+- **Estados de Foco**: anel de foco de 2px `--color-ring` com offset visível em todos os elementos interativos.
 
 ---
 
 ## 2. Tipografia
 
-Duas famílias do Google Fonts via `next/font`:
-1. **Títulos e Ações**: `Plus Jakarta Sans` (geométrica, moderna, corte contemporâneo e excelente leitura em cabeçalhos compactos).
-2. **Corpo, Dados e Horários**: `Inter` (numerais tabulares perfeitos para horários e valores em R$).
+Duas famílias do Google Fonts carregadas via `next/font/google` com zero layout shift e zero dependência de download externo em tempo de execução:
+1. **Títulos e Destaques (`--font-display`)**: `Plus Jakarta Sans` (geométrica, moderna, corte editorial contemporâneo).
+2. **Corpo, Dados e Horários (`--font-sans`)**: `Inter` (alta legibilidade, numerais tabulares para horários e valores BRL).
 
-### Escala de Tipos
+### 2.1 Escala Tipográfica Padronizada
 
-| Token | Tamanho / Altura de Linha | Peso | Uso |
-|---|---|---|---|
-| `type-2xl` | 28px / 36px | Bold (700) | Nome do estabelecimento no cabeçalho |
-| `type-xl` | 20px / 28px | SemiBold (600) | Títulos das etapas do fluxo |
-| `type-lg` | 18px / 26px | SemiBold (600) | Nome do serviço, valor em destaque |
-| `type-base` | 16px / 24px | Regular (400) / Medium (500) | Inputs de formulário (evita zoom no Safari iOS) e botões |
-| `type-sm` | 14px / 20px | Medium (500) | Grade de horários, durações (ex: "45 min") |
-| `type-xs` | 12px / 16px | Regular (400) | Badges de status, avisos de sinal Pix |
+| Tamanho | Leading | Token / Classe | Peso Padrão | Aplicação Típica |
+|---|---|---|---|---|
+| **64px** | 1.1 | `text-6xl` | Bold (700) | Títulos heróicos na landing page |
+| **40px** | 1.15 | `text-4xl` | Bold (700) | Cabeçalhos principais e destaques numéricos |
+| **28px** | 1.25 | `text-2xl` | Bold (700) | Nome do estabelecimento / cabeçalho do fluxo |
+| **20px** | 1.4 | `text-xl` | SemiBold (600) | Títulos de passos e modais |
+| **16px** | 1.5 | `text-base` | Regular / Medium | Inputs de formulário (≥16px previne zoom no iOS) |
+| **14px** | 1.45 | `text-sm` | Medium (500) | Grade de horários, durações de procedimentos |
 
-*Regra rígida: linhas de texto de leitura nunca ultrapassam 65 caracteres.*
+*Comprimento máximo de linha de leitura: 65 a 80 caracteres (`max-w-prose`).*
 
 ---
 
-## 3. Escalas Estruturais
+## 3. Escala Estrutural: Raios, Sombras e Espaçamentos
 
-### Raio de Borda (Border Radius)
-Hierarquia por tamanho de componente, evitando arredondamento uniforme e genérico:
+### 3.1 Raio de Borda (Border Radius)
+Hierarquia por escala física do elemento:
+- **`radius-sm` (6px / `0.375rem`)**: badges informativos, tags de duração.
+- **`radius` (10px / `0.625rem`)**: botões de horário (slots), campos de texto (inputs).
+- **`radius-lg` (16px / `1rem`)**: cards de procedimentos, container do QR Code Pix.
+- **`radius-xl` (24px / `1.5rem`)**: gavetas modais inferiores (bottom sheets).
+- **`radius-pill` (9999px / `rounded-full`)**: botões de conversão e badges de status.
 
-- `radius-sm` (6px): Badges informativas, tags de duração.
-- `radius-md` (10px): Botões de horários, campos de texto (inputs).
-- `radius-lg` (16px): Cards de serviços, caixa do QR Code Pix.
-- `radius-xl` (24px): Barra de ação inferior flutuante e gaveta modal (bottom sheet).
-
-### Sombras (Elevation)
-Sombras suaves e direcionadas, sem excesso de blur escuro:
-
-- `shadow-sm`: `0 1px 2px 0 rgb(15 23 42 / 0.05)` (cards e inputs em repouso).
-- `shadow-md`: `0 4px 12px -2px rgb(15 23 42 / 0.08)` (card selecionado, botão flutuante).
+### 3.2 Sombras (Elevation)
+- `shadow-xs`: `0 1px 2px 0 rgb(15 23 42 / 0.05)` (cards e inputs em repouso).
+- `shadow-sm`: `0 2px 8px -1px rgb(15 23 42 / 0.08)` (card ativo / selecionado).
 - `shadow-sheet`: `0 -8px 24px 0 rgb(15 23 42 / 0.10)` (barra inferior de confirmação).
 
-### Espaçamento (Spacing)
-Grid base de 4px:
-- `space-1` (4px): Espaçamento interno entre ícone e texto.
-- `space-2` (8px): Gaps internos em grupos compactos.
-- `space-3` (12px): Padding interno de inputs e botões de slot.
-- `space-4` (16px): **Padding lateral obrigatório no mobile (gutter)**.
-- `space-6` (24px): Separação entre seções verticais.
-- `space-8` (32px): Separação de blocos principais.
+### 3.3 Espaçamentos (Mobile-First 375px)
+- **Gutter Lateral Obrigatório**: 16px (`px-4`) no mobile, 24px (`px-6`) em telas maiores.
+- **Alvo de Toque Mínimo**: 44px x 44px (`min-h-11`) para qualquer botão ou controle tocável.
+- **Reserva de Espaço Inferior**: `pb-24` ou `pb-28` em fluxos com barra flutuante para evitar sobreposição de conteúdo.
 
 ---
 
-## 4. Elemento Memorável
+## 4. Elemento-Assinatura Memorável
 
-**A Régua Tátil de Dias com Indicador de Vagas Imediatas.**
-
-- **O que é**: Uma fita horizontal no topo do Passo 2 que mostra os próximos 7 dias em pílulas compactas com data e contador direto de vagas (ex: `Hoje · 3 vagas`, `Amanhã · 8 vagas`, `Qui · Esgotado`).
-- **Por que é memorável**:
-  1. Elimina a dor clássica do cliente de ficar clicando dia a dia em um calendário grego minúsculo só para descobrir que não tem vaga.
-  2. Cria senso de oportunidade legítimo ("restam 2 vagas") sem precisar de pop-ups agressivos.
-  3. Focado em uso real por celular com polegar (gesto natural de scroll horizontal).
+**A Régua Tátil de Dias com Indicador Imediato de Vagas:**
+- Fita horizontal com pílulas compactas no topo da seleção de horário.
+- Exibe o dia da semana, dia do mês e a quantidade de vagas disponíveis sem exigir múltiplos toques.
+- Navegação por toque com rolagem horizontal suave, sem barra de rolagem nativa aparente (`scrollbar-hide` compatível com claro e escuro).
+- Foco de teclado acessível com suporte a setas e leitor de tela.
 
 ---
 
-## 5. Fluxo de Agendamento em 4 Passos (Wireframe ASCII Mobile 375px)
+## 5. Tokens de Movimento e Acessibilidade
 
-```text
-+-----------------------------------+
-| PASSO 1: ESCOLHA DO SERVIÇO       |
-+-----------------------------------+
-| Barbearia do Silva                |
-| Rua Augusta, 1200 · Aberto        |
-|                                   |
-| Escolha o serviço:                |
-| +-------------------------------+ |
-| | Corte Cabelo + Barba          | |
-| | 50 min · R$ 70,00             | |
-| | Sinal de R$ 20,00 no Pix      | |
-| | [ Selecionar ]                | |
-| +-------------------------------+ |
-| +-------------------------------+ |
-| | Corte Tradicional             | |
-| | 30 min · R$ 45,00             | |
-| | Sinal de R$ 15,00 no Pix      | |
-| | [ Selecionar ]                | |
-| +-------------------------------+ |
-+-----------------------------------+
-
-+-----------------------------------+
-| PASSO 2: DIA E HORÁRIO            |
-+-----------------------------------+
-| Corte Cabelo + Barba (50 min)     |
-|                                   |
-| [Hoje · 2 vagas] [Amanhã · 5] >   |
-|                                   |
-| Horários disponíveis para Hoje:   |
-| [ 14:00 ]  [ 15:00 ]  [ 16:30 ]   |
-| [ 17:30 ]  [ 18:30 ]  [ 19:15 ]   |
-|                                   |
-| Horário selecionado: Hoje às 16:30|
-| +-------------------------------+ |
-| | Continuar (R$ 20 de sinal)    | |
-| +-------------------------------+ |
-+-----------------------------------+
-
-+-----------------------------------+
-| PASSO 3: SEUS DADOS               |
-+-----------------------------------+
-| Hoje, 16:30 · Corte + Barba       |
-| Total: R$ 70 (Sinal agora: R$ 20) |
-|                                   |
-| Seu nome completo                 |
-| [ Matheus Silva                 ] |
-|                                   |
-| WhatsApp (para confirmação)       |
-| [ (11) 98765-4321               ] |
-|                                   |
-| +-------------------------------+ |
-| | Gerar Pix de R$ 20,00         | |
-| +-------------------------------+ |
-+-----------------------------------+
-
-+-----------------------------------+
-| PASSO 4: PAGAMENTO DO SINAL PIX   |
-+-----------------------------------+
-| Quase lá! Pague para garantir     |
-| Expira em 10:00 minutos           |
-|                                   |
-|         +---------------+         |
-|         |    QR CODE    |         |
-|         |      PIX      |         |
-|         +---------------+         |
-| Valor do sinal: R$ 20,00          |
-|                                   |
-| [ Copiar código Pix ]             |
-|                                   |
-| [ Já fiz o pagamento no banco ]   |
-| Horário reservado temporariamente |
-+-----------------------------------+
-```
-
----
-
-## 6. O que Vamos Evitar Rigirosamente
-
-1. **Estética clichê de IA**:
-   - Zero fundo creme/bege com tipografia com serifa clássica (estilo "spa boutique genérico").
-   - Zero tema dark total com verde neon/ácido brilhante.
-2. **Poluição visual e atrito**:
-   - Sem rótulos em caixa alta espaçada (`S E R V I Ç O S`).
-   - Sem números ordinais gigantes e puramente decorativos ("01", "02", "03").
-   - Sem setas desnecessárias em botões (`Avançar ->`).
-   - Sem degradês/gradientes roxo-rosa ou enfeites sem função de usabilidade.
-3. **Perda de performance**:
-   - Sem animações de fade-up lentas que atrasam a exibição no 4G de salão.
-   - Sem modais aninhados ou calendários estilo desktop reduzidos à força.
-
----
-
-## 7. Tokens de Movimento e Animação (A1)
-
-Definidos pelo Terminal 4 para garantir consistência em toda a experiência (Booking, Dashboard do T2 e Landing/Onboarding do T5).
-
-### 7.1 Duração e Aceleração
-
-| Token | Valor | Uso / Propósito |
+| Token | Duração | Função |
 |---|---|---|
-| `--duration-feedback` | `120ms` | Toque, seleção de radio/cards, hover em desktop, scale de botão |
-| `--duration-opening` | `180ms` | Fades de rolagem (ex: régua de datas), menus suspensos, diálogos |
-| `--duration-step` | `240ms` | Troca de etapas de formulário/fluxo, preenchimento de progresso |
-| `--ease-standard` | `cubic-bezier(0.16, 1, 0.3, 1)` | Curva de desaceleração natural e suave sem sobressaltos |
+| `--duration-feedback` | `120ms` | Toque, seleção de radio, hover em botões |
+| `--duration-opening` | `180ms` | Fades de rolagem, modais |
+| `--duration-step` | `240ms` | Transição de passos de formulário |
+| `--ease-standard` | `cubic-bezier(0.16, 1, 0.3, 1)` | Curva de desaceleração suave |
 
-### 7.2 Utilitários CSS (`@layer utilities`)
-
-- `.transition-feedback`: transição de cores, sombras e transform em 120ms.
-- `.transition-opening`: transição suave de opacidade e visibilidade em 180ms.
-- `.transition-step`: transição sincronizada de largura e cor da barra de etapas em 240ms.
-- `.animate-step-in`: entrada sutil de tela com opacidade 0 → 1 e translação Y de 6px → 0 em 240ms.
-- `.animate-confirm-pop`: celebração única e discreta de confirmação (escala 0.96 → 1 e opacidade em 240ms).
-
-### 7.3 Diretrizes e Acessibilidade (`prefers-reduced-motion`)
-
-- Quando `@media (prefers-reduced-motion: reduce)` está ativo:
-  - Todas as durações de transição e animação são forçadas a `0s !important` (≤ 0.001s).
-  - Deslocamentos e transformações são desativados (`transform: none !important`).
-  - O conteúdo é imediatamente acessível sem esperas.
-- **Invariantes**:
-  - Nenhum botão ou formulário aguarda o término da animação para aceitar interação.
-  - Troca de passos preserva campos do formulário (sem reset de estado no recuo).
-  - Confirmação do Pix só é animada após resposta definitiva de confirmação pelo servidor (ou simulação demarcada no Preview).
-
+### Suporte a `prefers-reduced-motion`
+Quando ativo no sistema operacional do usuário, todas as animações e transições são imediatamente anuladas (`0s !important`), preservando usabilidade instantânea.
