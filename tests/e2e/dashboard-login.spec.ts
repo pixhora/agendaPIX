@@ -7,7 +7,7 @@ for (const colorScheme of ["light", "dark"] as const) {
       await page.emulateMedia({ colorScheme });
       await page.goto("/dashboard/login");
       await page.evaluate((scheme) => document.documentElement.classList.add(scheme), colorScheme);
-      await expect(page.locator("html")).toHaveClass(colorScheme);
+      await expect(page.locator("html")).toHaveClass(new RegExp(`\\b${colorScheme}\\b`));
       await expect(page.getByRole("link", { name: "Agenda, início" })).toBeVisible();
       await expect(page.getByRole("heading", { name: "Entre no seu painel" })).toBeVisible();
       const input = page.getByLabel("Seu email");

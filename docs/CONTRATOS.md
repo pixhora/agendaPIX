@@ -2,8 +2,7 @@
 
 ## Escopo e estado
 
-Esta versão inclui a base técnica e o fluxo público de reserva com Pix simulado.
-Rotas implementadas e seus formatos estão documentados abaixo. O painel local usa Server Components e Server Actions com PostgreSQL real; sua revisão e integração entre branches permanecem pendentes. Gateway bancário real não está implementado.
+Este contrato registra a base técnica e o fluxo público de reserva com Pix simulado mantidos pela autoridade backend. Nesta worktree, o painel usa Server Components e Server Actions com PostgreSQL real; autenticação, rotas públicas e webhooks não são publicados localmente. Gateway bancário real não está implementado.
 
 ## Convenções
 
@@ -47,17 +46,17 @@ Os testes com Postgres exercitam a consulta por dono e as referências cruzadas 
 Exclusões de domínio usam `RESTRICT` para evitar perda silenciosa de histórico financeiro.
 A exclusão de conta e a política de retenção LGPD ainda precisam de definição do humano; não há endpoint destrutivo nesta etapa.
 
-## Rotas implementadas
+## Rotas do processo
 
 | Método e rota | Comportamento |
 | --- | --- |
 | `GET /` | Página provisória do esqueleto. |
 | `GET /api/health` | `200` com `{ "status": "ok" }`; saúde do processo HTTP, sem consultar dependências. |
-| `GET/POST /api/auth/[...all]` | Handler do Better Auth. Validação de entrada e de origem feita pela biblioteca. |
-| `POST /api/auth/sign-in/magic-link` | Recebe email e callback; envia link por SMTP configurado. |
-| `GET /api/auth/magic-link/verify` | Consome link válido e cria sessão. |
-| `GET /api/auth/get-session` | Sessão atual ou ausência de sessão. |
-| `POST /api/auth/sign-out` | Encerra a sessão atual. |
+| `GET/POST /api/auth/[...all]` | Backend autoridade; não servido pelo dashboard. Validação de entrada e origem feita pelo Better Auth. |
+| `POST /api/auth/sign-in/magic-link` | Backend autoridade recebe email e callback e envia link por SMTP configurado. |
+| `GET /api/auth/magic-link/verify` | Backend autoridade consome link válido e cria sessão. |
+| `GET /api/auth/get-session` | Backend autoridade responde sessão atual ou ausência. No dashboard, esta rota retorna 404. |
+| `POST /api/auth/sign-out` | Backend autoridade encerra sessão. |
 
 A configuração é validada com Zod quando usada. Build não abre conexão ao banco nem exige segredos.
 Solicitação de link com SMTP inválido falha; nunca simula envio nem revela link no terminal.
@@ -120,7 +119,7 @@ Disponibilidade usa o fuso do negócio e o intervalo de funcionamento do dia. In
 Reservas pendentes vencidas não ocupam disponibilidade. Ao criar nova reserva, elas são marcadas como expiradas antes da disputa pelo horário.
 Concorrência é protegida por lock transacional do negócio e restrição de exclusão no Postgres. Não há confirmação após liberar uma reserva vencida.
 
-## Rotas públicas
+## Rotas públicas da autoridade backend
 
 - `GET /api/public/[slug]/services`: nome e fuso do negócio e serviços ativos com `id`, `name`, `durationMinutes`, `priceCents`, `depositCents`.
 - `GET /api/public/[slug]/availability?serviceId=<uuid>&date=YYYY-MM-DD`: responde `{ timezone, slots: [{ startsAt, endsAt }] }`. Datas de horários são ISO 8601 UTC. Lista vazia significa fechado, passado ou sem vagas.
@@ -146,7 +145,7 @@ A chamada ao provider ocorre na transação de reserva. Antes de um gateway real
 
 ## Webhook
 
-`POST /api/webhooks/payments/fake` recebe JSON estrito:
+`POST /api/webhooks/payments/fake` é servido somente pela autoridade backend. O dashboard retorna 404 e não processa webhooks. O endpoint backend recebe JSON estrito:
 
 ```json
 {

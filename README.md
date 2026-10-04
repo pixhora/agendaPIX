@@ -41,7 +41,7 @@ O terminal 3 adicionará os fluxos reais quando o agendamento e o Pix existirem.
 
 ## Autenticação
 
-Better Auth oferece email com link mágico em `/api/auth/[...all]`. Configure as variáveis SMTP antes de solicitar um link.
+O dashboard usa Better Auth pela autoridade configurada em `NEXT_PUBLIC_BACKEND_URL` (local: `http://localhost:3000`); as rotas de autenticação não são servidas nesta aplicação. Configure SMTP no backend antes de solicitar um link.
 O cliente pode usar `authClient.signIn.magicLink({ email, callbackURL: "/" })` e `authClient.signOut()`.
 O link expira em cinco minutos, é consumido uma vez e fica armazenado como hash.
 Não há login por senha ou Google nesta etapa. Nenhum link ou token é registrado no terminal.
@@ -65,7 +65,7 @@ Os scripts de instalação permitidos estão limitados a `esbuild` e `unrs-resol
 
 ## Fluxo Pix simulado
 
-As rotas públicas agora oferecem serviços, disponibilidade, reserva e consulta do pagamento.
+O backend de autoridade oferece serviços, disponibilidade, reserva e consulta do pagamento. O dashboard não publica cópias locais dessas rotas.
 Veja os formatos, headers e exemplos em [docs/CONTRATOS.md](docs/CONTRATOS.md).
 Atualize `.env` com `PAYMENT_PROVIDER=fake` e um `FAKE_WEBHOOK_SECRET` exclusivo de pelo menos 32 caracteres.
 A simulação funciona em desenvolvimento/testes; fica bloqueada em produção. QR Code e copia-e-cola são fictícios e não pagam em banco.

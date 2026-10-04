@@ -9,13 +9,13 @@ test("esqueleto abre no celular e responde à verificação de saúde", async ({
 });
 
 
-test("autenticação rejeita email inválido e não revela sessão inexistente", async ({ request }) => {
+test("dashboard não publica cópias locais das APIs da autoridade", async ({ request }) => {
   const session = await request.get("/api/auth/get-session");
-  expect(session.ok()).toBe(true);
-  expect(await session.json()).toBeNull();
-  const invalid = await request.post("/api/auth/sign-in/magic-link", {
-    headers: { origin: "http://localhost:3000" },
-    data: { email: "email-inválido", callbackURL: "/" },
-  });
-  expect(invalid.status()).toBe(400);
+  expect(session.status()).toBe(404);
+
+  const services = await request.get("/api/public/barbearia-demo/services");
+  expect(services.status()).toBe(404);
+
+  const webhook = await request.post("/api/webhooks/payments/fake", { data: {} });
+  expect(webhook.status()).toBe(404);
 });

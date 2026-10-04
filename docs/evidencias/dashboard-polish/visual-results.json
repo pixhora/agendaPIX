@@ -1,0 +1,167 @@
+{
+  "base": "c16fadd + uncommitted visual polish",
+  "server": "http://127.0.0.1:3342",
+  "results": [
+    {
+      "route": "agenda-dia",
+      "width": 375,
+      "colorScheme": "light",
+      "scrollWidth": 375,
+      "tabs": 4,
+      "minTabHeight": 44
+    },
+    {
+      "route": "agenda-semana",
+      "width": 375,
+      "colorScheme": "light",
+      "scrollWidth": 375,
+      "tabs": 4,
+      "minTabHeight": 44
+    },
+    {
+      "route": "servicos",
+      "width": 375,
+      "colorScheme": "light",
+      "scrollWidth": 375,
+      "tabs": 4,
+      "minTabHeight": 44
+    },
+    {
+      "route": "clientes",
+      "width": 375,
+      "colorScheme": "light",
+      "scrollWidth": 375,
+      "tabs": 4,
+      "minTabHeight": 44
+    },
+    {
+      "route": "configuracoes",
+      "width": 375,
+      "colorScheme": "light",
+      "scrollWidth": 375,
+      "tabs": 4,
+      "minTabHeight": 44
+    },
+    {
+      "route": "agenda-dia",
+      "width": 375,
+      "colorScheme": "dark",
+      "scrollWidth": 375,
+      "tabs": 4,
+      "minTabHeight": 44
+    },
+    {
+      "route": "agenda-semana",
+      "width": 375,
+      "colorScheme": "dark",
+      "scrollWidth": 375,
+      "tabs": 4,
+      "minTabHeight": 44
+    },
+    {
+      "route": "servicos",
+      "width": 375,
+      "colorScheme": "dark",
+      "scrollWidth": 375,
+      "tabs": 4,
+      "minTabHeight": 44
+    },
+    {
+      "route": "clientes",
+      "width": 375,
+      "colorScheme": "dark",
+      "scrollWidth": 375,
+      "tabs": 4,
+      "minTabHeight": 44
+    },
+    {
+      "route": "configuracoes",
+      "width": 375,
+      "colorScheme": "dark",
+      "scrollWidth": 375,
+      "tabs": 4,
+      "minTabHeight": 44
+    },
+    {
+      "route": "agenda-dia",
+      "width": 1280,
+      "colorScheme": "light",
+      "scrollWidth": 1280,
+      "tabs": 4,
+      "minTabHeight": 44
+    },
+    {
+      "route": "agenda-semana",
+      "width": 1280,
+      "colorScheme": "light",
+      "scrollWidth": 1280,
+      "tabs": 4,
+      "minTabHeight": 44
+    },
+    {
+      "route": "servicos",
+      "width": 1280,
+      "colorScheme": "light",
+      "scrollWidth": 1280,
+      "tabs": 4,
+      "minTabHeight": 44
+    },
+    {
+      "route": "clientes",
+      "width": 1280,
+      "colorScheme": "light",
+      "scrollWidth": 1280,
+      "tabs": 4,
+      "minTabHeight": 44
+    },
+    {
+      "route": "configuracoes",
+      "width": 1280,
+      "colorScheme": "light",
+      "scrollWidth": 1280,
+      "tabs": 4,
+      "minTabHeight": 44
+    },
+    {
+      "route": "agenda-dia",
+      "width": 1280,
+      "colorScheme": "dark",
+      "scrollWidth": 1280,
+      "tabs": 4,
+      "minTabHeight": 44
+    },
+    {
+      "route": "agenda-semana",
+      "width": 1280,
+      "colorScheme": "dark",
+      "scrollWidth": 1280,
+      "tabs": 4,
+      "minTabHeight": 44
+    },
+    {
+      "route": "servicos",
+      "width": 1280,
+      "colorScheme": "dark",
+      "scrollWidth": 1280,
+      "tabs": 4,
+      "minTabHeight": 44
+    },
+    {
+      "route": "clientes",
+      "width": 1280,
+      "colorScheme": "dark",
+      "scrollWidth": 1280,
+      "tabs": 4,
+      "minTabHeight": 44
+    },
+    {
+      "route": "configuracoes",
+      "width": 1280,
+      "colorScheme": "dark",
+      "scrollWidth": 1280,
+      "tabs": 4,
+      "minTabHeight": 44
+    }
+  ],
+  "consolePageErrors": []
+}
