@@ -116,13 +116,13 @@ export function OnboardingFlow() {
                   <div className="w-full flex items-center">
                     {idx > 0 && (
                       <div
-                        className={`h-1 flex-1 transition-colors ${
+                        className={`h-1 flex-1 transition-colors duration-240 motion-reduce:transition-none ${
                           isDone ? "bg-primary" : "bg-border"
                         }`}
                       />
                     )}
                     <div
-                      className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 transition-colors ${
+                      className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 transition-all duration-240 motion-reduce:transition-none ${
                         isCurrent
                           ? "bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2 ring-offset-background"
                           : isDone
@@ -134,14 +134,14 @@ export function OnboardingFlow() {
                     </div>
                     {idx < STEPS.length - 1 && (
                       <div
-                        className={`h-1 flex-1 transition-colors ${
+                        className={`h-1 flex-1 transition-colors duration-240 motion-reduce:transition-none ${
                           isDone && step > s.step + 1 ? "bg-primary" : "bg-border"
                         }`}
                       />
                     )}
                   </div>
                   <span
-                    className={`mt-1 text-[11px] font-medium ${
+                    className={`mt-1 text-[11px] font-medium transition-colors duration-240 motion-reduce:transition-none ${
                       isCurrent ? "text-primary font-semibold" : "text-muted-foreground"
                     }`}
                   >
@@ -153,8 +153,8 @@ export function OnboardingFlow() {
           </ol>
         </nav>
 
-        {/* Card do Passo Ativo */}
-        <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6 shadow-sm">
+        {/* Card do Passo Ativo com Transição Suave (240ms) */}
+        <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6 shadow-sm transition-opacity duration-240 ease-out motion-reduce:transition-none">
           {step === 1 && (
             <StepBusiness
               businessName={data.businessName}

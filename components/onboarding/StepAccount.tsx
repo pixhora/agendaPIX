@@ -231,7 +231,7 @@ export function StepAccount({
         {errorMessage && (
           <div
             role="alert"
-            className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-xs text-destructive"
+            className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-xs text-destructive transition-all duration-180 ease-out motion-reduce:transition-none"
           >
             {errorMessage}
           </div>
@@ -254,14 +254,14 @@ export function StepAccount({
           variant="outline"
           disabled={isSubmitting}
           onClick={onBack}
-          className="flex-1 min-h-12 font-medium rounded-full"
+          className="flex-1 min-h-12 font-medium rounded-full transition-transform duration-120 active:scale-[0.98] motion-reduce:transform-none"
         >
           Voltar
         </Button>
         <Button
           type="submit"
           disabled={!isEmailValid || isSubmitting}
-          className="flex-[2] min-h-12 font-semibold rounded-full bg-primary hover:bg-primary-hover text-primary-foreground"
+          className="flex-[2] min-h-12 font-semibold rounded-full bg-primary hover:bg-primary-hover text-primary-foreground transition-transform duration-120 active:scale-[0.98] motion-reduce:transform-none"
         >
           {isSubmitting ? "Enviando link..." : "Ativar meus 7 dias grátis"}
         </Button>

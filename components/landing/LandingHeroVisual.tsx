@@ -75,7 +75,7 @@ export function LandingHeroVisual() {
         <div className="absolute bottom-4 left-0 z-10 w-[230px] sm:w-[260px] rounded-3xl bg-[#0E1612] p-5 shadow-2xl border border-emerald-900/40 text-white">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-[#C0F739] animate-pulse" />
+              <span className="h-2 w-2 rounded-full bg-[#C0F739]" />
               <span className="text-[11px] font-semibold text-emerald-400">Próximo na Agenda</span>
             </div>
             <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded-full text-white/80">

@@ -194,14 +194,15 @@
   - `88ce4d2`: Redesenho mobile-first 375px: botões full-width `min-h-12` (48px), grid de nichos balanceado e inputs táteis.
   - `9e36847`: LandingHeader responsivo mobile: badge SINAL oculta `< sm`, Entrar link texto compacto `min-h-11`, CTA primário `whitespace-nowrap min-h-11` sem corte em 320px/360px/375px (homologado por T4 em `7002e78`).
   - `e5d8843`: Remoção de simulação de sucesso em desenvolvimento fora de `/preview` em `app/login/page.tsx` e `StepAccount.tsx`; criação de `lib/magic-link.ts` e suíte de testes `tests/unit/login-auth.test.ts`. Falha 500/rede exibe erro observável com `role="alert"`, NUNCA enviado fictício.
+  - Implementação A3 (`PLANO_ANIMACOES.md`): Micro-interações táteis nos CTAs (`duration-120 active:scale-[0.98] motion-reduce:transform-none`), transição suave de progresso/passo no Onboarding (`duration-240 ease-out`), alertas de erro/sucesso discretos (`duration-180 ease-out`), hero com sequência única e sóbria sem animação decorativa contínua, acessibilidade estrita com `motion-reduce:transition-none motion-reduce:transform-none`, e renderização imediata do conteúdo SSR sem dependência de JavaScript para visualização.
 - **Quality Gates**:
   - `pnpm lint`: 0 warnings / 0 erros.
   - `pnpm typecheck`: 0 erros.
   - `pnpm test`: 10 arquivos, 73/73 testes unitários aprovados (100%).
 - **Provas Browser (`agent-browser`)**:
-  - Landing (`/`): 320x640, 360x640, 375x812 e 1280x800 com `hasHorizontalOverflow: false` e touch targets >= 44px.
+  - Landing (`/`): 320x640, 360x640, 375x812 e 1280x800 com `hasHorizontalOverflow: false` e touch targets >= 44px; testado em tema claro, escuro e reduced-motion.
   - Login (`/login`): testado em modo claro e escuro; erro real observável sob falha de infraestrutura (`/tmp/login-real-error-375.png`).
-  - Onboarding (`/onboarding`): 4 etapas fluidas sem transbordo e com validação inline.
+  - Onboarding (`/onboarding`): 4 etapas com avanço fluido sincronizado entre stepper e card (`duration-240`), micro-interações táteis (`duration-120`), validações inline (`duration-180`) e suporte completo a `prefers-reduced-motion`.
 - **Bloqueios e Próximos Passos**:
   - Zero bloqueios na worktree de conversão.
   - Alinhamento de login canônico `/dashboard/login` compartilhado com CODEXADO (T2).

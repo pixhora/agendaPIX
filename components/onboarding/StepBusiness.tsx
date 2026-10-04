@@ -81,7 +81,7 @@ export function StepBusiness({
             <div
               id="business-name-error"
               role="alert"
-              className="mt-1.5 rounded-lg border border-destructive/20 bg-destructive/5 p-2.5 text-xs text-destructive font-medium"
+              className="mt-1.5 rounded-lg border border-destructive/20 bg-destructive/5 p-2.5 text-xs text-destructive font-medium transition-all duration-180 ease-out motion-reduce:transition-none"
             >
               O nome do estabelecimento deve ter pelo menos 2 caracteres.
             </div>
@@ -118,7 +118,7 @@ export function StepBusiness({
             <div
               id="business-slug-error"
               role="alert"
-              className="mt-1.5 rounded-lg border border-destructive/20 bg-destructive/5 p-2.5 text-xs text-destructive font-medium"
+              className="mt-1.5 rounded-lg border border-destructive/20 bg-destructive/5 p-2.5 text-xs text-destructive font-medium transition-all duration-180 ease-out motion-reduce:transition-none"
             >
               {slug.length < 2
                 ? "O link personalizado deve ter pelo menos 2 caracteres."
@@ -136,7 +136,7 @@ export function StepBusiness({
         <Button
           type="submit"
           disabled={!isValid}
-          className="w-full min-h-12 text-base font-semibold rounded-full"
+          className="w-full min-h-12 text-base font-semibold rounded-full transition-transform duration-120 active:scale-[0.98] motion-reduce:transform-none"
         >
           Continuar
         </Button>

@@ -137,7 +137,7 @@ export default function LoginPage() {
                   <div
                     id="login-error"
                     role="alert"
-                    className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-xs text-destructive"
+                    className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-xs text-destructive transition-all duration-180 ease-out motion-reduce:transition-none"
                   >
                     {errorMessage}
                   </div>
@@ -147,7 +147,7 @@ export default function LoginPage() {
               <Button
                 type="submit"
                 disabled={!isEmailValid || isSubmitting}
-                className="w-full min-h-12 font-semibold rounded-full bg-primary hover:bg-primary-hover text-primary-foreground text-base shadow-sm"
+                className="w-full min-h-12 font-semibold rounded-full bg-primary hover:bg-primary-hover text-primary-foreground text-base shadow-sm transition-transform duration-120 active:scale-[0.98] motion-reduce:transform-none"
               >
                 {isSubmitting ? "Enviando link..." : "Receber link de acesso"}
               </Button>

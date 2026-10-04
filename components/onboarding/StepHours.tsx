@@ -96,7 +96,7 @@ export function StepHours({
             <div
               id="days-error"
               role="alert"
-              className="mt-2 rounded-lg border border-destructive/20 bg-destructive/5 p-2.5 text-xs text-destructive font-medium"
+              className="mt-2 rounded-lg border border-destructive/20 bg-destructive/5 p-2.5 text-xs text-destructive font-medium transition-all duration-180 ease-out motion-reduce:transition-none"
             >
               Selecione pelo menos um dia de atendimento na semana.
             </div>
@@ -149,7 +149,7 @@ export function StepHours({
           <div
             id="hours-error"
             role="alert"
-            className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-xs text-destructive font-medium"
+            className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-xs text-destructive font-medium transition-all duration-180 ease-out motion-reduce:transition-none"
           >
             O horário de fechamento deve ser posterior ao horário de abertura.
           </div>
@@ -157,10 +157,19 @@ export function StepHours({
       </div>
 
       <div className="flex items-center gap-3 pt-2">
-        <Button type="button" variant="outline" onClick={onBack} className="flex-1 min-h-12 font-medium rounded-full">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onBack}
+          className="flex-1 min-h-12 font-medium rounded-full transition-transform duration-120 active:scale-[0.98] motion-reduce:transform-none"
+        >
           Voltar
         </Button>
-        <Button type="submit" disabled={!isValid} className="flex-[2] min-h-12 font-semibold rounded-full">
+        <Button
+          type="submit"
+          disabled={!isValid}
+          className="flex-[2] min-h-12 font-semibold rounded-full transition-transform duration-120 active:scale-[0.98] motion-reduce:transform-none"
+        >
           Continuar
         </Button>
       </div>

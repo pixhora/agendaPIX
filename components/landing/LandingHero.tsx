@@ -38,18 +38,18 @@ export function LandingHero() {
               Envie seu link no WhatsApp ou Instagram. Seu cliente escolhe o serviço e o horário sozinho e garante a vaga pagando o sinal no Pix. Acabe com o prejuízo de horários vazios.
             </p>
 
-            {/* Botões Pill de Conversão com Ergonomia Mobile (48px) */}
+            {/* Botões Pill de Conversão com Ergonomia Mobile (48px) e Feedback Tátil (120ms) */}
             <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               <Link
                 href="/onboarding"
-                className="w-full sm:w-auto min-h-12 inline-flex items-center justify-center rounded-full bg-primary hover:bg-primary-hover text-primary-foreground px-7 py-3 text-base font-bold shadow-sm transition-all focus:outline-hidden focus:ring-2 focus:ring-accent-forest focus:ring-offset-2 text-center"
+                className="w-full sm:w-auto min-h-12 inline-flex items-center justify-center rounded-full bg-primary hover:bg-primary-hover text-primary-foreground px-7 py-3 text-base font-bold shadow-sm transition-all duration-120 active:scale-[0.98] motion-reduce:transform-none focus:outline-hidden focus:ring-2 focus:ring-accent-forest focus:ring-offset-2 text-center"
               >
                 Começar teste grátis de 7 dias
               </Link>
 
               <a
                 href="#demonstracao"
-                className="w-full sm:w-auto min-h-12 inline-flex items-center justify-center gap-2 rounded-full border border-border bg-surface hover:bg-muted text-foreground px-5 py-3 text-sm font-semibold transition-all focus:outline-hidden text-center"
+                className="w-full sm:w-auto min-h-12 inline-flex items-center justify-center gap-2 rounded-full border border-border bg-surface hover:bg-muted text-foreground px-5 py-3 text-sm font-semibold transition-all duration-120 active:scale-[0.98] motion-reduce:transform-none focus:outline-hidden text-center"
               >
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent-forest text-primary text-xs shrink-0">
                   ▶

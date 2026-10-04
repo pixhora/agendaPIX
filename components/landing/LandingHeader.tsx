@@ -41,13 +41,13 @@ export function LandingHeader() {
         <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
           <Link
             href="/login"
-            className="flex items-center justify-center px-2 sm:px-4 text-xs font-bold text-muted-foreground hover:text-foreground sm:border sm:border-border sm:bg-surface sm:hover:bg-muted sm:rounded-full transition-colors min-h-11"
+            className="flex items-center justify-center px-2 sm:px-4 text-xs font-bold text-muted-foreground hover:text-foreground sm:border sm:border-border sm:bg-surface sm:hover:bg-muted sm:rounded-full transition-colors duration-120 min-h-11"
           >
             Entrar
           </Link>
           <Link
             href="/onboarding"
-            className="whitespace-nowrap shrink-0 rounded-full min-h-11 px-3.5 sm:px-5 py-2 text-xs font-extrabold bg-primary hover:bg-primary-hover text-primary-foreground shadow-xs transition-transform active:scale-95 inline-flex items-center justify-center"
+            className="whitespace-nowrap shrink-0 rounded-full min-h-11 px-3.5 sm:px-5 py-2 text-xs font-extrabold bg-primary hover:bg-primary-hover text-primary-foreground shadow-xs transition-transform duration-120 active:scale-[0.98] motion-reduce:transform-none inline-flex items-center justify-center"
           >
             Começar<span className="hidden min-[360px]:inline">&nbsp;grátis</span>
           </Link>
