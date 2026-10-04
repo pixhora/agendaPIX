@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { OnboardingData } from "@/components/onboarding/types";
+import { getBackendOrigin } from "./backend";
 
 export const backendProvisioningPayloadSchema = z.object({
   business: z.object({
@@ -61,10 +62,6 @@ export function buildProvisioningPayload(data: OnboardingData): BackendProvision
   });
 }
 
-/** URL padrão da autoridade backend */
-export const BACKEND_BASE_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3000";
-
 /**
  * Helper de provisionamento pós-autenticação consumindo a autoridade backend :3000 (F-01).
  * Preserva Idempotency-Key UUIDv4 e o mesmo corpo entre tentativas (retries).
@@ -76,7 +73,7 @@ export async function provisionBusiness(
     idempotencyKey?: string;
   }
 ): Promise<ProvisioningResult> {
-  const endpoint = options?.endpoint || `${BACKEND_BASE_URL}/api/onboarding`;
+  const endpoint = options?.endpoint || `${getBackendOrigin()}/api/onboarding`;
   const idempotencyKey = options?.idempotencyKey || crypto.randomUUID();
 
   let payload: BackendProvisioningPayload;
@@ -88,6 +85,7 @@ export async function provisionBusiness(
     }
     return { ok: false, code: "invalid_payload", message: "Erro de validação dos dados." };
   }
+
   try {
     const res = await fetch(endpoint, {
       method: "POST",

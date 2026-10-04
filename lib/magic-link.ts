@@ -1,9 +1,8 @@
+import { getBackendOrigin, getDashboardOrigin } from "./backend";
+
 export type MagicLinkResult =
   | { ok: true; simulated?: boolean }
   | { ok: false; code: "auth_unavailable" | "invalid_email" | "unknown"; message: string };
-
-export const BACKEND_AUTH_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3000";
 
 /**
  * Envia solicitação de link mágico de autenticação.
@@ -16,11 +15,11 @@ export const BACKEND_AUTH_URL =
 export async function requestMagicLink(
   email: string,
   pathname = typeof window !== "undefined" ? window.location.pathname : "",
-  callbackURL = "http://localhost:3343/dashboard",
+  callbackURL = `${getDashboardOrigin()}/dashboard`,
   authEndpoint?: string
 ): Promise<MagicLinkResult> {
   const isPreview = pathname.startsWith("/preview");
-  const endpoint = authEndpoint || `${BACKEND_AUTH_URL}/api/auth/sign-in/magic-link`;
+  const endpoint = authEndpoint || `${getBackendOrigin()}/api/auth/sign-in/magic-link`;
 
   try {
     const res = await fetch(endpoint, {
