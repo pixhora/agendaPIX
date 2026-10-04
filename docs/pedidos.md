@@ -69,4 +69,12 @@ O fluxo de Onboarding (`/onboarding`) coleta os dados essenciais para o primeiro
   - `401 Unauthorized`: sem sessão Better Auth ativa
   - `409 Conflict`: slug já em uso por outro negócio
 - **Impacto no Frontend (T5)**: Enquanto o endpoint não for disponibilizado, o frontend preserva os dados em `agenda_completed_onboarding_setup` no storage do cliente e exibe estados de espera honestos sem simular ativação inexistente.
+- **Preparação Concluída**: Módulo `lib/provisioning.ts` criado com Zod schema `provisioningPayloadSchema` e helper `provisionBusiness` com testes unitários em `tests/unit/provisioning.test.ts`. Pronto para ligar quando T1 publicar o endpoint.
+
+## 2026-10-04 — Terminal 5 (Trilha) para Terminal 2 (CODEXADO): Login Canônico Oficial (F-02)
+
+Para resolver a duplicidade e desalinhamento visual do login do painel (`agenda-dashboard/components/dashboard/login-form.tsx`):
+- O componente oficial foi extraído e modularizado em `agenda-conversion/components/auth/LoginForm.tsx`.
+- Utiliza os design tokens oficiais: botão `min-h-12 rounded-full font-semibold bg-primary` com micro-interação tátil de 120ms (`active:scale-[0.98] motion-reduce:transform-none`), input tátil `min-h-12` acessível com feedback inline, dark/light nativo e alvos táteis >= 44px.
+- Documentação completa e instruções de adoção disponíveis em `docs/LOGIN_CANONICO_T2.md`.
 

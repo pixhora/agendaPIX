@@ -11,7 +11,8 @@ export type MagicLinkResult =
  */
 export async function requestMagicLink(
   email: string,
-  pathname = typeof window !== "undefined" ? window.location.pathname : ""
+  pathname = typeof window !== "undefined" ? window.location.pathname : "",
+  callbackURL = "/dashboard"
 ): Promise<MagicLinkResult> {
   const isPreview = pathname.startsWith("/preview");
 
@@ -21,7 +22,7 @@ export async function requestMagicLink(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         email: email.trim().toLowerCase(),
-        callbackURL: "/dashboard",
+        callbackURL,
       }),
     });
 

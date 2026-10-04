@@ -203,12 +203,17 @@
 - **Quality Gates**:
   - `pnpm lint`: 0 warnings / 0 erros.
   - `pnpm typecheck`: 0 erros.
-  - `pnpm test`: 10 arquivos, 73/73 testes unitários aprovados (100%).
+  - `pnpm test`: 11 arquivos, 77/77 testes unitários aprovados (100%).
 - **Provas Browser (`agent-browser`)**:
   - Landing (`/`): 375px e desktop, dark e light, `undersizedCount: 0`, `hasHScroll: false`.
-  - Login (`/login`): 375px e desktop, dark e light, `undersizedCount: 0`, erro real de infraestrutura com `role="alert"`.
-  - Onboarding (`/onboarding`): 375px e desktop, 4 passos fluidos, `undersizedCount: 0`, `hasHScroll: false`.
+  - Login (`/login`): formulário canônico `LoginForm` com input e botão `min-h-12`, alvos >= 44px, erro observável com `role="alert"`.
+  - Onboarding (`/onboarding`): 4 passos fluidos com micro-interações táteis e validação inline.
+- **Entregas de Soluções (Hermes)**:
+  - **1) F-01 (Provisionamento)**: Módulo `lib/provisioning.ts` criado com Zod schema `provisioningPayloadSchema`, serialização estrita em centavos inteiros, helper `provisionBusiness` e testes unitários em `tests/unit/provisioning.test.ts`. Pronto para ligar quando T1 publicar o endpoint.
+  - **2) F-02 (Login Canônico)**: Componente oficial extraído em `components/auth/LoginForm.tsx` e consumido por `app/login/page.tsx`. Guia completo de integração para o dashboard entregue em `docs/LOGIN_CANONICO_T2.md` e registrado em `docs/pedidos.md`.
+  - **3) SMTP (Bloqueio Resend)**: Documentado em `docs/BLOQUEIOS.md`. Resend em modo de teste permite envio apenas para a conta dona (`francatorresmatheus@gmail.com`). Liberação para clientes externos exige verificação de domínio próprio no painel Resend (decisão/credencial do humano, não código).
 - **Bloqueios e Próximos Passos**:
-  - F-01 segue bloqueado aguardando API de provisionamento do T1.
-  - F-02 (canonização de login) aguarda decisão de integração.
+  - F-01 aguarda implementação do endpoint de provisionamento por T1.
+  - F-02 aguarda adoção do `LoginForm` pelo CODEXADO (T2) no dashboard.
+  - SMTP para clientes reais aguarda verificação de domínio no Resend pelo humano.
 
