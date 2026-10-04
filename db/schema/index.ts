@@ -25,6 +25,20 @@ export const businesses = pgTable("businesses", {
   check("businesses_slug_format", sql`${table.slug} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`),
 ]);
 
+export const pixKeyTypes = ["cpf", "cnpj", "email", "phone", "evp"] as const;
+export const businessPixKeys = pgTable("business_pix_keys", {
+  businessId: uuid("business_id").primaryKey().references(() => businesses.id, { onDelete: "restrict" }),
+  type: text("type", { enum: pixKeyTypes }).notNull(),
+  ciphertext: text("ciphertext").notNull(),
+  nonce: text("nonce").notNull(),
+  keyVersion: integer("key_version").notNull(),
+  hint: text("hint").notNull(),
+  ...timestamps(),
+}, (table) => [
+  check("business_pix_keys_cipher_valid", sql`length(${table.ciphertext}) > 0 AND length(${table.nonce}) > 0 AND ${table.keyVersion} > 0`),
+  check("business_pix_keys_type_valid", sql`${table.type} IN ('cpf', 'cnpj', 'email', 'phone', 'evp')`),
+]);
+
 export const services = pgTable("services", {
   id: uuid("id").defaultRandom().primaryKey(),
   businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "restrict" }),
