@@ -339,3 +339,11 @@ Próxima ação: terminais 1/2/4 concluir e integrar as partes principais; human
 - Prova: `pnpm exec vitest run --config vitest.db.config.ts tests/integration/auth.test.ts` — 9/9 passaram com DB real e email mock. Nenhum envio SMTP real.
 - Limites: Better Auth desliga proteção de origem em `NODE_ENV=test`; testes negativos restauram explicitamente `disableOriginCheck:false` e `disableCSRFCheck:false` em instância isolada. Rate limit não é ligado por padrão em dev/test; teste habilitado não comprova proteção do servidor dev nem limite distribuído entre processos. Referência T1 inclui logger ausente nesta worktree; logs T1 não foram revalidados. Sem alteração de backend, merge ou push.
 - Gates: `pnpm lint`, `pnpm typecheck`, `pnpm test` passaram; 48 testes unitários. Nenhuma falha de produto demonstrada nesta rodada.
+
+## QA T3 — A5 preparada — 2026-10-04
+
+- Missão: regressão de animações conforme `agenda-backend/docs/PLANO_ANIMACOES.md`, somente testes/docs T3.
+- Plano e critérios em `docs/QA_A5.md`; reutilizar suítes booking/Preview/régua/onboarding. Cobrir voltar/dados/foco, requests por ação, estados, reduced-motion e overflow375/1280.
+- Decisão: aguardar commits A1/A2/A3 e URL/commit servido antes de adaptar/executar testes. Nenhuma suíte ou gate executado nesta preparação; nenhuma aprovação de interface.
+- Limites identificados: espera fixa no teste Preview atual; substituir por estado observável ao adaptar A5. Onboarding separado exige URL do autor. Não enviar email real nem editar produto.
+- Próximo passo: receber handoff dos autores e revalidar somente delta/riscos afetados; registrar screenshots/trace e separar mock/Preview de integração real.
