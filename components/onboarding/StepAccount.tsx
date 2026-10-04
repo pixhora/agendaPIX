@@ -26,10 +26,11 @@ type MagicLinkResult =
  * Em produção, erros de infraestrutura exibem mensagem clara ao usuário,
  * sem culpar o e-mail informado.
  */
-async function sendMagicLink(email: string): Promise<MagicLinkResult> {
-  const isDevOrPreview =
-    process.env.NODE_ENV === "development" ||
-    (typeof window !== "undefined" && window.location.pathname.startsWith("/preview"));
+async function sendMagicLink(
+  email: string,
+  pathname = typeof window !== "undefined" ? window.location.pathname : ""
+): Promise<MagicLinkResult> {
+  const isPreview = pathname.startsWith("/preview");
 
   try {
     const res = await fetch("/api/auth/sign-in/magic-link", {
@@ -45,7 +46,7 @@ async function sendMagicLink(email: string): Promise<MagicLinkResult> {
 
     // 5xx → problema de infraestrutura (env ausentes, banco ou SMTP offline)
     if (res.status >= 500) {
-      if (isDevOrPreview) {
+      if (isPreview) {
         return { ok: true, simulated: true };
       }
       return {
@@ -67,7 +68,7 @@ async function sendMagicLink(email: string): Promise<MagicLinkResult> {
     };
   } catch {
     // Falha de rede: sem conexão, DNS, CORS, etc.
-    if (isDevOrPreview) {
+    if (isPreview) {
       return { ok: true, simulated: true };
     }
     return {
