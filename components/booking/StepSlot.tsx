@@ -121,14 +121,24 @@ export function StepSlot({
   // Carrega contagens de vagas para todos os 7 dias em background
   useEffect(() => {
     let isCancelled = false;
+    const controllers: AbortController[] = [];
 
     days.forEach((day) => {
       const fetchFn = getSlotsRef.current;
+      const controller = new AbortController();
+      controllers.push(controller);
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+      }, 10000);
+
       const promise = fetchFn
         ? fetchFn(day.dateString)
-        : fetch(`/api/public/${slug}/availability?serviceId=${service.id}&date=${day.dateString}`)
+        : fetch(`/api/public/${slug}/availability?serviceId=${service.id}&date=${day.dateString}`, {
+            signal: controller.signal,
+          })
             .then((res) => (res.ok ? res.json() : Promise.reject()))
-            .then((data) => data.slots || []);
+            .then((data) => data.slots || [])
+            .finally(() => clearTimeout(timeoutId));
 
       promise
         .then((dataSlots: AvailabilitySlot[]) => {
@@ -144,6 +154,7 @@ export function StepSlot({
 
     return () => {
       isCancelled = true;
+      controllers.forEach((c) => c.abort());
     };
   }, [slug, service.id, days]);
 
@@ -152,6 +163,10 @@ export function StepSlot({
     if (!selectedDate) return;
 
     let isCancelled = false;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, 10000);
 
     const loadSlots = async () => {
       try {
@@ -160,7 +175,12 @@ export function StepSlot({
         if (fetchFn) {
           loadedSlots = await fetchFn(selectedDate);
         } else {
-          const res = await fetch(`/api/public/${slug}/availability?serviceId=${service.id}&date=${selectedDate}`);
+          const res = await fetch(
+            `/api/public/${slug}/availability?serviceId=${service.id}&date=${selectedDate}`,
+            {
+              signal: controller.signal,
+            }
+          );
           if (!res.ok) throw new Error("Não foi possível carregar os horários.");
           const data = await res.json();
           loadedSlots = data.slots || [];
@@ -170,9 +190,17 @@ export function StepSlot({
         setErrorSlots(null);
       } catch (err: unknown) {
         if (isCancelled) return;
-        const msg = err instanceof Error ? err.message : "Erro ao consultar horários.";
+        let msg = "Erro ao consultar horários.";
+        if (err instanceof Error) {
+          if (err.name === "AbortError") {
+            msg = "A consulta de horários demorou muito. Tente novamente.";
+          } else {
+            msg = err.message;
+          }
+        }
         setErrorSlots(msg);
       } finally {
+        clearTimeout(timeoutId);
         if (!isCancelled) {
           setIsLoadingSlots(false);
         }
@@ -183,6 +211,8 @@ export function StepSlot({
 
     return () => {
       isCancelled = true;
+      clearTimeout(timeoutId);
+      controller.abort();
     };
   }, [slug, service.id, selectedDate, slotsRetryCount]);
 

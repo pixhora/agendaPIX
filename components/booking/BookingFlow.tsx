@@ -55,8 +55,14 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
   // Carrega serviços públicos do negócio
   useEffect(() => {
     let isCancelled = false;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, 10000);
 
-    fetch(`/api/public/${slug}/services`)
+    fetch(`/api/public/${slug}/services`, {
+      signal: controller.signal,
+    })
       .then((res) => {
         if (!res.ok) {
           if (res.status === 404) {
@@ -75,14 +81,26 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
       })
       .catch((err: unknown) => {
         if (!isCancelled) {
-          const msg = err instanceof Error ? err.message : "Erro inesperado ao carregar dados.";
+          let msg = "Erro inesperado ao carregar dados.";
+          if (err instanceof Error) {
+            if (err.name === "AbortError") {
+              msg = "A conexão demorou muito para responder. Verifique sua internet e tente novamente.";
+            } else {
+              msg = err.message;
+            }
+          }
           setBusinessError(msg);
           setIsLoadingBusiness(false);
         }
+      })
+      .finally(() => {
+        clearTimeout(timeoutId);
       });
 
     return () => {
       isCancelled = true;
+      clearTimeout(timeoutId);
+      controller.abort();
     };
   }, [slug, reloadCount]);
 
