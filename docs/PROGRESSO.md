@@ -47,3 +47,15 @@ Build de produção não passou (EPERM na abertura de porta interna); gateway/re
 `pnpm test:e2e`: falhou ao iniciar servidor no sandbox; repetição escalonada passou com 2 testes em 375px.
 `pnpm test:db`: falhou por conexão EPERM no sandbox; repetição escalonada passou com 25 testes.
 Sem push, merge ou desenvolvimento de novas funcionalidades.
+
+## 2026-10-04 — Backend validado e sistema disponível para teste
+
+T1 retomou a auditoria em `feat/backend`, base `0d6858f`. Launcher ativo: backend na porta 3000, Preview na 3001, landing na 3005 e painel na 3343; as quatro verificações HTTP passaram. Processos anteriores e banco da aplicação foram preservados.
+
+Correção `02c5b27`: `lib/auth.ts`, rota auth e regressões do handler real. Hooks nativos impedem log bruto de Error SMTP/adapter e saneiam respostas 5xx, inclusive APIError retornado diretamente; preservam status/cookies, origem, validação e redirecionamentos. Inicialização inválida responde 503 sem detalhes. Contrato atualizado; nenhuma dependência adicionada ou console global interceptado.
+
+Validação final: lint sem warnings, typecheck, 60 unitários, 26 integrados e 2 E2E básicos passaram. Build Turbopack de produção passou em snapshot isolado com a correção; snapshot removido. Banco exclusivo de auditoria recebeu migrations duas vezes e seed duas vezes (1 negócio, 3 serviços, 6 horários e 5 migrations), depois foi removido. Onze provas HTTP de saúde/sessão, autorização/origem e entradas inválidas passaram. O EPERM histórico de build não reapareceu.
+
+Plano detalhado: `docs/PLANO_BACKEND_HERMES.md`, com 12 atividades, donos, dependências, invariantes, testes e reversão. Codex Revisor: OK no commit 02c5b27, com 9 provas do handler. Cursor: MELHORAR, sem novo bloqueio no candidato; consumidores ainda precisam incorporar a correção. Recomenda um app Next final integrado, preservando Server Actions. Hermes recebe um único lote após concluir o anterior, sem interromper execução.
+
+Pendências: integrar correção aos consumidores pelos donos; escolher composição final sem REST/serviços duplicados desnecessários; provisionamento real; gateway/recebedor/confirmação Pix; SMTP real; regras LGPD/assinatura e produção. Testes fake/Preview não provam Pix bancário. Sem merge/push/deploy; alterações documentais anteriores preservadas e fora desta entrega.

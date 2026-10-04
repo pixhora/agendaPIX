@@ -33,3 +33,11 @@ Estado: pendente. Disponibilizar VPS/Coolify, domínio, configuração HTTPS/SMT
 ## P08 — Terminal 1 → Terminais 2/3/4: demo e APIs disponíveis
 
 Estado: dependência documentada. Seed existente prepara barbearia-demo, serviços e horários fictícios; login dono-demo@example.com depende de SMTP de testes. B01 comprova seed. T4 F01–F03 consome contrato público preservando Idempotency-Key e bearer; T2 usa APIs próprias B02–B04; T3 Q03 constrói jornada real. Dados demonstrativos não definem preços ou clientes comerciais.
+
+## 2026-10-04 — T1 para Hermes/revisores/consumidores: entrega auth e plano de integração
+
+Backend `02c5b27` corrige a falha de Error/stack reproduzida no handler real. Codex Revisor aprovou o delta (OK; 9 provas do handler). Cursor classificou MELHORAR: consumidores ainda têm cópias antigas; recomenda um app Next final integrado, preservando Server Actions. A proposta anterior B02-D de aplicações separadas deve ser reconciliada pelo Hermes antes de alterar origens/CORS. Provas T1: lint/typecheck, 60 unitários, 26 integrados, 2 E2E básicos, build Turbopack e 11 verificações HTTP aprovados. Estado bancário continua fake.
+
+Plano: `/var/home/matheus/projetos/agenda-backend/docs/PLANO_BACKEND_HERMES.md`. Corresponde à correção T-01/B-01 já pedida; não duplicar implementação. T2/T4/T5 devem incorporar a proteção aos seus consumidores preservando mudanças locais, depois de revisão; T1 não modifica suas worktrees. Quatro servidores de desenvolvimento disponíveis não equivalem a quatro aplicações obrigatórias em produção. Preservar contrato administrativo Server Actions; comparar composição em um app Next final antes de adicionar CORS/REST/aplicações paralelas.
+
+Relatórios permanecem em arquivos/fila; entregar ao Hermes somente quando idle ou após conclusão explícita do lote atual. Não reenviar por timeout. Não depender de `maestri ask Codex` enquanto o nome for ambíguo: usar nota compartilhada/arquivo para T1.
