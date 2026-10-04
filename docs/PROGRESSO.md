@@ -109,3 +109,11 @@
 - Única referência com preço antigo nesta área: `AGENTS.md:14`, atualizada. Busca em `app/dashboard`, `components/dashboard`, `lib/dashboard` e `docs` não encontrou preço de assinatura exibido ou configurado no produto.
 - Nenhuma tela de billing criada. Serviços, sinais, fixtures, benefícios, regras e trial de 7 dias preservados. Landing/pricing permanece com Trilha.
 - Verificação: busca de referências e `git diff --check` passaram; somente documentação alterada, sem repetir gates de produto aprovados.
+
+## 2026-10-03 — Polimento mobile do dashboard e integração Pix
+
+- Commit T2: `96ac512`. Agenda recebeu controles responsivos para data/dia/semana e navegação; serviços, clientes e horários ganharam densidade e alvos de toque adequados. Estados de erro/carregamento também foram refinados.
+- Configurações ganhou formulário de chave Pix com GET/PUT/DELETE same-origin, tipos e máscara do contrato T1. Segredo fica somente no input não controlado e corpo transitório da requisição; campo limpa após salvar; sem localStorage, React state ou logs. QR e confirmação seguem decisão pendente.
+- Prova pós-edição: `pnpm lint`, `pnpm typecheck`, `pnpm test` (73 testes / 7 arquivos) e `git diff --check` passaram. `pnpm build` passou antes da extração isolada de `PixKeyForm`; typecheck posterior passou. `pnpm test:e2e` não iniciou por Next dev já ativo na worktree (`Another next dev server is already running`, porta 3343); sessão preservada.
+- Limites reais: sem sessão autenticada, browser abriu somente login em 375, 390 e 1280px; agenda/configurações autenticadas não foram provadas nesta passagem. Endpoint Pix respondeu 404 no app ativo, ausente da rota compilada desta worktree; integração final depende do código/API T1 no app unido. Não alegar sucesso integrado.
+- Dependência visual T4: branch dashboard ainda tem tokens antigos em `app/globals.css`; não alterados sem acordo. Aplicações usam tokens/classes existentes.
