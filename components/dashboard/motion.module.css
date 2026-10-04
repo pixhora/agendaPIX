@@ -1,0 +1,32 @@
+.scope {
+  --dashboard-feedback: var(--duration-feedback, 120ms);
+  --dashboard-opening: var(--duration-opening, 180ms);
+  --dashboard-ease: var(--ease-standard, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.scope button, .scope a {
+  transition: opacity var(--dashboard-feedback) var(--dashboard-ease), transform var(--dashboard-feedback) var(--dashboard-ease);
+}
+.scope button:active:not(:disabled), .scope a:active { transform: translateY(1px); }
+.feedback { animation: feedback var(--dashboard-feedback) var(--dashboard-ease); }
+@keyframes feedback { from { opacity: 0.65; } to { opacity: 1; } }
+.mobile { position: relative; }
+.panel {
+  position: absolute;
+  z-index: 20;
+  inset: calc(100% + 8px) 0 auto;
+  opacity: 0;
+  transform: translateY(-4px);
+  visibility: hidden;
+  transition: opacity var(--dashboard-opening) var(--dashboard-ease), transform var(--dashboard-opening) var(--dashboard-ease), visibility var(--dashboard-opening);
+}
+.panel[data-open="true"] { opacity: 1; transform: none; visibility: visible; }
+.bookingStatus {
+  color: var(--foreground);
+  transition: color var(--duration-feedback, 120ms) var(--ease-standard, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.bookingStatus[data-status="pending_payment"], .bookingStatus[data-status="cancelled"], .bookingStatus[data-status="expired"] { color: var(--muted-foreground); }
+@media (prefers-reduced-motion: reduce) {
+  .scope button, .scope a, .panel, .bookingStatus { transition: none; }
+  .scope button:active:not(:disabled), .scope a:active, .panel { transform: none; }
+  .feedback { animation: none; }
+}

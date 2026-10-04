@@ -145,3 +145,23 @@
 - Conexão T1/ID `61670b9f-32f6-47d9-b19c-4a3dc19e8ae7` confirmada pelo `connect` com IDs, mas `check Codex` ainda falha por resolução homônima e o ID não é aceito por `check`. A CLI não oferece renomeação simples sem substituir/reiniciar terminal. Restam ligação manual CODEXADO–Trilha e nomes únicos para os dois Codex no canvas; preservar sessões.
 - Skills verificadas como arquivos legíveis: `/var/home/matheus/.agents/skills/frontend-design/SKILL.md`, `vercel-react-best-practices/SKILL.md` e `web-design-guidelines/SKILL.md`; links disponíveis em `.codex/skills`. Frontend-design consta no catálogo atual; as duas novas não aparecem na descoberta automática desta sessão. Serão lidas por caminho absoluto quando pertinentes; tarefa atual de conexões não carrega guias frontend.
 - Nenhum arquivo de produto, sessão, missão ou worktree alheia alterado. Próximo responsável: operador do canvas resolve os dois bloqueios acima; T2 valida somente as conexões afetadas e retoma handoff do login `9e24951`.
+
+## 2026-10-04 — A2: plano de execução
+
+- Disponibilidade recuperada em 3343; login e health responderam HTTP200 após reinício exclusivo do Next, preservando ambiente, dados e agentes.
+- Usar contrato A1 de duração/easing em CSS Module local, sem editar tokens compartilhados.
+- Adicionar menu mobile com camada sobreposta e foco de teclado; preservar montagem/scroll da agenda e dos formulários.
+- Aplicar feedback/pending após respostas reais; validar movimento reduzido, mobile/desktop e gates. Status persistido sem polling permanece responsabilidade do servidor.
+
+## 2026-10-04 — A2: entrega e prova
+
+- Menu mobile tem abertura/fechamento CSS de 180ms, camada sobreposta, Escape, retorno de foco, fechamento ao sair/clicar fora e links inertes quando fechado; agenda e formulários continuam montados. Desktop preserva navegação direta.
+- Serviços/horários/Pix têm feedback de 120ms e texto de pending, com resultado somente após resposta. Dados dos formulários permanecem controlados; chave Pix permanece no input não controlado, limpa após envio, sem storage/log/state. Falha Pix recebe foco; remoção devolve foco ao campo.
+- BookingStatus continua Server Component, com transição apenas de cor quando o status recebido muda; sem animação de entrada, polling ou confirmação local. Testes preservam os cinco rótulos e ausência de expiração calculada no cliente.
+- Contrato A1 confirmado por Antigravidade: `88a4d49`, tokens `--duration-feedback`, `--duration-opening`, `--duration-step`, `--ease-standard`. CSS local consome tokens com valores fallback idênticos; nenhum compartilhado editado.
+- Ambiente: Linux, Node v22.23.3, pnpm12.8.1, Next16.3.8, Chromium Playwright; servidor3343, Postgres/SMTP locais sintéticos preservados. Login/health HTTP200 após build.
+- Gates pós-código: lint/typecheck OK; Vitest73/73 em7 arquivos; Next build webpack OK. Primeiro build isolado passou; build final na própria worktree passou, sem interromper servidor. Preparação do build teve ENOBUFS no buffer de archive e pnpm recusou node_modules symlink; arquivo tar e execução direta do Next resolveram, sem instalar dependências.
+- Browser:12 combinações375/390/1280, claro/escuro, movimento normal/reduzido; CSS animations observadas no navegador, zero movimento reduzido, teclado/Escape/draft/overflow; serviço salvar/reload/restaurar e horários salvar/reload reais; request de serviço retido antes de encaminhar para verificar pending e uma única chamada. Login8/8 em4,6s, incluindo estados HTTP controlados.
+- Pix: UI PUT503/PUT200/DELETE200 controlada provou feedback, foco e limpeza do segredo; NÃO equivale a API integrada, rota real segue ausente. Sessão real preexistente de SMTP local usada; tentativa de novo login3342 não apresentou status nesta passagem, sem nova prova SMTP. Origem3343/3342 permanece pendência operacional.
+- Ajustes da prova: fixture inicial não correspondia à sessão; seletores de campos renomeados após salvar e leitura antes do carregamento falharam; corrigidos no script, versão final passou. Nenhum desses erros foi classificado como bug de produto.
+- Provas/comandos/limites: `docs/evidencias/dashboard-a2/README.md`; revisão A4/A5 ainda pendente de entrega do commit. Sem merge/push; backlog e screenshots preexistentes preservados fora do commit.

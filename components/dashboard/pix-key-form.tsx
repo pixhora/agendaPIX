@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import styles from "./motion.module.css";
 import { Button } from "@/components/ui/button";
 
 type PixKeyStatus = { configured: boolean; type: "cpf" | "cnpj" | "email" | "phone" | "evp" | null; hint: string | null };
@@ -16,6 +17,11 @@ export function PixKeyForm({ businessId }: { businessId: string }) {
   const [notice, setNotice] = useState("");
   const [removeConfirm, setRemoveConfirm] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const errorRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (!pending && error) errorRef.current?.focus();
+    if (!pending && notice === "Chave Pix removida.") inputRef.current?.focus();
+  }, [pending, loading, error, notice]);
   const typeRef = useRef<HTMLSelectElement>(null);
   const endpoint = `/api/businesses/${encodeURIComponent(businessId)}/pix-key`;
 
@@ -64,11 +70,10 @@ export function PixKeyForm({ businessId }: { businessId: string }) {
     } finally { setPending(false); }
   }
 
-  return <section className="rounded-xl border border-border bg-background p-4 sm:p-6" aria-labelledby="pix-key-title">
+  return <section className={`${styles.scope} rounded-xl border border-border bg-background p-4 sm:p-6`} aria-labelledby="pix-key-title" aria-busy={pending || loading}>
     <div className="mb-5 border-b border-border pb-4"><h2 id="pix-key-title" className="text-lg font-semibold">Chave Pix do negócio</h2><p className="mt-1 text-sm text-muted-foreground">A chave fica protegida no servidor. Ela não é exibida depois de salva.</p></div>
     {loading ? <p role="status" className="text-sm text-muted-foreground">Carregando configuração Pix…</p> : <>
-      {error && <p role="alert" className="mb-4 rounded-md border-l-2 border-destructive bg-muted p-3 text-sm">{error}</p>}
-      {notice && <p role="status" className="mb-4 rounded-md border-l-2 border-primary bg-muted p-3 text-sm">{notice}</p>}
+      <div className="mb-4 min-h-12">{pending ? <p role="status" className="p-3 text-sm text-muted-foreground">Atualizando configuração Pix…</p> : error ? <p ref={errorRef} tabIndex={-1} role="alert" className={`${styles.feedback} rounded-md border-l-2 border-destructive bg-muted p-3 text-sm`}>{error}</p> : notice ? <p role="status" className={`${styles.feedback} rounded-md border-l-2 border-primary bg-muted p-3 text-sm`}>{notice}</p> : null}</div>
       {status?.configured && <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted p-3 text-sm"><span>{status.type ? pixTypeLabels[status.type] : "Pix"}: <strong>{status.hint}</strong></span>{removeConfirm ? <span className="flex flex-wrap gap-2"><span className="self-center">Remover esta chave?</span><Button type="button" variant="outline" disabled={pending} onClick={() => setRemoveConfirm(false)}>Manter chave</Button><Button type="button" variant="outline" disabled={pending} onClick={remove}>{pending ? "Removendo…" : "Confirmar remoção"}</Button></span> : <Button type="button" variant="outline" disabled={pending} onClick={() => setRemoveConfirm(true)}>Remover</Button>}</div>}
       <form onSubmit={save} className="grid gap-4 sm:grid-cols-[minmax(8rem,0.7fr)_minmax(0,1.3fr)_auto] sm:items-end" aria-label="Configurar chave Pix">
         <label className="grid gap-2" htmlFor="pix-key-type">Tipo de chave<select ref={typeRef} className={control} id="pix-key-type" name="type" defaultValue={status?.type ?? "cpf"} disabled={pending}><option value="cpf">CPF</option><option value="cnpj">CNPJ</option><option value="email">E-mail</option><option value="phone">Telefone</option><option value="evp">Chave aleatória</option></select></label>

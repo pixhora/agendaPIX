@@ -1,0 +1,148 @@
+{
+  "url": "http://127.0.0.1:3343",
+  "authentication": "sessão SMTP local real preexistente; sem bypass",
+  "results": [
+    {
+      "width": 375,
+      "colorScheme": "light",
+      "reducedMotion": "no-preference",
+      "menuKeyboard": true,
+      "draftPreserved": true,
+      "noOverflow": true,
+      "motion": {
+        "animations": 2,
+        "opacity": "0.567488",
+        "endOpacity": "1"
+      }
+    },
+    {
+      "width": 375,
+      "colorScheme": "light",
+      "reducedMotion": "reduce",
+      "menuKeyboard": true,
+      "draftPreserved": true,
+      "noOverflow": true,
+      "motion": {
+        "animations": 0,
+        "opacity": "1",
+        "endOpacity": "1"
+      }
+    },
+    {
+      "width": 375,
+      "colorScheme": "dark",
+      "reducedMotion": "no-preference",
+      "menuKeyboard": true,
+      "draftPreserved": true,
+      "noOverflow": true,
+      "motion": {
+        "animations": 2,
+        "opacity": "0.720518",
+        "endOpacity": "1"
+      }
+    },
+    {
+      "width": 375,
+      "colorScheme": "dark",
+      "reducedMotion": "reduce",
+      "menuKeyboard": true,
+      "draftPreserved": true,
+      "noOverflow": true,
+      "motion": {
+        "animations": 0,
+        "opacity": "1",
+        "endOpacity": "1"
+      }
+    },
+    {
+      "width": 390,
+      "colorScheme": "light",
+      "reducedMotion": "no-preference",
+      "menuKeyboard": true,
+      "draftPreserved": true,
+      "noOverflow": true,
+      "motion": {
+        "animations": 2,
+        "opacity": "0.718285",
+        "endOpacity": "1"
+      }
+    },
+    {
+      "width": 390,
+      "colorScheme": "light",
+      "reducedMotion": "reduce",
+      "menuKeyboard": true,
+      "draftPreserved": true,
+      "noOverflow": true,
+      "motion": {
+        "animations": 0,
+        "opacity": "1",
+        "endOpacity": "1"
+      }
+    },
+    {
+      "width": 390,
+      "colorScheme": "dark",
+      "reducedMotion": "no-preference",
+      "menuKeyboard": true,
+      "draftPreserved": true,
+      "noOverflow": true,
+      "motion": {
+        "animations": 2,
+        "opacity": "0.568906",
+        "endOpacity": "1"
+      }
+    },
+    {
+      "width": 390,
+      "colorScheme": "dark",
+      "reducedMotion": "reduce",
+      "menuKeyboard": true,
+      "draftPreserved": true,
+      "noOverflow": true,
+      "motion": {
+        "animations": 0,
+        "opacity": "1",
+        "endOpacity": "1"
+      }
+    },
+    {
+      "width": 1280,
+      "colorScheme": "light",
+      "reducedMotion": "no-preference",
+      "menuKeyboard": true,
+      "draftPreserved": true,
+      "noOverflow": true,
+      "motion": null
+    },
+    {
+      "width": 1280,
+      "colorScheme": "light",
+      "reducedMotion": "reduce",
+      "menuKeyboard": true,
+      "draftPreserved": true,
+      "noOverflow": true,
+      "motion": null
+    },
+    {
+      "width": 1280,
+      "colorScheme": "dark",
+      "reducedMotion": "no-preference",
+      "menuKeyboard": true,
+      "draftPreserved": true,
+      "noOverflow": true,
+      "motion": null
+    },
+    {
+      "width": 1280,
+      "colorScheme": "dark",
+      "reducedMotion": "reduce",
+      "menuKeyboard": true,
+      "draftPreserved": true,
+      "noOverflow": true,
+      "motion": null
+    }
+  ],
+  "persistence": "salvar/reload/restaurar serviço fixture; horários salvar/reload sem mudar valores",
+  "pix": "UI PUT503/PUT200/DELETE200 controlados; API ausente, não provado integrado"
+}
