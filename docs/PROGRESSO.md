@@ -129,3 +129,11 @@
 - Página de login e `LoginForm` receberam marca Agenda, card central, CTA lime/pill e fontes Plus Jakarta Sans/Inter da identidade T4/T5. CSS Module e fontes limitados à rota; nenhum compartilhado/backend alterado. Callbacks e autenticação real preservados.
 - Prova: lint/typecheck passaram; 73 testes unitários/7 arquivos; 8 provas Playwright em 3343, incluindo 375/390/1280 claro/escuro, teclado e estados. Capturas e limites em `docs/evidencias/dashboard-login-style/README.md`.
 - Erro real 403 permanece por origem 3343/3342; estados HTTP controlados não equivalem a SMTP real. Servidor/sessões preservados. Trilha ausente no Maestri; Codex ambíguo (2 terminais), sem renomear/reiniciar. Revisão visual direta e alinhamento de QA permanecem pendentes.
+
+## 2026-10-03 — Diagnóstico das conexões Maestri
+
+- Transporte saudável: `maestri debug` respondeu `Connection: OK (status 200)`. `check` alcançou CODEFICADO, Antigravidade, Codex Revisor, Prisma e cursor-tech-lead. Não se alega disponibilidade de quota a partir disso.
+- T1 está ligado a CODEXADO com ID `61670b9f-32f6-47d9-b19c-4a3dc19e8ae7`, nome Codex. `ask Codex` falha por dois terminais homônimos; `check Codex` retorna `No connection to 'Codex'`, apesar da conexão constar no `list`. Resolução de nome é o bloqueio, não transporte.
+- cursor-tech-lead recebeu a tarefa de reparar as conexões existentes e confirmou Trilha ligado a ele; Trilha não está ligado a CODEXADO. Ele também não possui Maestro e não alterou conexões.
+- `connect CODEXADO Trilha` e `workspace list` foram recusados: `This terminal is not the Maestro. Toggle Maestro on the terminal in the canvas to unlock this command.` Inspeção somente leitura do próprio `/list` confirmou `self.maestro: false`.
+- Próximo responsável: humano/operador do canvas habilita Maestro em CODEXADO ou conecta manualmente CODEXADO a Trilha e corrige a ambiguidade dos dois nomes Codex, preservando sessões. A CLI disponível não expõe renomeação de terminal ou seleção por ID. Nenhum terminal foi criado, reiniciado, renomeado ou teve missão alterada nesta rodada.
