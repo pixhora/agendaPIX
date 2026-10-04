@@ -347,3 +347,10 @@ Próxima ação: terminais 1/2/4 concluir e integrar as partes principais; human
 - Decisão: aguardar commits A1/A2/A3 e URL/commit servido antes de adaptar/executar testes. Nenhuma suíte ou gate executado nesta preparação; nenhuma aprovação de interface.
 - Limites identificados: espera fixa no teste Preview atual; substituir por estado observável ao adaptar A5. Onboarding separado exige URL do autor. Não enviar email real nem editar produto.
 - Próximo passo: receber handoff dos autores e revalidar somente delta/riscos afetados; registrar screenshots/trace e separar mock/Preview de integração real.
+
+## QA T3 — A5 delta A2 — 2026-10-04
+
+- Alvo T2 `daf70ee`, services/settings3343; prova reutilizada em `tests/qa/dashboard-a5-proof.mjs`, relatório `docs/QA_A5_A2.md`.
+- Browser: oito combinações375/1280, claro/escuro, normal/reduced-motion passaram; teclado/foco/menu/rascunho/overflow. Serviço real salva/reload/restaura; Enter pendente mantém uma request. Horários reais preservados. Pix apenas respostas UI controladas, não integração real.
+- Comando documentado no relatório, exit0 `cases:8,persistence:true`; artefatos locais `dogfood-output/a5-dashboard/`. Sem gates gerais, produto alterado, email novo ou servidores reiniciados.
+- Limites: login novo/origin e API Pix continuam com T1/T2; nenhum bloqueio A2 novo demonstrado. Aguardar commits A1/A3 para demais regressões, sem repetir A2 sem causa.
