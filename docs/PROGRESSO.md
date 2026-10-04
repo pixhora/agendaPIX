@@ -182,3 +182,15 @@
 ## 6. Status de Entrega
 
 O fluxo de agendamento público (`/[slug]`), a landing page (`/`), o onboarding (`/onboarding`), o Modo Preview completo (`/preview/*`) e todas as verificações de acessibilidade, responsividade e isolamento estão 100% aprovados e validados.
+
+---
+
+## 7. Checkpoint Operação Maestri — Adesão e Diretrizes Ativas (2026-10-03 23:47 BRT)
+
+- **Papel e Escopo Estrito**: T6 (Prisma) — Auditoria UX/UI independente sem editar código de produto. Worktree exclusiva: `/var/home/matheus/projetos/agenda-ux-audit` (`feat/ux-audit`).
+- **Regras Operacionais Confirmadas**:
+  1. *Dono Único*: Nenhum arquivo fora de `docs/` em `agenda-ux-audit` é modificado por T6. Código pertence aos autores designados (T1 backend/Pix, T2 painel, T3 QA técnico, T4 booking/preview/tokens, T5 landing/conversão).
+  2. *Handoff Padronizado*: Toda comunicação segue formato estrito (`TAREFA`, `ESCOPO`, `PRONTO`, `DEVOLVA`).
+  3. *Sem Sucesso Fictício*: Validações visuais obrigam captura real de DOM (`agent-browser` / `maestri portal`), medição em pixels (`clientWidth`, `scrollWidth`, touch target ≥44px), viewport estrito (320px, 360px, 375px e desktop) e arquivo PNG salvo.
+  4. *Revisão por Risco*: Classificação rigorosa com `BLOQUEIA` / `MELHORAR` / `OK`, apontando `arquivo:linha`, evidência e responsável.
+  5. *Preservação de Contexto*: Sem `/clear` ou `/reset`. Testes e verificações não são repetidos sem alteração de código ou falha nova.
