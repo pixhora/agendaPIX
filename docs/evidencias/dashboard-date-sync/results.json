@@ -1,0 +1,24 @@
+{
+  "baseURL": "http://127.0.0.1:3343",
+  "auth": "SMTP sintético e sessão reais, sem bypass",
+  "results": [
+    {
+      "width": 375,
+      "nextDay": true,
+      "previousDay": true,
+      "applyGet": true,
+      "nextWeek": true,
+      "inputMatchesURL": true,
+      "noOverflow": true
+    },
+    {
+      "width": 1280,
+      "nextDay": true,
+      "previousDay": true,
+      "applyGet": true,
+      "nextWeek": true,
+      "inputMatchesURL": true,
+      "noOverflow": true
+    }
+  ]
+}

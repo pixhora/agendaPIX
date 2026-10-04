@@ -23,7 +23,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Promi
       <div className="grid gap-4 rounded-xl border border-border bg-background p-4 sm:flex sm:flex-wrap sm:items-end sm:justify-between sm:p-5">
         <form action="/dashboard" className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <input type="hidden" name="businessId" value={business.id} /><input type="hidden" name="view" value={weekly ? "week" : "day"} />
-          <label htmlFor="agenda-date" className="grid gap-2 text-sm font-medium">Data<input id="agenda-date" type="date" name="date" defaultValue={date} required className="min-h-11 rounded-md border border-border bg-background px-3 text-base focus-visible:outline-2 focus-visible:outline-ring" /></label>
+          <label htmlFor="agenda-date" className="grid gap-2 text-sm font-medium">Data<input key={date} id="agenda-date" type="date" name="date" defaultValue={date} required className="min-h-11 rounded-md border border-border bg-background px-3 text-base focus-visible:outline-2 focus-visible:outline-ring" /></label>
           <button type="submit" className={buttonVariants({ variant: "outline", className: "w-full justify-center sm:w-auto" })}>Ver horários</button>
         </form>
         <nav aria-label="Visualização da agenda" className="grid grid-cols-2 gap-2 sm:flex">
