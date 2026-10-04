@@ -282,7 +282,7 @@ export function BookingFlow({ slug }: BookingFlowProps) {
 
       {/* Rodapé Seguro */}
       <footer className="text-center text-[11px] text-muted-foreground pt-2">
-        <span>🔒 Seus dados estão protegidos. Confirmação instantânea por Pix.</span>
+        <span>🔒 Seus dados estão protegidos. Sinal antecipado para garantia do horário.</span>
       </footer>
     </main>
   );

@@ -122,7 +122,7 @@ export function PreviewBookingFlow() {
             {MOCK_PUBLIC_BUSINESS.name}
           </h1>
           <p className="text-xs text-muted-foreground">
-            São Paulo, SP · Agendamento online seguro com sinal por Pix
+            São Paulo, SP · Agendamento online com sinal garantido por Pix
           </p>
         </header>
 

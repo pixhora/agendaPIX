@@ -249,7 +249,7 @@ export function StepPayment({
           {isChecking ? "Verificando confirmação..." : "Já fiz o pagamento no banco"}
         </Button>
         <p className="text-[11px] text-center text-muted-foreground">
-          A confirmação é automática em poucos segundos após o pagamento.
+          Após efetuar o Pix do sinal, a vaga é confirmada pelo estabelecimento. Guarde seu comprovante.
         </p>
       </div>
     </div>

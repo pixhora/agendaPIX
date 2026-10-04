@@ -28,28 +28,28 @@ export default function PreviewConfiguracoesPage() {
             </div>
           </div>
 
-          <nav className="flex items-center gap-2 text-xs font-semibold overflow-x-auto pb-1 sm:pb-0" aria-label="Navegação do painel">
+          <nav className="grid grid-cols-2 gap-2 text-xs font-semibold sm:flex sm:items-center" aria-label="Navegação do painel">
             <Link
               href="/preview/dashboard"
-              className="rounded-lg border border-border bg-surface px-3 py-1.5 text-muted-foreground hover:text-foreground shrink-0"
+              className="flex min-h-11 items-center justify-center rounded-lg border border-border bg-surface px-3 py-1.5 text-muted-foreground hover:text-foreground sm:min-h-0 sm:shrink-0"
             >
               Visão Geral
             </Link>
             <Link
               href="/preview/reservas"
-              className="rounded-lg border border-border bg-surface px-3 py-1.5 text-muted-foreground hover:text-foreground shrink-0"
+              className="flex min-h-11 items-center justify-center rounded-lg border border-border bg-surface px-3 py-1.5 text-muted-foreground hover:text-foreground sm:min-h-0 sm:shrink-0"
             >
               Reservas ({MOCK_BOOKINGS.length})
             </Link>
             <Link
               href="/preview/servicos"
-              className="rounded-lg border border-border bg-surface px-3 py-1.5 text-muted-foreground hover:text-foreground shrink-0"
+              className="flex min-h-11 items-center justify-center rounded-lg border border-border bg-surface px-3 py-1.5 text-muted-foreground hover:text-foreground sm:min-h-0 sm:shrink-0"
             >
               Serviços ({MOCK_SERVICES.length})
             </Link>
             <Link
               href="/preview/configuracoes"
-              className="rounded-lg bg-primary text-primary-foreground px-3 py-1.5 shrink-0"
+              className="flex min-h-11 items-center justify-center rounded-lg bg-primary text-primary-foreground px-3 py-1.5 sm:min-h-0 sm:shrink-0"
             >
               Configurações
             </Link>

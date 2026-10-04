@@ -53,8 +53,10 @@ export function StepProgress({ currentStep }: StepProgressProps) {
                 )}
               </div>
               <span
-                className={`mt-1.5 text-xs font-medium ${
-                  isCurrent ? "text-primary font-semibold" : "text-muted-foreground"
+                className={`mt-1.5 text-xs ${
+                  isCurrent
+                    ? "text-accent-forest dark:text-primary font-bold"
+                    : "text-muted-foreground font-medium"
                 }`}
               >
                 {s.label}

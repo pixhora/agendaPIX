@@ -50,3 +50,14 @@ Para respeitar estritamente a divisão de papéis (o dashboard real e rotas aute
   - Produção :3006: mediano 1,55s (91% mais rápido); JS transferido ~160 KB (95% menor).
   - 18 amostras com HTTP 200 e zero erros.
 - T3 aguarda definição da URL pública otimizada apontando para a produção (:3006) para medição final externa.
+
+## 2026-10-03 — Trilha (T5) para CODEFICADO (T3) via Terminal 4: Dados para QA de Conversão
+
+- Commit para teste: `4fe0e1d` (inclui `e9dfba4` dos preços R$49/R$79, `e1877b4` da acessibilidade do login e melhorias de onboarding).
+- Branch / Worktree: `feat/conversion` em `/var/home/matheus/projetos/agenda-conversion`.
+- Servidor ativo: `http://127.0.0.1:3005` (porta 3005).
+- Rotas principais para QA:
+  1. `/login`: envio de magic link, validação de e-mail, `aria-invalid` / `aria-describedby` dinâmicos em erro e fallback transparente para dev.
+  2. `/onboarding`: 4 passos, persistência do rascunho e do passo ativo no reload, e alertas inline com `role="alert"` no Step 2 (sinal > total) e Step 3 (fechamento <= abertura / dias).
+  3. `/` (Landing): CTA "Entrar" visível no mobile 375px linkando para `/login`, e cards de preços R$ 49 e R$ 79.
+- Gates locais T5: lint 0 warnings, typecheck 0 erros, 68/68 testes unitários aprovados.
