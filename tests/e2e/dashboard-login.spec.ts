@@ -28,8 +28,10 @@ test("estados do login: espera HTTP, mantém callbacks e trata sucesso/falha", a
   let release!: () => void;
   const pendingResponse = new Promise<void>((resolve) => { release = resolve; });
   let observedBody: unknown;
+  let observedOrigin = "";
   await page.route("**/api/auth/sign-in/magic-link", async (route) => {
     observedBody = route.request().postDataJSON();
+    observedOrigin = new URL(route.request().url()).origin;
     await pendingResponse;
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ status: true }) });
   });
@@ -43,7 +45,8 @@ test("estados do login: espera HTTP, mantém callbacks e trata sucesso/falha", a
     await expect(page.locator('form [role="status"]')).toHaveText("Enviando link de acesso…");
   } finally { release(); }
   await expect(page.locator('form [role="status"]')).toContainText("Confira sua caixa de entrada");
-  expect(observedBody).toEqual({ email: "qa-login@example.com", callbackURL: "/dashboard", errorCallbackURL: "/dashboard/login?error=link" });
+  expect(observedOrigin).toBe("http://localhost:3000");
+  expect(observedBody).toEqual({ email: "qa-login@example.com", callbackURL: new URL("/dashboard", page.url()).href, errorCallbackURL: new URL("/dashboard/login?error=link", page.url()).href });
   await page.unroute("**/api/auth/sign-in/magic-link");
   await page.route("**/api/auth/sign-in/magic-link", (route) => route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ code: "EMAIL_UNAVAILABLE", message: "Envio indisponível" }) }));
   await page.getByRole("button", { name: "Receber link de acesso" }).click();

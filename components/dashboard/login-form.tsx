@@ -32,7 +32,7 @@ export function LoginForm({ linkError = false }: { linkError?: boolean }) {
           const form = new FormData(event.currentTarget);
           setPending(true); setError(""); setSent(false);
           try {
-            const result = await authClient.signIn.magicLink({ email: String(form.get("email")), callbackURL: "/dashboard", errorCallbackURL: "/dashboard/login?error=link" });
+            const result = await authClient.signIn.magicLink({ email: String(form.get("email")), callbackURL: new URL("/dashboard", window.location.origin).href, errorCallbackURL: new URL("/dashboard/login?error=link", window.location.origin).href });
             if (result.error) throw new Error();
             setSent(true);
           } catch { setError("Não foi possível enviar o link. Confira seu email e tente novamente."); }

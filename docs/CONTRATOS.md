@@ -76,7 +76,7 @@ T1 aprovou este caminho em 2026-10-03. O caminho administrativo atual é interno
 
 - `/dashboard`: agenda do dia ou semana. Query `businessId` seleciona negócio do dono; `date` usa `YYYY-MM-DD`; `view=week` seleciona segunda a domingo. Data inválida mostra aviso e usa hoje no fuso do negócio. A agenda apresenta o estado persistido, sem expirar reservas no cliente.
 - `/dashboard/services`, `/dashboard/customers`, `/dashboard/settings`: serviços, clientes e funcionamento do negócio selecionado.
-- `requireOwner()` obtém sessão Better Auth a partir dos headers da requisição. Sem sessão, páginas e ações redirecionam para `/dashboard/login`; `ownerId` nunca vem do formulário.
+- `requireOwner()` verifica sessão pela autoridade configurada em `NEXT_PUBLIC_BACKEND_URL` (local: `http://localhost:3000`), encaminhando somente Cookie a `/api/auth/get-session`, sem cache e sem seguir redirects. Sem sessão, páginas e ações redirecionam para `/dashboard/login`; `ownerId` nunca vem do formulário.
 - `ownerContext()` lista somente negócios do dono; sem `businessId`, escolhe o primeiro. Negócio alheio ou inexistente não é selecionado e mostra estado indisponível, sem consultar seus dados.
 - Consultas de serviços/clientes/funcionamento/agenda verificam `findOwnedBusiness` antes de ler e filtram `businessId`; joins da agenda incluem vínculo ao mesmo negócio. Datas são exibidas no fuso do negócio.
 
@@ -181,3 +181,11 @@ Aplicar migrations antes do novo código. Reversão: voltar ao código anterior,
 A chave enviada ao provider é derivada da identidade do negócio e da chave do pedido, em formato UUID. Assim, a mesma chave pública usada em negócios diferentes não cruza cobranças.
 O endpoint público não altera o nome de um cliente já cadastrado ao encontrar o mesmo telefone; atualização de cadastro fica a cargo do painel autenticado.
 QR Code e copia-e-cola são retornados somente enquanto a cobrança está pendente e válida; tornam-se `null` após vencimento ou pagamento.
+
+## B-02 — Consumo do painel
+
+Auth client (login e logout) e Pix GET/PUT/DELETE usam a origem pública fixa de `NEXT_PUBLIC_BACKEND_URL`, com credentials include. Em desenvolvimento: localhost3000 para autoridade e localhost3343 para painel; não alternar com127.0.0.1. Callbacks do link mágico são absolutos na origem do painel: /dashboard e /dashboard/login?error=link. A configuração pública é incorporada no build; produção exige a origem HTTPS correta, não o fallback local.
+
+Server Components e Server Actions validam sessão na autoridade antes de consultar/gravar com Drizzle. Encaminham somente Cookie, nunca Host/Origin/Authorization de entrada, sem cache/redirects; resposta é validada com Zod. Falha de transporte/resposta inválida falha fechada com mensagem segura, sem fingir logout ou sessão válida. Queries/ações mantêm autorização tenant/Zod/centavos/transação existentes. Banco do processo do painel deve ser o mesmo banco validado da autoridade.
+
+Pix preserva input password não controlado, limpeza após tentativa, máscaras type/hint e estados após resposta real. APIs e implementação auth locais permanecem durante esta transição, sem remoção antecipada. CORS/origins/cifragem continuam responsabilidades da autoridade. Contrato backend aprovado em29f3b75/1332daa; esta alteração não prova integração autenticada sem fixture/DB sintéticos atuais.

@@ -4,7 +4,7 @@ import { dateSchema, hoursSchema, parseMoney, serviceFormSchema, weekDates } fro
 const mocks = vi.hoisted(() => ({ findOwnedBusiness: vi.fn(), session: vi.fn(), redirect: vi.fn(), db: { select: vi.fn(), update: vi.fn(), insert: vi.fn(), transaction: vi.fn() } }));
 vi.mock("../../lib/tenancy", () => ({ findOwnedBusiness: mocks.findOwnedBusiness }));
 vi.mock("../../db", () => ({ getDb: () => mocks.db }));
-vi.mock("../../lib/auth", () => ({ getAuth: () => ({ api: { getSession: mocks.session } }) }));
+vi.mock("../../lib/dashboard/auth-session", () => ({ getOwnerSession: mocks.session }));
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 import { dashboardBookings, dashboardCustomers, dashboardHours, dashboardServices, saveDashboardHours, saveDashboardService } from "../../lib/dashboard/data";

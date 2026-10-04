@@ -3,4 +3,10 @@
 import { createAuthClient } from "better-auth/react";
 import { magicLinkClient } from "better-auth/client/plugins";
 
-export const authClient = createAuthClient({ plugins: [magicLinkClient()] });
+import { backendOrigin } from "./backend-origin";
+
+export const authClient = createAuthClient({
+  baseURL: backendOrigin,
+  fetchOptions: { credentials: "include" },
+  plugins: [magicLinkClient()],
+});

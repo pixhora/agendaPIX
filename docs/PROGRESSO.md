@@ -165,3 +165,9 @@
 - Pix: UI PUT503/PUT200/DELETE200 controlada provou feedback, foco e limpeza do segredo; NÃO equivale a API integrada, rota real segue ausente. Sessão real preexistente de SMTP local usada; tentativa de novo login3342 não apresentou status nesta passagem, sem nova prova SMTP. Origem3343/3342 permanece pendência operacional.
 - Ajustes da prova: fixture inicial não correspondia à sessão; seletores de campos renomeados após salvar e leitura antes do carregamento falharam; corrigidos no script, versão final passou. Nenhum desses erros foi classificado como bug de produto.
 - Provas/comandos/limites: `docs/evidencias/dashboard-a2/README.md`; revisão A4/A5 ainda pendente de entrega do commit. Sem merge/push; backlog e screenshots preexistentes preservados fora do commit.
+
+## 2026-10-04 — T2-B e B-02: checkpoint atual
+
+T2-B entregue em b7ad242: navegação mobile de quatro abas sempre visíveis, sem dropdown/hidratação própria; seletor e hierarquia ajustados. Shell SSR5/5, browser isolado6/6 em375/390/1280 claro/escuro,44px/teclado/zero overflow. Evidência: docs/T2-B_SHELL.md. Revisão solicitada uma vez, pendente.
+
+B-02 consumidor implementado: cliente auth/Pix autoridade3000 com credentials include; callbacks absolutos; sessão server-side pela autoridade, Cookie só na origem fixa/no-store/sem redirects/Zod; ações/tenant/APIs locais preservados. Lint/typecheck0;79/79; login8/8 (HTTP controlado no envio, não SMTP real); CORS backend real session200/Pix401/preflight204/origem externa403. Prova: docs/evidencias/dashboard-b02/README.md. Fixture/runtime privados informados estão ausentes; não reiniciar/reapontar processo atual29482 nem usar DB desconhecido. Pedido único de caminhos0600 atuais enviado a BORA BILL. Sessão autenticada/Pix persistido/isolamento/build/revisão pendentes; produção não aprovada. Mudanças documentais anteriores preservadas fora desta entrega.

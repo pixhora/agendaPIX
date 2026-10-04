@@ -1,11 +1,11 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { getAuth } from "../auth";
+import { getOwnerSession } from "./auth-session";
 import { ownedBusinesses } from "./data";
 
 export async function requireOwner() {
   const requestHeaders = await headers();
-  const session = await getAuth().api.getSession({ headers: requestHeaders });
+  const session = await getOwnerSession(requestHeaders);
   if (!session) redirect("/dashboard/login");
   return session.user;
 }

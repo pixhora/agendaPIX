@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { backendOrigin } from "@/lib/backend-origin";
 import styles from "./motion.module.css";
 import { Button } from "@/components/ui/button";
 
@@ -23,11 +24,11 @@ export function PixKeyForm({ businessId }: { businessId: string }) {
     if (!pending && notice === "Chave Pix removida.") inputRef.current?.focus();
   }, [pending, loading, error, notice]);
   const typeRef = useRef<HTMLSelectElement>(null);
-  const endpoint = `/api/businesses/${encodeURIComponent(businessId)}/pix-key`;
+  const endpoint = `${backendOrigin}/api/businesses/${encodeURIComponent(businessId)}/pix-key`;
 
   useEffect(() => {
     let active = true;
-    fetch(endpoint, { cache: "no-store", credentials: "same-origin" })
+    fetch(endpoint, { cache: "no-store", credentials: "include" })
       .then(async (response) => {
         if (!response.ok) throw new Error("Não foi possível carregar a chave Pix. Atualize a página para tentar novamente.");
         return response.json() as Promise<PixKeyStatus>;
@@ -46,7 +47,7 @@ export function PixKeyForm({ businessId }: { businessId: string }) {
     if (!input || !type || !value) { input?.focus(); return; }
     setPending(true); setError(""); setNotice("");
     try {
-      const response = await fetch(endpoint, { method: "PUT", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type, value }) });
+      const response = await fetch(endpoint, { method: "PUT", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type, value }) });
       const result = await response.json() as PixKeyStatus | { error?: { message?: string } };
       if (!response.ok) throw new Error("error" in result ? result.error?.message ?? "Não foi possível salvar a chave Pix." : "Não foi possível salvar a chave Pix.");
       setStatus(result as PixKeyStatus); setNotice("Chave Pix salva com segurança.");
@@ -61,7 +62,7 @@ export function PixKeyForm({ businessId }: { businessId: string }) {
   async function remove() {
     setPending(true); setError(""); setNotice("");
     try {
-      const response = await fetch(endpoint, { method: "DELETE", credentials: "same-origin" });
+      const response = await fetch(endpoint, { method: "DELETE", credentials: "include" });
       const result = await response.json() as PixKeyStatus | { error?: { message?: string } };
       if (!response.ok) throw new Error("error" in result ? result.error?.message ?? "Não foi possível remover a chave Pix." : "Não foi possível remover a chave Pix.");
       setStatus(result as PixKeyStatus); setNotice("Chave Pix removida."); setRemoveConfirm(false);
