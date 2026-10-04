@@ -179,6 +179,30 @@
 
 ---
 
-## 6. Status de Entrega
+## 6. Status de Entrega (T5 — Conversion / Onboarding / Login)
 
-O fluxo de agendamento público (`/[slug]`), a landing page (`/`), o onboarding (`/onboarding`), o Modo Preview completo (`/preview/*`) e todas as verificações de acessibilidade, responsividade e isolamento estão 100% aprovados e validados.
+### Checkpoint Operação Maestri (2026-10-03)
+- **Worktree / Branch**: `/var/home/matheus/projetos/agenda-conversion` @ `feat/conversion`
+- **Último Commit**: `e5d8843`
+- **Commits Entregues**:
+  - `e9dfba4`: Mensalidade R$ 49 (Base) e R$ 79 (Completo) alinhada a `docs/PRECOS.md`.
+  - `4fe0e1d`: Persistência de etapa do onboarding no `localStorage` sem hydration mismatch + validação inline.
+  - `f0927df`: Feedback inline em tempo real no `StepBusiness` (nome < 2 chars, slug < 2 chars / regex).
+  - `9317cc1`: Landing Decide/Learn alinhada a `AGENTS.md`, eliminando alegações de Pix automático.
+  - `d972de2`: Clarificação de recebimento via gateway integrado Asaas/MP sem chave pessoal no WhatsApp.
+  - `3195b99`: Touch targets de exatos 44px nos links de rodapé (`LandingFooter.tsx`).
+  - `88ce4d2`: Redesenho mobile-first 375px: botões full-width `min-h-12` (48px), grid de nichos balanceado e inputs táteis.
+  - `9e36847`: LandingHeader responsivo mobile: badge SINAL oculta `< sm`, Entrar link texto compacto `min-h-11`, CTA primário `whitespace-nowrap min-h-11` sem corte em 320px/360px/375px (homologado por T4 em `7002e78`).
+  - `e5d8843`: Remoção de simulação de sucesso em desenvolvimento fora de `/preview` em `app/login/page.tsx` e `StepAccount.tsx`; criação de `lib/magic-link.ts` e suíte de testes `tests/unit/login-auth.test.ts`. Falha 500/rede exibe erro observável com `role="alert"`, NUNCA enviado fictício.
+- **Quality Gates**:
+  - `pnpm lint`: 0 warnings / 0 erros.
+  - `pnpm typecheck`: 0 erros.
+  - `pnpm test`: 10 arquivos, 73/73 testes unitários aprovados (100%).
+- **Provas Browser (`agent-browser`)**:
+  - Landing (`/`): 320x640, 360x640, 375x812 e 1280x800 com `hasHorizontalOverflow: false` e touch targets >= 44px.
+  - Login (`/login`): testado em modo claro e escuro; erro real observável sob falha de infraestrutura (`/tmp/login-real-error-375.png`).
+  - Onboarding (`/onboarding`): 4 etapas fluidas sem transbordo e com validação inline.
+- **Bloqueios e Próximos Passos**:
+  - Zero bloqueios na worktree de conversão.
+  - Alinhamento de login canônico `/dashboard/login` compartilhado com CODEXADO (T2).
+
