@@ -16,23 +16,23 @@ export function LandingFooter() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-6 text-xs font-medium">
-            <Link href="/login" className="hover:text-primary transition-colors">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs font-medium">
+            <Link href="/login" className="inline-flex items-center py-2.5 hover:text-primary transition-colors min-h-[44px]">
               Entrar na conta
             </Link>
-            <Link href="/onboarding" className="hover:text-primary transition-colors">
+            <Link href="/onboarding" className="inline-flex items-center py-2.5 hover:text-primary transition-colors min-h-[44px]">
               Criar conta
             </Link>
-            <a href="#como-funciona" className="hover:text-primary transition-colors">
+            <a href="#como-funciona" className="inline-flex items-center py-2.5 hover:text-primary transition-colors min-h-[44px]">
               Como funciona
             </a>
-            <a href="#recursos" className="hover:text-primary transition-colors">
+            <a href="#recursos" className="inline-flex items-center py-2.5 hover:text-primary transition-colors min-h-[44px]">
               Vantagens
             </a>
-            <a href="#precos" className="hover:text-primary transition-colors">
+            <a href="#precos" className="inline-flex items-center py-2.5 hover:text-primary transition-colors min-h-[44px]">
               Planos & Preços
             </a>
-            <a href="#perguntas-frequentes" className="hover:text-primary transition-colors">
+            <a href="#perguntas-frequentes" className="inline-flex items-center py-2.5 hover:text-primary transition-colors min-h-[44px]">
               Dúvidas
             </a>
           </div>
