@@ -8,6 +8,7 @@ import { sendMagicLinkEmail } from "./email";
 import { authEnvSchema } from "./env";
 import { logAuthEvent } from "./auth-logger";
 import { HttpError } from "./http";
+import { trustedAppOrigins } from "./origins";
 
 const authErrorBody = {
   code: "AUTHENTICATION_FAILED",
@@ -28,8 +29,8 @@ function createAuth() {
         throw new APIError("INTERNAL_SERVER_ERROR", authErrorBody);
       },
     },
-    trustedOrigins: [new URL(env.BETTER_AUTH_URL).origin],
-    advanced: { disableOriginCheck: false },
+    trustedOrigins: trustedAppOrigins(),
+    advanced: { disableOriginCheck: false, crossSubDomainCookies: { enabled: false } },
     database: drizzleAdapter(getDb(), { provider: "pg", schema }),
     plugins: [
       magicLink({ storeToken: "hashed", sendMagicLink: async ({ email, url }) => sendMagicLinkEmail(email, url) }),

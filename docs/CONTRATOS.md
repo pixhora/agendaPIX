@@ -188,3 +188,11 @@ Não redefine cadastros já existentes, não troca o dono de um slug ocupado e n
 | Corte e barba | 60 minutos | 5500 | 1500 |
 
 Preços e horários acima são dados de teste, não uma definição comercial do produto.
+
+## B02 — autoridade auth/Pix e origens locais
+
+Autoridade: http://localhost:3000. Em desenvolvimento, origens exatas permitidas: localhost nas portas3000,3001,3005,3343. Usar localhost, nunca alternar com127.0.0.1. Em produção somente origem de BETTER_AUTH_URL; portas locais não são automaticamente confiáveis. Cookies Better Auth permanecem HttpOnly, SameSite=Lax e host-only (sem Domain; Secure em HTTPS). Browser deve usar credentials: include; Server Components encaminham Cookie somente à autoridade fixa. Callbacks absolutos das origens permitidas aceitos pela biblioteca.
+
+GET/POST auth e GET/PUT/DELETE pix-key recebem CORS credenciado somente para origem exata permitida. OPTIONS valida origem, método e headers solicitados; devolve204 com Allow-Origin específico, Allow-Credentials:true, Allow-Methods e Allow-Headers(Content-Type,Authorization). Origem externa/método/header alheio responde403 sem Allow-Origin. Respostas têm Vary:Origin e no-store. CORS não substitui sessão, tenant, CSRF ou cifragem; mutações Pix continuam exigindo Origin válido. Chamadas server-side GET sem Origin permanecem permitidas.
+
+Fixture B02: `NODE_ENV=development node scripts/create_backend_fixture.mjs /caminho/privado/fixture.json`. Exige banco local, autoridade localhost3000 e segredo Pix válido; cria somente usuário/negócio/serviço/horários sintéticos e sessão de1h. Arquivo0600 exclusivo contém Cookie/IDs, nunca versionar nem copiar para frontend/logs. Prova sessão/tenant/Pix; não valida link mágico nem entrega SMTP. Cookie do servidor continua sem Domain, sem tornar endpoint público de bypass. Fixture operacional disponível nesta máquina em `/tmp/agenda-backend-b02-fixture.json`; expira em1h.
