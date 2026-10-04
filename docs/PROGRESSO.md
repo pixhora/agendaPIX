@@ -326,3 +326,16 @@ Próxima ação: terminais 1/2/4 concluir e integrar as partes principais; human
 - **UI booking isolada:** configuração aponta `3104`, sem servidor. Em `3001`, rota é Preview (`/preview/booking`), incompatível com testes de `/{slug}`; falhas ali não atribuídas ao produto. E2E API real acima passou.
 - **Limite:** sistema não tem gateway real nem chave Pix real. `app/` e `lib/` não contêm logger de produto; ausência de vazamento em logs não pode ser provada para gateway inexistente. Fake não comprova recebimento bancário.
 - **Achados:** nenhum defeito novo reproduzido. MVP pagante segue bloqueado por gateway/webhook real e falta de revalidação atual do dashboard.
+
+## QA T3 — testes negativos de autenticação — 2026-10-03
+
+- Plano executado: reutilizar handler Better Auth e PostgreSQL; manter email mock; cobrir rejeições, expiração, concorrência e limite; registrar limites sem alterar backend.
+- `tests/integration/auth.test.ts:98`: origem inválida com cookie e callbacks externos absolutos/protocol-relative retornam 403, sem email, usuário ou verificação criada.
+- `tests/integration/auth.test.ts:111`: callback adulterado na verificação retorna 403, sem sessão; link original permanece utilizável.
+- `tests/integration/auth.test.ts:123`: validade padrão de 300 segundos verificada; expiração forçada no banco impede criação de usuário/sessão.
+- `tests/integration/auth.test.ts:137`: oito consumos concorrentes do mesmo link produzem exatamente uma sessão; demais recebem erro. Reuso sequencial e sessão expirada continuam cobertos pelo teste existente.
+- `tests/integration/auth.test.ts:151`: instância isolada, mesmas opções do produto com limite explicitamente habilitado; cinco pedidos aceitos, sexto 429, `X-Retry-After` positivo, apenas cinco emails mock.
+- `tests/integration/auth.test.ts:164`: origem inválida sem cookie, com Fetch Metadata de primeiro login, retorna 403 sem email.
+- Prova: `pnpm exec vitest run --config vitest.db.config.ts tests/integration/auth.test.ts` — 9/9 passaram com DB real e email mock. Nenhum envio SMTP real.
+- Limites: Better Auth desliga proteção de origem em `NODE_ENV=test`; testes negativos restauram explicitamente `disableOriginCheck:false` e `disableCSRFCheck:false` em instância isolada. Rate limit não é ligado por padrão em dev/test; teste habilitado não comprova proteção do servidor dev nem limite distribuído entre processos. Referência T1 inclui logger ausente nesta worktree; logs T1 não foram revalidados. Sem alteração de backend, merge ou push.
+- Gates: `pnpm lint`, `pnpm typecheck`, `pnpm test` passaram; 48 testes unitários. Nenhuma falha de produto demonstrada nesta rodada.

@@ -136,3 +136,8 @@ Validado nesta auditoria: 48 unitários e 25 integrações; isolamento de domín
 - **P1 BLOQUEIA — T1:** gateway real/chave Pix real ausentes; não existe prova de segredo Pix real em logs. Implementar/revisar provider real antes de cliente pagante; manter secret filtering/log tests no backend.
 - **P1 MELHORAR — T2:** reexecutar `tests/qa/dashboard-real.spec.ts` quando servidor de verificação estiver disponível; `127.0.0.1:3342` recusou conexão nesta rodada.
 - **Limite de evidência:** UI booking E2E requer `QA_BOOKING_UI_URL`; ausência causou skip. Preview em3001 não substitui rota pública `/{slug}`.
+
+## QA T3 — autenticação negativa — 2026-10-03
+
+- **OK:** origem/callback externos rejeitados, link expirado sem sessão, reuso concorrente com sessão única, sexto pedido limitado em instância habilitada; 9 testes de integração com DB real e email mock.
+- **Limitação — T1:** `lib/auth.ts:12` não habilita rate limit explicitamente; Better Auth usa padrão dependente do ambiente. Dev/test sem limite não representam produção. Prova atual usa limite em memória explicitamente habilitado; não valida múltiplos processos, proxy/IP nem logger do branch T1. Não há correção necessária demonstrada nesta rodada; validar configuração de implantação antes de aprovação de produção.
