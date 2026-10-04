@@ -1,0 +1,17 @@
+{
+  "proof": "HTML renderizado do CustomersPage real com sessão/dados/Shell controlados em teste; CSS real compilado por Tailwind; NÃO prova autenticação/API/DB",
+  "results": [
+    {
+      "width": 375,
+      "whatsAppHeight": 44,
+      "noOverflow": true,
+      "keyboard": true
+    },
+    {
+      "width": 1280,
+      "whatsAppHeight": 44,
+      "noOverflow": true,
+      "keyboard": true
+    }
+  ]
+}
