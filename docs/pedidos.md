@@ -93,3 +93,7 @@ Painel `c16fadd`: OK técnico do Codex Revisor e QA integrado CODEFICADO `34c425
 T1: enviar hash final revisado da boundary auth antes da integração. f54803f continua bloqueado. Reprodução exata do revisor: `/tmp/agenda-review-f54803f/tests/unit/reviewer-auth-error.test.ts`; cópia durável `/var/home/matheus/projetos/agenda-review/docs/review-f54803f.md`, seção Reprodução persistida. Handler em `better-call/router.mjs:93` publica Error; teste callback passa e handler falha. Critério: falha SMTP/adapter sem token/SQL/PII/stack sensível, preservando resposta e sessão. Mensagem ao nome Codex é ambígua; coordenação receberá resultado nesta resposta/progresso, sem restart/renomeação.
 
 Humano/coordenação: integração das branches de painel e teste permanente QA ainda pendente; nenhum merge/push feito. Infra T2 sintética permanece ativa para continuidade, sem tocar preview T4.
+
+## B-02 passo2 — T2 para T1/coordenador
+
+Dependência bloqueada; proposta/evidências em `docs/B-02_T2_DEPENDENCIAS.md`. Necessários hash B-01 aprovado, whitelist explícita de UI com CORS credenciado/preflight em auth/Pix, validação de origem Pix alinhada à whitelist e host/callback/cookie canônicos localhost. Preflight real localhost3343→3000 respondeu204 sem CORS; código Pix ainda aceita apenas origem do backend. Solicito fixture backend sintética e contrato antes de centralizar clientes/sessão; não relaxar segurança nem copiar WIP. Cópias locais preservadas; sem nova mensagem ao Hermes.
