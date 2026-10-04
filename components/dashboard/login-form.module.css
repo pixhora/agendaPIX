@@ -1,32 +1,59 @@
-/* Identidade aprovada T4/T5, limitada à rota enquanto os tokens compartilhados
-   ainda não foram integrados nesta branch. Não altera outras telas. */
+/* Tokens locais da identidade oficial, sem alterar CSS global ou componentes compartilhados. */
 .root {
   --background: #f5f6f2;
   --foreground: #111613;
-  --primary: var(--accent-lime, #c0f739);
-  --primary-foreground: #111613;
+  --surface: #ffffff;
   --muted: #eaede6;
   --muted-foreground: #5a645c;
   --border: #e2e6df;
+  --primary: var(--accent-lime, #c0f739);
+  --primary-foreground: #111613;
   --ring: var(--accent-forest, #0f3b2e);
-  --login-surface: var(--surface, #ffffff);
-  font-family: var(--font-sans, sans-serif);
+  color-scheme: light;
+  font-family: var(--font-sans, Inter, system-ui, sans-serif);
+}
+
+.root:global(.light), :global(.light) .root {
+  --background: #f5f6f2;
+  --foreground: #111613;
+  --surface: #ffffff;
+  --muted: #eaede6;
+  --muted-foreground: #5a645c;
+  --border: #e2e6df;
+  --primary: var(--accent-lime, #c0f739);
+  --primary-foreground: #111613;
+  --ring: var(--accent-forest, #0f3b2e);
   color-scheme: light;
 }
 
-.surface { background-color: var(--login-surface); }
-.display { font-family: var(--font-display, var(--font-sans, sans-serif)); }
-.brand { background-color: var(--accent-forest, #0f3b2e); color: var(--primary); }
+.root:global(.dark), :global(.dark) .root {
+  --background: #0e1612;
+  --foreground: #f5f6f2;
+  --surface: #141f1a;
+  --muted: #1c2a23;
+  --muted-foreground: #a5b0a8;
+  --border: #34463d;
+  --primary: var(--accent-lime, #c0f739);
+  --primary-foreground: #111613;
+  --ring: var(--accent-lime, #c0f739);
+  color-scheme: dark;
+}
 
 @media (prefers-color-scheme: dark) {
-  .root {
+  .root:not(:global(.light)) {
     --background: #0e1612;
     --foreground: #f5f6f2;
+    --surface: #141f1a;
     --muted: #1c2a23;
-    --muted-foreground: #8a968c;
-    --border: #23352c;
+    --muted-foreground: #a5b0a8;
+    --border: #34463d;
+    --primary: var(--accent-lime, #c0f739);
+    --primary-foreground: #111613;
     --ring: var(--accent-lime, #c0f739);
-    --login-surface: var(--surface, #141f1a);
     color-scheme: dark;
   }
 }
+
+.surface { background-color: var(--surface, #ffffff); }
+.display { font-family: var(--font-display, var(--font-sans, Inter, system-ui, sans-serif)); }
+.brand { background-color: var(--accent-forest, #0f3b2e); color: var(--accent-lime, #c0f739); }

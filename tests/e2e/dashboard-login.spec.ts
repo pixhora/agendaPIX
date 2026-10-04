@@ -6,6 +6,8 @@ for (const colorScheme of ["light", "dark"] as const) {
       await page.setViewportSize({ width, height: 812 });
       await page.emulateMedia({ colorScheme });
       await page.goto("/dashboard/login");
+      await page.evaluate((scheme) => document.documentElement.classList.add(scheme), colorScheme);
+      await expect(page.locator("html")).toHaveClass(colorScheme);
       await expect(page.getByRole("link", { name: "Agenda, início" })).toBeVisible();
       await expect(page.getByRole("heading", { name: "Entre no seu painel" })).toBeVisible();
       const input = page.getByLabel("Seu email");
@@ -15,6 +17,10 @@ for (const colorScheme of ["light", "dark"] as const) {
       }
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       expect(await button.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(192, 247, 57)");
+      const heading = page.getByRole("heading", { name: "Entre no seu painel" });
+      expect(await heading.evaluate((element) => getComputedStyle(element).fontFamily)).toContain("Plus Jakarta Sans");
+      const inputSurface = await input.evaluate((element) => getComputedStyle(element).backgroundColor);
+      expect(inputSurface).toBe(colorScheme === "dark" ? "rgb(20, 31, 26)" : "rgb(255, 255, 255)");
       await page.screenshot({ path: testInfo.outputPath(`login-${width}-${colorScheme}.png`), fullPage: true });
       await page.getByRole("link", { name: "Agenda, início" }).focus();
       await page.keyboard.press("Tab");

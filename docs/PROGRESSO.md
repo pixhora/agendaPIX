@@ -166,6 +166,43 @@
 - Ajustes da prova: fixture inicial não correspondia à sessão; seletores de campos renomeados após salvar e leitura antes do carregamento falharam; corrigidos no script, versão final passou. Nenhum desses erros foi classificado como bug de produto.
 - Provas/comandos/limites: `docs/evidencias/dashboard-a2/README.md`; revisão A4/A5 ainda pendente de entrega do commit. Sem merge/push; backlog e screenshots preexistentes preservados fora do commit.
 
+## 2026-10-04 — Checkpoint de auditoria para Hermes
+
+T2/agenda-dashboard, feat/dashboard, HEAD daf70ee. Auditoria somente leitura registrada em `docs/AUDITORIA_T2_HERMES_2026-10-04.md`. Servidor3343 recusou conexão (curl exit7/HTTP000); suíte unitária73/73 passou. Sem alteração funcional/rebase/reinício de processo; backlog e evidências preexistentes preservados. Próxima ação: envio único ao Hermes e aguardar tarefas delimitadas/dependências. Revisão A4/A5 anterior não reenviada; handle de espera indisponível não equivale a aprovação.
+
+## 2026-10-04 — T-03: plano
+
+Adicionar ação WhatsApp aos clientes, preservando ligação e consultas/tenant atuais. Reutilizar padrão wa.me/encodeURIComponent do Preview; telefones reais já vêm em E.164, sem prefixar 55 duas vezes. Mensagem neutra identifica cliente e negócio, sem inventar reserva confirmada. Validar URL/teclado/375px e gates. T-01 de Hermes tentou relay a Codex, mas CLI recusou por nomes duplicados; transporte200, backend não alterado.
+
+### T-03 — Entrega
+
+Commit `f4b4361`: WhatsApp junto de Ligar nos clientes, URL E.164 sem duplicar55 e mensagem neutra codificada. Gates lint/typecheck OK; suíte73/73 e regressão específica1/1. Browser isolado do CustomersPage real com sessão/dados/Shell controlados e CSS real:375/1280px,44px, foco/Tab e zero overflow. Não equivale à rota autenticada;3343/infra sintética indisponíveis, prova integrada pendente. Evidência: `docs/evidencias/dashboard-t03/README.md`. Relay T-01 a Codex recusado por nomes duplicados; pedido preservado nesse relatório, sem backend alterado e sem novo contato Hermes. Alterações documentais anteriores seguem não commitadas e preservadas. Revisão do delta solicitada ao Codex Revisor; próximo passo: corrigir achado reproduzido ou aguardar ambiente QA.
+
+## 2026-10-04 — B-05: checkpoint de disponibilidade e integração
+
+- T2/CODEXADO, agenda-dashboard/feat/dashboard, commit `b04643073fb1fd4ba557c67b35d09d1ce68ae714`, produto basef4b4361. Critério B-05 concluído:3343 login/health200, login SMTP e sessão normal, dados PostgreSQL reais sintéticos e browser375/1280. Nenhuma mudança funcional/backend/auth/schema.
+- Infra própria ativa: appPID96096 em3343; SMTPPID96095 em25243; container `agenda-t2-b05-d0bbcdb1` Postgres17 em55443. Manifesto/fixture/env/mails/logs privados em `/tmp/agenda-t2-b05-UyyG6a` (0700/0600); não copiar segredos. Portas antigas estavam vazias e `/tmp/agenda-t2-final` ausente; nada alheio foi interrompido.
+- Prova nova: migrations existentes passaram no banco novo; QA existente1/1 em10,9s (login/uso único, create/update/reload/centavos, tenant, horários, semana e proteção sem sessão); browser real8/8 telas, WhatsApp44px/foco/URL e serviço inativar/reload/reativar verificado no banco. Contagens finais fixture:1 reserva/1 serviço/1 cliente/1 horário. Lint e diff-check passaram. Gates gerais antigos não alegados como execução nova.
+- Preparação QA: runner de outra instalação Playwright inicialmente falhou antes de executar testes; CLI da própria instalação da suíte resolveu. Sem instalar dependências ou editar worktree QA. Saídas da suíte em test-results/dashboard-b05 na própria pasta.
+- Evidência/rollback: `docs/evidencias/dashboard-b05/README.md`. Antes de reversão, confirmar PIDs/comandos pelo manifesto; parar somente grupos próprios app/SMTP e container próprio, sem apagar dados. Sem merge/push/deploy. Alterações documentais anteriores/backlog/evidências não rastreadas preservadas.
+- Pendências reais: API Pix ausente nesta branch e boundary de logs auth sob T1; não bloqueiam prova sintética de caminho feliz, mas produção não aprovada. B-03/F-02/F-06 permanecem bloqueadas e não iniciadas. Próxima ação: Codex recebe caminho/commit/status para fila, sem novo envio ao Hermes; preservar infraestrutura para QA.
+
+## 2026-10-04 — B-02 passo2: checkpoint de dependências
+
+Painel permanece b046430/feat/dashboard, sem mudança funcional. T1 base0d6858f, B-01 não commitado; trustedOrigins ainda só backend e Pix mutação same-origin. OPTIONS real localhost3343→3000 retornou204 sem CORS; centralização direta ainda não funciona com credenciais. Documento/pedido: `docs/B-02_T2_DEPENDENCIAS.md` e pedidos. Cookie exige host canônico localhost (não misturar127.0.0.1); sessão server-side precisa consultar autoridade, não cópia local. Próxima ação: receber hash aprovado, whitelist/CORS/origem Pix e fixture sintética de T1; depois implementar e provar. Infra B-05 própria preservada; APIs/libs locais não removidas. Sem gates repetidos ou novo envio Hermes.
+
+## 2026-10-04 — Correções do painel após VER-ROTAS: plano
+
+Corrigir somente a data reproduzida, sincronizando o input não controlado ao dia carregado sem remontar agenda/formulário. Provar editar/Próximo/Anterior/aplicar GET em375/desktop e rodar gates. Login atual já tem identidade desde9e24951: solicitar contrato oficial/canônico de Trilha via coordenador antes de substituir, sem duplicar UI. Pix continua bloqueado por B-02 passo1/whitelist/CORS/cookie de T1; não apagar cópias nem relaxar origem.
+
+### Entrega — Data sincronizada na agenda
+
+Commit `206a5a3759bb70e60b3dca8db62ec665e991dffc`. Input Data com key do dia carregado; somente esse controle é reinicializado na navegação, sem chave nova na agenda/formulário. Browser real375/1280 passou editar+Próximo/Anterior/aplicar GET/próxima semana; URL e campo coincidem. Lint/typecheck e73/73 passaram; script direcionado e diff-check OK. Prova: `docs/evidencias/dashboard-date-sync/README.md`. Solicitação de contrato/login oficial Trilha enviada uma vez via coordenador BORA BILL, aguardando retorno; nada duplicado. Pix aguarda whitelist/CORS/cookie/fixture B-02 de T1; cópias preservadas. Revisão técnica mínima do delta será solicitada ao Codex Revisor. Alterações documentais antigas permanecem fora do commit, sem overwrite/rebase. Próximo passo: tratar achado de revisão ou continuar login/Pix após dependências prontas.
+
+## 2026-10-04 — B-02 passo2: plano de implementação
+
+Consumir autoridade3000 no cliente auth/Pix com credentials include e callbacks absolutos do painel. Verificar sessão no servidor pela autoridade fixa, Cookie somente nessa origem, no-store e sem redirects. Manter handlers/cópias locais e identidade existentes. Usar conexão sintética compartilhada apenas no processo local; preservar B05, sem migrations/seed. Provar sessão/Pix/tenant/browser e gates; SMTP da autoridade não possui captor, portanto não alegar entrega de email real.
+
 ## 2026-10-04 — T2-B e B-02: checkpoint atual
 
 T2-B entregue em b7ad242: navegação mobile de quatro abas sempre visíveis, sem dropdown/hidratação própria; seletor e hierarquia ajustados. Shell SSR5/5, browser isolado6/6 em375/390/1280 claro/escuro,44px/teclado/zero overflow. Evidência: docs/T2-B_SHELL.md. Revisão solicitada uma vez, pendente.
@@ -175,3 +212,11 @@ B-02 consumidor implementado: cliente auth/Pix autoridade3000 com credentials in
 ## 2026-10-04 — T2-C: checkpoint
 
 Estados de vazio/sucesso concluídos no frontend: confirmação antiga desaparece ao editar serviços/horários/Pix; nenhum dado/foco apagado; horários sem dia selecionado e Pix sem chave explícitos; semana vazia identifica sete dias. Feedback continua exclusivamente após resposta da ação/API. CSS reduced-motion existente validado, sem tokens/shared/backend novos. Baseline230b569 falhou com sucesso antigo visível (esperado0/observado1); versão corrigida passou browser8/8 em375/1280 claro/escuro e movimento normal/reduzido. SSR2/2;lint/typecheck0;79/79. Prova isolada com ações/Pix controlados, não persistência/sessão real. Relatório docs/T2-C_ESTADOS.md. T2-B b7ad242;T2-A aguarda T4-A; revisão/build e B-02 autenticado continuam pendentes. Sem merge/push/deploy; documentos antigos preservados.
+
+## 2026-10-04 — T2-A login e fechamento da refatoração frontend
+
+T2-A concluído em feat/dashboard: `components/dashboard/login-form.module.css` adota paleta/superfícies/tipografia de tokens T4-A `538f6a3`, incluindo preferência do sistema e `.dark`/`.light` explícitos. Formulário de Trilha não duplicado; auth/Server Actions/API preservados. Protótipo comparou composições de login; versão enxuta escolhida para manter foco mobile e marca aprovada. Evidência e decisão: `docs/T2-A_LOGIN.md` e `docs/evidencias/dashboard-login/`.
+
+Verificação após código: `pnpm lint` exit0; `pnpm typecheck` exit0; `pnpm test` 79/79; `pnpm build` Next16.3.8 concluiu produção; `QA_DASHBOARD_URL=http://localhost:3361 pnpm exec playwright test --config tests/dashboard-login.config.ts` 8/8 contra build de produção, 375/390/1280, tema claro/escuro e estados/callbacks. HTTP200 em3361. Servidor pré-existente3343 preservado. Testes HTTP de email usaram respostas controladas; entrega SMTP/sessão real não alegada.
+
+T2-B entregue b7ad242, T2-C 19d5562, revisão Hermes OK com ressalva independente apenas sobre T2-A/build. Build agora verde. Revisão independente específica de T2-A solicitada ao Codex Revisor; aguarda parecer. Provas visuais T2-C modificadas pela execução revalidada e preservadas para revisão; quatro previews desktop/mobile anteriores seguem em artefato histórico não commitado. Auditoria T2 e verificação de rotas são relatórios independentes anteriores, preservados no worktree. Backlog recebe adendo de status atual; nenhum merge/push/deploy.
