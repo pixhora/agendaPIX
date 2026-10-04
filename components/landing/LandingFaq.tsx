@@ -28,9 +28,6 @@ export function LandingFaq() {
     <section id="perguntas-frequentes" className="py-16 sm:py-24 border-t border-border bg-background">
       <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-2xl mx-auto mb-14">
-          <span className="inline-block rounded-full bg-accent-forest text-primary px-3.5 py-1 text-xs font-bold uppercase tracking-wider mb-4">
-            Tire Suas Dúvidas
-          </span>
           <h2 className="font-display text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground">
             Perguntas frequentes
           </h2>

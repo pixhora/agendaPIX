@@ -73,7 +73,7 @@ export function LandingHero() {
 
             {/* Divisor Fino e Badges de Nichos */}
             <div className="mt-8 pt-6 border-t border-border">
-              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2.5">
+              <p className="text-xs font-semibold text-muted-foreground mb-2.5">
                 Feito para quem vive de atendimento:
               </p>
               <div className="flex flex-wrap gap-2">

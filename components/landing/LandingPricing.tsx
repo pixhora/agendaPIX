@@ -6,9 +6,6 @@ export function LandingPricing() {
     <section id="precos" className="py-16 sm:py-24 border-t border-border bg-surface/20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-3xl mx-auto mb-14">
-          <span className="inline-block rounded-full bg-accent-forest text-primary px-3.5 py-1 text-xs font-bold uppercase tracking-wider mb-4">
-            Preços Transparentes
-          </span>
           <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-foreground">
             Invista menos de 1 atendimento por mês e pare de perder horários
           </h2>
@@ -72,8 +69,8 @@ export function LandingPricing() {
 
           {/* Plano Completo (Destaque Verde-Petróleo & Lima) */}
           <div className="relative flex flex-col justify-between rounded-3xl border-2 border-accent-forest dark:border-primary bg-surface p-5 sm:p-9 shadow-xl">
-            <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-accent-forest px-4 py-1 text-[11px] font-extrabold uppercase tracking-wider text-primary shadow-sm">
-              Mais Escolhido
+            <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-accent-forest px-4 py-1 text-xs font-bold text-primary shadow-sm">
+              Mais escolhido
             </div>
 
             <div className="space-y-4">

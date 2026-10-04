@@ -43,8 +43,8 @@ export function LandingHeroVisual() {
           }}
         >
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider bg-black/10 px-2 py-0.5 rounded-full">
-              Pix Instantâneo
+            <span className="text-[11px] font-bold bg-black/10 px-2.5 py-0.5 rounded-full">
+              Pix instantâneo
             </span>
             {/* Ícone de sinal wireless / contactless minimalista */}
             <div className="flex items-center gap-0.5 text-black/60">

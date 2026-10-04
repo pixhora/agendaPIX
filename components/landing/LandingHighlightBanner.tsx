@@ -79,8 +79,8 @@ export function LandingHighlightBanner() {
 
             {/* Lado Direito: Os 3 Passos Simples */}
             <div className="lg:col-span-7">
-              <span className="inline-block rounded-full bg-black/10 px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-[#111613] mb-3">
-                Simplicidade Total
+              <span className="inline-block rounded-full bg-black/10 px-3.5 py-1 text-xs font-bold text-[#111613] mb-3">
+                Simplicidade total
               </span>
               <h2 className="font-display text-2xl sm:text-4xl lg:text-5xl font-extrabold text-[#111613] leading-tight">
                 Receba sinal por Pix em 3 passos simples

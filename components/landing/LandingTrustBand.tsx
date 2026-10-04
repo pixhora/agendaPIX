@@ -12,8 +12,8 @@ export function LandingTrustBand() {
   return (
     <section className="border-y border-border bg-surface/50 py-6 sm:py-8">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
-        <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-5">
-          Concebido para profissionais e pequenos negócios em todo o Brasil
+        <p className="text-xs font-semibold text-muted-foreground mb-5">
+          Para profissionais e pequenos negócios em todo o Brasil
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 items-center">
           {categories.map((cat, idx) => (

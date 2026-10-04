@@ -34,7 +34,7 @@ export function LandingInteractiveDemo() {
     <section id="demonstracao" className="py-14 sm:py-20 border-t border-border bg-background">
       <div className="mx-auto max-w-5xl px-4 sm:px-6">
         <div className="text-center max-w-2xl mx-auto mb-12">
-          <span className="text-xs font-bold uppercase tracking-wider text-primary">
+          <span className="text-xs font-bold text-primary">
             Demonstração em 4 passos
           </span>
           <h2 className="mt-2 font-display text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
