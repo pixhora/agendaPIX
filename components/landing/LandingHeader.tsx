@@ -6,7 +6,7 @@ export function LandingHeader() {
     <header className="sticky top-0 z-40 w-full border-b border-border bg-background/90 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-3 sm:px-6 lg:px-8">
         {/* Logo Neo-Editorial */}
-        <Link href="/" className="flex items-center gap-2 sm:gap-2.5 font-display text-lg sm:text-xl font-extrabold tracking-tight text-foreground shrink-0">
+        <Link href="/" className="flex items-center gap-2 sm:gap-2.5 font-display text-lg sm:text-xl font-extrabold tracking-tight text-foreground shrink-0 min-h-11 py-1">
           <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent-forest text-sm font-black text-primary shadow-xs">
             A
           </span>
@@ -20,19 +20,19 @@ export function LandingHeader() {
 
         {/* Navegação Central */}
         <nav className="hidden md:flex items-center gap-7 text-sm font-semibold text-muted-foreground" aria-label="Navegação principal">
-          <a href="#como-funciona" className="hover:text-foreground transition-colors">
+          <a href="#como-funciona" className="hover:text-foreground transition-colors min-h-11 flex items-center">
             Como funciona
           </a>
-          <a href="#recursos" className="hover:text-foreground transition-colors">
+          <a href="#recursos" className="hover:text-foreground transition-colors min-h-11 flex items-center">
             Vantagens
           </a>
-          <a href="#demonstracao" className="hover:text-foreground transition-colors">
+          <a href="#demonstracao" className="hover:text-foreground transition-colors min-h-11 flex items-center">
             Demonstração
           </a>
-          <a href="#precos" className="hover:text-foreground transition-colors">
+          <a href="#precos" className="hover:text-foreground transition-colors min-h-11 flex items-center">
             Preços
           </a>
-          <a href="#perguntas-frequentes" className="hover:text-foreground transition-colors">
+          <a href="#perguntas-frequentes" className="hover:text-foreground transition-colors min-h-11 flex items-center">
             Dúvidas
           </a>
         </nav>

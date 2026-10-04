@@ -39,9 +39,9 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       {/* Header Compacto */}
-      <header className="border-b border-border bg-surface py-3.5 px-4 sm:px-6">
+      <header className="border-b border-border bg-surface py-2 px-4 sm:px-6">
         <div className="mx-auto max-w-md flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 font-display text-lg font-bold text-foreground">
+          <Link href="/" className="flex items-center gap-2 font-display text-lg font-bold text-foreground min-h-11 py-1">
             <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent-forest text-xs font-black text-primary">
               A
             </span>
@@ -49,7 +49,7 @@ export default function LoginPage() {
           </Link>
           <Link
             href="/onboarding"
-            className="text-xs font-semibold text-primary hover:underline"
+            className="inline-flex items-center text-xs font-semibold text-primary hover:underline min-h-11 px-2 -mr-2"
           >
             Criar conta
           </Link>
@@ -152,11 +152,11 @@ export default function LoginPage() {
                 {isSubmitting ? "Enviando link..." : "Receber link de acesso"}
               </Button>
 
-              <div className="text-center pt-2 text-xs text-muted-foreground">
-                Ainda não tem uma conta?{" "}
+              <div className="text-center pt-2 text-xs text-muted-foreground flex items-center justify-center flex-wrap gap-1">
+                <span>Ainda não tem uma conta?</span>
                 <Link
                   href="/onboarding"
-                  className="font-semibold text-foreground hover:underline"
+                  className="inline-flex items-center font-semibold text-foreground hover:underline min-h-11 px-1.5"
                 >
                   Começar 7 dias grátis
                 </Link>

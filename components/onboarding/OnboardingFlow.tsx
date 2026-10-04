@@ -84,9 +84,9 @@ export function OnboardingFlow() {
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       {/* Header Compacto do Onboarding */}
-      <header className="border-b border-border bg-surface py-3.5 px-4 sm:px-6">
+      <header className="border-b border-border bg-surface py-2 px-4 sm:px-6">
         <div className="mx-auto max-w-md flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 font-display text-lg font-bold text-foreground">
+          <Link href="/" className="flex items-center gap-2 font-display text-lg font-bold text-foreground min-h-11 py-1">
             <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-xs font-black text-primary-foreground">
               A
             </span>
