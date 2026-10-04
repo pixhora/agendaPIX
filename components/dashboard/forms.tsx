@@ -10,7 +10,7 @@ const control = "min-h-11 w-full rounded-md border border-border bg-background p
 function Feedback({ state }: { state: FormState }) {
   const ref = useRef<HTMLParagraphElement>(null);
   useEffect(() => { if (state.error) ref.current?.focus(); }, [state]);
-  return <>{state.error && <p ref={ref} tabIndex={-1} role="alert" className="rounded-md border border-border p-3 font-medium">{state.error}</p>}{state.success && <p role="status" className="rounded-md bg-muted p-3 font-medium">{state.success}</p>}</>;
+  return <>{state.error && <p ref={ref} tabIndex={-1} role="alert" className="rounded-md border-l-2 border-border bg-muted p-3 font-medium">{state.error}</p>}{state.success && <p role="status" className="rounded-md border-l-2 border-primary bg-muted p-3 font-medium">{state.success}</p>}</>;
 }
 type Service = { id: string; name: string; durationMinutes: number; priceCents: number; depositCents: number; active: boolean };
 export function ServiceForm({ businessId, service }: { businessId: string; service?: Service }) {
@@ -40,14 +40,14 @@ export function HoursForm({ businessId, hours }: { businessId: string; hours: { 
     <input type="hidden" name="businessId" value={businessId} />
     {weekdays.map((day, weekday) => {
       const value = days[weekday];
-      return <fieldset key={day} className="grid gap-3 border-b border-border pb-4 sm:grid-cols-[1fr_1fr_1fr]">
-        <legend className="mb-2 font-semibold">{day}</legend>
-        <label className="flex min-h-11 items-center gap-3"><input className="size-5 accent-primary" type="checkbox" name={`open-${weekday}`} checked={value.open} onChange={(event) => changeDay(weekday, { open: event.target.checked })} />Aberto</label>
+      return <fieldset key={day} className="grid min-w-0 grid-cols-2 items-center gap-x-3 gap-y-2 border-b border-border py-3 last:border-0 sm:grid-cols-[minmax(7rem,1fr)_minmax(7rem,1fr)_minmax(8rem,1fr)_minmax(8rem,1fr)] sm:gap-3 sm:py-2">
+        <legend className="w-fit max-w-full py-2 font-semibold">{day}</legend>
+        <label className="flex min-h-11 items-center justify-end gap-2 text-sm sm:justify-start"><input className="size-5 accent-primary" type="checkbox" name={`open-${weekday}`} checked={value.open} onChange={(event) => changeDay(weekday, { open: event.target.checked })} />Aberto</label>
         <label className="grid gap-2" htmlFor={`start-${weekday}`}>Abre às<input className={control} id={`start-${weekday}`} name={`start-${weekday}`} type="time" value={value.start} onChange={(event) => changeDay(weekday, { start: event.target.value })} disabled={!value.open} required /></label>
         <label className="grid gap-2" htmlFor={`end-${weekday}`}>Fecha às<input className={control} id={`end-${weekday}`} name={`end-${weekday}`} type="time" value={value.end} onChange={(event) => changeDay(weekday, { end: event.target.value })} disabled={!value.open} required /></label>
       </fieldset>;
     })}
-    <p className="text-sm text-muted-foreground">Desmarque “Aberto” nos dias sem atendimento. Os horários seguem o fuso do negócio.</p>
+    <p className="text-sm text-muted-foreground">Desmarque “Aberto” nos dias sem atendimento.</p>
     <Feedback state={state} />
     <Button type="submit" disabled={pending} className="justify-self-start">{pending ? "Salvando horários…" : "Salvar horários de funcionamento"}</Button>
   </form>;
