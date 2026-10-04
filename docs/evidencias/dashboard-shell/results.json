@@ -1,0 +1,71 @@
+{
+  "mode": "Shell real SSR e CSS real; documento isolado sem auth/API",
+  "results": [
+    {
+      "width": 375,
+      "colorScheme": "light",
+      "visibleDestinations": 4,
+      "touch44": true,
+      "keyboard": true,
+      "tenantInLink": true,
+      "noOverflow": true,
+      "reducedMotion": true,
+      "pageErrors": 0
+    },
+    {
+      "width": 390,
+      "colorScheme": "light",
+      "visibleDestinations": 4,
+      "touch44": true,
+      "keyboard": true,
+      "tenantInLink": true,
+      "noOverflow": true,
+      "reducedMotion": true,
+      "pageErrors": 0
+    },
+    {
+      "width": 1280,
+      "colorScheme": "light",
+      "visibleDestinations": 4,
+      "touch44": true,
+      "keyboard": true,
+      "tenantInLink": true,
+      "noOverflow": true,
+      "reducedMotion": true,
+      "pageErrors": 0
+    },
+    {
+      "width": 375,
+      "colorScheme": "dark",
+      "visibleDestinations": 4,
+      "touch44": true,
+      "keyboard": true,
+      "tenantInLink": true,
+      "noOverflow": true,
+      "reducedMotion": true,
+      "pageErrors": 0
+    },
+    {
+      "width": 390,
+      "colorScheme": "dark",
+      "visibleDestinations": 4,
+      "touch44": true,
+      "keyboard": true,
+      "tenantInLink": true,
+      "noOverflow": true,
+      "reducedMotion": true,
+      "pageErrors": 0
+    },
+    {
+      "width": 1280,
+      "colorScheme": "dark",
+      "visibleDestinations": 4,
+      "touch44": true,
+      "keyboard": true,
+      "tenantInLink": true,
+      "noOverflow": true,
+      "reducedMotion": true,
+      "pageErrors": 0
+    }
+  ]
+}
