@@ -129,3 +129,10 @@ Validado nesta auditoria: 48 unitários e 25 integrações; isolamento de domín
 - Cobrir reserva, pagamento fake e confirmação por webhook assinado.
 - Verificar horário ocupado e duplicação de webhook com persistência e auditoria.
 - Documentar execução e validar e2e, lint, typecheck e testes unitários.
+
+## QA T3 `feat/tests` — 2026-10-03
+
+- **OK:** mobile E2E Pix fake confirma apenas após webhook assinado; duplicidade/valor/tenant/segredo público cobertos. 5 E2E + 48 Vitest relacionados passaram; lint/typecheck verdes.
+- **P1 BLOQUEIA — T1:** gateway real/chave Pix real ausentes; não existe prova de segredo Pix real em logs. Implementar/revisar provider real antes de cliente pagante; manter secret filtering/log tests no backend.
+- **P1 MELHORAR — T2:** reexecutar `tests/qa/dashboard-real.spec.ts` quando servidor de verificação estiver disponível; `127.0.0.1:3342` recusou conexão nesta rodada.
+- **Limite de evidência:** UI booking E2E requer `QA_BOOKING_UI_URL`; ausência causou skip. Preview em3001 não substitui rota pública `/{slug}`.

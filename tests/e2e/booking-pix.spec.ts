@@ -49,7 +49,10 @@ const test = base.extend<{ business: Business }>({
 async function reserve(request: APIRequestContext, business: Business) {
   const services = await request.get(`/api/public/${business.slug}/services`);
   expect(services.status()).toBe(200);
-  expect((await services.json()).services).toEqual([expect.objectContaining({ id: business.serviceId, depositCents: 1000 })]);
+  const publicBusiness = await services.json();
+  expect(publicBusiness.services).toEqual([expect.objectContaining({ id: business.serviceId, depositCents: 1000 })]);
+  expect(JSON.stringify(publicBusiness)).not.toContain(process.env.FAKE_WEBHOOK_SECRET);
+  expect(JSON.stringify(publicBusiness)).not.toMatch(/"(?:pixKey|pix_key|privateKey|private_key|webhookSecret|webhook_secret|apiKey|api_key)"\s*:/i);
   const date = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
   const availability = await request.get(`/api/public/${business.slug}/availability`, { params: { serviceId: business.serviceId, date } });
   expect(availability.status()).toBe(200);
@@ -60,6 +63,8 @@ async function reserve(request: APIRequestContext, business: Business) {
   expect(response.status()).toBe(201);
   const booking = await response.json();
   expect(booking).toMatchObject({ status: "pending_payment", startsAt: input.startsAt, payment: { provider: "fake", status: "pending", amountCents: 1000 } });
+  expect(JSON.stringify(booking)).not.toContain(process.env.FAKE_WEBHOOK_SECRET);
+  expect(JSON.stringify(booking)).not.toMatch(/"(?:pixKey|pix_key|privateKey|private_key|webhookSecret|webhook_secret|apiKey|api_key)"\s*:/i);
   expect(booking.payment.copyPaste).toContain("FAKE-PIX-NOT-PAYABLE");
   expect(booking.payment.qrCodeDataUrl).toMatch(/^data:image\/png;base64,/);
   return { booking, input, date };
@@ -126,6 +131,13 @@ test("interface pública agenda e confirma com API, banco e webhook reais", asyn
 
 test("consulta pública rejeita token, ID e slug manipulados sem expor dados", async ({ request, business }) => {
   const { booking } = await reserve(request, business);
+  const valid = await request.get(`/api/public/${business.slug}/bookings/${booking.bookingId}/payment`, {
+    headers: { Authorization: `Bearer ${booking.accessToken}` },
+  });
+  const publicStatus = await valid.json();
+  expect(JSON.stringify(publicStatus)).not.toContain(process.env.FAKE_WEBHOOK_SECRET);
+  expect(JSON.stringify(publicStatus)).not.toMatch(/"(?:pixKey|pix_key|privateKey|private_key|webhookSecret|webhook_secret|apiKey|api_key|customerName|customerPhone|ownerId|owner_id)"\s*:/i);
+  expect(publicStatus).not.toHaveProperty("accessToken");
   for (const [slug, id, token] of [
     [business.slug, booking.bookingId, null],
     [business.slug, booking.bookingId, "invalid-token"],

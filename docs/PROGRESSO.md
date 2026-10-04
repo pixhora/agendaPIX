@@ -315,3 +315,14 @@ Base auditada: `feat/tests`, commit inicial `d4451f6`, sobre `master` (`main` n�
 Com `.env` local configurado: `pnpm db:up`, `pnpm db:migrate`, `pnpm build`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm test:db`, `pnpm test:e2e`. A simulação exige segredos locais exclusivos; não usar valores fictícios da `.env.example` como credenciais finais.
 
 Próxima ação: terminais 1/2/4 concluir e integrar as partes principais; humano faz os merges autorizados. Depois Terminal 3 repete auditoria completa, mobile/desktop e ambos os fluxos pelo navegador. Não solicitar revisão a terminal desconectado. Não há aprovação para primeiro cliente pagante.
+
+## QA T3 — booking/Pix mobile — 2026-10-03
+
+- **Mudança:** `tests/e2e/booking-pix.spec.ts:49-56, 132-145` testa que respostas públicas não incluem segredo fake, chaves/credenciais Pix, dados do dono/cliente ou token na consulta de status.
+- **E2E 375px:** `pnpm exec playwright test tests/e2e/booking-pix.spec.ts --project=mobile` — 5 passou, 1 pulou por falta de `QA_BOOKING_UI_URL`. Reserva ficou `pending_payment` com QR/copia-e-cola fake; só webhook assinado confirmou. Assinatura/valor inválidos não confirmaram; repetição idempotente; tenant/token/ID/slug cruzados rejeitados.
+- **Pix unitário/integração:** `pnpm test -- tests/integration/pix.test.ts tests/unit/payments.test.ts` — 48 testes em 5 arquivos passaram. Abrange isolamento, expiração/tardio, duplicidade e provider fake.
+- **Gates:** `pnpm lint`, `pnpm typecheck` passaram.
+- **Dashboard:** nova prova indisponível; `127.0.0.1:3342` recusou conexão. Resultado T2 `c16fadd` segue histórico, sem revalidação.
+- **UI booking isolada:** configuração aponta `3104`, sem servidor. Em `3001`, rota é Preview (`/preview/booking`), incompatível com testes de `/{slug}`; falhas ali não atribuídas ao produto. E2E API real acima passou.
+- **Limite:** sistema não tem gateway real nem chave Pix real. `app/` e `lib/` não contêm logger de produto; ausência de vazamento em logs não pode ser provada para gateway inexistente. Fake não comprova recebimento bancário.
+- **Achados:** nenhum defeito novo reproduzido. MVP pagante segue bloqueado por gateway/webhook real e falta de revalidação atual do dashboard.
