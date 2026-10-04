@@ -91,7 +91,7 @@ export default function PreviewServicosPage() {
                     <span>💰 Preço total:</span>
                     <strong className="text-foreground">{formatCurrency(s.priceCents)}</strong>
                   </div>
-                  <div className="flex justify-between text-primary">
+                  <div className="flex justify-between text-accent-forest dark:text-primary">
                     <span className="font-semibold">⚡ Sinal no Pix:</span>
                     <strong className="font-bold">{formatCurrency(s.depositCents)}</strong>
                   </div>

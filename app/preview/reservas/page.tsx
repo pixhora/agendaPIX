@@ -69,14 +69,18 @@ export default function PreviewReservasPage() {
       {/* Conteúdo */}
       <main className="mx-auto max-w-6xl px-4 sm:px-6 pt-6 space-y-6">
         {/* Barra de Filtros */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-1.5 text-xs font-semibold" role="tablist" aria-label="Filtro de reservas">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div
+            className="flex items-center gap-1.5 text-xs font-semibold overflow-x-auto pb-1 scrollbar-hide w-full sm:w-auto"
+            role="tablist"
+            aria-label="Filtro de reservas"
+          >
             <button
               type="button"
               role="tab"
               aria-selected={filter === "all"}
               onClick={() => setFilter("all")}
-              className={`rounded-lg px-3 py-1.5 transition-colors ${
+              className={`shrink-0 min-h-10 rounded-lg px-3.5 py-1.5 transition-colors ${
                 filter === "all"
                   ? "bg-foreground text-background"
                   : "bg-surface text-muted-foreground border border-border hover:bg-muted"
@@ -89,7 +93,7 @@ export default function PreviewReservasPage() {
               role="tab"
               aria-selected={filter === "confirmed"}
               onClick={() => setFilter("confirmed")}
-              className={`rounded-lg px-3 py-1.5 transition-colors ${
+              className={`shrink-0 min-h-10 rounded-lg px-3.5 py-1.5 transition-colors ${
                 filter === "confirmed"
                   ? "bg-foreground text-background"
                   : "bg-surface text-muted-foreground border border-border hover:bg-muted"
@@ -102,7 +106,7 @@ export default function PreviewReservasPage() {
               role="tab"
               aria-selected={filter === "pending_payment"}
               onClick={() => setFilter("pending_payment")}
-              className={`rounded-lg px-3 py-1.5 transition-colors ${
+              className={`shrink-0 min-h-10 rounded-lg px-3.5 py-1.5 transition-colors ${
                 filter === "pending_payment"
                   ? "bg-foreground text-background"
                   : "bg-surface text-muted-foreground border border-border hover:bg-muted"
@@ -182,7 +186,7 @@ export default function PreviewReservasPage() {
                     href={waLink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20"
+                    className="w-full sm:w-auto inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                   >
                     <span>💬</span> Conversar no WhatsApp
                   </a>

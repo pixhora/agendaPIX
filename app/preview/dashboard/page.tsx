@@ -98,7 +98,7 @@ export default function PreviewDashboardPage() {
         >
           <div className="space-y-0.5">
             <p className="font-semibold text-foreground">Seu link público de agendamento:</p>
-            <p className="font-mono text-primary font-bold">agenda.com.br/{MOCK_BUSINESS_INFO.slug}</p>
+            <p className="font-mono text-accent-forest dark:text-primary font-bold">agenda.com.br/{MOCK_BUSINESS_INFO.slug}</p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <Button
@@ -139,10 +139,10 @@ export default function PreviewDashboardPage() {
           </div>
 
           <div className="rounded-xl border border-border bg-surface p-4 space-y-1 shadow-sm">
-            <span className="text-[11px] font-semibold text-primary uppercase">
+            <span className="text-[11px] font-semibold text-accent-forest dark:text-primary uppercase">
               Confirmadas
             </span>
-            <p className="text-xl sm:text-2xl font-extrabold text-primary">
+            <p className="text-xl sm:text-2xl font-extrabold text-accent-forest dark:text-primary">
               {confirmadas} / {MOCK_BOOKINGS.length}
             </p>
             <p className="text-[11px] text-muted-foreground">1 aguardando sinal</p>
