@@ -65,17 +65,19 @@ Antes de dizer que terminou: rode `lint`, `typecheck` e `test`. Se algum falhar,
 
 ## 5. Terminais e papéis (Maestri)
 
-Há 6 agentes em paralelo: 3 Codex e 3 Antigravity CLI (`agy`). **Descubra qual é o seu terminal pela primeira mensagem que receber** ("Você é o terminal X"). Se não souber, pergunte.
+Há 6 agentes numerados: 3 Codex e 3 Antigravity CLI (`agy`). **Descubra qual é o seu terminal pela primeira mensagem que receber** ("Você é o terminal X"). Se não souber, pergunte. Papéis ativos e detalhes de worktrees estão em `docs/EQUIPE.md`, que prevalece sobre a tabela histórica abaixo quando houver divergência.
 
 | # | Agente | Papel | Branch / pasta |
 |---|---|---|---|
-| 1 | Codex | Backend, banco, Pix e webhooks | `feat/backend` / `agenda-backend` |
-| 2 | Codex | Painel do dono (agenda, clientes, serviços) | `feat/dashboard` / `agenda-dashboard` |
-| 3 | Codex | Testes e2e e QA do trabalho dos agy 4 e 5 | `feat/tests` / `agenda-tests` |
-| 4 | agy | Página pública de agendamento e design system | `feat/booking-ui` / `agenda-booking-ui` |
-| 5 | agy | Landing de vendas e onboarding | `feat/landing` / `agenda-landing` |
-| 6 | agy | Revisor de código e segurança do trabalho dos Codex 1 e 2 | `feat/review` / `agenda-review` |
+| 1 | Codex | Backend, banco, auth, APIs, Pix e webhooks | `feat/backend` / `agenda-backend` |
+| 2 | Codex | Painel do dono | `feat/dashboard` / `agenda-dashboard` |
+| 3 | Codex | QA, E2E e auditoria técnica | `feat/tests` / `agenda-tests` |
+| 4 | agy | Frontend, booking, design system e Preview | `feat/booking-ui` / `agenda-booking-ui` |
+| 5 | agy | Landing, conversão e onboarding | `feat/conversion` / `agenda-conversion` |
+| 6 | agy | Auditoria UX/UI e acessibilidade | `feat/ux-audit` / `agenda-ux-audit` |
 | - | Humano (eu) | Decide produto, preço e prioridade | - |
+
+O Maestri/Codex é o orquestrador principal. O agente persistente `cursor-tech-lead` atua transversalmente como Tech Lead consultivo e Integration Architect; não é um terminal numerado nem substitui T1–T6. Em auditorias, consulta só as seções/documentos pertinentes e inspeciona código real pelo escopo e dependências diretas. Classifica achados como `OK`, `MELHORAR` ou `BLOQUEIA`, registra impactos em T1–T6 e recomendações verificáveis. Encaminhamento cabe ao Maestri. Cursor só implementa quando solicitado explicitamente pelo Maestri ou quando autorizado para correção transversal sem dono claro. Não cria tarefas, contata agentes, interrompe sessões, nem faz merge/push/deploy por iniciativa própria.
 
 ### Regras de convivência (obrigatórias)
 
@@ -88,9 +90,9 @@ Há 6 agentes em paralelo: 3 Codex e 3 Antigravity CLI (`agy`). **Descubra qual 
 
 ### Revisão cruzada (modelos diferentes se revisam)
 
-- Terminal 6 (agy) revisa os terminais 1 e 2 (Codex): bugs, segurança, dinheiro em centavos, isolamento entre clientes, estados de erro esquecidos.
-- Terminal 3 (Codex) testa os terminais 4 e 5 (agy): fluxos reais com Playwright, mobile 375px, acessibilidade e regressão visual.
+- Terminal 6 (agy) audita UX/UI e encaminha problemas aos autores; Terminal 3 (Codex) testa fluxos e revisa tecnicamente as entregas conforme `docs/EQUIPE.md`.
 - Resultado da revisão: lista objetiva com **bloqueia** / **melhorar** / **ok**, com arquivo e linha. Revisor não reescreve o código do outro; aponta e quem fez corrige.
+- Após mudanças importantes ou transversais, o Maestri pode solicitar ao `cursor-tech-lead` uma revisão de integração de contratos, dependências, segurança e regressões. Cursor recomenda; Maestri decide o encaminhamento e solicita revalidação após correção.
 
 ### Como trabalhar cada tarefa
 
