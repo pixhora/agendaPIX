@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, check, foreignKey, index, integer, pgEnum, pgTable, text, time, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, foreignKey, index, integer, pgEnum, pgTable, primaryKey, text, time, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 
 export * from "./auth";
@@ -26,6 +26,17 @@ export const businesses = pgTable("businesses", {
 ]);
 
 export const pixKeyTypes = ["cpf", "cnpj", "email", "phone", "evp"] as const;
+
+export const bookingRateLimits = pgTable("booking_rate_limits", {
+  businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "cascade" }),
+  clientHash: text("client_hash").notNull(),
+  windowStartedAt: timestamp("window_started_at", { withTimezone: true }).defaultNow().notNull(),
+  attempts: integer("attempts").notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.businessId, table.clientHash] }),
+  index("booking_rate_window_idx").on(table.windowStartedAt),
+  check("booking_rate_attempts_valid", sql`${table.attempts} BETWEEN 1 AND 10`),
+]);
 export const businessPixKeys = pgTable("business_pix_keys", {
   businessId: uuid("business_id").primaryKey().references(() => businesses.id, { onDelete: "restrict" }),
   type: text("type", { enum: pixKeyTypes }).notNull(),

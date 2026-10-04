@@ -196,3 +196,25 @@ Autoridade: http://localhost:3000. Em desenvolvimento, origens exatas permitidas
 GET/POST auth e GET/PUT/DELETE pix-key recebem CORS credenciado somente para origem exata permitida. OPTIONS valida origem, método e headers solicitados; devolve204 com Allow-Origin específico, Allow-Credentials:true, Allow-Methods e Allow-Headers(Content-Type,Authorization). Origem externa/método/header alheio responde403 sem Allow-Origin. Respostas têm Vary:Origin e no-store. CORS não substitui sessão, tenant, CSRF ou cifragem; mutações Pix continuam exigindo Origin válido. Chamadas server-side GET sem Origin permanecem permitidas.
 
 Fixture B02: `NODE_ENV=development node scripts/create_backend_fixture.mjs /caminho/privado/fixture.json`. Exige banco local, autoridade localhost3000 e segredo Pix válido; cria somente usuário/negócio/serviço/horários sintéticos e sessão de1h. Arquivo0600 exclusivo contém Cookie/IDs, nunca versionar nem copiar para frontend/logs. Prova sessão/tenant/Pix; não valida link mágico nem entrega SMTP. Cookie do servidor continua sem Domain, sem tornar endpoint público de bypass. Fixture operacional disponível nesta máquina em `/tmp/agenda-backend-b02-fixture.json`; expira em1h.
+
+## F01 — contrato de provisionamento pós-auth (definido; endpoint ainda AUSENTE)
+
+Proposta pronta para implementação T1 e consumo T5 após handoff explícito; não chamar enquanto ausente. `POST /api/onboarding`, JSON estrito `{business:{name,slug,timezone},service:{name,durationMinutes,priceCents,depositCents},hours:[{weekday,opensAt,closesAt}]}`. Nome/slug conforme validação do domínio; timezone IANA válido; weekday inteiro0..6 sem duplicatas; horas HH:mm, abertura<fechamento, somente dias escolhidos. Dinheiro em inteiros centavos, preço>=0 e0<=sinal<=preço; duração inteira positiva. Não enviar ownerId, businessId, status, trialEndsAt ou plano; rejeitar campos extras.
+
+Exige sessão Better Auth validada pela autoridade, Origin permitido e `Idempotency-Key` UUIDv4. Derivar ownerId da sessão, nunca do formulário. Criar negócio, primeiro serviço e horários em uma transação: ou todos persistem, ou nenhum. Não criar cobrança/assinatura/chave Pix neste endpoint. Trial/assinatura são contrato separado; não assumir ativação apenas por cadastro.
+
+Primeiro pedido responde201 `{businessId,slug,publicPath,serviceId}` (publicPath=`/[slug]`); replay idêntico por mesmo owner+chave responde200 com o mesmo resultado; mesma chave/corpo diferente409 `idempotency_conflict`; slug indisponível409 `slug_unavailable`. Nenhum replay de outro dono lê tenant alheio. O contrato não impõe limite inventado de negócios por dono. Persistir chave/hash/resultado vinculado ao dono para replay; schema desse mecanismo ainda deve ser migrado antes de implementar.
+
+Erros padrão `{error:{code,message}}`:400 entrada,401 sem sessão,403 origem,409 conflito,413 corpo>16KiB,503 infraestrutura; no-store. GET/PUT/DELETE não definidos. Após201/200, T5 exibe link real e pode encaminhar para http://localhost:3343/dashboard (mesmo host da autoridade); não duplicar login/UI nem simular sucesso fora de Preview. Pronto futuro: teste transação/rollback, conflito slug, replay concorrente e isolamento de dois donos. Endpoint continua AUSENTE nesta entrega: pedido era definir contrato.
+
+## Antiabuso de reservas
+
+POST reservas mantém corpo/chave e respostas201/200/409. Limite técnico inicial:10 chamadas por minuto para par negócio+origem cliente, contador atômico PostgreSQL (compartilhado por processos). Excesso429 `rate_limited`, Retry-After:60; reenvio com mesma Idempotency-Key preserva idempotência de negócio e não renova reserva, mas também consome o limite de tentativas. Não recriar pedido com nova chave por erro transitório.
+
+Por padrão headers de IP enviados pelo cliente são ignorados e usa-se bucket anônimo por negócio. `BOOKING_TRUST_PROXY=true` habilita somente X-Real-IP válido; usar apenas quando proxy de entrada sobrescreve/remove esse header e impede acesso direto ao Next. Header ausente/inválido volta ao bucket anônimo, sem aceitar X-Forwarded-For arbitrário. Endereço não é armazenado: HMAC com segredo do servidor, combinado ao tenant. Registros obsoletos>24h são removidos oportunisticamente em lotes100; não há corpo/telefone/IP bruto.
+
+Migration aditiva cria apenas contadores, preservando schema/dados existentes. Aplicar antes do novo código; processos antigos continuam compatíveis mas sem limite até atualização. Reversão preferida: voltar ao commit anterior e manter tabela aditiva; remoção da tabela só depois de nenhum novo leitor/escritor ativo, com aprovação operacional. Nunca remover reservas/pagamentos ao reverter.
+
+## Readiness
+
+`GET /api/health` permanece liveness200. `GET /api/ready` (novo):200 `{status:"ready"}` se SELECT1 PostgreSQL e autenticação/conexão SMTP passam;503 `{status:"unavailable"}` em qualquer falha. Sem autenticação, no-store, sem nomes de servidores, credenciais, erros brutos ou PII. Não envia e-mail, não cria cobrança, não testa domínio/remetente ou entrega do destinatário; pagamento bancário continua gate separado.

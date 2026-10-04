@@ -10,6 +10,7 @@ import { getPaymentProvider } from "../payments";
 import { pixChargeSchema, type PaymentProvider } from "../payments/provider";
 import { availableSlots, localDate } from "./availability";
 import { availabilitySchema, bookingInputSchema, requestKeySchema, slugSchema } from "./validation";
+import { consumeBookingRateLimit } from "./rate-limit";
 
 type Database = NodePgDatabase<typeof schema>;
 export function hash(value: string) { return createHash("sha256").update(value).digest("hex"); }
@@ -74,11 +75,12 @@ async function bookingView(booking: typeof schema.bookings.$inferSelect, databas
   return { bookingId: booking.id, status: booking.status, startsAt: booking.startsAt, endsAt: booking.endsAt, expiresAt: booking.expiresAt, payment: paymentView(payment, now) };
 }
 
-export async function createBooking(slug: string, body: unknown, key: unknown, database: Database = getDb(), provider?: PaymentProvider) {
+export async function createBooking(slug: string, body: unknown, key: unknown, database: Database = getDb(), provider?: PaymentProvider, clientIdentity = "anonymous") {
   const input = bookingInputSchema.parse(body);
   const requestKey = requestKeySchema.parse(key);
   const requestHash = hash(JSON.stringify(input));
   const business = await businessBySlug(slug, database);
+  await consumeBookingRateLimit(database, business.id, clientIdentity);
   return database.transaction(async (transaction) => {
     await lockBusiness(transaction, business.id);
     const now = new Date();
