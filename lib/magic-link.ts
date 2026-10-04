@@ -2,9 +2,13 @@ export type MagicLinkResult =
   | { ok: true; simulated?: boolean }
   | { ok: false; code: "auth_unavailable" | "invalid_email" | "unknown"; message: string };
 
+export const BACKEND_AUTH_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3000";
+
 /**
  * Envia solicitação de link mágico de autenticação.
  * 
+ * Consome o serviço de autenticação do backend (:3000) com credentials: "include" e CORS.
  * Regra de segurança: falhas de infraestrutura (5xx) ou rede (catch)
  * NUNCA devem fingir sucesso nem simular envio em rotas reais (/login, /onboarding).
  * Apenas rotas explicitamente sob /preview podem simular feedback para fins visuais.
@@ -12,14 +16,17 @@ export type MagicLinkResult =
 export async function requestMagicLink(
   email: string,
   pathname = typeof window !== "undefined" ? window.location.pathname : "",
-  callbackURL = "/dashboard"
+  callbackURL = "http://localhost:3343/dashboard",
+  authEndpoint?: string
 ): Promise<MagicLinkResult> {
   const isPreview = pathname.startsWith("/preview");
+  const endpoint = authEndpoint || `${BACKEND_AUTH_URL}/api/auth/sign-in/magic-link`;
 
   try {
-    const res = await fetch("/api/auth/sign-in/magic-link", {
+    const res = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify({
         email: email.trim().toLowerCase(),
         callbackURL,

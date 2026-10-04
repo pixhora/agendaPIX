@@ -11,73 +11,7 @@ interface StepAccountProps {
   onComplete: () => void;
 }
 
-type MagicLinkResult =
-  | { ok: true; simulated?: boolean }
-  | { ok: false; code: "auth_unavailable" | "invalid_email" | "unknown"; message: string };
-
-/**
- * Tenta enviar o magic-link real.
- *
- * Em ambiente de desenvolvimento ou em rotas /preview, quando o servidor
- * responde com 5xx (ex: BETTER_AUTH_URL/SECRET ausentes, banco ou SMTP offline),
- * simula o sucesso localmente para que o fluxo visual possa ser testado
- * sem Postgres + SMTP configurados.
- *
- * Em produção, erros de infraestrutura exibem mensagem clara ao usuário,
- * sem culpar o e-mail informado.
- */
-async function sendMagicLink(
-  email: string,
-  pathname = typeof window !== "undefined" ? window.location.pathname : ""
-): Promise<MagicLinkResult> {
-  const isPreview = pathname.startsWith("/preview");
-
-  try {
-    const res = await fetch("/api/auth/sign-in/magic-link", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: email.trim().toLowerCase(),
-        callbackURL: "/dashboard",
-      }),
-    });
-
-    if (res.ok) return { ok: true };
-
-    // 5xx → problema de infraestrutura (env ausentes, banco ou SMTP offline)
-    if (res.status >= 500) {
-      if (isPreview) {
-        return { ok: true, simulated: true };
-      }
-      return {
-        ok: false,
-        code: "auth_unavailable",
-        message:
-          "O serviço de envio de e-mail está temporariamente indisponível. Tente novamente em alguns instantes.",
-      };
-    }
-
-    // 4xx → erro de validação (e-mail inválido, domínio bloqueado, etc.)
-    const body = await res.json().catch(() => null);
-    return {
-      ok: false,
-      code: "invalid_email",
-      message:
-        (body?.message as string) ||
-        "Não foi possível enviar o link de acesso. Verifique o e-mail informado.",
-    };
-  } catch {
-    // Falha de rede: sem conexão, DNS, CORS, etc.
-    if (isPreview) {
-      return { ok: true, simulated: true };
-    }
-    return {
-      ok: false,
-      code: "unknown",
-      message: "Sem conexão com o servidor. Verifique sua internet e tente novamente.",
-    };
-  }
-}
+import { requestMagicLink } from "@/lib/magic-link";
 
 export function StepAccount({
   data,
@@ -100,7 +34,21 @@ export function StepAccount({
     setIsSubmitting(true);
     setErrorMessage(null);
 
-    const result = await sendMagicLink(email.trim());
+    // Salva o rascunho de onboarding e recupera ou gera a Idempotency-Key
+    let idempotencyKey: string;
+    try {
+      const existingKey = localStorage.getItem("agenda_onboarding_idempotency_key");
+      if (existingKey) {
+        idempotencyKey = existingKey;
+      } else {
+        idempotencyKey = crypto.randomUUID();
+        localStorage.setItem("agenda_onboarding_idempotency_key", idempotencyKey);
+      }
+    } catch {
+      idempotencyKey = crypto.randomUUID();
+    }
+
+    const result = await requestMagicLink(email.trim());
 
     if (result.ok) {
       setWasSimulated(!!result.simulated);
