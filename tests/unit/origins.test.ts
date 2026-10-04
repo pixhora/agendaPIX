@@ -17,7 +17,7 @@ it.each([3000, 3001, 3005, 3343])("allows credentialed preflight for exact local
   expect(response.headers.get("access-control-allow-origin")).toBe(origin);
   expect(response.headers.get("access-control-allow-credentials")).toBe("true");
   expect(response.headers.get("access-control-allow-methods")).toBe("GET, PUT, DELETE");
-  expect(response.headers.get("access-control-allow-headers")).toBe("Content-Type, Authorization");
+  expect(response.headers.get("access-control-allow-headers")).toBe("Content-Type, Authorization, Idempotency-Key");
   expect(response.headers.get("vary")).toContain("Origin");
 });
 
@@ -52,10 +52,21 @@ it.each([
   expect((await appPreflight(request, ["GET", "PUT", "DELETE"])).status).toBe(403);
 });
 
-it("does not trust local development origins in production", () => {
+it("uses only the canonical app origin in production and rejects other origins before writes", async () => {
   vi.stubEnv("NODE_ENV", "production");
-  vi.stubEnv("BETTER_AUTH_URL", "https://agenda.example");
+  vi.stubEnv("BETTER_AUTH_URL", "https://agenda.example/auth");
   expect(trustedAppOrigins()).toEqual(["https://agenda.example"]);
+  const run = vi.fn(async () => Response.json({ ok: true }));
+  for (const origin of ["http://localhost:3000", "http://localhost:3001", "http://localhost:3005", "http://localhost:3343", "https://other.example", "https://agenda.example.evil.example"]) {
+    const response = await withAppCors(new Request("https://agenda.example/api/onboarding", { method: "POST", headers: { origin } }), run);
+    expect(response.status).toBe(403);
+    expect(response.headers.has("access-control-allow-origin")).toBe(false);
+  }
+  expect(run).not.toHaveBeenCalled();
+  const response = await withAppCors(new Request("https://agenda.example/api/onboarding", { method: "POST", headers: { origin: "https://agenda.example" } }), run);
+  expect(response.status).toBe(200);
+  expect(response.headers.get("access-control-allow-origin")).toBe("https://agenda.example");
+  expect(run).toHaveBeenCalledOnce();
 });
 
 it("returns safe unavailable response on invalid server configuration", async () => {

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, check, foreignKey, index, integer, pgEnum, pgTable, primaryKey, text, time, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, foreignKey, index, integer, jsonb, pgEnum, pgTable, primaryKey, text, time, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 
 export * from "./auth";
@@ -164,3 +164,11 @@ export const webhookDeliveries = pgTable("webhook_deliveries", {
   reason: text("reason"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [index("webhook_deliveries_event_idx").on(table.provider, table.eventId)]);
+
+export const onboardingRequests = pgTable("onboarding_requests", {
+  ownerId: text("owner_id").notNull().references(() => user.id, { onDelete: "restrict" }),
+  requestKey: uuid("request_key").notNull(),
+  requestHash: text("request_hash").notNull(),
+  result: jsonb("result").$type<{ businessId: string; slug: string; publicPath: string; serviceId: string }>(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [primaryKey({ columns: [table.ownerId, table.requestKey] })]);

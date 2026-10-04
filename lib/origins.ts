@@ -40,12 +40,12 @@ export function appPreflight(request: Request, methods: readonly string[]) {
     requireAppOrigin(request);
     const method = request.headers.get("access-control-request-method") ?? "";
     const requestedHeaders = (request.headers.get("access-control-request-headers") ?? "").split(",").map((value) => value.trim().toLowerCase()).filter(Boolean);
-    if (!methods.includes(method) || requestedHeaders.some((value) => !["content-type", "authorization"].includes(value))) {
+    if (!methods.includes(method) || requestedHeaders.some((value) => !["content-type", "authorization", "idempotency-key"].includes(value))) {
       throw new HttpError(403, "cors_not_allowed", "Solicitação não permitida.");
     }
     return new Response(null, { status: 204, headers: {
       "access-control-allow-methods": methods.join(", "),
-      "access-control-allow-headers": "Content-Type, Authorization",
+      "access-control-allow-headers": "Content-Type, Authorization, Idempotency-Key",
       vary: "Access-Control-Request-Method, Access-Control-Request-Headers",
     } });
   });
