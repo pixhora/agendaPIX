@@ -87,12 +87,13 @@ export function OnboardingFlow() {
       <header className="border-b border-border bg-surface py-2 px-4 sm:px-6">
         <div className="mx-auto max-w-md flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2 font-display text-lg font-bold text-foreground min-h-11 py-1">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-xs font-black text-primary-foreground">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-foreground text-xs font-black text-background">
               A
             </span>
             <span>Agenda</span>
           </Link>
-          <span className="text-xs font-medium text-muted-foreground">
+          <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-lime inline-block" />
             7 dias grátis · Plano {data.plan === "completo" ? "Completo" : "Base"}
           </span>
         </div>
@@ -116,17 +117,17 @@ export function OnboardingFlow() {
                   <div className="w-full flex items-center">
                     {idx > 0 && (
                       <div
-                        className={`h-1 flex-1 transition-colors duration-240 motion-reduce:transition-none ${
-                          isDone ? "bg-primary" : "bg-border"
+                        className={`h-0.5 flex-1 transition-colors duration-240 motion-reduce:transition-none ${
+                          isDone ? "bg-foreground" : "bg-border"
                         }`}
                       />
                     )}
                     <div
                       className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 transition-all duration-240 motion-reduce:transition-none ${
                         isCurrent
-                          ? "bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2 ring-offset-background"
+                          ? "bg-foreground text-background ring-2 ring-foreground ring-offset-2 ring-offset-background"
                           : isDone
-                          ? "bg-primary text-primary-foreground"
+                          ? "bg-foreground text-background"
                           : "bg-surface text-muted-foreground border border-border"
                       }`}
                     >
@@ -134,15 +135,15 @@ export function OnboardingFlow() {
                     </div>
                     {idx < STEPS.length - 1 && (
                       <div
-                        className={`h-1 flex-1 transition-colors duration-240 motion-reduce:transition-none ${
-                          isDone && step > s.step + 1 ? "bg-primary" : "bg-border"
+                        className={`h-0.5 flex-1 transition-colors duration-240 motion-reduce:transition-none ${
+                          isDone && step > s.step + 1 ? "bg-foreground" : "bg-border"
                         }`}
                       />
                     )}
                   </div>
                   <span
-                    className={`mt-1 text-[11px] font-medium transition-colors duration-240 motion-reduce:transition-none ${
-                      isCurrent ? "text-primary font-semibold" : "text-muted-foreground"
+                    className={`mt-1.5 text-[11px] font-medium transition-colors duration-240 motion-reduce:transition-none ${
+                      isCurrent ? "text-foreground font-semibold" : "text-muted-foreground"
                     }`}
                   >
                     {s.label}

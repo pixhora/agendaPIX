@@ -45,9 +45,9 @@ export function LandingPainSolution() {
           </div>
 
           {/* O Jeito com a Agenda Pix */}
-          <div className="rounded-3xl border-2 border-accent-forest dark:border-primary/60 bg-surface p-5 sm:p-8 space-y-5 shadow-lg">
+          <div className="rounded-3xl border-2 border-foreground/30 bg-surface p-5 sm:p-8 space-y-5 shadow-lg">
             <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-accent-forest text-primary text-lg font-bold">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-foreground text-background text-lg font-bold">
                 ✓
               </span>
               <h3 className="font-display text-xl font-bold text-foreground">
@@ -57,19 +57,19 @@ export function LandingPainSolution() {
 
             <ul className="space-y-4 text-xs sm:text-sm text-muted-foreground">
               <li className="flex items-start gap-3">
-                <span className="text-accent-forest dark:text-primary font-bold shrink-0 mt-0.5">•</span>
+                <span className="h-1.5 w-1.5 rounded-full bg-lime shrink-0 mt-2" />
                 <span>
                   <strong className="text-foreground">Sinal no Pix garante o compromisso:</strong> o cliente paga uma entrada no Pix na hora. Quem paga o sinal não falta.
                 </span>
               </li>
               <li className="flex items-start gap-3">
-                <span className="text-accent-forest dark:text-primary font-bold shrink-0 mt-0.5">•</span>
+                <span className="h-1.5 w-1.5 rounded-full bg-lime shrink-0 mt-2" />
                 <span>
                   <strong className="text-foreground">Agendamento em 1 minuto:</strong> link público na bio do Instagram ou fixado no WhatsApp. O cliente agenda em 4 toques rápidos.
                 </span>
               </li>
               <li className="flex items-start gap-3">
-                <span className="text-accent-forest dark:text-primary font-bold shrink-0 mt-0.5">•</span>
+                <span className="h-1.5 w-1.5 rounded-full bg-lime shrink-0 mt-2" />
                 <span>
                   <strong className="text-foreground">Confirmação instantânea do sinal:</strong> sistema gera o QR Code Pix com 15 min de prazo e libera o horário se não houver pagamento.
                 </span>

@@ -78,9 +78,9 @@ export function StepHours({
                   type="button"
                   aria-pressed={isSelected}
                   onClick={() => toggleDay(w.id)}
-                  className={`flex flex-col items-center justify-center py-2.5 rounded-lg border text-xs font-semibold min-h-11 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
+                  className={`flex flex-col items-center justify-center py-2.5 rounded-lg border text-xs font-semibold min-h-11 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground ${
                     isSelected
-                      ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                      ? "border-foreground bg-foreground text-background shadow-xs"
                       : "border-border bg-surface text-muted-foreground hover:bg-muted"
                   }`}
                 >

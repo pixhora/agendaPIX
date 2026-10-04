@@ -84,7 +84,7 @@ export function StepAccount({
           </p>
           <p>
             2. Você entrará no seu painel para confirmar a ativação do seu link personalizado{" "}
-            <code className="text-primary font-mono font-bold">
+            <code className="text-foreground font-mono font-bold">
               agenda.com.br/{data.slug}
             </code>.
           </p>
@@ -137,7 +137,7 @@ export function StepAccount({
         </div>
         <div className="flex justify-between items-center pb-2 border-b border-border">
           <span className="text-muted-foreground">Link público:</span>
-          <span className="font-mono text-primary font-semibold">
+          <span className="font-mono text-foreground font-semibold">
             agenda.com.br/{data.slug}
           </span>
         </div>
@@ -150,7 +150,7 @@ export function StepAccount({
         </div>
         <div className="flex justify-between items-center">
           <span className="text-muted-foreground">Sinal no Pix:</span>
-          <span className="font-semibold text-emerald-600">
+          <span className="font-semibold text-foreground">
             {data.depositCents > 0 ? formatCurrency(data.depositCents) : "Sem sinal"}
           </span>
         </div>
@@ -172,7 +172,7 @@ export function StepAccount({
             placeholder="seuemail@exemplo.com.br"
             value={email}
             onChange={(e) => onChangeEmail(e.target.value)}
-            className="w-full rounded-lg border border-border bg-surface px-3.5 py-3 text-base text-foreground placeholder:text-muted-foreground/60 min-h-12 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            className="w-full rounded-lg border border-border bg-surface px-3.5 py-3 text-base text-foreground placeholder:text-muted-foreground/60 min-h-12 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
           />
         </div>
 
@@ -187,11 +187,11 @@ export function StepAccount({
 
         <div className="text-xs text-muted-foreground space-y-1">
           <p className="flex items-center gap-1.5">
-            <span className="text-emerald-600 font-bold">✓</span> 7 dias de teste grátis
+            <span className="h-1.5 w-1.5 rounded-full bg-lime inline-block" /> 7 dias de teste grátis
             do Plano {data.plan === "completo" ? "Completo" : "Base"}
           </p>
           <p className="flex items-center gap-1.5">
-            <span className="text-emerald-600 font-bold">✓</span> Sem cartão de crédito
+            <span className="h-1.5 w-1.5 rounded-full bg-lime inline-block" /> Sem cartão de crédito
           </p>
         </div>
       </div>
@@ -209,7 +209,7 @@ export function StepAccount({
         <Button
           type="submit"
           disabled={!isEmailValid || isSubmitting}
-          className="flex-[2] min-h-12 font-semibold rounded-full bg-primary hover:bg-primary-hover text-primary-foreground transition-transform duration-120 active:scale-[0.98] motion-reduce:transform-none"
+          className="flex-[2] min-h-12 font-semibold rounded-full bg-foreground text-background hover:bg-foreground/90 transition-transform duration-120 active:scale-[0.98] motion-reduce:transform-none"
         >
           {isSubmitting ? "Enviando link..." : "Ativar meus 7 dias grátis"}
         </Button>

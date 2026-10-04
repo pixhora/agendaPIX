@@ -139,8 +139,11 @@ export function StepService({
           </div>
         )}
 
-        <div className="rounded-lg border border-primary/20 bg-primary/5 p-3.5 text-xs text-muted-foreground space-y-1.5">
-          <p className="font-semibold text-primary">💡 Sinal seguro e profissional:</p>
+        <div className="rounded-xl border border-border bg-surface p-3.5 text-xs text-muted-foreground space-y-1.5 shadow-2xs">
+          <p className="font-semibold text-foreground flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-lime inline-block" />
+            Sinal seguro e profissional
+          </p>
           <p>
             Recomendamos cobrar entre 20% e 50% do valor como sinal no Pix (ex: R$ 15 ou R$ 20) para garantir a presença do cliente.
           </p>

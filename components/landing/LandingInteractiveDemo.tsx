@@ -34,7 +34,7 @@ export function LandingInteractiveDemo() {
     <section id="demonstracao" className="py-14 sm:py-20 border-t border-border bg-background">
       <div className="mx-auto max-w-5xl px-4 sm:px-6">
         <div className="text-center max-w-2xl mx-auto mb-12">
-          <span className="text-xs font-bold text-primary">
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             Demonstração em 4 passos
           </span>
           <h2 className="mt-2 font-display text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
@@ -55,17 +55,17 @@ export function LandingInteractiveDemo() {
                   key={s.step}
                   type="button"
                   onClick={() => setActiveStep(s.step)}
-                  className={`w-full text-left p-4 rounded-xl border transition-all min-h-11 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
+                  className={`w-full text-left p-4 rounded-2xl border transition-all min-h-11 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground ${
                     isActive
-                      ? "border-primary bg-surface shadow-sm ring-1 ring-primary/40"
+                      ? "border-foreground bg-surface shadow-sm ring-1 ring-foreground"
                       : "border-border bg-surface/50 hover:bg-surface"
                   }`}
                 >
                   <div className="flex items-start gap-3">
                     <span
-                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold transition-colors ${
+                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors ${
                         isActive
-                          ? "bg-primary text-primary-foreground"
+                          ? "bg-foreground text-background"
                           : "bg-muted text-muted-foreground"
                       }`}
                     >
@@ -89,7 +89,7 @@ export function LandingInteractiveDemo() {
             })}
 
             <div className="pt-2">
-              <Button asChild className="w-full sm:w-auto min-h-11 font-semibold">
+              <Button asChild className="w-full sm:w-auto min-h-12 px-6 font-semibold rounded-full bg-foreground text-background hover:bg-foreground/90 transition-transform duration-120 active:scale-[0.98]">
                 <Link href="/onboarding">Criar minha agenda agora</Link>
               </Button>
             </div>
@@ -97,7 +97,7 @@ export function LandingInteractiveDemo() {
 
           {/* Coluna da Direita: Mockup do Celular 375px */}
           <div className="lg:col-span-6 flex justify-center overflow-hidden">
-            <div className="w-full max-w-[310px] sm:max-w-[340px] rounded-2xl sm:rounded-3xl border-2 sm:border-4 border-foreground/10 bg-surface p-3.5 sm:p-4 shadow-xl">
+            <div className="w-full max-w-[310px] sm:max-w-[340px] rounded-3xl border-2 sm:border-4 border-foreground/10 bg-surface p-3.5 sm:p-4 shadow-xl">
               {/* Notch / Speaker simulado */}
               <div className="mx-auto h-3.5 sm:h-4 w-24 sm:w-28 rounded-full bg-muted mb-3 sm:mb-4" />
 
@@ -112,17 +112,17 @@ export function LandingInteractiveDemo() {
                 {activeStep === 1 && (
                   <div className="space-y-2">
                     <p className="text-xs font-semibold text-foreground">Escolha o serviço:</p>
-                    <div className="rounded-xl border border-primary bg-primary/5 p-3 text-xs space-y-1">
+                    <div className="rounded-xl border border-foreground bg-muted/20 p-3 text-xs space-y-1">
                       <div className="flex justify-between font-bold text-foreground">
                         <span>Corte + Barba</span>
-                        <span className="text-primary">Sinal R$ 20,00</span>
+                        <span className="font-mono text-foreground">Sinal R$ 20,00</span>
                       </div>
                       <p className="text-[11px] text-muted-foreground">⏱ 50 min • Total R$ 70,00</p>
                     </div>
                     <div className="rounded-xl border border-border p-3 text-xs space-y-1 opacity-70">
                       <div className="flex justify-between font-bold text-foreground">
                         <span>Corte Tradicional</span>
-                        <span className="text-primary">Sinal R$ 15,00</span>
+                        <span className="font-mono text-muted-foreground">Sinal R$ 15,00</span>
                       </div>
                       <p className="text-[11px] text-muted-foreground">⏱ 30 min • Total R$ 45,00</p>
                     </div>
@@ -133,27 +133,27 @@ export function LandingInteractiveDemo() {
                   <div className="space-y-3">
                     <p className="text-xs font-semibold text-foreground">Régua de datas disponíveis:</p>
                     <div className="flex gap-1.5 overflow-hidden">
-                      <div className="rounded-lg bg-primary text-primary-foreground p-2 text-center text-[10px] flex-1">
+                      <div className="rounded-lg bg-foreground text-background p-2 text-center text-[10px] flex-1">
                         <p className="font-bold">Hoje</p>
                         <p className="opacity-90">02/10</p>
-                        <span className="mt-1 inline-block bg-white/20 rounded px-1 text-[9px]">3 vagas</span>
+                        <span className="mt-1 inline-block bg-background/20 rounded px-1 text-[9px]">3 vagas</span>
                       </div>
                       <div className="rounded-lg border border-border bg-muted/30 p-2 text-center text-[10px] flex-1">
                         <p className="font-bold text-foreground">Amanhã</p>
                         <p className="text-muted-foreground">03/10</p>
-                        <span className="mt-1 inline-block bg-primary/10 text-primary font-semibold rounded px-1 text-[9px]">8 vagas</span>
+                        <span className="mt-1 inline-block bg-muted/60 text-foreground font-semibold rounded px-1 text-[9px]">8 vagas</span>
                       </div>
                       <div className="rounded-lg border border-border bg-muted/30 p-2 text-center text-[10px] flex-1">
                         <p className="font-bold text-foreground">SÁB</p>
                         <p className="text-muted-foreground">04/10</p>
-                        <span className="mt-1 inline-block bg-primary/10 text-primary font-semibold rounded px-1 text-[9px]">5 vagas</span>
+                        <span className="mt-1 inline-block bg-muted/60 text-foreground font-semibold rounded px-1 text-[9px]">5 vagas</span>
                       </div>
                     </div>
 
                     <p className="text-xs font-semibold text-foreground pt-1">Horários para Hoje:</p>
                     <div className="grid grid-cols-3 gap-1.5 text-xs font-semibold">
                       <span className="rounded border border-border p-2 text-center text-foreground">14:00</span>
-                      <span className="rounded border border-primary bg-primary text-primary-foreground p-2 text-center">15:30</span>
+                      <span className="rounded border border-foreground bg-foreground text-background p-2 text-center">15:30</span>
                       <span className="rounded border border-border p-2 text-center text-foreground">17:00</span>
                     </div>
                   </div>
@@ -170,8 +170,8 @@ export function LandingInteractiveDemo() {
                       <p className="text-[10px] text-muted-foreground">WhatsApp</p>
                       <p className="font-medium text-foreground">(11) 98765-4321</p>
                     </div>
-                    <div className="rounded-lg bg-primary/10 p-2 text-center">
-                      <span className="text-[11px] font-bold text-primary">Sinal no Pix: R$ 20,00</span>
+                    <div className="rounded-lg bg-muted/40 p-2 text-center border border-border">
+                      <span className="text-[11px] font-bold text-foreground">Sinal no Pix: R$ 20,00</span>
                     </div>
                   </div>
                 )}
@@ -179,12 +179,12 @@ export function LandingInteractiveDemo() {
                 {activeStep === 4 && (
                   <div className="text-center space-y-2">
                     <p className="text-xs font-bold text-foreground">Pague o sinal por Pix</p>
-                    <p className="text-xl font-extrabold text-primary">R$ 20,00</p>
+                    <p className="text-xl font-extrabold text-foreground tabular-nums">R$ 20,00</p>
                     <div className="mx-auto h-24 w-24 rounded-lg border border-border bg-muted/40 flex items-center justify-center text-2xl">
                       📱
                     </div>
                     <p className="text-[10px] text-muted-foreground">⏳ Expira em 14:52 minutos</p>
-                    <div className="rounded bg-primary text-primary-foreground py-1 text-[11px] font-semibold">
+                    <div className="rounded-full bg-foreground text-background py-1.5 text-[11px] font-semibold">
                       Copiar código Pix
                     </div>
                   </div>
@@ -193,7 +193,10 @@ export function LandingInteractiveDemo() {
 
               {/* Botão de Rodapé Simulado */}
               <div className="pt-2 border-t border-border text-center">
-                <span className="text-[10px] text-emerald-600 font-medium">🔒 Confirmação imediata após pagamento</span>
+                <span className="text-[10px] text-muted-foreground font-medium flex items-center justify-center gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-lime inline-block" />
+                  Confirmação imediata após pagamento
+                </span>
               </div>
             </div>
           </div>

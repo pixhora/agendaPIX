@@ -137,7 +137,7 @@ export function LoginForm({
           <Button
             type="submit"
             disabled={!isEmailValid || isSubmitting}
-            className="w-full min-h-12 font-semibold rounded-full bg-primary hover:bg-primary-hover text-primary-foreground text-base shadow-sm transition-transform duration-120 active:scale-[0.98] motion-reduce:transform-none"
+            className="w-full min-h-12 font-semibold rounded-full bg-foreground text-background hover:bg-foreground/90 text-base shadow-sm transition-transform duration-120 active:scale-[0.98] motion-reduce:transform-none"
           >
             {isSubmitting ? "Enviando link..." : "Receber link de acesso"}
           </Button>
