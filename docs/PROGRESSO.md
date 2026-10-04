@@ -200,15 +200,20 @@
     - `app/login/page.tsx`: logo link, link "Criar conta" e link "Começar 7 dias grátis" com `min-h-11` (alvo >= 44px).
     - `components/onboarding/OnboardingFlow.tsx`: logo link com `min-h-11 py-1` (alvo >= 44px).
     - 0 elementos < 44px em mobile 375px e desktop 1280px; 0 overflow horizontal (`hasHScroll: false`).
+  - Entrega B-02 Passo 2 (Autoridade Backend):
+    - `lib/magic-link.ts`: `requestMagicLink` consome backend autoridade (`http://localhost:3000/api/auth/sign-in/magic-link`) com `credentials: "include"`, suporte a `NEXT_PUBLIC_BACKEND_URL`.
+    - `components/onboarding/StepAccount.tsx`: unificado para usar `requestMagicLink` centralizado com o backend autoridade, eliminando duplicação de chamadas.
+    - Preservada simulação estritamente em `/preview` e preservadas rotas locais em `app/api` sem remoção prematura.
 - **Quality Gates**:
   - `pnpm lint`: 0 warnings / 0 erros.
   - `pnpm typecheck`: 0 erros.
-  - `pnpm test`: 10 arquivos, 73/73 testes unitários aprovados (100%).
+  - `pnpm test`: 10 arquivos, 74/74 testes unitários aprovados (100%).
 - **Provas Browser (`agent-browser`)**:
   - Landing (`/`): 375px e desktop, dark e light, `undersizedCount: 0`, `hasHScroll: false`.
-  - Login (`/login`): 375px e desktop, dark e light, `undersizedCount: 0`, erro real de infraestrutura com `role="alert"`.
-  - Onboarding (`/onboarding`): 375px e desktop, 4 passos fluidos, `undersizedCount: 0`, `hasHScroll: false`.
+  - Login (`/login`): chama backend autoridade com erro de rede real observável sob indisponibilidade (`/tmp/b02-login-error-real-backend.png`), NUNCA sucesso simulado.
+  - Onboarding (`/onboarding`): StepAccount chama backend autoridade com erro real observável sob indisponibilidade (`/tmp/b02-onboarding-error-real-backend.png`).
 - **Bloqueios e Próximos Passos**:
   - F-01 segue bloqueado aguardando API de provisionamento do T1.
   - F-02 (canonização de login) aguarda decisão de integração.
+  - Passo 3 de B-02 (remoção de `app/api`) aguarda confirmação e prova de todas as pontas antes da deleção.
 

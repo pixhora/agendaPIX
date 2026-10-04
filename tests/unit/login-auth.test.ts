@@ -67,6 +67,22 @@ describe("requestMagicLink security & error integrity", () => {
     }
   });
 
+  it("calls backend auth authority URL with credentials: include", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: true }),
+    });
+    global.fetch = fetchMock;
+
+    await requestMagicLink("dono@studio.com", "/login");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(url).toBe("http://localhost:3000/api/auth/sign-in/magic-link");
+    expect(options.credentials).toBe("include");
+    expect(options.method).toBe("POST");
+  });
+
   it("allows simulation ONLY when explicitly under /preview pathname", async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: false,

@@ -2,8 +2,13 @@ export type MagicLinkResult =
   | { ok: true; simulated?: boolean }
   | { ok: false; code: "auth_unavailable" | "invalid_email" | "unknown"; message: string };
 
+export const BACKEND_AUTH_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL ||
+  process.env.NEXT_PUBLIC_BETTER_AUTH_URL ||
+  "http://localhost:3000";
+
 /**
- * Envia solicitação de link mágico de autenticação.
+ * Envia solicitação de link mágico de autenticação consumindo a autoridade do backend (B-02).
  * 
  * Regra de segurança: falhas de infraestrutura (5xx) ou rede (catch)
  * NUNCA devem fingir sucesso nem simular envio em rotas reais (/login, /onboarding).
@@ -16,9 +21,10 @@ export async function requestMagicLink(
   const isPreview = pathname.startsWith("/preview");
 
   try {
-    const res = await fetch("/api/auth/sign-in/magic-link", {
+    const res = await fetch(`${BACKEND_AUTH_URL}/api/auth/sign-in/magic-link`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify({
         email: email.trim().toLowerCase(),
         callbackURL: "/dashboard",
