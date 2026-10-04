@@ -117,3 +117,9 @@
 - Prova pós-edição: `pnpm lint`, `pnpm typecheck`, `pnpm test` (73 testes / 7 arquivos) e `git diff --check` passaram. `pnpm build` passou antes da extração isolada de `PixKeyForm`; typecheck posterior passou. `pnpm test:e2e` não iniciou por Next dev já ativo na worktree (`Another next dev server is already running`, porta 3343); sessão preservada.
 - Limites reais: sem sessão autenticada, browser abriu somente login em 375, 390 e 1280px; agenda/configurações autenticadas não foram provadas nesta passagem. Endpoint Pix respondeu 404 no app ativo, ausente da rota compilada desta worktree; integração final depende do código/API T1 no app unido. Não alegar sucesso integrado.
 - Dependência visual T4: branch dashboard ainda tem tokens antigos em `app/globals.css`; não alterados sem acordo. Aplicações usam tokens/classes existentes.
+
+## 2026-10-03 — Diagnóstico do feedback de login
+
+- Falha de QA reproduzida em HTTP e Playwright: servidor 3343 usa URL Better Auth 3342; origem do browser recebe `403 INVALID_ORIGIN`. O formulário mostra o alerta previsto, sem falso sucesso.
+- Diagnóstico com origem configurada recebeu 200; nenhum bloqueio SMTP observado. Sem alteração de produto, sessão artificial ou reinício do servidor.
+- Prova e reprodução: `docs/evidencias/dashboard-login-2026-10-03.md`. Próximo responsável: operador QA/T1 alinha origem/URL na próxima inicialização coordenada; CODEFICADO repete login e páginas autenticadas.
