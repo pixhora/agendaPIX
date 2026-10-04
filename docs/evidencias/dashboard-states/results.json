@@ -1,0 +1,93 @@
+{
+  "mode": "Componentes reais; ações/Pix controlados, sem DB/sessão",
+  "results": [
+    {
+      "width": 375,
+      "colorScheme": "light",
+      "reducedMotion": "reduce",
+      "successAfterResponse": true,
+      "staleSuccessRemoved": true,
+      "errorRecovery": true,
+      "focusDataPreserved": true,
+      "emptyHoursPix": true,
+      "noOverflow": true
+    },
+    {
+      "width": 375,
+      "colorScheme": "dark",
+      "reducedMotion": "reduce",
+      "successAfterResponse": true,
+      "staleSuccessRemoved": true,
+      "errorRecovery": true,
+      "focusDataPreserved": true,
+      "emptyHoursPix": true,
+      "noOverflow": true
+    },
+    {
+      "width": 1280,
+      "colorScheme": "light",
+      "reducedMotion": "reduce",
+      "successAfterResponse": true,
+      "staleSuccessRemoved": true,
+      "errorRecovery": true,
+      "focusDataPreserved": true,
+      "emptyHoursPix": true,
+      "noOverflow": true
+    },
+    {
+      "width": 1280,
+      "colorScheme": "dark",
+      "reducedMotion": "reduce",
+      "successAfterResponse": true,
+      "staleSuccessRemoved": true,
+      "errorRecovery": true,
+      "focusDataPreserved": true,
+      "emptyHoursPix": true,
+      "noOverflow": true
+    },
+    {
+      "width": 375,
+      "colorScheme": "light",
+      "reducedMotion": "no-preference",
+      "successAfterResponse": true,
+      "staleSuccessRemoved": true,
+      "errorRecovery": true,
+      "focusDataPreserved": true,
+      "emptyHoursPix": true,
+      "noOverflow": true
+    },
+    {
+      "width": 375,
+      "colorScheme": "dark",
+      "reducedMotion": "no-preference",
+      "successAfterResponse": true,
+      "staleSuccessRemoved": true,
+      "errorRecovery": true,
+      "focusDataPreserved": true,
+      "emptyHoursPix": true,
+      "noOverflow": true
+    },
+    {
+      "width": 1280,
+      "colorScheme": "light",
+      "reducedMotion": "no-preference",
+      "successAfterResponse": true,
+      "staleSuccessRemoved": true,
+      "errorRecovery": true,
+      "focusDataPreserved": true,
+      "emptyHoursPix": true,
+      "noOverflow": true
+    },
+    {
+      "width": 1280,
+      "colorScheme": "dark",
+      "reducedMotion": "no-preference",
+      "successAfterResponse": true,
+      "staleSuccessRemoved": true,
+      "errorRecovery": true,
+      "focusDataPreserved": true,
+      "emptyHoursPix": true,
+      "noOverflow": true
+    }
+  ]
+}
