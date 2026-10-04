@@ -1,6 +1,6 @@
 # Relatório T2 — painel visual v2
 
-Status: **PARCIAL**. Código e gates passaram. Capturas autenticadas do painel ficaram pendentes: não há fixture/sessão QA disponível nesta execução (`QA_DASHBOARD_*` ausentes; arquivos de fixture locais esperados ausentes). Não solicitei login SMTP nem usei dados reais.
+Status: **PARCIAL**. Entrega de código `97db50baf29ca3de55fb05b45f1b50f5ddb62bba`. Código e gates passaram. Capturas autenticadas do painel ficaram pendentes: não há fixture/sessão QA disponível nesta execução (`QA_DASHBOARD_*` ausentes; arquivos de fixture locais esperados ausentes). Não solicitei login SMTP nem usei dados reais.
 
 ## Mudanças
 
