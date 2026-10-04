@@ -125,7 +125,7 @@ export function StepCustomer({
             onBlur={() => setTouched((prev) => ({ ...prev, name: true }))}
             aria-invalid={touched.name && !isNameValid}
             aria-describedby={touched.name && !isNameValid ? "name-error" : undefined}
-            className={`w-full rounded-lg border bg-surface px-3.5 py-2.5 text-base text-foreground placeholder:text-muted-foreground/60 min-h-11 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
+            className={`w-full rounded-xl border bg-surface px-4 py-3 text-base text-foreground placeholder:text-muted-foreground/60 min-h-12 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
               touched.name && !isNameValid ? "border-destructive ring-1 ring-destructive" : "border-border"
             }`}
           />
@@ -152,7 +152,7 @@ export function StepCustomer({
             onBlur={() => setTouched((prev) => ({ ...prev, phone: true }))}
             aria-invalid={touched.phone && !isPhoneValid}
             aria-describedby={touched.phone && !isPhoneValid ? "phone-error" : undefined}
-            className={`w-full rounded-lg border bg-surface px-3.5 py-2.5 text-base text-foreground placeholder:text-muted-foreground/60 min-h-11 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
+            className={`w-full rounded-xl border bg-surface px-4 py-3 text-base text-foreground placeholder:text-muted-foreground/60 min-h-12 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
               touched.phone && !isPhoneValid ? "border-destructive ring-1 ring-destructive" : "border-border"
             }`}
           />
@@ -176,20 +176,20 @@ export function StepCustomer({
       )}
 
       {/* Ações Voltar / Confirmar */}
-      <div className="flex items-center gap-3 pt-2">
+      <div className="flex items-center gap-3 pt-3 border-t border-border/60">
         <Button
           type="button"
           variant="outline"
           disabled={isSubmitting}
           onClick={onBack}
-          className="flex-1 min-h-11 font-medium"
+          className="flex-1 min-h-12 rounded-full font-semibold"
         >
           Voltar
         </Button>
         <Button
           type="submit"
           disabled={isSubmitting}
-          className="flex-[2] min-h-11 font-semibold"
+          className="flex-[2] min-h-12 rounded-full font-bold shadow-xs"
         >
           {isSubmitting
             ? "Processando..."

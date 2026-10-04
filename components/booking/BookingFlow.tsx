@@ -216,18 +216,33 @@ export function BookingFlow({ slug }: BookingFlowProps) {
   }
 
   return (
-    <main className="w-full max-w-md mx-auto px-4 py-6 md:py-10 space-y-6">
+    <main className="w-full max-w-md mx-auto px-4 py-6 md:py-10 space-y-5">
       {/* Cabeçalho da Empresa */}
-      <header className="text-center space-y-1">
-        <h1 className="text-2xl font-bold text-foreground tracking-tight">{business.name}</h1>
-        <p className="text-xs text-muted-foreground">Agendamento online seguro</p>
+      <header className="flex flex-col items-center text-center space-y-2">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent-forest text-primary font-display font-extrabold text-lg shadow-xs ring-2 ring-primary/20">
+          {business.name
+            .split(" ")
+            .map((w) => w[0])
+            .slice(0, 2)
+            .join("")
+            .toUpperCase()}
+        </div>
+        <div className="space-y-0.5">
+          <h1 className="text-2xl font-display font-extrabold text-foreground tracking-tight">
+            {business.name}
+          </h1>
+          <p className="text-xs text-muted-foreground flex items-center justify-center gap-1.5 font-medium">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            Agendamento online oficial · Garantia por Pix
+          </p>
+        </div>
       </header>
 
       {/* Barra de Progresso */}
       <StepProgress currentStep={step} />
 
       {/* Conteúdo do Passo Atual */}
-      <div className="rounded-2xl border border-border bg-surface p-5 shadow-sm">
+      <div className="rounded-3xl border border-border bg-surface p-5 sm:p-7 shadow-sm transition-all">
         {step === 1 && (
           <StepService
             services={business.services}

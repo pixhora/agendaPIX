@@ -98,24 +98,24 @@ export function BookingConfirmation({
       </div>
 
       {/* Ações */}
-      <div className="space-y-3 pt-2">
+      <div className="space-y-3 pt-3 border-t border-border/60">
         <Button
           asChild
-          variant="outline"
-          className="w-full min-h-11 font-medium border-emerald-600/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10"
+          className="w-full min-h-12 rounded-full font-bold bg-[#25D366] hover:bg-[#20bd5a] text-white shadow-xs transition-all active:scale-[0.99]"
         >
           <a
             href={`https://wa.me/?text=${whatsappMessage}`}
             target="_blank"
             rel="noopener noreferrer"
           >
-            💬 Notificar no WhatsApp
+            💬 Enviar Confirmação no WhatsApp
           </a>
         </Button>
 
         <Button
           onClick={onNewBooking}
-          className="w-full min-h-11 font-semibold"
+          variant="outline"
+          className="w-full min-h-12 rounded-full font-semibold"
         >
           Fazer outro agendamento
         </Button>

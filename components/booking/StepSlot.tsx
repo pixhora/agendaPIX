@@ -341,12 +341,12 @@ export function StepSlot({
       </section>
 
       {/* Ações Voltar / Avançar */}
-      <div className="flex items-center gap-3 pt-2">
+      <div className="flex items-center gap-3 pt-3 border-t border-border/60">
         <Button
           type="button"
           variant="outline"
           onClick={onBack}
-          className="flex-1 min-h-11 font-medium"
+          className="flex-1 min-h-12 rounded-full font-semibold"
         >
           Voltar
         </Button>
@@ -354,7 +354,7 @@ export function StepSlot({
           type="button"
           disabled={!selectedSlot}
           onClick={onNext}
-          className="flex-[2] min-h-11 font-semibold"
+          className="flex-[2] min-h-12 rounded-full font-bold"
         >
           {selectedSlot ? "Preencher meus dados" : "Selecione um horário"}
         </Button>

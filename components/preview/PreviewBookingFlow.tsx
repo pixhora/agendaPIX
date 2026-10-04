@@ -108,26 +108,32 @@ export function PreviewBookingFlow() {
       <div className="w-full max-w-md mx-auto space-y-6">
         {/* Barra Superior do Preview */}
         <div className="flex items-center justify-between text-xs text-muted-foreground pb-2 border-b border-border">
-          <Link href="/preview" className="font-semibold text-primary hover:underline">
+          <Link href="/preview" className="font-bold text-accent-forest dark:text-primary hover:underline">
             ← Voltar ao Hub Preview
           </Link>
-          <span className="rounded bg-muted px-2 py-0.5 text-[11px] font-mono">
+          <span className="rounded-full bg-muted border border-border px-2.5 py-0.5 text-[10px] font-mono font-semibold">
             {MOCK_PUBLIC_BUSINESS.name}
           </span>
         </div>
 
         {/* Cabeçalho do Estabelecimento */}
-        <header className="text-center space-y-1">
-          <h1 className="font-display text-2xl font-bold text-foreground tracking-tight">
-            {MOCK_PUBLIC_BUSINESS.name}
-          </h1>
-          <p className="text-xs text-muted-foreground">
-            São Paulo, SP · Agendamento online com sinal garantido por Pix
-          </p>
+        <header className="flex flex-col items-center text-center space-y-2">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent-forest text-primary font-display font-extrabold text-lg shadow-xs ring-2 ring-primary/20">
+            SB
+          </div>
+          <div className="space-y-0.5">
+            <h1 className="font-display text-2xl font-extrabold text-foreground tracking-tight">
+              {MOCK_PUBLIC_BUSINESS.name}
+            </h1>
+            <p className="text-xs text-muted-foreground flex items-center justify-center gap-1.5 font-medium">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              São Paulo, SP · Agendamento com sinal Pix garantido
+            </p>
+          </div>
         </header>
 
         {isCompleted && selectedService && selectedSlot ? (
-          <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
+          <div className="rounded-3xl border border-border bg-surface p-6 sm:p-7 shadow-sm">
             <BookingConfirmation
               businessName={MOCK_PUBLIC_BUSINESS.name}
               service={selectedService}
@@ -142,7 +148,7 @@ export function PreviewBookingFlow() {
           <>
             <StepProgress currentStep={step} />
 
-            <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6 shadow-sm">
+            <div className="rounded-3xl border border-border bg-surface p-5 sm:p-7 shadow-sm transition-all">
               {step === 1 && (
                 <StepService
                   services={MOCK_SERVICES}
