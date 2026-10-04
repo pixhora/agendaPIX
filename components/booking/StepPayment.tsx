@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback, useRef } from "react";
 import type { BookingResponse, PaymentStatusResponse } from "./types";
 import { formatCurrency } from "./formatters";
 import { Button } from "@/components/ui/button";
+import { ValueSlab, StatusChip } from "@/components/ui/value-slab";
 
 interface StepPaymentProps {
   slug: string;
@@ -170,22 +171,22 @@ export function StepPayment({
         </p>
       </div>
 
-      {/* Caixa do Pix */}
+      {/* Placa de Valor do Sinal (Elemento-Assinatura v2) */}
+      <ValueSlab
+        label="Sinal a pagar por Pix"
+        value={formatCurrency(payment?.amountCents ?? 0)}
+        badge={
+          timeLeft ? (
+            <StatusChip active={true}>
+              Expira em <span className="font-mono tabular-nums">{timeLeft}</span>
+            </StatusChip>
+          ) : undefined
+        }
+        sublabel="Horário garantido imediatamente após confirmação bancária"
+      />
+
+      {/* Caixa do QR Code e Copia e Cola */}
       <div className="rounded-2xl border border-border bg-surface p-5 text-center space-y-4 shadow-sm">
-        <div className="space-y-1">
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            Valor do sinal
-          </span>
-          <p className="text-3xl font-extrabold text-foreground">
-            {formatCurrency(payment?.amountCents ?? 0)}
-          </p>
-          {timeLeft && (
-            <p className="text-xs text-muted-foreground font-medium flex items-center justify-center gap-1 pt-1">
-              <span>⏳ Expira em:</span>
-              <span className="font-mono font-bold text-foreground text-sm">{timeLeft}</span>
-            </p>
-          )}
-        </div>
 
         {/* QR Code */}
         {payment?.qrCodeDataUrl ? (

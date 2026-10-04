@@ -10,6 +10,7 @@ import {
 import { formatCurrency, formatDuration } from "@/components/booking/formatters";
 import { Button } from "@/components/ui/button";
 import { PreviewHeader } from "@/components/preview/PreviewNav";
+import { ValueSlab, StatusChip } from "@/components/ui/value-slab";
 
 export default function PreviewDashboardPage() {
   const [copied, setCopied] = useState(false);
@@ -68,9 +69,23 @@ export default function PreviewDashboardPage() {
           </div>
         </section>
 
-        {/* Indicadores Principais do Dia (Métricas) */}
-        <section aria-label="Métricas do dia" className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
-          <div className="rounded-xl border border-border bg-surface p-4 space-y-1 shadow-sm">
+        {/* Placa de Valor do Painel (Elemento-Assinatura v2) */}
+        <section aria-label="Destaque de Sinais Garantidos no Pix">
+          <ValueSlab
+            label="Sinais Confirmados no Pix (Hoje)"
+            value={formatCurrency(totalSinaisPix)}
+            badge={
+              <StatusChip active={true}>
+                {confirmadas} reservas garantidas
+              </StatusChip>
+            }
+            sublabel="Garantia antecipada em caixa contra no-show"
+          />
+        </section>
+
+        {/* Indicadores Complementares do Dia (Métricas) */}
+        <section aria-label="Métricas do dia" className="grid grid-cols-2 lg:grid-cols-3 gap-3.5">
+          <div className="rounded-2xl border border-border bg-surface p-4 space-y-1 shadow-sm">
             <span className="text-[11px] font-semibold text-muted-foreground uppercase">
               Faturamento Previsto
             </span>
@@ -80,17 +95,17 @@ export default function PreviewDashboardPage() {
             <p className="text-[11px] text-muted-foreground">5 atendimentos agendados</p>
           </div>
 
-          <div className="rounded-xl border border-border bg-surface p-4 space-y-1 shadow-sm">
-            <span className="text-[11px] font-semibold text-emerald-600 uppercase">
-              Sinais Pagos no Pix
+          <div className="rounded-2xl border border-border bg-surface p-4 space-y-1 shadow-sm">
+            <span className="text-[11px] font-semibold text-muted-foreground uppercase">
+              Taxa de Comparecimento
             </span>
-            <p className="text-xl sm:text-2xl font-extrabold text-emerald-600">
-              {formatCurrency(totalSinaisPix)}
+            <p className="text-xl sm:text-2xl font-extrabold text-foreground">
+              100%
             </p>
-            <p className="text-[11px] text-muted-foreground">Garantia antecipada em caixa</p>
+            <p className="text-[11px] text-muted-foreground">Zero faltas após sinal</p>
           </div>
 
-          <div className="rounded-xl border border-border bg-surface p-4 space-y-1 shadow-sm">
+          <div className="rounded-2xl border border-border bg-surface p-4 space-y-1 shadow-sm">
             <span className="text-[11px] font-semibold text-accent-forest dark:text-primary uppercase">
               Confirmadas
             </span>

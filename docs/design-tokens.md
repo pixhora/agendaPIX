@@ -1,96 +1,80 @@
-# Design Tokens e Direção Visual (Definitivo)
+# Design Tokens e Direção Visual v2
 
 > Documento normativo de design system para toda a interface pública de agendamento (Booking), telas de Onboarding/Landing e Painel do Dono.
-> Status: **FINAL / HOMOLOGADO (T4)**
-> Foco: mobile-first (375px), velocidade operacional, contraste alto (WCAG AA/AAA) e conversão imediata de agendamentos com Pix.
+> Status: **V2 HOMOLOGADA (T4)**  
+> Referência de Design: Editorial Mineral & Placa de Valor (`ref_whale_loans.png`).  
+> Autorização de Exceção ao AGENTS.md §6: Aceita pelo humano via Maestri.
 
 ---
 
-## 1. Identidade e Paleta de Cores (Verde-Lima & Floresta Mineral)
+## 1. Exceção Mitigada ao AGENTS.md Seção 6
 
-Uma direção visual editorial, limpa e funcional, que afasta qualquer cara de template genérico (sem fundo creme/terracota e sem fundo preto com verde neon).
+O AGENTS.md §6 recomenda evitar "preto + verde ácido como padrão automático".  
+**Mitigação arquitetural obrigatória aceita e registrada**:
+- O verde-lima (`--lime` / `#C0F739`) **nunca** é utilizado como fundo expansivo ou preenchimento de botões de ação.
+- O verde-lima atua estritamente como ponto de estado ativo (live dot), chip fino de status e detalhe métrico de alta precisão.
+- O botão primário é rigorosamente uma **pílula preta** (`--ink` / `#0B0B0C`) com texto claro (`#F6F5F2`), ou pílula clara no modo escuro.
+- O elemento memorável é a **Placa de Valor** (`--slab`), gerando sofisticação sem poluição visual.
 
-### 1.1 Cores Nomeadas (6 Cores Principais)
+---
 
-| Token Semântico | Hex (Claro) | Hex (Escuro / `.dark`) | Função / Aplicação | WCAG Contraste Mínimo |
+## 2. Paleta de Cores Definitiva (6 Cores Fundamentais)
+
+| Nome do Token | Hex Claro | Hex Escuro (`.dark`) | Função / Aplicação | Contraste Calculado |
 |---|---|---|---|---|
-| `--color-background` | `#F5F6F2` | `#0E1612` | Fundo principal da página (canvas mineral) | Base |
-| `--color-surface` | `#FFFFFF` | `#141F1A` | Superfície de cartões, formulários, modais | 1.05:1 vs canvas |
-| `--color-foreground` | `#111613` | `#F5F6F2` | Texto principal, títulos e números tabulares | 16.5:1 vs surface (AAA) |
-| `--color-muted-foreground` | `#5A645C` | `#8A968C` | Textos de apoio, durações, etiquetas secundárias | 4.8:1 vs surface (AA) |
-| `--color-border` | `#E2E6DF` | `#23352C` | Divisores, contorno de inputs e cards desmarcados | Estrutural |
-| `--color-primary` (Acento Lima) | `#C0F739` | `#C0F739` | Ação primária de conversão (botão pill com texto preto) | 13.8:1 vs texto `#111613` (AAA) |
-| `--color-accent-forest` | `#0F3B2E` | `#175442` | Acento sólido para badges, estados selecionados e anéis | 9.2:1 vs branco (AAA) |
-| `--color-dark-card` | `#0E1612` | `#080D0A` | Fundo de cards de destaque escuros | Alto contraste |
+| `--paper` | `#F6F5F2` | `#0F0F10` | Fundo principal da página (canvas mineral) | Base |
+| `--surface` | `#FFFFFF` | `#19191B` | Superfície de cartões, listas e molduras | Estrutural |
+| `--ink` | `#0B0B0C` | `#F6F5F2` | Texto principal, botões primários e placas | ≈ 18:1 vs paper (AAA) |
+| `--muted` | `#5B5B5F` | `#A3A3A8` | Rótulos secundários, durações e apoio | ≈ 6:1 vs paper (AA) |
+| `--line` | `#DEDCD6` | `#2C2C2F` | Divisores, contornos e linhas sutis | Estrutural |
+| `--lime` | `#C0F739` | `#C0F739` | Ponto de estado (dot), chip fino, realce | 15:1 vs slab |
 
-### 1.2 Regras de Aplicação
-- **Modo Escuro**: ativado via seletor de classe `.dark` explícito no `<html>` (ou `@media (prefers-color-scheme: dark)` como fallback nativo do sistema).
-- **Botões de Ação Principal**: fundo `--color-primary` (`#C0F739`), texto `--color-primary-foreground` (`#111613`), formato pill (`rounded-full`), nunca texto branco sobre verde-lima.
-- **Estados de Foco**: anel de foco de 2px `--color-ring` com offset visível em todos os elementos interativos.
-
----
-
-## 2. Tipografia
-
-Duas famílias do Google Fonts carregadas via `next/font/google` com zero layout shift e zero dependência de download externo em tempo de execução:
-1. **Títulos e Destaques (`--font-display`)**: `Plus Jakarta Sans` (geométrica, moderna, corte editorial contemporâneo).
-2. **Corpo, Dados e Horários (`--font-sans`)**: `Inter` (alta legibilidade, numerais tabulares para horários e valores BRL).
-
-### 2.1 Escala Tipográfica Padronizada
-
-| Tamanho | Leading | Token / Classe | Peso Padrão | Aplicação Típica |
-|---|---|---|---|---|
-| **64px** | 1.1 | `text-6xl` | Bold (700) | Títulos heróicos na landing page |
-| **40px** | 1.15 | `text-4xl` | Bold (700) | Cabeçalhos principais e destaques numéricos |
-| **28px** | 1.25 | `text-2xl` | Bold (700) | Nome do estabelecimento / cabeçalho do fluxo |
-| **20px** | 1.4 | `text-xl` | SemiBold (600) | Títulos de passos e modais |
-| **16px** | 1.5 | `text-base` | Regular / Medium | Inputs de formulário (≥16px previne zoom no iOS) |
-| **14px** | 1.45 | `text-sm` | Medium (500) | Grade de horários, durações de procedimentos |
-
-*Comprimento máximo de linha de leitura: 65 a 80 caracteres (`max-w-prose`).*
+### 2.1 Placa de Valor e Estados
+- **`--slab`**: Fundo `#0B0B0C` (claro) e `#000000` (escuro), borda `--line`, texto `--slab-foreground` (`#FFFFFF`).
+- **`--danger`**: `#B3261E` (claro) e `#FF8A80` (escuro).
+- **`--ring`**: Foco com anel de 2px `--ink` com offset no tema claro; anel `--lime` no tema escuro.
+- **Regra de Acessibilidade**: O verde-lima sobre `--paper` possui contraste de 1,2:1, sendo **estritamente proibido** para textos soltos, ícones desacompanhados ou bordas de foco no modo claro.
 
 ---
 
-## 3. Escala Estrutural: Raios, Sombras e Espaçamentos
+## 3. Tipografia
 
-### 3.1 Raio de Borda (Border Radius)
-Hierarquia por escala física do elemento:
-- **`radius-sm` (6px / `0.375rem`)**: badges informativos, tags de duração.
-- **`radius` (10px / `0.625rem`)**: botões de horário (slots), campos de texto (inputs).
-- **`radius-lg` (16px / `1rem`)**: cards de procedimentos, container do QR Code Pix.
-- **`radius-xl` (24px / `1.5rem`)**: gavetas modais inferiores (bottom sheets).
-- **`radius-pill` (9999px / `rounded-full`)**: botões de conversão e badges de status.
+Duas famílias via `next/font/google`:
+1. **Títulos, Cabeçalhos e Números da Placa (`--font-display`)**: `Plus Jakarta Sans` (geométrica, precisa, robusta).
+2. **Corpo, Dados e Horários (`--font-sans`)**: `Inter` (numerais tabulares `tabular-nums` para moedas e horários).
 
-### 3.2 Sombras (Elevation)
-- `shadow-xs`: `0 1px 2px 0 rgb(15 23 42 / 0.05)` (cards e inputs em repouso).
-- `shadow-sm`: `0 2px 8px -1px rgb(15 23 42 / 0.08)` (card ativo / selecionado).
-- `shadow-sheet`: `0 -8px 24px 0 rgb(15 23 42 / 0.10)` (barra inferior de confirmação).
+### 3.1 Escala Tipográfica (14 / 16 / 20 / 28 / 40 / 64 px)
 
-### 3.3 Espaçamentos (Mobile-First 375px)
-- **Gutter Lateral Obrigatório**: 16px (`px-4`) no mobile, 24px (`px-6`) em telas maiores.
-- **Alvo de Toque Mínimo**: 44px x 44px (`min-h-11`) para qualquer botão ou controle tocável.
-- **Reserva de Espaço Inferior**: `pb-24` ou `pb-28` em fluxos com barra flutuante para evitar sobreposição de conteúdo.
+| Tamanho | Leading | Token | Aplicação |
+|---|---|---|---|
+| **64px** | 1.05 | `text-6xl` | Número central da Placa de Valor (`font-display font-extrabold tabular-nums`) |
+| **40px** | 1.15 | `text-4xl` | Placa de valor em mobile compacto (< 375px) e títulos da landing |
+| **28px** | 1.25 | `text-2xl` | Nome do estabelecimento / cabeçalhos principais |
+| **20px** | 1.4 | `text-xl` | Títulos de passos e diálogos |
+| **16px** | 1.5 | `text-base` | Formulários e botões principais (evita zoom iOS) |
+| **14px** | 1.45 | `text-sm` | Grade de horários e legendas de procedimentos |
 
 ---
 
-## 4. Elemento-Assinatura Memorável
+## 4. Escala Estrutural: Raios e Espaçamentos
 
-**A Régua Tátil de Dias com Indicador Imediato de Vagas:**
-- Fita horizontal com pílulas compactas no topo da seleção de horário.
-- Exibe o dia da semana, dia do mês e a quantidade de vagas disponíveis sem exigir múltiplos toques.
-- Navegação por toque com rolagem horizontal suave, sem barra de rolagem nativa aparente (`scrollbar-hide` compatível com claro e escuro).
-- Foco de teclado acessível com suporte a setas e leitor de tela.
+### 4.1 Raios de Borda (Border Radius)
+- **Moldura Externa (`--radius-frame`)**: 32px (`rounded-3xl` / 32px).
+- **Cartões e Seções (`--radius-card`)**: 14px (`rounded-2xl` / 14px).
+- **Inputs e Campos (`--radius-field`)**: 12px (`rounded-xl` / 12px).
+- **Botões e Chips**: Formato Pílula (`rounded-full`).
+
+### 4.2 Espaçamentos (Mobile-First)
+Grid padronizado: `4px`, `8px`, `12px`, `16px`, `24px`, `32px`, `48px`, `64px`.  
+Padding lateral obrigatório no mobile: `16px` (`px-4`).  
+Alvo de toque mínimo: `44px x 44px` (`min-h-11`).
 
 ---
 
-## 5. Tokens de Movimento e Acessibilidade
+## 5. Elemento-Assinatura Memorável: A Placa de Valor (`ValueSlab`)
 
-| Token | Duração | Função |
-|---|---|---|
-| `--duration-feedback` | `120ms` | Toque, seleção de radio, hover em botões |
-| `--duration-opening` | `180ms` | Fades de rolagem, modais |
-| `--duration-step` | `240ms` | Transição de passos de formulário |
-| `--ease-standard` | `cubic-bezier(0.16, 1, 0.3, 1)` | Curva de desaceleração suave |
+Um cartão escuro mineral imponente (`bg-slab text-slab-foreground`), moldado com raio de 24–32px e borda fina, exibindo em tipografia gigante (`64px` com fallback responsivo para `40px`) o valor exato a ser pago ou recebido.
 
-### Suporte a `prefers-reduced-motion`
-Quando ativo no sistema operacional do usuário, todas as animações e transições são imediatamente anuladas (`0s !important`), preservando usabilidade instantânea.
+- **No Booking**: Apresenta com impacto transparente o valor do sinal no Pix no Passo 4 (e resumo destacado no Passo 3).
+- **No Painel (T2)**: Destaca o total de sinais confirmados no dia e o faturamento garantido.
+- **Na Landing (T5)**: Destaca a precificação dos planos mensais (R$ 49 / R$ 79).
