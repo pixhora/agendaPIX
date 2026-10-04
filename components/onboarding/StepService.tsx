@@ -139,10 +139,13 @@ export function StepService({
           </div>
         )}
 
-        <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground space-y-1">
-          <p className="font-semibold text-primary">💡 Dica sobre o sinal:</p>
+        <div className="rounded-lg border border-primary/20 bg-primary/5 p-3.5 text-xs text-muted-foreground space-y-1.5">
+          <p className="font-semibold text-primary">💡 Sinal seguro e profissional:</p>
           <p>
-            Recomendamos cobrar entre 20% e 50% do valor como sinal no Pix (ex: R$ 15 ou R$ 20). Isso garante que o cliente não falte sem criar barreira de entrada.
+            Recomendamos cobrar entre 20% e 50% do valor como sinal no Pix (ex: R$ 15 ou R$ 20) para garantir a presença do cliente.
+          </p>
+          <p className="text-[11px] text-muted-foreground/90">
+            🔒 O Pix é gerado diretamente pelo gateway de pagamentos integrado. Você não precisa passar sua chave Pix pessoal nem cobrar comprovante no WhatsApp.
           </p>
         </div>
       </div>

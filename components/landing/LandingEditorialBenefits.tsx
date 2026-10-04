@@ -32,12 +32,12 @@ export function LandingEditorialBenefits() {
             </div>
             <div>
               <div className="inline-block rounded-xl bg-muted p-3 border border-border mb-3">
-                <p className="text-[11px] font-bold text-accent-forest dark:text-primary">✓ Notificação no celular</p>
-                <p className="text-xs font-semibold text-foreground">&ldquo;Pix de R$ 30 recebido. Vaga das 14h garantida!&rdquo;</p>
+                <p className="text-[11px] font-bold text-accent-forest dark:text-primary">✓ Confirmação no painel e WhatsApp</p>
+                <p className="text-xs font-semibold text-foreground">&ldquo;Sinal de R$ 30 confirmado. Horário das 14h garantido!&rdquo;</p>
               </div>
               <h3 className="text-lg font-bold text-foreground">Zero perda de tempo</h3>
               <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                Você não precisa abrir o app do banco toda hora para checar se o comprovante é verdadeiro.
+                A confirmação atualiza direto na sua agenda e no WhatsApp. Você não precisa conferir extrato bancário nem pedir comprovante.
               </p>
             </div>
           </div>
