@@ -3,11 +3,12 @@ import { expect, test } from "@playwright/test";
 for (const colorScheme of ["light", "dark"] as const) {
   for (const width of [375, 390, 1280]) {
     test(`login real: ${width}px ${colorScheme}`, async ({ page }, testInfo) => {
+      const browserErrors: string[] = [];
+      page.on("console", (message) => { if (message.type() === "error") browserErrors.push(message.text()); });
+      page.on("pageerror", (error) => browserErrors.push(error.message));
       await page.setViewportSize({ width, height: 812 });
       await page.emulateMedia({ colorScheme });
       await page.goto("/dashboard/login");
-      await page.evaluate((scheme) => document.documentElement.classList.add(scheme), colorScheme);
-      await expect(page.locator("html")).toHaveClass(new RegExp(`\\b${colorScheme}\\b`));
       await expect(page.getByRole("link", { name: "Agenda, início" })).toBeVisible();
       await expect(page.getByRole("heading", { name: "Entre no seu painel" })).toBeVisible();
       const input = page.getByLabel("Seu email");
@@ -16,15 +17,18 @@ for (const colorScheme of ["light", "dark"] as const) {
         expect((await control.boundingBox())!.height).toBeGreaterThanOrEqual(44);
       }
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-      expect(await button.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(192, 247, 57)");
+      expect(await button.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe(colorScheme === "dark" ? "rgb(246, 245, 242)" : "rgb(11, 11, 12)");
       const heading = page.getByRole("heading", { name: "Entre no seu painel" });
       expect(await heading.evaluate((element) => getComputedStyle(element).fontFamily)).toContain("Plus Jakarta Sans");
       const inputSurface = await input.evaluate((element) => getComputedStyle(element).backgroundColor);
-      expect(inputSurface).toBe(colorScheme === "dark" ? "rgb(20, 31, 26)" : "rgb(255, 255, 255)");
-      await page.screenshot({ path: testInfo.outputPath(`login-${width}-${colorScheme}.png`), fullPage: true });
+      expect(inputSurface).toBe(colorScheme === "dark" ? "rgb(25, 25, 27)" : "rgb(255, 255, 255)");
       await page.getByRole("link", { name: "Agenda, início" }).focus();
       await page.keyboard.press("Tab");
       await expect(input).toBeFocused();
+      expect(await input.evaluate((element) => getComputedStyle(element).outlineStyle)).toBe("solid");
+      expect(browserErrors).toEqual([]);
+      await page.addStyleTag({ content: "nextjs-portal { display: none !important; }" });
+      await page.screenshot({ path: testInfo.outputPath(`login-${width}-${colorScheme}.png`), fullPage: true });
     });
   }
 }

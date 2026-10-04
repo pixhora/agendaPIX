@@ -1,4 +1,4 @@
-import styles from "./motion.module.css";
+import { StatusChip } from "../ui/value-slab";
 import type { bookings } from "@/db/schema";
 
 const labels = {
@@ -10,5 +10,5 @@ const labels = {
 } satisfies Record<typeof bookings.$inferSelect.status, string>;
 
 export function BookingStatus({ status }: { status: typeof bookings.$inferSelect.status }) {
-  return <span className={styles.bookingStatus} data-status={status}>{labels[status]}</span>;
+  return <StatusChip active={status === "confirmed"}>{labels[status]}</StatusChip>;
 }

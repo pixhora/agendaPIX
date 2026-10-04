@@ -7,11 +7,11 @@ import { saveHours, saveService } from "@/app/dashboard/(owner)/actions";
 import type { FormState } from "@/lib/dashboard/validation";
 
 export const weekdays = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
-const control = "min-h-11 w-full rounded-md border border-border bg-background px-3 text-base focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+const control = "min-h-11 w-full rounded-field border border-line bg-paper px-3 text-base focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 function Feedback({ state, showSuccess }: { state: FormState; showSuccess: boolean }) {
   const ref = useRef<HTMLParagraphElement>(null);
   useEffect(() => { if (state.error) ref.current?.focus(); }, [state]);
-  return <>{state.error && <p ref={ref} tabIndex={-1} role="alert" className={`${styles.feedback} rounded-md border-l-2 border-border bg-muted p-3 font-medium`}>{state.error}</p>}{showSuccess && state.success && <p role="status" aria-atomic="true" className={`${styles.feedback} rounded-md border-l-2 border-primary bg-muted p-3 font-medium`}>{state.success}</p>}</>;
+  return <>{state.error && <p ref={ref} tabIndex={-1} role="alert" className={`${styles.feedback} rounded-field border border-line bg-surface p-3 font-medium text-danger`}>{state.error}</p>}{showSuccess && state.success && <p role="status" aria-atomic="true" className={`${styles.feedback} rounded-field border border-line bg-surface p-3 font-medium text-ink`}>{state.success}</p>}</>;
 }
 type Service = { id: string; name: string; durationMinutes: number; priceCents: number; depositCents: number; active: boolean };
 export function ServiceForm({ businessId, service }: { businessId: string; service?: Service }) {
@@ -51,7 +51,7 @@ export function HoursForm({ businessId, hours }: { businessId: string; hours: { 
       </fieldset>;
     })}
     <p className="text-sm text-muted-foreground">Desmarque “Aberto” nos dias sem atendimento.</p>
-    {!days.some((day) => day.open) && <p role="status" className="rounded-md border border-dashed border-border p-3 text-sm text-muted-foreground">Nenhum dia selecionado. Ao salvar, sua agenda ficará fechada para novos agendamentos.</p>}
+    {!days.some((day) => day.open) && <p role="status" className="rounded-field border border-dashed border-line bg-surface p-3 text-sm text-muted-foreground">Nenhum dia selecionado. Ao salvar, sua agenda ficará fechada para novos agendamentos.</p>}
     <div className="min-h-12">{pending ? <p role="status" className="p-3 text-sm text-muted-foreground">Salvando alterações…</p> : <Feedback state={state} showSuccess={showSuccess} />}</div>
     <Button type="submit" disabled={pending} className="justify-self-start">{pending ? "Salvando horários…" : "Salvar horários de funcionamento"}</Button>
   </form>;

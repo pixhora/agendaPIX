@@ -15,8 +15,8 @@ export function LoginForm({ linkError = false }: { linkError?: boolean }) {
   return <div className={`${styles.root} flex min-h-dvh flex-col bg-background text-foreground`}>
     <header className={`${styles.surface} border-b border-border px-4 sm:px-6`}>
       <div className="mx-auto flex min-h-20 max-w-6xl items-center justify-between gap-4">
-        <Link href="/" aria-label="Agenda, início" className={`${styles.display} inline-flex min-h-11 items-center gap-2.5 rounded-md text-xl font-bold tracking-tight focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring`}>
-          <span aria-hidden="true" className={`${styles.brand} flex size-8 items-center justify-center rounded-lg text-base`}>A</span>
+        <Link href="/" aria-label="Agenda, início" className={`${styles.display} inline-flex min-h-11 items-center gap-2.5 rounded-field text-xl font-bold tracking-tight focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring`}>
+          <span aria-hidden="true" className={`${styles.brand} flex size-8 items-center justify-center rounded-field text-base`}>A</span>
           Agenda
         </Link>
         <span className="text-sm text-muted-foreground">Painel do negócio</span>
@@ -43,8 +43,8 @@ export function LoginForm({ linkError = false }: { linkError?: boolean }) {
             <input id="email" name="email" type="email" autoComplete="email" required disabled={pending} aria-describedby={`email-hint${error ? " login-error" : ""}`} placeholder="voce@exemplo.com.br" className={`${styles.surface} min-h-12 min-w-0 w-full rounded-lg border border-muted-foreground px-3.5 text-base placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-60`} />
             <p id="email-hint" className="text-sm text-muted-foreground">Use o email da sua conta.</p>
           </div>
-          {error && <p id="login-error" ref={errorRef} tabIndex={-1} role="alert" className="rounded-lg border-l-2 border-foreground bg-muted p-4 text-sm leading-relaxed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">{error}</p>}
-          {sent && <p role="status" className="rounded-lg border-l-2 border-primary bg-muted p-4 text-sm leading-relaxed"><strong className="block font-semibold">Confira sua caixa de entrada</strong>Confira também a pasta de spam. Abra o link para entrar.</p>}
+          {error && <p id="login-error" ref={errorRef} tabIndex={-1} role="alert" className="rounded-card border border-line bg-surface p-4 text-sm leading-relaxed text-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">{error}</p>}
+          {sent && <p role="status" className="rounded-card border border-line bg-surface p-4 text-sm leading-relaxed"><strong className="block font-semibold">Confira sua caixa de entrada</strong>Confira também a pasta de spam. Abra o link para entrar.</p>}
           {pending && <p role="status" className="sr-only">Enviando link de acesso…</p>}
           <Button disabled={pending} type="submit" className="min-h-12 w-full rounded-full px-4 text-base font-semibold">{pending ? "Enviando link…" : "Receber link de acesso"}</Button>
         </form>

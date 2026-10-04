@@ -41,6 +41,7 @@ export async function dashboardBookings(ownerId: string, businessId: string, dat
     .orderBy(asc(bookings.startsAt), asc(bookings.id));
   return rows.filter((row) => dates.includes(localDate(row.startsAt, business.timezone)));
 }
+export type DashboardBooking = Awaited<ReturnType<typeof dashboardBookings>>[number];
 export async function saveDashboardService(ownerId: string, input: unknown, database: Database = getDb()) {
   const { businessId, id, ...values } = serviceFormSchema.parse(input);
   await authorize(ownerId, businessId, database);
