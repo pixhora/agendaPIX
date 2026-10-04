@@ -123,3 +123,9 @@
 - Falha de QA reproduzida em HTTP e Playwright: servidor 3343 usa URL Better Auth 3342; origem do browser recebe `403 INVALID_ORIGIN`. O formulário mostra o alerta previsto, sem falso sucesso.
 - Diagnóstico com origem configurada recebeu 200; nenhum bloqueio SMTP observado. Sem alteração de produto, sessão artificial ou reinício do servidor.
 - Prova e reprodução: `docs/evidencias/dashboard-login-2026-10-03.md`. Próximo responsável: operador QA/T1 alinha origem/URL na próxima inicialização coordenada; CODEFICADO repete login e páginas autenticadas.
+
+## 2026-10-03 — Identidade do login real
+
+- Página de login e `LoginForm` receberam marca Agenda, card central, CTA lime/pill e fontes Plus Jakarta Sans/Inter da identidade T4/T5. CSS Module e fontes limitados à rota; nenhum compartilhado/backend alterado. Callbacks e autenticação real preservados.
+- Prova: lint/typecheck passaram; 73 testes unitários/7 arquivos; 8 provas Playwright em 3343, incluindo 375/390/1280 claro/escuro, teclado e estados. Capturas e limites em `docs/evidencias/dashboard-login-style/README.md`.
+- Erro real 403 permanece por origem 3343/3342; estados HTTP controlados não equivalem a SMTP real. Servidor/sessões preservados. Trilha ausente no Maestri; Codex ambíguo (2 terminais), sem renomear/reiniciar. Revisão visual direta e alinhamento de QA permanecem pendentes.

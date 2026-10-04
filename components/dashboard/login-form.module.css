@@ -1,0 +1,32 @@
+/* Identidade aprovada T4/T5, limitada à rota enquanto os tokens compartilhados
+   ainda não foram integrados nesta branch. Não altera outras telas. */
+.root {
+  --background: #f5f6f2;
+  --foreground: #111613;
+  --primary: var(--accent-lime, #c0f739);
+  --primary-foreground: #111613;
+  --muted: #eaede6;
+  --muted-foreground: #5a645c;
+  --border: #e2e6df;
+  --ring: var(--accent-forest, #0f3b2e);
+  --login-surface: var(--surface, #ffffff);
+  font-family: var(--font-sans, sans-serif);
+  color-scheme: light;
+}
+
+.surface { background-color: var(--login-surface); }
+.display { font-family: var(--font-display, var(--font-sans, sans-serif)); }
+.brand { background-color: var(--accent-forest, #0f3b2e); color: var(--primary); }
+
+@media (prefers-color-scheme: dark) {
+  .root {
+    --background: #0e1612;
+    --foreground: #f5f6f2;
+    --muted: #1c2a23;
+    --muted-foreground: #8a968c;
+    --border: #23352c;
+    --ring: var(--accent-lime, #c0f739);
+    --login-surface: var(--surface, #141f1a);
+    color-scheme: dark;
+  }
+}
