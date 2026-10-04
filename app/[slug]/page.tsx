@@ -15,9 +15,12 @@ export async function generateMetadata({
 
 export default async function BookingPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams?: Promise<{ bookingId?: string }>;
 }) {
   const { slug } = await params;
-  return <BookingFlow slug={slug} />;
+  const search = searchParams ? await searchParams : undefined;
+  return <BookingFlow slug={slug} initialBookingId={search?.bookingId} />;
 }

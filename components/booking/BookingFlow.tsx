@@ -18,9 +18,10 @@ import { Button } from "@/components/ui/button";
 
 interface BookingFlowProps {
   slug: string;
+  initialBookingId?: string;
 }
 
-export function BookingFlow({ slug }: BookingFlowProps) {
+export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
   // Estado do Negócio
   const [business, setBusiness] = useState<PublicBusinessData | null>(null);
   const [isLoadingBusiness, setIsLoadingBusiness] = useState(true);
@@ -85,6 +86,128 @@ export function BookingFlow({ slug }: BookingFlowProps) {
     };
   }, [slug, reloadCount]);
 
+  // Retoma sessão Pix ativa se cliente fechar aba e reabrir /[slug]
+  useEffect(() => {
+    if (!business || step !== 1 || isCompleted || bookingResponse) return;
+    if (typeof window === "undefined") return;
+
+    let stored: {
+      bookingId: string;
+      accessToken: string;
+      serviceId?: string;
+      customerName?: string;
+      customerPhone?: string;
+      expiresAt?: string;
+    } | null = null;
+
+    try {
+      const raw = sessionStorage.getItem(`booking_session_${slug}`);
+      if (raw) {
+        stored = JSON.parse(raw);
+      }
+    } catch {
+      stored = null;
+    }
+
+    if (!stored?.bookingId || !stored?.accessToken) {
+      return;
+    }
+
+    if (initialBookingId && stored.bookingId !== initialBookingId) {
+      return;
+    }
+
+    // Invariante: expirado permanece expirado
+    if (stored.expiresAt && new Date(stored.expiresAt).getTime() <= Date.now()) {
+      try {
+        sessionStorage.removeItem(`booking_session_${slug}`);
+      } catch {
+        // ignore
+      }
+      return;
+    }
+
+    let isCancelled = false;
+
+    fetch(`/api/public/${slug}/bookings/${stored.bookingId}/payment`, {
+      headers: {
+        Authorization: `Bearer ${stored.accessToken}`,
+      },
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Reserva não encontrada ou expirada");
+        return res.json();
+      })
+      .then((paymentData) => {
+        if (isCancelled) return;
+
+        // Invariante: expirado permanece expirado
+        if (paymentData.status === "expired" || paymentData.payment?.status === "expired") {
+          try {
+            sessionStorage.removeItem(`booking_session_${slug}`);
+            window.history.replaceState(null, "", `/${slug}`);
+          } catch {
+            // ignore
+          }
+          return;
+        }
+
+        const matchedService =
+          business.services.find((s) => s.id === stored!.serviceId) ||
+          business.services[0];
+        if (matchedService) {
+          setSelectedService(matchedService);
+        }
+
+        if (paymentData.startsAt && paymentData.endsAt) {
+          setSelectedSlot({
+            startsAt: paymentData.startsAt,
+            endsAt: paymentData.endsAt,
+          });
+        }
+
+        if (stored?.customerName) setCustomerName(stored.customerName);
+        if (stored?.customerPhone) setCustomerPhone(stored.customerPhone);
+
+        if (paymentData.status === "confirmed") {
+          setIsCompleted(true);
+          try {
+            sessionStorage.removeItem(`booking_session_${slug}`);
+            window.history.replaceState(null, "", `/${slug}`);
+          } catch {
+            // ignore
+          }
+          return;
+        }
+
+        const fullResponse: BookingResponse = {
+          bookingId: paymentData.bookingId,
+          status: paymentData.status,
+          startsAt: paymentData.startsAt,
+          endsAt: paymentData.endsAt,
+          expiresAt: paymentData.expiresAt,
+          accessToken: stored!.accessToken,
+          payment: paymentData.payment,
+        };
+
+        setBookingResponse(fullResponse);
+        setStep(4);
+      })
+      .catch(() => {
+        if (isCancelled) return;
+        try {
+          sessionStorage.removeItem(`booking_session_${slug}`);
+          window.history.replaceState(null, "", `/${slug}`);
+        } catch {
+          // ignore
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [business, slug, initialBookingId, step, isCompleted, bookingResponse]);
+
   // Cria a reserva chamando POST /api/public/[slug]/bookings
   const handleCreateBooking = async () => {
     if (!selectedService || !selectedSlot) return;
@@ -129,6 +252,25 @@ export function BookingFlow({ slug }: BookingFlowProps) {
       if (booking.status === "confirmed" || !booking.payment) {
         setIsCompleted(true);
       } else {
+        // Persiste sessão ativa no sessionStorage para permitir retomar se aba for fechada
+        if (typeof window !== "undefined") {
+          try {
+            sessionStorage.setItem(
+              `booking_session_${slug}`,
+              JSON.stringify({
+                bookingId: booking.bookingId,
+                accessToken: booking.accessToken,
+                serviceId: selectedService.id,
+                customerName: customerName.trim(),
+                customerPhone: customerPhone.trim(),
+                expiresAt: booking.expiresAt,
+              })
+            );
+            window.history.replaceState(null, "", `/${slug}?bookingId=${booking.bookingId}`);
+          } catch {
+            // sessionStorage desabilitado ou indisponível
+          }
+        }
         // Avança para o Passo 4 (Pix)
         setStep(4);
       }
@@ -149,6 +291,14 @@ export function BookingFlow({ slug }: BookingFlowProps) {
     setBookingResponse(null);
     setIsCompleted(false);
     setStep(1);
+    if (typeof window !== "undefined") {
+      try {
+        sessionStorage.removeItem(`booking_session_${slug}`);
+        window.history.replaceState(null, "", `/${slug}`);
+      } catch {
+        // ignore
+      }
+    }
     if (typeof crypto !== "undefined" && crypto.randomUUID) {
       setIdempotencyKey(crypto.randomUUID());
     }
@@ -291,6 +441,14 @@ export function BookingFlow({ slug }: BookingFlowProps) {
             slug={slug}
             booking={bookingResponse}
             onPaymentConfirmed={() => {
+              if (typeof window !== "undefined") {
+                try {
+                  sessionStorage.removeItem(`booking_session_${slug}`);
+                  window.history.replaceState(null, "", `/${slug}`);
+                } catch {
+                  // ignore
+                }
+              }
               setIsCompleted(true);
             }}
             onRestart={handleRestart}
