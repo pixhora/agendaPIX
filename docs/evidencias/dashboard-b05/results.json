@@ -1,0 +1,63 @@
+{
+  "base": "f4b4361",
+  "baseURL": "http://127.0.0.1:3343",
+  "auth": "SMTP local e sessão Better Auth reais; nenhum bypass ou HTTP mock",
+  "results": [
+    {
+      "route": "/dashboard",
+      "width": 375,
+      "authenticated": true,
+      "noOverflow": true
+    },
+    {
+      "route": "/dashboard/services",
+      "width": 375,
+      "authenticated": true,
+      "noOverflow": true
+    },
+    {
+      "route": "/dashboard/customers",
+      "width": 375,
+      "authenticated": true,
+      "noOverflow": true
+    },
+    {
+      "route": "/dashboard/settings",
+      "width": 375,
+      "authenticated": true,
+      "noOverflow": true
+    },
+    {
+      "route": "/dashboard",
+      "width": 1280,
+      "authenticated": true,
+      "noOverflow": true
+    },
+    {
+      "route": "/dashboard/services",
+      "width": 1280,
+      "authenticated": true,
+      "noOverflow": true
+    },
+    {
+      "route": "/dashboard/customers",
+      "width": 1280,
+      "authenticated": true,
+      "noOverflow": true
+    },
+    {
+      "route": "/dashboard/settings",
+      "width": 1280,
+      "authenticated": true,
+      "noOverflow": true
+    }
+  ],
+  "dbCounts": {
+    "bookings": 1,
+    "services": 1,
+    "customers": 1,
+    "hours": 1
+  },
+  "serviceDeactivateReloadReactivate": true,
+  "pix": "API ausente desta branch; sem validação Pix integrada"
+}
