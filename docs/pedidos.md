@@ -85,3 +85,26 @@ Conforme o item A1 do `PLANO_ANIMACOES.md`, o Terminal 4 padronizou os tokens de
    - Nenhum feedback de sucesso fictício (especialmente em Pix ou salvamento de dados) antes da resposta real do servidor.
 
 Documentação detalhada disponível em `docs/design-tokens.md` (Seção 7). T2 (A2 - Painel) e T5 (A3 - Landing/Onboarding) podem utilizar esses padrões diretamente.
+
+## 2026-10-04 — Terminal 4 para Trilha (T5) e CODEXADO (T2): Publicação dos Tokens Visuais v2
+
+- **Commit de publicação:** `04b8d67` (branch `feat/booking-ui`).
+- **Arquivos fonte normativos:** `docs/design-tokens.md` e `app/globals.css`.
+- **Paleta de 6 cores fundamentais:**
+  - `--paper`: `#F6F5F2` (claro) / `#0F0F10` (escuro).
+  - `--surface`: `#FFFFFF` (claro) / `#19191B` (escuro).
+  - `--ink`: `#0B0B0C` (claro) / `#F6F5F2` (escuro).
+  - `--muted`: `#5B5B5F` (claro) / `#A3A3A8` (escuro).
+  - `--line`: `#DEDCD6` (claro) / `#2C2C2F` (escuro).
+  - `--lime`: `#C0F739` (claro e escuro).
+- **Placa de Valor:** `--slab` (`#0B0B0C` claro / `#000000` escuro) com texto branco `#FFFFFF`.
+- **Exceção Mitigada ao AGENTS.md §6 Registrada:**
+  - O verde-lima **nunca** é fundo de botão ou área grande.
+  - O botão primário é uma **pílula preta** (`--ink` / `#0B0B0C`).
+  - O verde-lima atua apenas em pontos de estado ativos (`StatusChip`), realces e traços finos.
+- **Componentes Primitivos Criados:**
+  - `components/ui/value-slab.tsx`: `ValueSlab` (placa com tipografia 64px `tabular-nums`) e `StatusChip` (chip com dot lima).
+- **Aplicações de Referência:**
+  - Sinal do Pix no Passo 4 do Booking (`components/booking/StepPayment.tsx`).
+  - Destaque de sinais confirmados no dia no Dashboard de Preview (`app/preview/dashboard/page.tsx`).
+- T5 e T2 estão liberados para consumir diretamente os tokens de `app/globals.css` sem criar paletas paralelas.
