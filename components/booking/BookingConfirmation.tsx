@@ -35,9 +35,9 @@ export function BookingConfirmation({
   );
 
   return (
-    <div className="space-y-6 text-center">
-      {/* Ícone de Sucesso */}
-      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 text-3xl font-bold ring-8 ring-emerald-500/5">
+    <div className="space-y-6 text-center animate-confirm-pop">
+      {/* Ícone de Sucesso com celebração discreta */}
+      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 text-3xl font-bold ring-8 ring-emerald-500/5 animate-confirm-pop">
         ✓
       </div>
 
@@ -103,7 +103,7 @@ export function BookingConfirmation({
       <div className="space-y-3 pt-3 border-t border-border/60">
         <Button
           asChild
-          className="w-full min-h-12 rounded-full font-bold bg-[#25D366] hover:bg-[#20bd5a] text-white shadow-xs transition-all active:scale-[0.99]"
+          className="w-full min-h-12 rounded-full font-bold bg-[#25D366] hover:bg-[#20bd5a] text-white shadow-xs transition-feedback active:scale-[0.99]"
         >
           <a
             href={`https://wa.me/?text=${whatsappMessage}`}
@@ -117,7 +117,7 @@ export function BookingConfirmation({
         <Button
           onClick={onNewBooking}
           variant="outline"
-          className="w-full min-h-12 rounded-full font-semibold"
+          className="w-full min-h-12 rounded-full font-semibold transition-feedback active:scale-[0.99]"
         >
           Fazer outro agendamento
         </Button>

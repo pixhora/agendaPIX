@@ -214,14 +214,14 @@ export function StepSlot({
         <div className="relative">
           {/* Fade esquerdo indica mais datas para rolar à esquerda */}
           <div
-            className={`pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-background to-transparent z-10 transition-opacity duration-200 ${
+            className={`pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-background to-transparent z-10 transition-opening ${
               canScrollLeft ? "opacity-100" : "opacity-0"
             }`}
             aria-hidden="true"
           />
           {/* Fade direito indica mais datas para rolar à direita */}
           <div
-            className={`pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent z-10 transition-opacity duration-200 ${
+            className={`pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent z-10 transition-opening ${
               canScrollRight ? "opacity-100" : "opacity-0"
             }`}
             aria-hidden="true"
@@ -252,7 +252,7 @@ export function StepSlot({
                       inline: "nearest",
                     });
                   }}
-                  className={`flex flex-col items-center justify-center min-w-[76px] py-2 px-2.5 rounded-xl border text-center transition-all min-h-11 shrink-0 scroll-mx-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
+                  className={`flex flex-col items-center justify-center min-w-[76px] py-2 px-2.5 rounded-xl border text-center transition-feedback active:scale-[0.98] min-h-11 shrink-0 scroll-mx-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
                     isCurrent
                       ? "border-primary bg-primary text-primary-foreground shadow-sm"
                       : "border-border bg-surface text-foreground hover:bg-muted/60"
@@ -265,7 +265,7 @@ export function StepSlot({
                     {day.dateNumber}
                   </span>
                   <span
-                    className={`text-[10px] mt-1 font-medium px-1.5 py-0.5 rounded-full ${
+                    className={`text-[10px] mt-1 font-medium px-1.5 py-0.5 rounded-full transition-feedback ${
                       isCurrent
                         ? "bg-primary-foreground/15 text-primary-foreground"
                         : isZero
@@ -328,7 +328,7 @@ export function StepSlot({
                   role="radio"
                   aria-checked={isSelected}
                   onClick={() => onSelectSlot(slot)}
-                  className={`min-h-11 flex items-center justify-center font-medium text-sm rounded-lg border transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
+                  className={`min-h-11 flex items-center justify-center font-medium text-sm rounded-lg border transition-feedback active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
                     isSelected
                       ? "border-primary bg-primary text-primary-foreground font-semibold shadow-sm"
                       : "border-border bg-surface text-foreground hover:border-primary/40 hover:bg-muted/40"
@@ -348,7 +348,7 @@ export function StepSlot({
           type="button"
           variant="outline"
           onClick={onBack}
-          className="flex-1 min-h-12 rounded-full font-semibold"
+          className="flex-1 min-h-12 rounded-full font-semibold transition-feedback active:scale-[0.99]"
         >
           Voltar
         </Button>
@@ -356,7 +356,7 @@ export function StepSlot({
           type="button"
           disabled={!selectedSlot}
           onClick={onNext}
-          className="flex-[2] min-h-12 rounded-full font-bold"
+          className="flex-[2] min-h-12 rounded-full font-bold transition-feedback active:scale-[0.99]"
         >
           {selectedSlot ? "Preencher meus dados" : "Selecione um horário"}
         </Button>

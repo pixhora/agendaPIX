@@ -70,7 +70,7 @@ export function StepService({
               aria-checked={isSelected}
               onClick={() => onSelectService(service)}
               onKeyDown={(e) => handleKeyDown(e, index)}
-              className={`w-full text-left p-4 rounded-2xl border transition-all min-h-12 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
+              className={`w-full text-left p-4 rounded-2xl border transition-feedback active:scale-[0.99] min-h-12 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
                 isSelected
                   ? "border-2 border-primary bg-primary/5 shadow-xs"
                   : "border-border bg-surface hover:border-muted-foreground/40 hover:bg-muted/40"
@@ -79,7 +79,7 @@ export function StepService({
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-3">
                   <div
-                    className={`mt-0.5 h-4 w-4 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
+                    className={`mt-0.5 h-4 w-4 rounded-full border flex items-center justify-center shrink-0 transition-feedback ${
                       isSelected
                         ? "border-primary bg-primary"
                         : "border-muted-foreground/50 bg-surface"
@@ -124,7 +124,7 @@ export function StepService({
           type="button"
           disabled={!selectedService}
           onClick={onNext}
-          className="w-full text-base font-bold py-3.5 min-h-12 rounded-full"
+          className="w-full text-base font-bold py-3.5 min-h-12 rounded-full transition-feedback active:scale-[0.99]"
         >
           {selectedService ? "Continuar para escolher horário" : "Selecione um serviço"}
         </Button>

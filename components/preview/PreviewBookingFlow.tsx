@@ -148,7 +148,10 @@ export function PreviewBookingFlow() {
           <>
             <StepProgress currentStep={step} />
 
-            <div className="rounded-3xl border border-border bg-surface p-5 sm:p-7 shadow-sm transition-all">
+            <div
+              key={step}
+              className="rounded-3xl border border-border bg-surface p-5 sm:p-7 shadow-sm animate-step-in"
+            >
               {step === 1 && (
                 <StepService
                   services={MOCK_SERVICES}

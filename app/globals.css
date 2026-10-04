@@ -22,6 +22,12 @@
   --radius-lg: 1rem;
   --radius-xl: 1.5rem;
   --radius-pill: 9999px;
+
+  /* Tokens de movimento */
+  --duration-feedback: 120ms;
+  --duration-opening: 180ms;
+  --duration-step: 240ms;
+  --ease-standard: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -42,6 +48,12 @@
     --dark-card: #080d0a;
     --ring: #c0f739;
     --pix-success: #c0f739;
+
+    /* Tokens de movimento */
+    --duration-feedback: 120ms;
+    --duration-opening: 180ms;
+    --duration-step: 240ms;
+    --ease-standard: cubic-bezier(0.16, 1, 0.3, 1);
   }
 }
 
@@ -85,20 +97,75 @@ h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display);
 }
 
+@keyframes stepIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes confirmPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after {
     animation-duration: 0s !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0s !important;
     scroll-behavior: auto !important;
+    transform: none !important;
   }
 }
 
-/* Utilitário: oculta scrollbar nativa mantendo scroll touch/mouse/teclado */
+/* Utilitários de movimento e scroll */
 @layer utilities {
   .scrollbar-hide::-webkit-scrollbar { display: none; }
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
+  }
+
+  .transition-feedback {
+    transition: background-color var(--duration-feedback) var(--ease-standard),
+      border-color var(--duration-feedback) var(--ease-standard),
+      color var(--duration-feedback) var(--ease-standard),
+      box-shadow var(--duration-feedback) var(--ease-standard),
+      transform var(--duration-feedback) var(--ease-standard),
+      opacity var(--duration-feedback) var(--ease-standard);
+  }
+
+  .transition-opening {
+    transition: opacity var(--duration-opening) var(--ease-standard),
+      transform var(--duration-opening) var(--ease-standard),
+      background-color var(--duration-opening) var(--ease-standard),
+      border-color var(--duration-opening) var(--ease-standard);
+  }
+
+  .transition-step {
+    transition: background-color var(--duration-step) var(--ease-standard),
+      border-color var(--duration-step) var(--ease-standard),
+      color var(--duration-step) var(--ease-standard),
+      width var(--duration-step) var(--ease-standard),
+      box-shadow var(--duration-step) var(--ease-standard);
+  }
+
+  .animate-step-in {
+    animation: stepIn var(--duration-step) var(--ease-standard) both;
+  }
+
+  .animate-confirm-pop {
+    animation: confirmPop var(--duration-step) var(--ease-standard) both;
   }
 }

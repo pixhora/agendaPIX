@@ -178,3 +178,38 @@ Grid base de 4px:
 3. **Perda de performance**:
    - Sem animações de fade-up lentas que atrasam a exibição no 4G de salão.
    - Sem modais aninhados ou calendários estilo desktop reduzidos à força.
+
+---
+
+## 7. Tokens de Movimento e Animação (A1)
+
+Definidos pelo Terminal 4 para garantir consistência em toda a experiência (Booking, Dashboard do T2 e Landing/Onboarding do T5).
+
+### 7.1 Duração e Aceleração
+
+| Token | Valor | Uso / Propósito |
+|---|---|---|
+| `--duration-feedback` | `120ms` | Toque, seleção de radio/cards, hover em desktop, scale de botão |
+| `--duration-opening` | `180ms` | Fades de rolagem (ex: régua de datas), menus suspensos, diálogos |
+| `--duration-step` | `240ms` | Troca de etapas de formulário/fluxo, preenchimento de progresso |
+| `--ease-standard` | `cubic-bezier(0.16, 1, 0.3, 1)` | Curva de desaceleração natural e suave sem sobressaltos |
+
+### 7.2 Utilitários CSS (`@layer utilities`)
+
+- `.transition-feedback`: transição de cores, sombras e transform em 120ms.
+- `.transition-opening`: transição suave de opacidade e visibilidade em 180ms.
+- `.transition-step`: transição sincronizada de largura e cor da barra de etapas em 240ms.
+- `.animate-step-in`: entrada sutil de tela com opacidade 0 → 1 e translação Y de 6px → 0 em 240ms.
+- `.animate-confirm-pop`: celebração única e discreta de confirmação (escala 0.96 → 1 e opacidade em 240ms).
+
+### 7.3 Diretrizes e Acessibilidade (`prefers-reduced-motion`)
+
+- Quando `@media (prefers-reduced-motion: reduce)` está ativo:
+  - Todas as durações de transição e animação são forçadas a `0s !important` (≤ 0.001s).
+  - Deslocamentos e transformações são desativados (`transform: none !important`).
+  - O conteúdo é imediatamente acessível sem esperas.
+- **Invariantes**:
+  - Nenhum botão ou formulário aguarda o término da animação para aceitar interação.
+  - Troca de passos preserva campos do formulário (sem reset de estado no recuo).
+  - Confirmação do Pix só é animada após resposta definitiva de confirmação pelo servidor (ou simulação demarcada no Preview).
+

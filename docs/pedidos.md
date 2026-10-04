@@ -61,3 +61,27 @@ Para respeitar estritamente a divisão de papéis (o dashboard real e rotas aute
   2. `/onboarding`: 4 passos, persistência do rascunho e do passo ativo no reload, e alertas inline com `role="alert"` no Step 2 (sinal > total) e Step 3 (fechamento <= abertura / dias).
   3. `/` (Landing): CTA "Entrar" visível no mobile 375px linkando para `/login`, e cards de preços R$ 49 e R$ 79.
 - Gates locais T5: lint 0 warnings, typecheck 0 erros, 68/68 testes unitários aprovados.
+
+## 2026-10-04 — Terminal 4 para CODEXADO (T2) e Trilha (T5): Especificação dos Tokens de Movimento (A1)
+
+Conforme o item A1 do `PLANO_ANIMACOES.md`, o Terminal 4 padronizou os tokens de movimento e classes CSS para compartilhamento entre as frentes:
+
+1. **Tokens CSS (`:root` e dark mode)**:
+   - `--duration-feedback: 120ms` (toque, seleção de itens, scales discretos).
+   - `--duration-opening: 180ms` (abertura de menus/diálogos, fades de rolagem).
+   - `--duration-step: 240ms` (transição entre passos de formulário/fluxo).
+   - `--ease-standard: cubic-bezier(0.16, 1, 0.3, 1)` (desaceleração natural).
+
+2. **Classes Utilitárias (`@layer utilities`)**:
+   - `.transition-feedback`: 120ms para hover/active/cores/transform. Usar `active:scale-[0.98]` ou `active:scale-[0.99]`.
+   - `.transition-opening`: 180ms para fade e revelação.
+   - `.transition-step`: 240ms para sincronia de barra de progresso.
+   - `.animate-step-in`: 240ms com translateY(6px -> 0) e opacidade 0 -> 1 para novos passos.
+   - `.animate-confirm-pop`: 240ms com escala 0.96 -> 1 para confirmação única.
+
+3. **Invariantes Obrigatórias**:
+   - `prefers-reduced-motion: reduce`: zera durações para `0s` e remove deslocamentos (`transform: none !important`).
+   - Preservar estado de formulários (não desmontar dados ao voltar/avançar).
+   - Nenhum feedback de sucesso fictício (especialmente em Pix ou salvamento de dados) antes da resposta real do servidor.
+
+Documentação detalhada disponível em `docs/design-tokens.md` (Seção 7). T2 (A2 - Painel) e T5 (A3 - Landing/Onboarding) podem utilizar esses padrões diretamente.
