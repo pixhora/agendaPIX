@@ -19,7 +19,7 @@ let serviceId: string;
 const slot = (index: number) => new Date(Date.UTC(2030, 0, 1, 12, 0) + index * 1800000).toISOString();
 const phone = (index: number) => `+55119${String(index).padStart(8, "0")}`;
 const book = (index: number, phoneIndex: number, identity: string | null, key = randomUUID()) =>
-  createBooking(slug, { serviceId, startsAt: slot(index), customer: { name: "Cliente de teste", phone: phone(phoneIndex) } }, key, database, provider, identity);
+  createBooking(slug, { serviceId, startsAt: slot(index), customer: { name: "Cliente de teste", phone: phone(phoneIndex) , cpfCnpj: "52998224725" } }, key, database, provider, identity);
 
 beforeEach(async () => {
   ownerId = randomUUID(); businessId = randomUUID(); serviceId = randomUUID(); slug = `holds-${businessId}`;

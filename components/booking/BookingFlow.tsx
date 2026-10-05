@@ -8,7 +8,7 @@ import type {
   AvailabilitySlot,
   BookingResponse,
 } from "./types";
-import { normalizePhoneToE164 } from "./formatters";
+import { cpfDigitsOnly, normalizePhoneToE164 } from "./formatters";
 import { publicBookingPagePath, publicBookingPaymentUrl, publicBookingsUrl, publicServicesUrl } from "@/lib/public-api";
 import { StepProgress } from "./StepProgress";
 import { StepService } from "./StepService";
@@ -43,6 +43,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
   const [selectedSlot, setSelectedSlot] = useState<AvailabilitySlot | null>(null);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [customerCpf, setCustomerCpf] = useState("");
 
   // Submissão da Reserva
   const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
@@ -122,6 +123,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
       serviceId?: string;
       customerName?: string;
       customerPhone?: string;
+      customerCpf?: string;
       expiresAt?: string;
     } | null = null;
 
@@ -170,8 +172,13 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
       .then((paymentData) => {
         if (isCancelled) return;
 
-        // Invariante: expirado permanece expirado
-        if (paymentData.status === "expired" || paymentData.payment?.status === "expired") {
+        // Invariante: expirado/cancelado permanece terminal
+        if (
+          paymentData.status === "expired"
+          || paymentData.status === "cancelled"
+          || paymentData.payment?.status === "expired"
+          || paymentData.payment?.status === "cancelled"
+        ) {
           try {
             sessionStorage.removeItem(`booking_session_${slug}`);
             window.history.replaceState(null, "", publicBookingPagePath(slug));
@@ -197,6 +204,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
 
         if (stored?.customerName) setCustomerName(stored.customerName);
         if (stored?.customerPhone) setCustomerPhone(stored.customerPhone);
+        if (stored?.customerCpf) setCustomerCpf(stored.customerCpf);
 
         if (paymentData.status === "confirmed") {
           setIsCompleted(true);
@@ -250,6 +258,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
       customer: {
         name: customerName.trim(),
         phone: normalizePhoneToE164(customerPhone),
+        cpfCnpj: cpfDigitsOnly(customerCpf),
       },
     };
 
@@ -292,6 +301,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
                 serviceId: selectedService.id,
                 customerName: customerName.trim(),
                 customerPhone: customerPhone.trim(),
+                customerCpf: customerCpf.trim(),
                 expiresAt: booking.expiresAt,
               })
             );
@@ -317,6 +327,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
     setSelectedSlot(null);
     setCustomerName("");
     setCustomerPhone("");
+    setCustomerCpf("");
     setBookingResponse(null);
     setIsCompleted(false);
     setStep(1);
@@ -476,10 +487,12 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
                 timezone={business.timezone}
                 name={customerName}
                 phone={customerPhone}
+                cpf={customerCpf}
                 isSubmitting={isSubmittingBooking}
                 errorMessage={bookingError}
                 onChangeName={setCustomerName}
                 onChangePhone={setCustomerPhone}
+                onChangeCpf={setCustomerCpf}
                 onBack={() => setStep(2)}
                 onSubmit={handleCreateBooking}
                 summaryClassName="lg:hidden"
@@ -512,7 +525,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
           <BookingSummary service={selectedService} slot={selectedSlot} timezone={business.timezone} />
           <p className="mt-4 flex gap-2 px-1 text-xs leading-relaxed text-muted">
             <ShieldCheck aria-hidden="true" className="size-4 shrink-0 text-pix" />
-            Você paga só o sinal agora. O horário fica reservado por 15 minutos enquanto o Pix é feito.
+            Você paga só o sinal agora. O horário fica pré-reservado enquanto o Pix é feito. O prazo aparece no contador da cobrança.
           </p>
         </aside>
       </main>

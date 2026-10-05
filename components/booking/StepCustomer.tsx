@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import type { PublicService, AvailabilitySlot } from "./types";
-import { formatCurrency, formatPhoneMask, isValidBrazilianPhone } from "./formatters";
+import { formatCurrency, formatCpfMask, formatPhoneMask, isValidBrazilianPhone, isValidCpf } from "./formatters";
 import { ArrowLeft, Lock, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,10 +16,12 @@ interface StepCustomerProps {
   timezone: string;
   name: string;
   phone: string;
+  cpf: string;
   isSubmitting: boolean;
   errorMessage: string | null;
   onChangeName: (name: string) => void;
   onChangePhone: (phone: string) => void;
+  onChangeCpf: (cpf: string) => void;
   onBack: () => void;
   onSubmit: () => void;
   /** Classes do resumo (ex.: `lg:hidden` quando a página já mostra o resumo ao lado). */
@@ -32,28 +34,34 @@ export function StepCustomer({
   timezone,
   name,
   phone,
+  cpf,
   isSubmitting,
   errorMessage,
   onChangeName,
   onChangePhone,
+  onChangeCpf,
   onBack,
   onSubmit,
   summaryClassName,
 }: StepCustomerProps) {
-  const [touched, setTouched] = useState({ name: false, phone: false });
+  const [touched, setTouched] = useState({ name: false, phone: false, cpf: false });
 
   const isNameValid = name.trim().length >= 2;
   const isPhoneValid = isValidBrazilianPhone(phone);
-  const canSubmit = isNameValid && isPhoneValid && !isSubmitting;
+  const isCpfValid = isValidCpf(cpf);
+  const canSubmit = isNameValid && isPhoneValid && isCpfValid && !isSubmitting;
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const masked = formatPhoneMask(e.target.value);
-    onChangePhone(masked);
+    onChangePhone(formatPhoneMask(e.target.value));
+  };
+
+  const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onChangeCpf(formatCpfMask(e.target.value));
   };
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setTouched({ name: true, phone: true });
+    setTouched({ name: true, phone: true, cpf: true });
     if (canSubmit) {
       onSubmit();
     }
@@ -61,12 +69,13 @@ export function StepCustomer({
 
   const nameError = touched.name && !isNameValid ? "Informe seu nome (pelo menos 2 letras)." : null;
   const phoneError = touched.phone && !isPhoneValid ? "Informe um celular válido com DDD, por exemplo (11) 98765-4321." : null;
+  const cpfError = touched.cpf && !isCpfValid ? "Informe um CPF válido." : null;
 
   return (
     <form onSubmit={handleFormSubmit} className="space-y-6" noValidate>
       <div>
         <h2 className="font-display text-xl font-bold tracking-tight text-ink sm:text-2xl">Seus dados para contato</h2>
-        <p className="mt-1 text-sm text-muted">Só nome e WhatsApp. Sem cadastro e sem senha.</p>
+        <p className="mt-1 text-sm text-muted">Nome, WhatsApp e CPF. Sem cadastro e sem senha.</p>
       </div>
 
       <BookingSummary service={service} slot={slot} timezone={timezone} variant="plain" className={summaryClassName} headingLevel="h3" />
@@ -109,6 +118,25 @@ export function StepCustomer({
           </div>
           <FieldHint id="phone-hint">Usado só para lembrar você do horário.</FieldHint>
           <FieldError id="phone-error">{phoneError}</FieldError>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="customer-cpf">CPF</Label>
+          <Input
+            id="customer-cpf"
+            type="text"
+            inputMode="numeric"
+            required
+            autoComplete="off"
+            placeholder="000.000.000-00"
+            value={cpf}
+            onChange={handleCpfChange}
+            onBlur={() => setTouched((prev) => ({ ...prev, cpf: true }))}
+            aria-invalid={cpfError ? true : undefined}
+            aria-describedby={cpfError ? "cpf-error cpf-hint" : "cpf-hint"}
+          />
+          <FieldHint id="cpf-hint">Exigido para emitir a cobrança Pix em seu nome.</FieldHint>
+          <FieldError id="cpf-error">{cpfError}</FieldError>
         </div>
       </div>
 

@@ -3,7 +3,8 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import type { BookingResponse, PaymentStatusResponse } from "./types";
 import { formatCurrency } from "./formatters";
-import { Check, Copy, FlaskConical, Loader2, RefreshCw, Timer, TimerOff } from "lucide-react";
+import { pixUiPhase } from "./pix-status";
+import { Ban, Check, Copy, FlaskConical, Loader2, RefreshCw, Timer, TimerOff } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ValueSlab, StatusChip } from "@/components/ui/value-slab";
@@ -15,7 +16,6 @@ import {
   PAYMENT_CHECK_TIMEOUT_MESSAGE,
   PAYMENT_CHECK_TIMEOUT_MS,
   canShowDevSimulatePix,
-  interpretPaymentStatus,
   pendingMessageForAttempts,
   withPaymentCheckTimeout,
 } from "./payment-check";
@@ -40,7 +40,7 @@ export function StepPayment({
 }: StepPaymentProps) {
   const [copied, setCopied] = useState(false);
   const [timeLeft, setTimeLeft] = useState<string>("");
-  const [isExpired, setIsExpired] = useState(false);
+  const [phase, setPhase] = useState(() => pixUiPhase(booking));
   /** Spinner do botão "Já paguei" — só em verificação manual. */
   const [isManualChecking, setIsManualChecking] = useState(false);
   /** Indicador suave no status (polling em segundo plano). */
@@ -56,20 +56,33 @@ export function StepPayment({
   const payment = booking.payment;
   const expiresAt = payment?.expiresAt || booking.expiresAt;
   const showDevSimulate = canShowDevSimulatePix(payment?.provider);
+  const isTerminal = phase === "expired" || phase === "cancelled";
 
-  const applyOutcome = useCallback(
-    (outcome: ReturnType<typeof interpretPaymentStatus>, source: "manual" | "background") => {
-      if (outcome.kind === "expired") {
-        setIsExpired(true);
+  const applyStatus = useCallback(
+    (data: PaymentStatusResponse | null | undefined, source: "manual" | "background") => {
+      if (!data) {
+        if (source === "manual") {
+          manualAttemptsRef.current += 1;
+          setCheckError(pendingMessageForAttempts(manualAttemptsRef.current));
+        }
+        return;
+      }
+
+      const next = pixUiPhase(data);
+      setPhase(next);
+
+      if (next === "paid" || data.status === "confirmed") {
+        setCheckError(null);
+        onPaymentConfirmed(data);
+        return;
+      }
+
+      if (next === "expired" || next === "cancelled") {
         setCheckError(null);
         return;
       }
-      if (outcome.kind === "confirmed" && outcome.data) {
-        setCheckError(null);
-        onPaymentConfirmed(outcome.data);
-        return;
-      }
-      if (outcome.kind === "pending" && source === "manual") {
+
+      if (source === "manual") {
         manualAttemptsRef.current += 1;
         setCheckError(pendingMessageForAttempts(manualAttemptsRef.current));
       }
@@ -118,7 +131,7 @@ export function StepPayment({
           data = (await res.json()) as PaymentStatusResponse;
         }
 
-        applyOutcome(interpretPaymentStatus(data), source);
+        applyStatus(data, source);
       } catch (error) {
         const aborted = error instanceof DOMException
           ? error.name === "AbortError"
@@ -138,12 +151,12 @@ export function StepPayment({
         isCheckingRef.current = false;
       }
     },
-    [slug, booking.bookingId, booking.accessToken, checkStatusFn, applyOutcome],
+    [slug, booking.bookingId, booking.accessToken, checkStatusFn, applyStatus],
   );
 
   // Atualiza contador regressivo a cada segundo
   useEffect(() => {
-    if (!expiresAt) return;
+    if (!expiresAt || isTerminal) return;
 
     const targetTime = new Date(expiresAt).getTime();
 
@@ -172,18 +185,18 @@ export function StepPayment({
     updateTimer();
     const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
-  }, [expiresAt, checkStatus]);
+  }, [expiresAt, checkStatus, isTerminal]);
 
   // Polling automático a cada 4 segundos
   useEffect(() => {
-    if (isExpired) return;
+    if (isTerminal) return;
 
     const interval = setInterval(() => {
       void checkStatus("background");
     }, 4000);
 
     return () => clearInterval(interval);
-  }, [checkStatus, isExpired]);
+  }, [checkStatus, isTerminal]);
 
   useEffect(() => {
     return () => {
@@ -199,7 +212,7 @@ export function StepPayment({
       toast.success("Código Pix copiado", { description: "Cole no app do seu banco, em Pix › Copia e Cola." });
       setTimeout(() => setCopied(false), 2500);
     } catch {
-      // Fallback para seleção manual
+      // Fallback: o input readonly abaixo permite seleção manual
     }
   };
 
@@ -225,14 +238,7 @@ export function StepPayment({
       });
       if (!statusRes.ok) throw new Error("Falha ao ler status");
       const data = (await statusRes.json()) as PaymentStatusResponse;
-      const outcome = interpretPaymentStatus(data);
-      if (outcome.kind === "confirmed" && outcome.data) {
-        onPaymentConfirmed(outcome.data);
-      } else if (outcome.kind === "expired") {
-        setIsExpired(true);
-      } else {
-        setCheckError(pendingMessageForAttempts(1));
-      }
+      applyStatus(data, "manual");
     } catch {
       setCheckError("Não foi possível simular o pagamento. Verifique o ambiente de desenvolvimento.");
     } finally {
@@ -240,12 +246,25 @@ export function StepPayment({
     }
   };
 
-  if (isExpired) {
+  if (phase === "expired") {
     return (
-      <div role="alert" className="space-y-4 rounded-card border border-danger/30 bg-danger-soft p-6 text-center">
+      <div role="alert" aria-live="assertive" className="space-y-4 rounded-card border border-danger/30 bg-danger-soft p-6 text-center">
         <TimerOff aria-hidden="true" className="mx-auto size-8 text-danger" />
         <h2 className="font-display text-xl font-bold text-ink">Tempo de reserva esgotado</h2>
-        <p className="text-sm text-ink">O prazo de 15 minutos para pagar o sinal acabou e o horário foi liberado para outros clientes.</p>
+        <p className="text-sm text-ink">O prazo para pagar o sinal acabou e o horário foi liberado para outros clientes.</p>
+        <Button onClick={onRestart} size="lg" className="w-full">
+          Fazer novo agendamento
+        </Button>
+      </div>
+    );
+  }
+
+  if (phase === "cancelled") {
+    return (
+      <div role="alert" aria-live="assertive" className="space-y-4 rounded-card border border-danger/30 bg-danger-soft p-6 text-center">
+        <Ban aria-hidden="true" className="mx-auto size-8 text-danger" />
+        <h2 className="font-display text-xl font-bold text-ink">Pagamento cancelado</h2>
+        <p className="text-sm text-ink">Esta cobrança Pix foi cancelada. Escolha outro horário para gerar um novo sinal.</p>
         <Button onClick={onRestart} size="lg" className="w-full">
           Fazer novo agendamento
         </Button>
@@ -301,7 +320,7 @@ export function StepPayment({
 
       <div className="rounded-card border border-line bg-surface p-5 sm:p-6">
         <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-start">
-          {payment?.qrCodeDataUrl ? (
+          {payment?.qrCodeDataUrl?.startsWith("data:image/png;base64,") ? (
             <div className="shrink-0 rounded-2xl border border-line bg-white p-3">
               {/* QR sempre sobre branco, inclusive no modo escuro. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -318,7 +337,7 @@ export function StepPayment({
             </ol>
             {payment?.copyPaste && (
               <div className="space-y-2">
-                <Button type="button" variant="pix" size="lg" onClick={handleCopy} className="w-full">
+                <Button type="button" variant="pix" size="lg" onClick={handleCopy} className="w-full" data-testid="pix-copy-button">
                   {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
                   {copied ? "Código copiado" : "Copiar código Pix"}
                 </Button>
@@ -326,6 +345,7 @@ export function StepPayment({
                 <label htmlFor="pix-copypaste" className="block text-xs font-semibold text-muted">Pix copia e cola</label>
                 <input
                   id="pix-copypaste"
+                  data-testid="pix-copypaste"
                   type="text"
                   readOnly
                   value={payment.copyPaste}
