@@ -131,6 +131,7 @@ Na imagem (`NODE_ENV=production`) o provedor Pix fake é recusado, então cada p
 - `docker`: hadolint, build da imagem, `node migrate.cjs` pela imagem, app no ar e smoke test HTTP (`/`, `/api/health`, rota pública com banco,
   `/api/ready` com um SMTP descartável quando a rota existir, usuário não-root), reconciliador (`--once` contra o banco e worker em loop,
   quando `reconcile.mjs` existir) + `HEALTHCHECK`.
+- `e2e`: Postgres 17 vazio, Chromium do Playwright, `pnpm db:migrate` e `pnpm test:e2e` (só quando `tests/e2e/global-setup.ts` e `docs/E2E.md` existem — a suíte completa chega com o PR #8; sem ela o job passa sem rodar nada). Em falha sobe `playwright-report/` e `test-results/`.
 - `audit`: `pnpm audit --prod --audit-level=high`.
 
 ## Autenticação

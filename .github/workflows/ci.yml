@@ -205,6 +205,88 @@ jobs:
           docker logs agendapix || true
           docker logs agendapix-worker 2>/dev/null || true
 
+  e2e:
+    name: test:e2e (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: agenda_e2e
+          POSTGRES_USER: agenda
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U agenda -d agenda_e2e"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      # Ver docs/E2E.md (PR #8). Playwright sobe next dev em 127.0.0.1:3344.
+      DATABASE_URL: postgresql://agenda@localhost:5432/agenda_e2e
+      BETTER_AUTH_URL: http://127.0.0.1:3344
+      PAYMENT_PROVIDER: fake
+      CI: "true"
+    steps:
+      - uses: actions/checkout@v7
+      - name: Detect full e2e suite
+        id: suite
+        run: |
+          if [ -f tests/e2e/global-setup.ts ] && [ -f docs/E2E.md ]; then
+            echo "full=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "full=false" >> "$GITHUB_OUTPUT"
+            echo "Suíte e2e completa ainda não chegou a esta branch (só o esqueleto). Etapa ignorada."
+          fi
+      - uses: actions/setup-node@v7
+        if: steps.suite.outputs.full == 'true'
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          package-manager-cache: false
+      - name: Enable pnpm (corepack)
+        if: steps.suite.outputs.full == 'true'
+        run: corepack enable pnpm && pnpm --version
+      - name: Locate pnpm store
+        if: steps.suite.outputs.full == 'true'
+        id: pnpm-store
+        run: echo "dir=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v6
+        if: steps.suite.outputs.full == 'true'
+        with:
+          path: ${{ steps.pnpm-store.outputs.dir }}
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-store-${{ runner.os }}-
+      - name: Install dependencies
+        if: steps.suite.outputs.full == 'true'
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium (Playwright)
+        if: steps.suite.outputs.full == 'true'
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Generate ephemeral e2e secrets
+        if: steps.suite.outputs.full == 'true'
+        run: |
+          secret="$(openssl rand -base64 32)"; echo "::add-mask::$secret"; echo "BETTER_AUTH_SECRET=$secret" >> "$GITHUB_ENV"
+          secret="$(openssl rand -hex 32)"; echo "::add-mask::$secret"; echo "FAKE_WEBHOOK_SECRET=$secret" >> "$GITHUB_ENV"
+          secret="$(openssl rand -hex 32)"; echo "::add-mask::$secret"; echo "PIX_KEY_ENCRYPTION_KEY=$secret" >> "$GITHUB_ENV"
+      - name: Apply migrations
+        if: steps.suite.outputs.full == 'true'
+        run: pnpm db:migrate
+      - name: Run Playwright e2e
+        if: steps.suite.outputs.full == 'true'
+        run: pnpm test:e2e
+      - name: Upload Playwright report
+        if: failure() && steps.suite.outputs.full == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
   audit:
     name: pnpm audit (prod, high)
     runs-on: ubuntu-latest
