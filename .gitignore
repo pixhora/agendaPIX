@@ -1,31 +1,40 @@
+# Dependências e builds
 node_modules/
 .next/
 out/
-coverage/
-playwright-report/
-test-results/
-.env*
-!.env.example
+dist/
 *.tsbuildinfo
 next-env.d.ts
 
-# Private configuration and generated local artifacts
+# Configuração privada (somente o exemplo é versionado)
 .env*
 !.env.example
-node_modules/
-.next/
-out/
-coverage/
-playwright-report/
-test-results/
-*.tsbuildinfo
-next-env.d.ts
-__pycache__/
-*.py[cod]
-.maestri/run-system-logs/
-**/trace.zip
-**/.last-run.json
+
+# Segredos e chaves
 *.pem
 *.key
 id_rsa
 id_ed25519
+
+# Relatórios de teste
+coverage/
+playwright-report/
+test-results/
+**/trace.zip
+**/.last-run.json
+
+# Artefatos locais de agentes, QA e evidências (não versionar; anexe ao PR se necessário)
+.maestri/
+.scratch/
+dogfood-output/
+docs/evidencias/
+docs/evidence/
+screenshots/
+videos/
+*.webm
+*.mp4
+*.mov
+
+# Python (scripts locais)
+__pycache__/
+*.py[cod]
