@@ -5,7 +5,7 @@ import path from "node:path";
 import { eq } from "drizzle-orm";
 import { chromium, type FullConfig } from "@playwright/test";
 import { getDb } from "../../db";
-import { businesses, businessHours, customers, services, user } from "../../db/schema";
+import { bookings, businesses, businessHours, customers, services, user } from "../../db/schema";
 import { getAuth } from "../../lib/auth";
 
 const fixturePath = path.resolve("tests/e2e/.auth");
@@ -23,23 +23,37 @@ async function ensureUser(name: string, email: string) {
   return created;
 }
 
-async function ensureBusiness(ownerId: string, name: string, slug: string) {
+function todayInSaoPaulo() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+}
+
+async function ensureBusiness(ownerId: string, name: string, slug: string, seedBooking = false) {
   const database = getDb();
   const [existing] = await database.select().from(businesses).where(eq(businesses.slug, slug)).limit(1);
   if (existing) return existing;
   const [created] = await database.insert(businesses).values({
     ownerId, name, slug, timezone: "America/Sao_Paulo",
   }).returning();
-  await database.insert(services).values({
+  const [service] = await database.insert(services).values({
     businessId: created.id, name: "Corte E2E", durationMinutes: 30,
     priceCents: 5000, depositCents: 1000, active: true,
-  });
-  await database.insert(businessHours).values({
-    businessId: created.id, weekday: 1, opensAt: "09:00", closesAt: "18:00",
-  });
-  await database.insert(customers).values({
+  }).returning();
+  // Todos os dias abertos: a jornada de agendamento sempre encontra horário nos próximos dias.
+  await database.insert(businessHours).values(Array.from({ length: 7 }, (_, weekday) => ({
+    businessId: created.id, weekday, opensAt: "08:00", closesAt: "20:00",
+  })));
+  const [customer] = await database.insert(customers).values({
     businessId: created.id, name: "Cliente E2E", phone: "+5511987654321",
-  });
+  }).returning();
+  if (seedBooking) {
+    // Reserva confirmada hoje às 07:00 (antes da abertura, não disputa horário com a jornada de agendamento).
+    const today = todayInSaoPaulo();
+    await database.insert(bookings).values({
+      businessId: created.id, serviceId: service.id, customerId: customer.id,
+      startsAt: new Date(`${today}T07:00:00-03:00`), endsAt: new Date(`${today}T07:30:00-03:00`),
+      priceCents: 5000, depositCents: 1000, status: "confirmed",
+    });
+  }
   return created;
 }
 
@@ -75,7 +89,7 @@ export default async function globalSetup(config: FullConfig) {
   const foreignEmail = `e2e-foreign-${randomUUID().slice(0, 8)}@example.com`;
   const owner = await ensureUser("Dono E2E", ownerEmail);
   const foreign = await ensureUser("Dono Estrangeiro", foreignEmail);
-  const businessA = await ensureBusiness(owner.id, "Negócio E2E A", `e2e-a-${owner.id.slice(0, 8)}`);
+  const businessA = await ensureBusiness(owner.id, "Negócio E2E A", `e2e-a-${owner.id.slice(0, 8)}`, true);
   const businessB = await ensureBusiness(foreign.id, "Negócio E2E B", `e2e-b-${foreign.id.slice(0, 8)}`);
   const cookie = await mintCookie(ownerEmail);
 
@@ -95,6 +109,7 @@ export default async function globalSetup(config: FullConfig) {
   await writeFile(metaPath, JSON.stringify({
     ownerEmail, foreignEmail,
     businessAId: businessA.id, businessBId: businessB.id,
+    businessASlug: businessA.slug, businessBSlug: businessB.slug,
     ownerName: owner.name,
   }, null, 2));
 
