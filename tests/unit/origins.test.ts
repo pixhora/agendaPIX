@@ -8,7 +8,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 
-it.each([3000, 3001, 3005, 3343])("allows credentialed preflight for exact localhost:%i", async (port) => {
+it.each([3000, 3001, 3005, 3343, 3344])("allows credentialed preflight for exact localhost:%i", async (port) => {
   const origin = `http://localhost:${port}`;
   const response = await appPreflight(new Request("http://localhost:3000/api/pix", { method: "OPTIONS", headers: {
     origin, "access-control-request-method": "PUT", "access-control-request-headers": "Content-Type, Authorization",
@@ -57,7 +57,7 @@ it("uses only the canonical app origin in production and rejects other origins b
   vi.stubEnv("BETTER_AUTH_URL", "https://agenda.example/auth");
   expect(trustedAppOrigins()).toEqual(["https://agenda.example"]);
   const run = vi.fn(async () => Response.json({ ok: true }));
-  for (const origin of ["http://localhost:3000", "http://localhost:3001", "http://localhost:3005", "http://localhost:3343", "https://other.example", "https://agenda.example.evil.example"]) {
+  for (const origin of ["http://localhost:3000", "http://localhost:3001", "http://localhost:3005", "http://localhost:3343", "http://localhost:3344", "https://other.example", "https://agenda.example.evil.example"]) {
     const response = await withAppCors(new Request("https://agenda.example/api/onboarding", { method: "POST", headers: { origin } }), run);
     expect(response.status).toBe(403);
     expect(response.headers.has("access-control-allow-origin")).toBe(false);
