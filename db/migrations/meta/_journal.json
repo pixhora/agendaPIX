@@ -57,6 +57,20 @@
       "when": 1791178274754,
       "tag": "0007_backend_hardening",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791178830533,
+      "tag": "0008_pix_charge_outside_tx",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791178844677,
+      "tag": "0009_pix_charge_schema",
+      "breakpoints": true
     }
   ]
 }
