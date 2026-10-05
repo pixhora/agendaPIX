@@ -1,6 +1,7 @@
 import React, { Suspense } from "react";
 import type { Metadata } from "next";
 import { OnboardingFlow } from "@/components/onboarding/OnboardingFlow";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export const metadata: Metadata = {
   title: "Começar teste grátis de 7 dias · Agenda",
@@ -11,8 +12,8 @@ export default function OnboardingPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center p-4">
-          <div className="h-8 w-48 bg-muted animate-pulse rounded-lg" />
+        <div role="status" aria-label="Carregando cadastro" className="flex min-h-dvh items-center justify-center p-4">
+          <Skeleton className="h-8 w-48" />
         </div>
       }
     >

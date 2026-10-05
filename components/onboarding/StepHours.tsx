@@ -1,5 +1,9 @@
 import React from "react";
-import { Button } from "@/components/ui/button";
+import { Check } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { FieldError, FieldHint } from "@/components/ui/field";
+import { cn } from "@/lib/utils";
+import { StepActions, StepHeader } from "./parts";
 
 interface StepHoursProps {
   openDays: number[];
@@ -13,30 +17,19 @@ interface StepHoursProps {
 }
 
 const WEEKDAYS = [
-  { id: 1, label: "Seg" },
-  { id: 2, label: "Ter" },
-  { id: 3, label: "Qua" },
-  { id: 4, label: "Qui" },
-  { id: 5, label: "Sex" },
-  { id: 6, label: "Sáb" },
-  { id: 0, label: "Dom" },
+  { id: 1, label: "Seg", name: "Segunda-feira" },
+  { id: 2, label: "Ter", name: "Terça-feira" },
+  { id: 3, label: "Qua", name: "Quarta-feira" },
+  { id: 4, label: "Qui", name: "Quinta-feira" },
+  { id: 5, label: "Sex", name: "Sexta-feira" },
+  { id: 6, label: "Sáb", name: "Sábado" },
+  { id: 0, label: "Dom", name: "Domingo" },
 ];
 
-export function StepHours({
-  openDays,
-  opensAt,
-  closesAt,
-  onChangeOpenDays,
-  onChangeOpensAt,
-  onChangeClosesAt,
-  onBack,
-  onNext,
-}: StepHoursProps) {
+export function StepHours({ openDays, opensAt, closesAt, onChangeOpenDays, onChangeOpensAt, onChangeClosesAt, onBack, onNext }: StepHoursProps) {
   const toggleDay = (dayId: number) => {
     if (openDays.includes(dayId)) {
-      if (openDays.length > 1) {
-        onChangeOpenDays(openDays.filter((d) => d !== dayId));
-      }
+      if (openDays.length > 1) onChangeOpenDays(openDays.filter((d) => d !== dayId));
     } else {
       onChangeOpenDays([...openDays, dayId]);
     }
@@ -48,131 +41,53 @@ export function StepHours({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (isValid) {
-      onNext();
-    }
+    if (isValid) onNext();
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
-      <div>
-        <h2 className="font-display text-xl font-bold text-foreground">
-          Quais são seus dias e horários de atendimento?
-        </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          O sistema só liberará horários de agendamento dentro do seu expediente.
-        </p>
-      </div>
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <StepHeader title="Quando você atende?" description="Seus clientes só veem horários livres dentro do seu expediente." />
 
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-2">
-            Dias de funcionamento
-          </label>
-          <div className="grid grid-cols-7 gap-1.5" role="group" aria-label="Dias de atendimento">
-            {WEEKDAYS.map((w) => {
-              const isSelected = openDays.includes(w.id);
-              return (
-                <button
-                  key={w.id}
-                  type="button"
-                  aria-pressed={isSelected}
-                  onClick={() => toggleDay(w.id)}
-                  className={`flex flex-col items-center justify-center py-2.5 rounded-lg border text-xs font-semibold min-h-11 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground ${
-                    isSelected
-                      ? "border-foreground bg-foreground text-background shadow-xs"
-                      : "border-border bg-surface text-muted-foreground hover:bg-muted"
-                  }`}
-                >
-                  {w.label}
-                </button>
-              );
-            })}
-          </div>
-          <p className="mt-1.5 text-xs text-muted-foreground">
-            Toque nos dias para ativar ou desativar.
-          </p>
-          {!isDaysValid && (
-            <div
-              id="days-error"
-              role="alert"
-              className="mt-2 rounded-lg border border-destructive/20 bg-destructive/5 p-2.5 text-xs text-destructive font-medium transition-all duration-180 ease-out motion-reduce:transition-none"
-            >
-              Selecione pelo menos um dia de atendimento na semana.
-            </div>
-          )}
+      <fieldset className="grid gap-2">
+        <legend className="mb-2 text-sm font-semibold">Dias de atendimento</legend>
+        <div className="grid grid-cols-7 gap-1.5" role="group" aria-label="Dias de atendimento">
+          {WEEKDAYS.map((w) => {
+            const isSelected = openDays.includes(w.id);
+            return (
+              <button
+                key={w.id}
+                type="button"
+                aria-pressed={isSelected}
+                aria-label={w.name}
+                onClick={() => toggleDay(w.id)}
+                className={cn(
+                  "flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-field border text-xs font-bold transition-feedback focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                  isSelected ? "border-ink bg-ink text-paper" : "border-line bg-surface text-muted hover:border-line-strong hover:text-ink",
+                )}
+              >
+                <span aria-hidden="true">{w.label}</span>
+                <Check aria-hidden="true" className={cn("size-3.5", isSelected ? "opacity-100" : "opacity-0")} strokeWidth={3} />
+              </button>
+            );
+          })}
         </div>
+        <FieldHint>Toque para ligar ou desligar. Ajustes por dia ficam no painel.</FieldHint>
+        <FieldError id="days-error">{!isDaysValid ? "Selecione pelo menos um dia de atendimento." : null}</FieldError>
+      </fieldset>
 
-        <div className="grid grid-cols-2 gap-3 pt-2">
-          <div>
-            <label htmlFor="hours-opens" className="block text-xs font-semibold text-foreground mb-1.5">
-              Horário de abertura
-            </label>
-            <input
-              id="hours-opens"
-              type="time"
-              required
-              aria-invalid={!isTimeOrderValid ? "true" : undefined}
-              aria-describedby={!isTimeOrderValid ? "hours-error" : undefined}
-              value={opensAt}
-              onChange={(e) => onChangeOpensAt(e.target.value)}
-              className={`w-full rounded-lg border bg-surface px-3 py-3 text-sm font-medium text-foreground min-h-12 focus-visible:outline-2 focus-visible:outline-offset-2 ${
-                !isTimeOrderValid
-                  ? "border-destructive focus-visible:outline-destructive"
-                  : "border-border focus-visible:outline-primary"
-              }`}
-            />
-          </div>
-
-          <div>
-            <label htmlFor="hours-closes" className="block text-xs font-semibold text-foreground mb-1.5">
-              Horário de fechamento
-            </label>
-            <input
-              id="hours-closes"
-              type="time"
-              required
-              aria-invalid={!isTimeOrderValid ? "true" : undefined}
-              aria-describedby={!isTimeOrderValid ? "hours-error" : undefined}
-              value={closesAt}
-              onChange={(e) => onChangeClosesAt(e.target.value)}
-              className={`w-full rounded-lg border bg-surface px-3 py-3 text-sm font-medium text-foreground min-h-12 focus-visible:outline-2 focus-visible:outline-offset-2 ${
-                !isTimeOrderValid
-                  ? "border-destructive focus-visible:outline-destructive"
-                  : "border-border focus-visible:outline-primary"
-              }`}
-            />
-          </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="grid gap-1.5">
+          <label htmlFor="hours-opens" className="text-sm font-semibold">Abre às</label>
+          <Input id="hours-opens" type="time" required className="tabular-nums" aria-invalid={!isTimeOrderValid ? "true" : undefined} aria-describedby={!isTimeOrderValid ? "hours-error" : undefined} value={opensAt} onChange={(e) => onChangeOpensAt(e.target.value)} />
         </div>
-
-        {!isTimeOrderValid && (
-          <div
-            id="hours-error"
-            role="alert"
-            className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-xs text-destructive font-medium transition-all duration-180 ease-out motion-reduce:transition-none"
-          >
-            O horário de fechamento deve ser posterior ao horário de abertura.
-          </div>
-        )}
+        <div className="grid gap-1.5">
+          <label htmlFor="hours-closes" className="text-sm font-semibold">Fecha às</label>
+          <Input id="hours-closes" type="time" required className="tabular-nums" aria-invalid={!isTimeOrderValid ? "true" : undefined} aria-describedby={!isTimeOrderValid ? "hours-error" : undefined} value={closesAt} onChange={(e) => onChangeClosesAt(e.target.value)} />
+        </div>
       </div>
+      <FieldError id="hours-error">{!isTimeOrderValid ? "O fechamento deve ser depois da abertura." : null}</FieldError>
 
-      <div className="flex items-center gap-3 pt-2">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onBack}
-          className="flex-1 min-h-12 font-medium rounded-full transition-transform duration-120 active:scale-[0.98] motion-reduce:transform-none"
-        >
-          Voltar
-        </Button>
-        <Button
-          type="submit"
-          disabled={!isValid}
-          className="flex-[2] min-h-12 font-semibold rounded-full transition-transform duration-120 active:scale-[0.98] motion-reduce:transform-none"
-        >
-          Continuar
-        </Button>
-      </div>
+      <StepActions onBack={onBack} submitLabel="Continuar" disabled={!isValid} />
     </form>
   );
 }

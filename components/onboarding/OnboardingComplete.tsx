@@ -2,7 +2,10 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { ArrowRight, Check, ExternalLink, FileQuestion, Loader2, TriangleAlert } from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { BrandLink } from "@/components/ui/brand";
+import { cn } from "@/lib/utils";
 import { provisionBusiness, type ProvisioningResult } from "@/lib/provisioning";
 import {
   IDEMPOTENCY_KEY,
@@ -59,68 +62,70 @@ export function OnboardingComplete() {
     queueMicrotask(() => void run());
   }, [run]);
 
+  const primary = cn(buttonVariants({ size: "lg" }), "w-full");
+  const secondary = cn(buttonVariants({ variant: "outline", size: "lg" }), "w-full");
+
   return (
-    <main className="min-h-screen flex items-center justify-center bg-background px-4 py-10 text-foreground">
-      <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 sm:p-8 shadow-sm space-y-5" aria-live="polite">
-        {state.kind === "loading" && (
-          <div className="space-y-3 text-center" role="status">
-            <div className="mx-auto h-8 w-8 rounded-full border-2 border-foreground border-t-transparent animate-spin motion-reduce:animate-none" aria-hidden="true" />
-            <p className="text-sm text-muted-foreground">Ativando sua agenda…</p>
-          </div>
-        )}
-
-        {state.kind === "missing" && (
-          <div className="space-y-4 text-center">
-            <h1 className="font-display text-2xl font-bold">Nenhum cadastro pendente</h1>
-            <p className="text-sm text-muted-foreground">
-              Não encontramos os dados do cadastro neste navegador. Abra o link no mesmo navegador em que você preencheu o cadastro, ou comece de novo.
-            </p>
-            <Link href="/onboarding" className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-foreground px-5 text-sm font-semibold text-background">
-              Fazer cadastro
-            </Link>
-          </div>
-        )}
-
-        {state.kind === "done" && (
-          <div className="space-y-4 text-center">
-            <h1 className="font-display text-2xl font-bold">Sua agenda está no ar</h1>
-            <p className="text-sm text-muted-foreground">
-              Compartilhe seu link com os clientes:{" "}
-              <span className="font-mono font-semibold text-foreground break-all">/{state.slug}</span>
-            </p>
-            <div className="flex flex-col gap-2">
-              <Link href={state.publicPath} className="inline-flex min-h-11 items-center justify-center rounded-full bg-foreground px-5 text-sm font-semibold text-background">
-                Abrir minha página de agendamento
-              </Link>
-              <Link href="/dashboard" className="inline-flex min-h-11 items-center justify-center rounded-full border border-border px-5 text-sm font-medium">
-                Ir para o painel
-              </Link>
+    <div className="flex min-h-dvh flex-col bg-paper">
+      <header className="border-b border-line bg-surface">
+        <div className="mx-auto flex min-h-16 max-w-5xl items-center px-4 sm:px-6"><BrandLink /></div>
+      </header>
+      <main id="content" className="flex flex-1 items-center justify-center px-4 py-10">
+        <div className="w-full max-w-md rounded-frame border border-line bg-surface p-6 shadow-[var(--shadow-card)] sm:p-8" aria-live="polite">
+          {state.kind === "loading" && (
+            <div className="space-y-4 py-6 text-center" role="status">
+              <Loader2 aria-hidden="true" className="mx-auto size-8 animate-spin text-pix motion-reduce:animate-none" />
+              <p className="font-semibold">Ativando sua agenda…</p>
+              <p className="text-sm text-muted">Criando sua página, serviço e horários.</p>
             </div>
-          </div>
-        )}
+          )}
 
-        {state.kind === "error" && (
-          <div className="space-y-4">
-            <h1 className="font-display text-2xl font-bold">Não foi possível ativar sua agenda</h1>
-            <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-              {state.result.message}
-            </p>
-            {state.result.code === "server_error" ? (
-              <Button type="button" onClick={() => void run()} className="w-full min-h-11">
-                Tentar novamente
-              </Button>
-            ) : state.result.code === "unauthorized" ? (
-              <Link href={`/login?next=${encodeURIComponent(ONBOARDING_COMPLETE_PATH)}`} className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-foreground px-5 text-sm font-semibold text-background">
-                Entrar novamente
-              </Link>
-            ) : (
-              <Link href="/onboarding" className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-foreground px-5 text-sm font-semibold text-background">
-                Revisar cadastro
-              </Link>
-            )}
-          </div>
-        )}
-      </div>
-    </main>
+          {state.kind === "missing" && (
+            <div className="space-y-5 text-center">
+              <span aria-hidden="true" className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-subtle text-muted"><FileQuestion className="size-7" /></span>
+              <h1 className="font-display text-2xl font-extrabold tracking-tight">Nenhum cadastro pendente</h1>
+              <p className="text-muted">
+                Não encontramos os dados do cadastro neste navegador. Abra o link no mesmo navegador em que você preencheu o cadastro, ou comece de novo.
+              </p>
+              <Link href="/onboarding" className={primary}>Fazer cadastro</Link>
+            </div>
+          )}
+
+          {state.kind === "done" && (
+            <div className="space-y-6 text-center">
+              <span aria-hidden="true" className="animate-confirm-pop mx-auto flex size-16 items-center justify-center rounded-full bg-pix text-pix-foreground"><Check className="size-8" strokeWidth={3} /></span>
+              <div className="space-y-2">
+                <h1 className="font-display text-3xl font-extrabold tracking-tight">Sua agenda está no ar</h1>
+                <p className="text-muted">Compartilhe o link no WhatsApp e no Instagram. Cada reserva chega com o sinal pago no Pix.</p>
+              </div>
+              <p className="rounded-field border border-line bg-subtle px-4 py-3 font-semibold break-all">/{state.slug}</p>
+              <div className="flex flex-col gap-2">
+                <Link href="/dashboard" className={primary}>Ir para o painel<ArrowRight aria-hidden="true" /></Link>
+                <Link href={state.publicPath} className={secondary}><ExternalLink aria-hidden="true" />Ver minha página</Link>
+              </div>
+            </div>
+          )}
+
+          {state.kind === "error" && (
+            <div className="space-y-5">
+              <span aria-hidden="true" className="flex size-12 items-center justify-center rounded-full bg-danger-soft text-danger"><TriangleAlert className="size-6" /></span>
+              <h1 className="font-display text-2xl font-extrabold tracking-tight">Não foi possível ativar sua agenda</h1>
+              <p role="alert" className="rounded-field border border-danger/30 bg-danger-soft p-3 text-sm font-medium text-danger">
+                {state.result.message}
+              </p>
+              {state.result.code === "server_error" ? (
+                <Button type="button" size="lg" onClick={() => void run()} className="w-full">
+                  Tentar novamente
+                </Button>
+              ) : state.result.code === "unauthorized" ? (
+                <Link href={`/login?next=${encodeURIComponent(ONBOARDING_COMPLETE_PATH)}`} className={primary}>Entrar novamente</Link>
+              ) : (
+                <Link href="/onboarding" className={primary}>Revisar cadastro</Link>
+              )}
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
   );
 }

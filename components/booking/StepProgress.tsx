@@ -4,9 +4,12 @@ import { cn } from "@/lib/utils";
 
 interface StepProgressProps {
   currentStep: 1 | 2 | 3 | 4;
+  /** Rótulos das 4 etapas (padrão: fluxo de agendamento). */
+  steps?: readonly { step: number; label: string }[];
+  label?: string;
 }
 
-const STEPS = [
+const BOOKING_STEPS = [
   { step: 1, label: "Serviço" },
   { step: 2, label: "Data e hora" },
   { step: 3, label: "Seus dados" },
@@ -14,10 +17,11 @@ const STEPS = [
 ] as const;
 
 /** Stepper serviço → data/hora → dados → Pix. */
-export function StepProgress({ currentStep }: StepProgressProps) {
+export function StepProgress({ currentStep, steps = BOOKING_STEPS, label = "Etapas do agendamento" }: StepProgressProps) {
+  const STEPS = steps;
   const current = STEPS[currentStep - 1];
   return (
-    <nav aria-label="Etapas do agendamento" className="w-full">
+    <nav aria-label={label} className="w-full">
       <p className="mb-2 flex items-baseline justify-between text-sm sm:hidden">
         <span className="font-semibold text-ink">{current.label}</span>
         <span className="text-muted">Passo {currentStep} de {STEPS.length}</span>

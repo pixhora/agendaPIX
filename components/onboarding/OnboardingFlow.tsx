@@ -9,6 +9,9 @@ import { StepService } from "./StepService";
 import { StepHours } from "./StepHours";
 import { StepAccount } from "./StepAccount";
 import { COMPLETED_SETUP_KEY } from "./storage";
+import { OnboardingPreview } from "./OnboardingPreview";
+import { StepProgress } from "@/components/booking/StepProgress";
+import { BrandLink } from "@/components/ui/brand";
 
 const STEPS = [
   { step: 1, label: "Negócio" },
@@ -83,80 +86,22 @@ export function OnboardingFlow() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground">
-      {/* Header Compacto do Onboarding */}
-      <header className="border-b border-border bg-surface py-2 px-4 sm:px-6">
-        <div className="mx-auto max-w-md flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 font-display text-lg font-bold text-foreground min-h-11 py-1">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-foreground text-xs font-black text-background">
-              A
-            </span>
-            <span>Agenda</span>
-          </Link>
-          <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-lime inline-block" />
+    <div className="flex min-h-dvh flex-col bg-paper">
+      <header className="border-b border-line bg-surface">
+        <div className="mx-auto flex min-h-16 max-w-5xl items-center justify-between gap-3 px-4 sm:px-6">
+          <BrandLink />
+          <span className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-pix-soft px-3 text-xs font-semibold text-pix">
+            <span aria-hidden="true" className="size-1.5 rounded-full bg-pix" />
             7 dias grátis · Plano {data.plan === "completo" ? "Completo" : "Base"}
           </span>
         </div>
       </header>
 
-      {/* Conteúdo Principal Centralizado Mobile-First */}
-      <main className="flex-1 w-full max-w-md mx-auto px-4 py-8 space-y-6">
-        {/* Barra de Progresso do Onboarding */}
-        <nav aria-label="Progresso do cadastro" className="w-full">
-          <ol className="flex items-center justify-between gap-1 w-full" role="list">
-            {STEPS.map((s, idx) => {
-              const isDone = step > s.step;
-              const isCurrent = step === s.step;
+      <div className="mx-auto grid w-full max-w-5xl flex-1 gap-10 px-4 py-6 sm:px-6 sm:py-10 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
+      <main id="content" className="mx-auto w-full max-w-lg space-y-6 lg:mx-0">
+        <StepProgress currentStep={step} steps={STEPS} label="Progresso do cadastro" />
 
-              return (
-                <li
-                  key={s.step}
-                  className="flex-1 flex flex-col items-center"
-                  aria-current={isCurrent ? "step" : undefined}
-                >
-                  <div className="w-full flex items-center">
-                    {idx > 0 && (
-                      <div
-                        className={`h-0.5 flex-1 transition-colors duration-240 motion-reduce:transition-none ${
-                          isDone ? "bg-foreground" : "bg-border"
-                        }`}
-                      />
-                    )}
-                    <div
-                      className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 transition-all duration-240 motion-reduce:transition-none ${
-                        isCurrent
-                          ? "bg-foreground text-background ring-2 ring-foreground ring-offset-2 ring-offset-background"
-                          : isDone
-                          ? "bg-foreground text-background"
-                          : "bg-surface text-muted-foreground border border-border"
-                      }`}
-                    >
-                      {isDone ? "✓" : s.step}
-                    </div>
-                    {idx < STEPS.length - 1 && (
-                      <div
-                        className={`h-0.5 flex-1 transition-colors duration-240 motion-reduce:transition-none ${
-                          isDone && step > s.step + 1 ? "bg-foreground" : "bg-border"
-                        }`}
-                      />
-                    )}
-                  </div>
-                  <span
-                    className={`mt-1.5 text-[11px] font-medium transition-colors duration-240 motion-reduce:transition-none ${
-                      isCurrent ? "text-foreground font-semibold" : "text-muted-foreground"
-                    }`}
-                  >
-                    {s.label}
-                  </span>
-                </li>
-              );
-            })}
-          </ol>
-        </nav>
-
-        {/* Card do Passo Ativo com Transição Suave (240ms) */}
-        <div className="rounded-2xl border border-border bg-surface p-5 sm:p-6 shadow-sm transition-opacity duration-240 ease-out motion-reduce:transition-none">
+        <div key={step} className="animate-step-in rounded-frame border border-line bg-surface p-5 shadow-[var(--shadow-card)] sm:p-8">
           {step === 1 && (
             <StepBusiness
               businessName={data.businessName}
@@ -213,7 +158,12 @@ export function OnboardingFlow() {
             />
           )}
         </div>
+        <p className="text-center text-sm text-muted">
+          Já tem conta? <Link href="/login" className="inline-flex min-h-11 items-center px-1 font-semibold text-ink underline-offset-4 hover:underline">Entrar</Link>
+        </p>
       </main>
+      <OnboardingPreview data={data} />
+      </div>
     </div>
   );
 }

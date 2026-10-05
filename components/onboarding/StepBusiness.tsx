@@ -1,6 +1,9 @@
 import React from "react";
-import { Button } from "../ui/button";
+import { Input } from "@/components/ui/input";
+import { FieldError, FieldHint } from "@/components/ui/field";
+import { cn } from "@/lib/utils";
 import { slugify } from "./slug";
+import { StepActions, StepHeader, usePublicHost } from "./parts";
 
 interface StepBusinessProps {
   businessName: string;
@@ -10,13 +13,8 @@ interface StepBusinessProps {
   onNext: () => void;
 }
 
-export function StepBusiness({
-  businessName,
-  slug,
-  onChangeBusinessName,
-  onChangeSlug,
-  onNext,
-}: StepBusinessProps) {
+export function StepBusiness({ businessName, slug, onChangeBusinessName, onChangeSlug, onNext }: StepBusinessProps) {
+  const host = usePublicHost();
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     onChangeBusinessName(val);
@@ -41,106 +39,64 @@ export function StepBusiness({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (isValid) {
-      onNext();
-    }
+    if (isValid) onNext();
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
-      <div>
-        <h2 className="font-display text-xl font-bold text-foreground">
-          Qual é o nome do seu negócio?
-        </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Seus clientes verão esse nome no topo da sua página de agendamentos.
-        </p>
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <StepHeader title="Como se chama o seu negócio?" description="É o nome que seus clientes veem no topo da sua página de agendamento." />
+
+      <div className="grid gap-1.5">
+        <label htmlFor="business-name" className="text-sm font-semibold">Nome do negócio ou profissional</label>
+        <Input
+          id="business-name"
+          type="text"
+          required
+          autoComplete="organization"
+          aria-invalid={showNameError ? "true" : undefined}
+          aria-describedby={showNameError ? "business-name-error" : undefined}
+          placeholder="Ex.: Barbearia do Silva, Studio Ana Lash"
+          value={businessName}
+          onChange={handleNameChange}
+        />
+        <FieldError id="business-name-error">{showNameError ? "O nome deve ter pelo menos 2 caracteres." : null}</FieldError>
       </div>
 
-      <div className="space-y-4">
-        <div>
-          <label htmlFor="business-name" className="block text-sm font-medium text-foreground mb-1.5">
-            Nome do estabelecimento ou profissional
-          </label>
+      <div className="grid gap-1.5">
+        <label htmlFor="business-slug" className="text-sm font-semibold">Seu link de agendamento</label>
+        <div
+          className={cn(
+            "flex min-h-12 items-stretch overflow-hidden rounded-field border bg-surface transition-feedback focus-within:outline-2 focus-within:outline-offset-1",
+            showSlugError ? "border-danger focus-within:outline-danger" : "border-line-strong/60 hover:border-line-strong focus-within:border-ink focus-within:outline-ring",
+          )}
+        >
+          <span aria-hidden="true" className="flex max-w-[45%] shrink-0 select-none items-center truncate border-r border-line bg-subtle px-3 text-sm font-medium text-muted">
+            {host}/
+          </span>
           <input
-            id="business-name"
+            id="business-slug"
             type="text"
             required
-            aria-invalid={showNameError ? "true" : undefined}
-            aria-describedby={showNameError ? "business-name-error" : undefined}
-            placeholder="Ex: Barbearia do Silva, Studio Ana Lash..."
-            value={businessName}
-            onChange={handleNameChange}
-            className={`w-full rounded-lg border bg-surface px-3.5 py-3 text-base text-foreground placeholder:text-muted-foreground/60 min-h-12 focus-visible:outline-2 focus-visible:outline-offset-2 ${
-              showNameError
-                ? "border-destructive focus-visible:outline-destructive"
-                : "border-border focus-visible:outline-primary"
-            }`}
+            autoCapitalize="none"
+            spellCheck={false}
+            aria-invalid={showSlugError ? "true" : undefined}
+            aria-describedby={showSlugError ? "business-slug-error" : "business-slug-hint"}
+            placeholder="seu-negocio"
+            value={slug}
+            onChange={handleSlugChange}
+            className="min-w-0 flex-1 bg-transparent px-3 text-base text-ink placeholder:text-muted/80 focus:outline-none"
           />
-          {showNameError && (
-            <div
-              id="business-name-error"
-              role="alert"
-              className="mt-1.5 rounded-lg border border-destructive/20 bg-destructive/5 p-2.5 text-xs text-destructive font-medium transition-all duration-180 ease-out motion-reduce:transition-none"
-            >
-              O nome do estabelecimento deve ter pelo menos 2 caracteres.
-            </div>
-          )}
         </div>
-
-        <div>
-          <label htmlFor="business-slug" className="block text-sm font-medium text-foreground mb-1.5">
-            Seu link personalizado
-          </label>
-          <div
-            className={`flex items-center rounded-lg border bg-surface overflow-hidden focus-within:ring-2 focus-within:ring-offset-2 ${
-              showSlugError
-                ? "border-destructive focus-within:ring-destructive"
-                : "border-border focus-within:ring-primary"
-            }`}
-          >
-            <span className="bg-muted px-3 py-3 text-xs sm:text-sm font-medium text-muted-foreground select-none shrink-0">
-              agenda.com.br/
-            </span>
-            <input
-              id="business-slug"
-              type="text"
-              required
-              aria-invalid={showSlugError ? "true" : undefined}
-              aria-describedby={showSlugError ? "business-slug-error" : undefined}
-              placeholder="seu-negocio"
-              value={slug}
-              onChange={handleSlugChange}
-              className="flex-1 min-w-0 bg-transparent px-3 py-3 text-base text-foreground placeholder:text-muted-foreground/60 focus:outline-none min-h-12"
-            />
-          </div>
-          {showSlugError ? (
-            <div
-              id="business-slug-error"
-              role="alert"
-              className="mt-1.5 rounded-lg border border-destructive/20 bg-destructive/5 p-2.5 text-xs text-destructive font-medium transition-all duration-180 ease-out motion-reduce:transition-none"
-            >
-              {slug.length < 2
-                ? "O link personalizado deve ter pelo menos 2 caracteres."
-                : "O link deve conter apenas letras minúsculas, números e hífens."}
-            </div>
-          ) : (
-            <p className="mt-1 text-xs text-muted-foreground">
-              Apenas letras minúsculas, números e hífens.
-            </p>
-          )}
-        </div>
+        {showSlugError ? (
+          <FieldError id="business-slug-error">
+            {slug.length < 2 ? "O link deve ter pelo menos 2 caracteres." : "Use só letras minúsculas, números e hífens."}
+          </FieldError>
+        ) : (
+          <FieldHint id="business-slug-hint">Letras minúsculas, números e hífens. Dá para mudar depois.</FieldHint>
+        )}
       </div>
 
-      <div className="pt-2">
-        <Button
-          type="submit"
-          disabled={!isValid}
-          className="w-full min-h-12 text-base font-semibold rounded-full transition-transform duration-120 active:scale-[0.98] motion-reduce:transform-none"
-        >
-          Continuar
-        </Button>
-      </div>
+      <StepActions submitLabel="Continuar" disabled={!isValid} />
     </form>
   );
 }
