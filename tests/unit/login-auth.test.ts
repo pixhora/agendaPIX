@@ -75,7 +75,17 @@ describe("requestMagicLink security & error integrity", () => {
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe("/api/auth/sign-in/magic-link");
     expect(init.credentials).toBe("same-origin");
-    expect(JSON.parse(init.body)).toEqual({ email: "dono@studio.com", callbackURL: "/dashboard" });
+    expect(JSON.parse(init.body)).toEqual({ email: "dono@studio.com", callbackURL: "/dashboard", errorCallbackURL: "/login" });
+  });
+
+  it("sends link errors back to /login preserving a non-default destination", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ status: true }) });
+    global.fetch = fetchMock;
+
+    await requestMagicLink("dono@studio.com", "/onboarding", "/onboarding/concluir");
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.callbackURL).toBe("/onboarding/concluir");
+    expect(body.errorCallbackURL).toBe("/login?next=%2Fonboarding%2Fconcluir");
   });
 
   it("allows simulation ONLY when explicitly under /preview pathname", async () => {

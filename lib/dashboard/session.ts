@@ -6,7 +6,7 @@ import { ownedBusinesses } from "./data";
 export async function requireOwner() {
   const requestHeaders = await headers();
   const session = await getOwnerSession(requestHeaders);
-  if (!session) redirect("/dashboard/login");
+  if (!session) redirect("/login");
   return session.user;
 }
 export async function ownerContext(businessId?: string) {

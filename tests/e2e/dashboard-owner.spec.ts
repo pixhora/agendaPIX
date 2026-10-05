@@ -13,13 +13,13 @@ test.describe("painel do dono — sem sessão", () => {
 
   test("rotas protegidas redirecionam para o login", async ({ page }) => {
     await page.goto("/dashboard");
-    await expect(page).toHaveURL(/\/dashboard\/login/);
-    await expect(page.getByRole("heading", { name: "Entre no seu painel" })).toBeVisible();
+    await expect(page).toHaveURL(/\/login$/);
+    await expect(page.getByRole("heading", { name: "Entrar na sua conta" })).toBeVisible();
   });
 
   test("login exibe formulário de link mágico", async ({ page }) => {
-    await page.goto("/dashboard/login");
-    await expect(page.getByLabel("Seu email")).toBeVisible();
+    await page.goto("/login");
+    await expect(page.getByLabel("E-mail profissional")).toBeVisible();
     await expect(page.getByRole("button", { name: "Receber link de acesso" })).toBeVisible();
   });
 });

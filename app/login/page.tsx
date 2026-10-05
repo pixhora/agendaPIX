@@ -1,10 +1,38 @@
-"use client";
-
-import React from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { LoginForm } from "@/components/auth/LoginForm";
+import { getOwnerSession } from "@/lib/dashboard/auth-session";
+import { safeNextPath } from "@/lib/safe-redirect";
 
-export default function LoginPage() {
+export const metadata: Metadata = {
+  title: "Entrar · Agenda",
+  robots: { index: false },
+};
+
+type SearchParams = Promise<{ error?: string | string[]; next?: string | string[] }>;
+
+function first(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+/** Login único do app (dono do negócio): link mágico do Better Auth na mesma origem. */
+export default async function LoginPage({ searchParams }: { searchParams: SearchParams }) {
+  const params = await searchParams;
+  const next = safeNextPath(first(params.next));
+  const linkError = Boolean(first(params.error));
+
+  let signedIn = false;
+  if (!linkError) {
+    try {
+      signedIn = (await getOwnerSession(await headers())) !== null;
+    } catch {
+      // Sem conseguir verificar a sessão, mostra o formulário normalmente.
+    }
+  }
+  if (signedIn) redirect(next);
+
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       {/* Header Compacto */}
@@ -27,7 +55,7 @@ export default function LoginPage() {
 
       {/* Conteúdo Centralizado */}
       <main className="flex-1 w-full max-w-md mx-auto px-4 py-10 flex flex-col justify-center">
-        <LoginForm />
+        <LoginForm callbackURL={next} linkError={linkError} />
       </main>
     </div>
   );
