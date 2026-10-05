@@ -11,7 +11,7 @@ beforeEach(() => {
   mocks.provision.mockReset().mockResolvedValue({ replay: false, result: { businessId: "synthetic" } });
 });
 afterEach(() => vi.unstubAllEnvs());
-const request = (body = "{}", origin = "http://localhost:3005") => new Request("http://localhost:3000/api/onboarding", { method: "POST", headers: { origin, "idempotency-key": "synthetic-key" }, body });
+const request = (body = "{}", origin = "http://localhost:3000") => new Request("http://localhost:3000/api/onboarding", { method: "POST", headers: { origin, "idempotency-key": "synthetic-key" }, body });
 it("derives owner from session and returns creation/replay statuses", async () => {
   expect((await POST(request())).status).toBe(201);
   expect(mocks.provision).toHaveBeenCalledWith("session-owner", "synthetic-key", {});
@@ -34,7 +34,7 @@ it("returns safe 503 on session infrastructure errors", async () => {
   expect(await response.text()).not.toContain("PRIVATE_ERROR");
 });
 it("allows credentialed onboarding preflight including idempotency header", async () => {
-  const response = await OPTIONS(new Request("http://localhost:3000/api/onboarding", { method: "OPTIONS", headers: { origin: "http://localhost:3005", "access-control-request-method": "POST", "access-control-request-headers": "Content-Type, Idempotency-Key" } }));
+  const response = await OPTIONS(new Request("http://localhost:3000/api/onboarding", { method: "OPTIONS", headers: { origin: "http://localhost:3000", "access-control-request-method": "POST", "access-control-request-headers": "Content-Type, Idempotency-Key" } }));
   expect(response.status).toBe(204);
-  expect(response.headers.get("access-control-allow-origin")).toBe("http://localhost:3005");
+  expect(response.headers.get("access-control-allow-origin")).toBe("http://localhost:3000");
 });

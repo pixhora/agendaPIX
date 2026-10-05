@@ -39,7 +39,7 @@ try {
   await client.query('INSERT INTO "session" (id,user_id,token,expires_at) VALUES($1,$2,$3,$4)', [randomUUID(), userId, token, expiresAt]);
   const cookieName = getCookies({ baseURL: env.BETTER_AUTH_URL }).sessionToken.name;
   const cookie = `${cookieName}=${encodeURIComponent(`${token}.${await makeSignature(token, env.BETTER_AUTH_SECRET)}`)}`;
-  writeFileSync(fd, JSON.stringify({ authority: authUrl.origin, dashboard: "http://localhost:3343", userId, businessId, serviceId, slug, email, expiresAt, cookie }, null, 2));
+  writeFileSync(fd, JSON.stringify({ authority: authUrl.origin, dashboard: "http://localhost:3000/dashboard", userId, businessId, serviceId, slug, email, expiresAt, cookie }, null, 2));
   fsyncSync(fd);
   await client.query("COMMIT");
   complete = true;

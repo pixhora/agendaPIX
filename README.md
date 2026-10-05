@@ -10,29 +10,6 @@ Esqueleto do produto de agendamento com sinal por Pix. Os fluxos comerciais aind
 
 ## Desenvolvimento
 
-### Iniciar as worktrees com Python
-
-Na organização local com as quatro worktrees irmãs instaladas:
-
-```bash
-python3 scripts/run_system.py
-```
-
-O launcher inicia backend (`3000`), Preview (`3001`), landing (`3005`) e painel (`3343`). Reutiliza servidores da mesma worktree já ativos e recusa portas ocupadas por processos desconhecidos. Aguarda HTTP 200 nas rotas indicadas; falha se uma rota não responder no prazo. As worktrees são versões de desenvolvimento separadas: iniciar todas não integra suas branches automaticamente.
-
-```bash
-python3 scripts/run_system.py --check          # Apenas verifica disponibilidade
-python3 scripts/run_system.py --with-db        # Também executa o Compose existente
-python3 scripts/run_system.py --timeout 180    # Mais tempo para compilação inicial
-python3 scripts/run_system.py --root /caminho/projetos
-```
-
-Requisitos adicionais: Python 3.9+, Linux com `ss`, dependências pnpm instaladas em cada worktree. Configure `.env`/ambiente dos serviços conforme necessário; o launcher não copia credenciais entre worktrees. Nos processos novos, `BETTER_AUTH_URL` recebe a origem local da respectiva porta. Processos reaproveitados mantêm sua configuração.
-
-Ctrl+C encerra apenas os servidores iniciados pelo launcher. Banco e servidores anteriores permanecem. Logs novos ficam em `.maestri/run-system-logs/`, com arquivos privados; não publique tokens ou dados pessoais dos logs.
-
-O launcher não instala dependências, aplica migrations, roda seed ou configura SMTP/provider. Execute migrations explicitamente quando necessárias. O Compose atual contém somente PostgreSQL; email real exige SMTP configurado. Preview e Pix fake continuam simulações, mesmo com todas as URLs disponíveis.
-
 ```bash
 pnpm install
 cp .env.example .env

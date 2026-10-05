@@ -2,7 +2,7 @@
 
 ## Escopo
 
-Produção aceita somente a origem de `BETTER_AUTH_URL`; desenvolvimento preserva localhost3000/3001/3005/3343. APIs públicas e onboarding recebem CORS credenciado e preflight com Idempotency-Key. Nenhuma autoridade de auth ou webhook foi criada fora do backend.
+Produção aceita somente a origem de `BETTER_AUTH_URL`; desenvolvimento preserva localhost3000 (app único). APIs públicas e onboarding recebem CORS credenciado e preflight com Idempotency-Key. Nenhuma autoridade de auth ou webhook foi criada fora do backend.
 
 POST `/api/onboarding` exige origem permitida, sessão e entrada estrita. O dono vem da sessão. Negócio, primeiro serviço, horários e resultado de idempotência são gravados numa transação. Chave composta por dono/UUID evita replay entre tenants; conflitos de corpo/slug respondem 409.
 

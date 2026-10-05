@@ -67,17 +67,28 @@ it("preserva envio bem-sucedido pelo handler sem acessar banco ou SMTP reais", a
   expect(sendMagicLinkEmail).toHaveBeenCalled();
 });
 
-it.each([3001, 3005, 3343])("aceita origem e callback absoluto da UI na porta %i", async (port) => {
+it("aceita origem e callback absoluto da UI na autoridade local :3000", async () => {
   const auth = getAuth();
   const context = await auth.$context;
   vi.spyOn(context.internalAdapter, "createVerificationValue").mockResolvedValue({} as never);
-  const origin = `http://localhost:${port}`;
+  const origin = "http://localhost:3000";
   const response = await auth.handler(new Request("http://localhost:3000/api/auth/sign-in/magic-link", {
     method: "POST", headers: { origin, "content-type": "application/json" },
     body: JSON.stringify({ email: "synthetic@example.com", callbackURL: `${origin}/dashboard`, errorCallbackURL: `${origin}/dashboard/login?error=link` }),
   }));
   expect(response.status).toBe(200);
   expect(sendMagicLinkEmail).toHaveBeenCalled();
+});
+
+it.each([3001, 3005, 3343])("rejeita origem legada da UI multi-app na porta %i", async (port) => {
+  const auth = getAuth();
+  const context = await auth.$context;
+  const persist = vi.spyOn(context.internalAdapter, "createVerificationValue");
+  vi.mocked(sendMagicLinkEmail).mockClear();
+  const origin = `http://localhost:${port}`;
+  expect((await auth.handler(request(origin))).status).toBe(403);
+  expect(persist).not.toHaveBeenCalled();
+  expect(sendMagicLinkEmail).not.toHaveBeenCalled();
 });
 
 it("preserva rejeição de origem sem criar verificação nem enviar email", async () => {

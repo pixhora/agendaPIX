@@ -8,8 +8,8 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 
-it.each([3000, 3001, 3005, 3343])("allows credentialed preflight for exact localhost:%i", async (port) => {
-  const origin = `http://localhost:${port}`;
+it("allows credentialed preflight for exact localhost:3000", async () => {
+  const origin = "http://localhost:3000";
   const response = await appPreflight(new Request("http://localhost:3000/api/pix", { method: "OPTIONS", headers: {
     origin, "access-control-request-method": "PUT", "access-control-request-headers": "Content-Type, Authorization",
   } }), ["GET", "PUT", "DELETE"]);
@@ -21,7 +21,7 @@ it.each([3000, 3001, 3005, 3343])("allows credentialed preflight for exact local
   expect(response.headers.get("vary")).toContain("Origin");
 });
 
-it.each(["http://untrusted.example", "http://localhost:3343.evil.example", "http://127.0.0.1:3343", "null", "http://localhost:3343/path"])("rejects origin %s before running the handler", async (origin) => {
+it.each(["http://untrusted.example", "http://localhost:3000.evil.example", "http://127.0.0.1:3000", "null", "http://localhost:3000/path", "http://localhost:3001", "http://localhost:3005", "http://localhost:3343"])("rejects origin %s before running the handler", async (origin) => {
   const run = vi.fn();
   const response = await withAppCors(new Request("http://localhost:3000/api/auth", { headers: { origin } }), run);
   expect(response.status).toBe(403);
@@ -33,11 +33,11 @@ it("keeps cookies/status and CORS on error responses; accepts server-side GET wi
   const headers = new Headers();
   headers.append("set-cookie", "one=synthetic; HttpOnly; SameSite=Lax");
   headers.append("set-cookie", "two=synthetic; HttpOnly; SameSite=Lax");
-  const request = new Request("http://localhost:3000/api/auth", { headers: { origin: "http://localhost:3343" } });
+  const request = new Request("http://localhost:3000/api/auth", { headers: { origin: "http://localhost:3000" } });
   const response = await withAppCors(request, async () => new Response(null, { status: 401, headers }));
   expect(response.status).toBe(401);
   expect(response.headers.getSetCookie()).toEqual(headers.getSetCookie());
-  expect(response.headers.get("access-control-allow-origin")).toBe("http://localhost:3343");
+  expect(response.headers.get("access-control-allow-origin")).toBe("http://localhost:3000");
   const serverResponse = await withAppCors(new Request(request.url), async () => Response.json(null));
   expect(serverResponse.status).toBe(200);
   expect(serverResponse.headers.has("access-control-allow-origin")).toBe(false);
@@ -48,7 +48,7 @@ it.each([
   { "access-control-request-method": "PATCH", "access-control-request-headers": "" },
   { "access-control-request-method": "PUT", "access-control-request-headers": "x-untrusted" },
 ])("rejects unsupported preflight", async (extra) => {
-  const request = new Request("http://localhost:3000/api/pix", { method: "OPTIONS", headers: { origin: "http://localhost:3343", ...extra } });
+  const request = new Request("http://localhost:3000/api/pix", { method: "OPTIONS", headers: { origin: "http://localhost:3000", ...extra } });
   expect((await appPreflight(request, ["GET", "PUT", "DELETE"])).status).toBe(403);
 });
 
@@ -71,7 +71,7 @@ it("uses only the canonical app origin in production and rejects other origins b
 
 it("returns safe unavailable response on invalid server configuration", async () => {
   vi.stubEnv("BETTER_AUTH_SECRET", "invalid");
-  const response = await appPreflight(new Request("http://localhost:3000/api/auth", { headers: { origin: "http://localhost:3343" } }), ["POST"]);
+  const response = await appPreflight(new Request("http://localhost:3000/api/auth", { headers: { origin: "http://localhost:3000" } }), ["POST"]);
   expect(response.status).toBe(503);
   expect(response.headers.has("access-control-allow-origin")).toBe(false);
 });
