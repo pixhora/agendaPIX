@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import type {
   PublicBusinessData,
   PublicService,
@@ -15,7 +16,12 @@ import { StepSlot } from "./StepSlot";
 import { StepCustomer } from "./StepCustomer";
 import { StepPayment } from "./StepPayment";
 import { BookingConfirmation } from "./BookingConfirmation";
+import { AlertTriangle, Lock, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { BrandMark } from "@/components/ui/brand";
+import { BookingSummary } from "./BookingSummary";
 
 interface BookingFlowProps {
   slug: string;
@@ -327,162 +333,190 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
     }
   };
 
-  // Estado de Carregamento Inicial (Skeleton)
+  const initials = (business?.name ?? "")
+    .split(" ")
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
+  const pageHeader = (
+    <header className="border-b border-line bg-surface">
+      <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+        <div className="flex min-w-0 items-center gap-3">
+          <span aria-hidden="true" className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-ink font-display text-base font-extrabold text-paper">
+            {business ? initials : ""}
+          </span>
+          <div className="min-w-0">
+            <h1 className="truncate font-display text-lg font-extrabold tracking-tight text-ink sm:text-xl">
+              {business?.name ?? <span aria-hidden="true" className="inline-block h-5 w-40 animate-pulse rounded bg-subtle motion-reduce:animate-none" />}
+            </h1>
+            <p className="flex items-center gap-1.5 text-xs font-medium text-muted sm:text-sm">
+              <ShieldCheck aria-hidden="true" className="size-3.5 text-pix" />
+              Agendamento online · sinal por Pix
+            </p>
+          </div>
+        </div>
+        <ThemeToggle className="hidden sm:inline-flex" />
+      </div>
+    </header>
+  );
+
+  const pageFooter = (
+    <footer className="mx-auto flex max-w-5xl flex-col items-center gap-3 px-4 pb-10 pt-4 text-center text-xs text-muted sm:flex-row sm:justify-between sm:px-6 sm:text-left">
+      <p className="inline-flex items-center gap-1.5">
+        <Lock aria-hidden="true" className="size-3.5" />
+        O sinal garante o horário. Seus dados são usados só para este agendamento.
+      </p>
+      <div className="flex items-center gap-3">
+        <ThemeToggle className="sm:hidden" />
+        <Link href="/" className="inline-flex min-h-11 items-center gap-2 font-semibold text-ink">
+          <BrandMark className="size-6 rounded-md text-[10px]" /> Feito com Agenda
+        </Link>
+      </div>
+    </footer>
+  );
+
   if (isLoadingBusiness) {
     return (
-      <div className="w-full max-w-md mx-auto px-4 py-8 space-y-6" role="status" aria-busy="true">
-        <div className="space-y-2 text-center">
-          <div className="h-7 w-48 bg-muted animate-pulse rounded-lg mx-auto" />
-          <div className="h-4 w-32 bg-muted animate-pulse rounded mx-auto" />
-        </div>
-        <div className="space-y-3 pt-4">
-          <div className="h-20 bg-muted animate-pulse rounded-xl" />
-          <div className="h-20 bg-muted animate-pulse rounded-xl" />
-          <div className="h-20 bg-muted animate-pulse rounded-xl" />
-        </div>
-        <span className="sr-only">Carregando informações do estabelecimento...</span>
+      <div className="min-h-dvh bg-paper">
+        {pageHeader}
+        <main id="content" className="mx-auto max-w-5xl px-4 py-8 sm:px-6" role="status" aria-busy="true">
+          <div className="max-w-2xl space-y-3">
+            <Skeleton className="h-2 w-full rounded-full" />
+            <Skeleton className="h-24 rounded-card" />
+            <Skeleton className="h-24 rounded-card" />
+            <Skeleton className="h-24 rounded-card" />
+          </div>
+          <span className="sr-only">Carregando informações do estabelecimento...</span>
+        </main>
       </div>
     );
   }
 
-  // Estado de Erro de Carregamento
   if (businessError || !business) {
     return (
-      <div className="w-full max-w-md mx-auto px-4 py-12 text-center space-y-4">
-        <div
-          role="alert"
-          aria-live="polite"
-          className="rounded-2xl border border-destructive/20 bg-surface p-6 shadow-sm space-y-3"
-        >
-          <span className="text-3xl" aria-hidden="true">⚠️</span>
-          <h2 className="text-lg font-bold text-foreground">Aviso</h2>
-          <p className="text-sm text-muted-foreground">{businessError || "Estabelecimento não disponível."}</p>
-          <Button
-            onClick={() => {
-              setIsLoadingBusiness(true);
-              setReloadCount((c) => c + 1);
-            }}
-            className="mt-2 min-h-11 w-full font-semibold"
-          >
-            Tentar novamente
-          </Button>
-        </div>
+      <div className="min-h-dvh bg-paper">
+        <main id="content" className="mx-auto max-w-md px-4 py-16">
+          <div role="alert" className="space-y-3 rounded-card border border-line bg-surface p-6 text-center shadow-[var(--shadow-card)]">
+            <AlertTriangle aria-hidden="true" className="mx-auto size-8 text-warning" />
+            <h1 className="font-display text-xl font-bold text-ink">Página indisponível</h1>
+            <p className="text-sm text-muted">{businessError || "Estabelecimento não disponível."}</p>
+            <Button
+              onClick={() => {
+                setIsLoadingBusiness(true);
+                setReloadCount((c) => c + 1);
+              }}
+              className="mt-2 w-full"
+            >
+              Tentar novamente
+            </Button>
+          </div>
+        </main>
       </div>
     );
   }
 
-  // Tela de Sucesso Final (Reserva Confirmada)
   if (isCompleted && selectedService && selectedSlot) {
     return (
-      <main className="w-full max-w-md mx-auto px-4 py-6 md:py-10">
-        <BookingConfirmation
-          businessName={business.name}
-          service={selectedService}
-          slot={selectedSlot}
-          timezone={business.timezone}
-          customerName={customerName}
-          customerPhone={customerPhone}
-          onNewBooking={handleRestart}
-        />
-      </main>
+      <div className="min-h-dvh bg-paper">
+        {pageHeader}
+        <main id="content" className="mx-auto w-full max-w-xl px-4 py-8 sm:py-12">
+          <BookingConfirmation
+            businessName={business.name}
+            service={selectedService}
+            slot={selectedSlot}
+            timezone={business.timezone}
+            customerName={customerName}
+            customerPhone={customerPhone}
+            onNewBooking={handleRestart}
+          />
+        </main>
+        {pageFooter}
+      </div>
     );
   }
 
   return (
-    <main className="w-full max-w-md mx-auto px-4 py-6 md:py-10 space-y-5">
-      {/* Cabeçalho da Empresa */}
-      <header className="flex flex-col items-center text-center space-y-2">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent-forest text-primary font-display font-extrabold text-lg shadow-xs ring-2 ring-primary/20">
-          {business.name
-            .split(" ")
-            .map((w) => w[0])
-            .slice(0, 2)
-            .join("")
-            .toUpperCase()}
+    <div className="min-h-dvh bg-paper">
+      {pageHeader}
+      <main id="content" className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-10 lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-10">
+        <div className="min-w-0 space-y-5">
+          <StepProgress currentStep={step} />
+
+          <section key={step} aria-label="Etapa atual" className="rounded-[22px] border border-line bg-surface p-5 shadow-[var(--shadow-card)] animate-step-in sm:p-8">
+            {step === 1 && (
+              <StepService
+                services={business.services}
+                selectedServiceId={selectedService?.id ?? null}
+                onSelectService={(srv) => {
+                  setSelectedService(srv);
+                  setSelectedSlot(null);
+                }}
+                onNext={() => setStep(2)}
+              />
+            )}
+
+            {step === 2 && selectedService && (
+              <StepSlot
+                slug={slug}
+                service={selectedService}
+                timezone={business.timezone}
+                selectedStartsAt={selectedSlot?.startsAt ?? null}
+                onSelectSlot={(slot) => setSelectedSlot(slot)}
+                onBack={() => setStep(1)}
+                onNext={() => setStep(3)}
+              />
+            )}
+
+            {step === 3 && selectedService && selectedSlot && (
+              <StepCustomer
+                service={selectedService}
+                slot={selectedSlot}
+                timezone={business.timezone}
+                name={customerName}
+                phone={customerPhone}
+                isSubmitting={isSubmittingBooking}
+                errorMessage={bookingError}
+                onChangeName={setCustomerName}
+                onChangePhone={setCustomerPhone}
+                onBack={() => setStep(2)}
+                onSubmit={handleCreateBooking}
+                summaryClassName="lg:hidden"
+              />
+            )}
+
+            {step === 4 && bookingResponse && (
+              <StepPayment
+                slug={slug}
+                booking={bookingResponse}
+                summary={selectedService && selectedSlot ? { service: selectedService, slot: selectedSlot, timezone: business.timezone } : undefined}
+                onPaymentConfirmed={() => {
+                  if (typeof window !== "undefined") {
+                    try {
+                      sessionStorage.removeItem(`booking_session_${slug}`);
+                      window.history.replaceState(null, "", publicBookingPagePath(slug));
+                    } catch {
+                      // ignore
+                    }
+                  }
+                  setIsCompleted(true);
+                }}
+                onRestart={handleRestart}
+              />
+            )}
+          </section>
         </div>
-        <div className="space-y-0.5">
-          <h1 className="text-2xl font-display font-extrabold text-foreground tracking-tight">
-            {business.name}
-          </h1>
-          <p className="text-xs text-muted-foreground flex items-center justify-center gap-1.5 font-medium">
-            <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            Agendamento online oficial · Garantia por Pix
+
+        <aside aria-label="Seu pedido" className="hidden lg:sticky lg:top-6 lg:block">
+          <BookingSummary service={selectedService} slot={selectedSlot} timezone={business.timezone} />
+          <p className="mt-4 flex gap-2 px-1 text-xs leading-relaxed text-muted">
+            <ShieldCheck aria-hidden="true" className="size-4 shrink-0 text-pix" />
+            Você paga só o sinal agora. O horário fica reservado por 15 minutos enquanto o Pix é feito.
           </p>
-        </div>
-      </header>
-
-      {/* Barra de Progresso */}
-      <StepProgress currentStep={step} />
-
-      {/* Conteúdo do Passo Atual */}
-      <div
-        key={step}
-        className="rounded-3xl border border-border bg-surface p-5 sm:p-7 shadow-sm animate-step-in"
-      >
-        {step === 1 && (
-          <StepService
-            services={business.services}
-            selectedServiceId={selectedService?.id ?? null}
-            onSelectService={(srv) => {
-              setSelectedService(srv);
-              setSelectedSlot(null);
-            }}
-            onNext={() => setStep(2)}
-          />
-        )}
-
-        {step === 2 && selectedService && (
-          <StepSlot
-            slug={slug}
-            service={selectedService}
-            timezone={business.timezone}
-            selectedStartsAt={selectedSlot?.startsAt ?? null}
-            onSelectSlot={(slot) => setSelectedSlot(slot)}
-            onBack={() => setStep(1)}
-            onNext={() => setStep(3)}
-          />
-        )}
-
-        {step === 3 && selectedService && selectedSlot && (
-          <StepCustomer
-            service={selectedService}
-            slot={selectedSlot}
-            timezone={business.timezone}
-            name={customerName}
-            phone={customerPhone}
-            isSubmitting={isSubmittingBooking}
-            errorMessage={bookingError}
-            onChangeName={setCustomerName}
-            onChangePhone={setCustomerPhone}
-            onBack={() => setStep(2)}
-            onSubmit={handleCreateBooking}
-          />
-        )}
-
-        {step === 4 && bookingResponse && (
-          <StepPayment
-            slug={slug}
-            booking={bookingResponse}
-            onPaymentConfirmed={() => {
-              if (typeof window !== "undefined") {
-                try {
-                  sessionStorage.removeItem(`booking_session_${slug}`);
-                  window.history.replaceState(null, "", publicBookingPagePath(slug));
-                } catch {
-                  // ignore
-                }
-              }
-              setIsCompleted(true);
-            }}
-            onRestart={handleRestart}
-          />
-        )}
-      </div>
-
-      {/* Rodapé Seguro */}
-      <footer className="text-center text-[11px] text-muted-foreground pt-2">
-        <span>🔒 Seus dados estão protegidos. Sinal antecipado para garantia do horário.</span>
-      </footer>
-    </main>
+        </aside>
+      </main>
+      {pageFooter}
+    </div>
   );
 }

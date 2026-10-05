@@ -3,6 +3,7 @@
 import React from "react";
 import type { PublicService, AvailabilitySlot } from "./types";
 import { formatCurrency, formatDateFull, formatTimeSlot, formatDuration } from "./formatters";
+import { CalendarDays, Check, Clock3, MessageCircle, RotateCcw, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface BookingConfirmationProps {
@@ -35,91 +36,62 @@ export function BookingConfirmation({
   );
 
   return (
-    <div className="space-y-6 text-center animate-confirm-pop">
-      {/* Ícone de Sucesso com celebração discreta */}
-      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 text-3xl font-bold ring-8 ring-emerald-500/5 animate-confirm-pop">
-        ✓
-      </div>
-
-      <div className="space-y-1">
-        <h2 className="text-2xl font-bold text-foreground">Horário confirmado!</h2>
-        <p className="text-sm text-muted-foreground">
-          Seu agendamento na <span className="font-semibold text-foreground">{businessName}</span> foi garantido.
+    <div className="space-y-6">
+      <div className="text-center" role="status" aria-live="polite">
+        <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-success-soft text-success ring-8 ring-success-soft/50 animate-confirm-pop">
+          <Check aria-hidden="true" className="size-8" strokeWidth={3} />
+        </div>
+        <h2 className="mt-5 font-display text-2xl font-extrabold tracking-tight text-ink sm:text-3xl">Horário confirmado!</h2>
+        <p className="mt-2 text-sm text-muted">
+          Sinal recebido. Seu horário em <span className="font-semibold text-ink">{businessName}</span> está garantido.
         </p>
       </div>
 
-      {/* Cartão de Resumo da Reserva */}
-      <div className="rounded-2xl border border-border bg-surface p-5 text-left space-y-4 shadow-sm">
-        <div className="border-b border-border pb-3">
-          <p className="text-xs uppercase font-semibold text-muted-foreground tracking-wide">
-            Serviço reservado
-          </p>
-          <p className="text-lg font-bold text-foreground mt-0.5">{service.name}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">⏱ Duração: {formatDuration(service.durationMinutes)}</p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 text-xs border-b border-border pb-3">
-          <div>
-            <p className="text-muted-foreground">Data</p>
-            <p className="font-semibold text-foreground capitalize mt-0.5">
-              {formatDateFull(slot.startsAt, timezone)}
-            </p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">Horário</p>
-            <p className="font-semibold text-foreground text-sm mt-0.5">
-              {formatTimeSlot(slot.startsAt, timezone)}
-            </p>
-          </div>
-        </div>
-
-        <div className="text-xs border-b border-border pb-3 space-y-1">
-          <p className="text-muted-foreground">Cliente</p>
-          <p className="font-semibold text-foreground">{customerName}</p>
-          <p className="text-muted-foreground">{customerPhone}</p>
-        </div>
-
-        <div className="text-xs space-y-1.5 pt-1">
-          <div className="flex justify-between items-center">
-            <span className="text-muted-foreground">Valor total:</span>
-            <span className="font-medium text-foreground">{formatCurrency(service.priceCents)}</span>
-          </div>
-          {service.depositCents > 0 && (
-            <div className="flex justify-between items-center text-emerald-600 font-semibold">
-              <span>Sinal pago no Pix:</span>
-              <span>{formatCurrency(service.depositCents)}</span>
+      {/* Comprovante em formato de ticket */}
+      <article aria-label="Comprovante do agendamento" className="overflow-hidden rounded-card border border-line bg-surface">
+        <div className="p-5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Serviço</p>
+          <p className="mt-1 font-display text-xl font-bold text-ink">{service.name}</p>
+          <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+            <div className="flex items-start gap-2">
+              <CalendarDays aria-hidden="true" className="mt-0.5 size-4 text-muted" />
+              <div><dt className="sr-only">Data</dt><dd className="font-semibold text-ink first-letter:uppercase">{formatDateFull(slot.startsAt, timezone)}</dd></div>
             </div>
-          )}
-          {remainingCents > 0 && (
-            <div className="flex justify-between items-center font-bold text-foreground text-sm pt-1">
-              <span>Restante no local:</span>
-              <span>{formatCurrency(remainingCents)}</span>
+            <div className="flex items-start gap-2">
+              <Clock3 aria-hidden="true" className="mt-0.5 size-4 text-muted" />
+              <div><dt className="sr-only">Horário</dt><dd className="font-semibold tabular-nums text-ink">{formatTimeSlot(slot.startsAt, timezone)} · {formatDuration(service.durationMinutes)}</dd></div>
             </div>
-          )}
+            <div className="flex items-start gap-2 sm:col-span-2">
+              <User aria-hidden="true" className="mt-0.5 size-4 text-muted" />
+              <div><dt className="sr-only">Cliente</dt><dd className="text-ink"><span className="font-semibold">{customerName}</span> <span className="text-muted">· {customerPhone}</span></dd></div>
+            </div>
+          </dl>
         </div>
-      </div>
+        <div className="relative border-t border-dashed border-line-strong/50 bg-subtle/60 p-5">
+          <span aria-hidden="true" className="absolute -left-3 -top-3 size-6 rounded-full border border-line bg-paper" />
+          <span aria-hidden="true" className="absolute -right-3 -top-3 size-6 rounded-full border border-line bg-paper" />
+          <dl className="space-y-1.5 text-sm">
+            <div className="flex justify-between"><dt className="text-muted">Valor do serviço</dt><dd className="tabular-nums text-ink">{formatCurrency(service.priceCents)}</dd></div>
+            {service.depositCents > 0 && (
+              <div className="flex justify-between font-semibold text-success"><dt className="inline-flex items-center gap-1.5"><Check aria-hidden="true" className="size-3.5" />Sinal pago no Pix</dt><dd className="tabular-nums">{formatCurrency(service.depositCents)}</dd></div>
+            )}
+            <div className="flex justify-between border-t border-line pt-2 font-bold text-ink"><dt>Restante no local</dt><dd className="tabular-nums">{formatCurrency(remainingCents)}</dd></div>
+          </dl>
+        </div>
+      </article>
 
-      {/* Ações */}
-      <div className="space-y-3 pt-3 border-t border-border/60">
-        <Button
-          asChild
-          className="w-full min-h-12 rounded-full font-bold bg-[#25D366] hover:bg-[#20bd5a] text-white shadow-xs transition-feedback active:scale-[0.99]"
-        >
-          <a
-            href={`https://wa.me/?text=${whatsappMessage}`}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            💬 Enviar Confirmação no WhatsApp
+      <p className="rounded-card border border-line bg-surface p-4 text-sm text-muted">
+        <strong className="font-semibold text-ink">Vai se atrasar ou precisa remarcar?</strong> Avise o estabelecimento pelo WhatsApp o quanto antes.
+      </p>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Button asChild size="lg">
+          <a href={`https://wa.me/?text=${whatsappMessage}`} target="_blank" rel="noopener noreferrer">
+            <MessageCircle aria-hidden="true" /> Enviar no WhatsApp
           </a>
         </Button>
-
-        <Button
-          onClick={onNewBooking}
-          variant="outline"
-          className="w-full min-h-12 rounded-full font-semibold transition-feedback active:scale-[0.99]"
-        >
-          Fazer outro agendamento
+        <Button onClick={onNewBooking} variant="outline" size="lg">
+          <RotateCcw aria-hidden="true" /> Fazer outro agendamento
         </Button>
       </div>
     </div>

@@ -2,15 +2,13 @@
 
 import React, { useState } from "react";
 import type { PublicService, AvailabilitySlot } from "./types";
-import {
-  formatCurrency,
-  formatDuration,
-  formatPhoneMask,
-  formatTimeSlot,
-  formatDateFull,
-  isValidBrazilianPhone,
-} from "./formatters";
+import { formatCurrency, formatPhoneMask, isValidBrazilianPhone } from "./formatters";
+import { ArrowLeft, Lock, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { FieldError, FieldHint } from "@/components/ui/field";
+import { BookingSummary } from "./BookingSummary";
 
 interface StepCustomerProps {
   service: PublicService;
@@ -24,6 +22,8 @@ interface StepCustomerProps {
   onChangePhone: (phone: string) => void;
   onBack: () => void;
   onSubmit: () => void;
+  /** Classes do resumo (ex.: `lg:hidden` quando a página já mostra o resumo ao lado). */
+  summaryClassName?: string;
 }
 
 export function StepCustomer({
@@ -38,6 +38,7 @@ export function StepCustomer({
   onChangePhone,
   onBack,
   onSubmit,
+  summaryClassName,
 }: StepCustomerProps) {
   const [touched, setTouched] = useState({ name: false, phone: false });
 
@@ -58,146 +59,76 @@ export function StepCustomer({
     }
   };
 
-  const remainingCents = Math.max(0, service.priceCents - service.depositCents);
+  const nameError = touched.name && !isNameValid ? "Informe seu nome (pelo menos 2 letras)." : null;
+  const phoneError = touched.phone && !isPhoneValid ? "Informe um celular válido com DDD, por exemplo (11) 98765-4321." : null;
 
   return (
-    <form onSubmit={handleFormSubmit} className="space-y-5" noValidate>
+    <form onSubmit={handleFormSubmit} className="space-y-6" noValidate>
       <div>
-        <h2 className="text-xl font-semibold text-foreground">Seus dados para contato</h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Informe seu nome e WhatsApp para confirmar a reserva.
-        </p>
+        <h2 className="font-display text-xl font-bold tracking-tight text-ink sm:text-2xl">Seus dados para contato</h2>
+        <p className="mt-1 text-sm text-muted">Só nome e WhatsApp. Sem cadastro e sem senha.</p>
       </div>
 
-      {/* Resumo do Horário Selecionado */}
-      <section
-        aria-label="Resumo do agendamento"
-        className="rounded-xl border border-border bg-surface p-4 space-y-2.5 text-sm"
-      >
-        <div className="flex justify-between items-start">
-          <div>
-            <p className="font-semibold text-foreground">{service.name}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              ⏱ {formatDuration(service.durationMinutes)} de atendimento
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="font-semibold text-foreground">{formatCurrency(service.priceCents)}</p>
-            <p className="text-xs text-muted-foreground">Valor total</p>
-          </div>
-        </div>
+      <BookingSummary service={service} slot={slot} timezone={timezone} variant="plain" className={summaryClassName} headingLevel="h3" />
 
-        <div className="border-t border-border pt-2 text-xs text-muted-foreground space-y-1">
-          <p>
-            📅 <span className="font-medium text-foreground capitalize">{formatDateFull(slot.startsAt, timezone)}</span>
-          </p>
-          <p>
-            ⏰ Horário: <span className="font-semibold text-foreground">{formatTimeSlot(slot.startsAt, timezone)}</span>
-          </p>
-        </div>
-
-        {service.depositCents > 0 && (
-          <div className="border-t border-border pt-2 flex items-center justify-between text-xs">
-            <span className="font-semibold text-primary">Sinal no Pix agora:</span>
-            <span className="font-bold text-primary text-sm">{formatCurrency(service.depositCents)}</span>
-          </div>
-        )}
-        {remainingCents > 0 && service.depositCents > 0 && (
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Restante a pagar no local:</span>
-            <span>{formatCurrency(remainingCents)}</span>
-          </div>
-        )}
-      </section>
-
-      {/* Campos de Entrada */}
-      <div className="space-y-4">
-        <div>
-          <label htmlFor="customer-name" className="block text-sm font-medium text-foreground mb-1.5">
-            Nome completo
-          </label>
-          <input
+      <div className="space-y-5">
+        <div className="space-y-2">
+          <Label htmlFor="customer-name">Seu nome</Label>
+          <Input
             id="customer-name"
-            type="text"
             required
             autoComplete="name"
-            placeholder="Como gostaria de ser chamado?"
+            placeholder="Como podemos te chamar?"
             value={name}
             onChange={(e) => onChangeName(e.target.value)}
             onBlur={() => setTouched((prev) => ({ ...prev, name: true }))}
-            aria-invalid={touched.name && !isNameValid}
-            aria-describedby={touched.name && !isNameValid ? "name-error" : undefined}
-            className={`w-full rounded-xl border bg-surface px-4 py-3 text-base text-foreground placeholder:text-muted-foreground/60 min-h-12 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
-              touched.name && !isNameValid ? "border-destructive ring-1 ring-destructive" : "border-border"
-            }`}
+            aria-invalid={nameError ? true : undefined}
+            aria-describedby={nameError ? "name-error" : undefined}
           />
-          {touched.name && !isNameValid && (
-            <p id="name-error" className="mt-1 text-xs text-destructive">
-              Por favor, informe seu nome (pelo menos 2 caracteres).
-            </p>
-          )}
+          <FieldError id="name-error">{nameError}</FieldError>
         </div>
 
-        <div>
-          <label htmlFor="customer-phone" className="block text-sm font-medium text-foreground mb-1.5">
-            WhatsApp para confirmação
-          </label>
-          <input
-            id="customer-phone"
-            type="tel"
-            inputMode="tel"
-            required
-            autoComplete="tel"
-            placeholder="(11) 98765-4321"
-            value={phone}
-            onChange={handlePhoneChange}
-            onBlur={() => setTouched((prev) => ({ ...prev, phone: true }))}
-            aria-invalid={touched.phone && !isPhoneValid}
-            aria-describedby={touched.phone && !isPhoneValid ? "phone-error" : undefined}
-            className={`w-full rounded-xl border bg-surface px-4 py-3 text-base text-foreground placeholder:text-muted-foreground/60 min-h-12 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
-              touched.phone && !isPhoneValid ? "border-destructive ring-1 ring-destructive" : "border-border"
-            }`}
-          />
-          {touched.phone && !isPhoneValid && (
-            <p id="phone-error" className="mt-1 text-xs text-destructive">
-              Informe um número de celular válido com DDD (ex: 11 99999-9999).
-            </p>
-          )}
+        <div className="space-y-2">
+          <Label htmlFor="customer-phone">WhatsApp</Label>
+          <div className="relative">
+            <MessageCircle aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
+            <Input
+              id="customer-phone"
+              type="tel"
+              inputMode="tel"
+              required
+              autoComplete="tel"
+              placeholder="(11) 98765-4321"
+              value={phone}
+              onChange={handlePhoneChange}
+              onBlur={() => setTouched((prev) => ({ ...prev, phone: true }))}
+              aria-invalid={phoneError ? true : undefined}
+              aria-describedby={phoneError ? "phone-error phone-hint" : "phone-hint"}
+              className="pl-10"
+            />
+          </div>
+          <FieldHint id="phone-hint">Usado só para lembrar você do horário.</FieldHint>
+          <FieldError id="phone-error">{phoneError}</FieldError>
         </div>
       </div>
 
-      {/* Erro Geral do Servidor */}
       {errorMessage && (
-        <div
-          role="alert"
-          aria-live="assertive"
-          className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-xs text-destructive"
-        >
+        <div role="alert" className="rounded-card border border-danger/30 bg-danger-soft p-4 text-sm font-medium text-danger">
           {errorMessage}
         </div>
       )}
 
-      {/* Ações Voltar / Confirmar */}
-      <div className="flex items-center gap-3 pt-3 border-t border-border/60">
-        <Button
-          type="button"
-          variant="outline"
-          disabled={isSubmitting}
-          onClick={onBack}
-          className="flex-1 min-h-12 rounded-full font-semibold"
-        >
-          Voltar
+      <div className="flex flex-col-reverse gap-3 border-t border-line pt-5 sm:flex-row sm:items-center sm:justify-between">
+        <Button type="button" variant="ghost" disabled={isSubmitting} onClick={onBack} className="sm:-ml-3">
+          <ArrowLeft aria-hidden="true" /> Voltar
         </Button>
-        <Button
-          type="submit"
-          disabled={isSubmitting}
-          className="flex-[2] min-h-12 rounded-full font-bold shadow-xs"
-        >
+        <Button type="submit" size="lg" variant={service.depositCents > 0 ? "pix" : "default"} disabled={isSubmitting} className="w-full sm:w-auto">
+          {service.depositCents > 0 && <Lock aria-hidden="true" />}
           {isSubmitting
-            ? "Processando..."
+            ? "Gerando Pix…"
             : service.depositCents > 0
-            ? `Pagar sinal de ${formatCurrency(service.depositCents)}`
-            : "Confirmar agendamento"}
+              ? `Gerar Pix de ${formatCurrency(service.depositCents)}`
+              : "Confirmar agendamento"}
         </Button>
       </div>
     </form>

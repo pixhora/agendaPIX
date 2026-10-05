@@ -3,8 +3,12 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import type { BookingResponse, PaymentStatusResponse } from "./types";
 import { formatCurrency } from "./formatters";
+import { Check, Copy, FlaskConical, Loader2, RefreshCw, Timer, TimerOff } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ValueSlab, StatusChip } from "@/components/ui/value-slab";
+import type { AvailabilitySlot, PublicService } from "./types";
+import { formatDateFull, formatTimeSlot } from "./formatters";
 import { publicBookingPaymentUrl } from "@/lib/public-api";
 
 interface StepPaymentProps {
@@ -13,6 +17,8 @@ interface StepPaymentProps {
   onPaymentConfirmed: (updatedBooking: PaymentStatusResponse) => void;
   onRestart: () => void;
   checkStatusFn?: () => Promise<PaymentStatusResponse | null>;
+  /** Dados do pedido para o resumo acima do QR. */
+  summary?: { service: PublicService; slot: AvailabilitySlot; timezone: string };
 }
 
 export function StepPayment({
@@ -21,6 +27,7 @@ export function StepPayment({
   onPaymentConfirmed,
   onRestart,
   checkStatusFn,
+  summary,
 }: StepPaymentProps) {
   const [copied, setCopied] = useState(false);
   const [timeLeft, setTimeLeft] = useState<string>("");
@@ -130,6 +137,7 @@ export function StepPayment({
     try {
       await navigator.clipboard.writeText(payment.copyPaste);
       setCopied(true);
+      toast.success("Código Pix copiado", { description: "Cole no app do seu banco, em Pix › Copia e Cola." });
       setTimeout(() => setCopied(false), 2500);
     } catch {
       // Fallback para seleção manual
@@ -138,123 +146,113 @@ export function StepPayment({
 
   if (isExpired) {
     return (
-      <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-center space-y-4">
-        <h2 className="text-xl font-bold text-destructive">Tempo de reserva esgotado</h2>
-        <p className="text-sm text-foreground">
-          O prazo para pagamento do sinal de 15 minutos expirou e o horário foi liberado para outros clientes.
-        </p>
-        <Button onClick={onRestart} className="w-full min-h-11 font-semibold">
+      <div role="alert" className="space-y-4 rounded-card border border-danger/30 bg-danger-soft p-6 text-center">
+        <TimerOff aria-hidden="true" className="mx-auto size-8 text-danger" />
+        <h2 className="font-display text-xl font-bold text-ink">Tempo de reserva esgotado</h2>
+        <p className="text-sm text-ink">O prazo de 15 minutos para pagar o sinal acabou e o horário foi liberado para outros clientes.</p>
+        <Button onClick={onRestart} size="lg" className="w-full">
           Fazer novo agendamento
         </Button>
       </div>
     );
   }
 
+  const expiresLabel = expiresAt ? formatTimeSlot(expiresAt, summary?.timezone ?? "America/Sao_Paulo") : null;
+
   return (
-    <div className="space-y-5">
-      <div className="text-center space-y-1">
-        <h2 className="text-xl font-semibold text-foreground">Pague o sinal por Pix</h2>
-        <p className="text-sm text-muted-foreground">
-          Horário pré-reservado. Conclua o Pix para confirmar sua vaga.
+    <div className="space-y-6">
+      <div>
+        <h2 className="font-display text-xl font-bold tracking-tight text-ink sm:text-2xl">Pague o sinal por Pix</h2>
+        <p role="status" aria-live="polite" aria-atomic="true" className="mt-2 flex items-center gap-2 text-sm text-ink">
+          <span className="relative flex size-2.5" aria-hidden="true">
+            <span className="absolute inline-flex size-full animate-ping rounded-full bg-pix opacity-60 motion-reduce:animate-none" />
+            <span className="relative inline-flex size-2.5 rounded-full bg-pix" />
+          </span>
+          {isChecking ? "Verificando o pagamento…" : "Horário pré-reservado. Aguardando o pagamento do Pix."}
         </p>
       </div>
 
-      {/* Alerta Obrigatório de Simulação / Teste */}
-      <div
-        role="alert"
-        className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-left text-xs text-amber-900 dark:text-amber-200 space-y-1"
-      >
-        <p className="font-bold flex items-center gap-1.5">
-          <span>⚠️</span> AMBIENTE DE TESTE / DEMONSTRAÇÃO
-        </p>
-        <p>
-          Este é um Pix simulado para testes. Não envie dinheiro real de sua conta bancária.
-        </p>
-      </div>
+      {payment?.provider === "fake" && (
+        <div role="note" className="flex gap-3 rounded-card border border-warning/30 bg-warning-soft p-4 text-sm text-warning">
+          <FlaskConical aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+          <p>
+            <strong className="font-semibold">Ambiente de teste.</strong> Este Pix é simulado: não envie dinheiro real.
+          </p>
+        </div>
+      )}
 
-      {/* Placa de Valor do Sinal (Elemento-Assinatura v2) */}
+      {/* Resumo estilo Stripe: valor em destaque antes do QR */}
       <ValueSlab
+        size="compact"
         label="Sinal a pagar por Pix"
         value={formatCurrency(payment?.amountCents ?? 0)}
         badge={
           timeLeft ? (
-            <StatusChip active={true}>
-              Expira em <span className="font-mono tabular-nums">{timeLeft}</span>
+            <StatusChip active tone="slab">
+              <Timer aria-hidden="true" className="size-3.5" />
+              <span aria-hidden="true" className="font-mono tabular-nums">{timeLeft}</span>
+              <span className="sr-only">{expiresLabel ? `Expira às ${expiresLabel}` : "Prazo em andamento"}</span>
             </StatusChip>
           ) : undefined
         }
-        sublabel="Horário garantido imediatamente após confirmação bancária"
+        sublabel={
+          summary
+            ? `${summary.service.name} · ${formatDateFull(summary.slot.startsAt, summary.timezone)}, ${formatTimeSlot(summary.slot.startsAt, summary.timezone)}`
+            : "O horário é confirmado assim que o Pix cair."
+        }
       />
 
-      {/* Caixa do QR Code e Copia e Cola */}
-      <div className="rounded-2xl border border-border bg-surface p-5 text-center space-y-4 shadow-sm">
-
-        {/* QR Code */}
-        {payment?.qrCodeDataUrl ? (
-          <div className="flex justify-center p-2">
-            <div className="rounded-xl border border-border bg-white p-3 shadow-inner inline-block">
+      <div className="rounded-card border border-line bg-surface p-5 sm:p-6">
+        <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-start">
+          {payment?.qrCodeDataUrl ? (
+            <div className="shrink-0 rounded-2xl border border-line bg-white p-3">
+              {/* QR sempre sobre branco, inclusive no modo escuro. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={payment.qrCodeDataUrl}
-                alt="QR Code do Pix simulado"
-                width={200}
-                height={200}
-                className="w-48 h-48 block mx-auto object-contain"
-              />
+              <img src={payment.qrCodeDataUrl} alt="QR Code do Pix para pagar o sinal" width={208} height={208} className="block size-44 object-contain sm:size-52" />
             </div>
+          ) : (
+            <div className="flex size-44 shrink-0 items-center justify-center rounded-2xl bg-subtle text-sm text-muted">QR Code indisponível</div>
+          )}
+          <div className="w-full min-w-0 space-y-4">
+            <ol className="space-y-2 text-sm text-ink">
+              <li className="flex gap-2"><span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-subtle text-xs font-bold">1</span>Abra o app do seu banco e vá em Pix.</li>
+              <li className="flex gap-2"><span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-subtle text-xs font-bold">2</span>Escaneie o QR ou use o Pix copia e cola.</li>
+              <li className="flex gap-2"><span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-subtle text-xs font-bold">3</span>Confirme o valor. A confirmação aparece aqui sozinha.</li>
+            </ol>
+            {payment?.copyPaste && (
+              <div className="space-y-2">
+                <Button type="button" variant="pix" size="lg" onClick={handleCopy} className="w-full">
+                  {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
+                  {copied ? "Código copiado" : "Copiar código Pix"}
+                </Button>
+                <span className="sr-only" aria-live="polite">{copied ? "Código Pix copiado." : ""}</span>
+                <label htmlFor="pix-copypaste" className="block text-xs font-semibold text-muted">Pix copia e cola</label>
+                <input
+                  id="pix-copypaste"
+                  type="text"
+                  readOnly
+                  value={payment.copyPaste}
+                  onFocus={(e) => e.currentTarget.select()}
+                  className="min-h-11 w-full truncate rounded-field border border-line bg-subtle px-3 font-mono text-xs text-ink"
+                />
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="h-48 flex items-center justify-center bg-muted rounded-xl text-xs text-muted-foreground">
-            QR Code indisponível
-          </div>
-        )}
-
-        {/* Copia e Cola */}
-        {payment?.copyPaste && (
-          <div className="space-y-2 text-left">
-            <label htmlFor="pix-copypaste" className="text-xs font-semibold text-muted-foreground block">
-              Código Pix Copia e Cola:
-            </label>
-            <div className="flex gap-2">
-              <input
-                id="pix-copypaste"
-                type="text"
-                readOnly
-                value={payment.copyPaste}
-                className="flex-1 rounded-lg border border-border bg-muted/50 px-3 py-2 text-xs font-mono text-foreground truncate focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:outline-none"
-              />
-              <Button
-                type="button"
-                variant={copied ? "default" : "outline"}
-                onClick={handleCopy}
-                className="shrink-0 min-h-11 px-4 text-xs font-semibold"
-              >
-                {copied ? "✓ Copiado!" : "Copiar"}
-              </Button>
-            </div>
-          </div>
-        )}
+        </div>
       </div>
 
       {checkError && (
-        <p role="alert" aria-live="polite" className="text-xs text-destructive text-center">
+        <p role="alert" className="text-center text-sm font-medium text-danger">
           {checkError}
         </p>
       )}
 
-      {/* Botão de Verificação Manual */}
-      <div className="space-y-2 pt-1">
-        <Button
-          type="button"
-          disabled={isChecking}
-          onClick={checkStatus}
-          className="w-full min-h-11 font-semibold"
-        >
-          {isChecking ? "Verificando confirmação..." : "Já fiz o pagamento no banco"}
+      <div className="space-y-2">
+        <Button type="button" variant="outline" disabled={isChecking} onClick={checkStatus} className="w-full">
+          {isChecking ? <Loader2 aria-hidden="true" className="animate-spin" /> : <RefreshCw aria-hidden="true" />}
+          {isChecking ? "Verificando confirmação…" : "Já paguei, verificar agora"}
         </Button>
-        <p className="text-[11px] text-center text-muted-foreground">
-          Após efetuar o Pix do sinal, a vaga é confirmada pelo estabelecimento. Guarde seu comprovante.
-        </p>
+        <p className="text-center text-xs text-muted">Verificamos automaticamente a cada poucos segundos. Guarde o comprovante.</p>
       </div>
     </div>
   );

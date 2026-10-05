@@ -1,4 +1,6 @@
 import React from "react";
+import { Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface StepProgressProps {
   currentStep: 1 | 2 | 3 | 4;
@@ -6,60 +8,41 @@ interface StepProgressProps {
 
 const STEPS = [
   { step: 1, label: "Serviço" },
-  { step: 2, label: "Horário" },
-  { step: 3, label: "Dados" },
+  { step: 2, label: "Data e hora" },
+  { step: 3, label: "Seus dados" },
   { step: 4, label: "Pix" },
 ] as const;
 
+/** Stepper serviço → data/hora → dados → Pix. */
 export function StepProgress({ currentStep }: StepProgressProps) {
+  const current = STEPS[currentStep - 1];
   return (
-    <nav aria-label="Etapas do agendamento" className="w-full mb-6">
-      <ol className="flex items-center justify-between gap-1 w-full" role="list">
-        {STEPS.map((s, idx) => {
+    <nav aria-label="Etapas do agendamento" className="w-full">
+      <p className="mb-2 flex items-baseline justify-between text-sm sm:hidden">
+        <span className="font-semibold text-ink">{current.label}</span>
+        <span className="text-muted">Passo {currentStep} de {STEPS.length}</span>
+      </p>
+      <ol className="grid grid-cols-4 gap-1.5 sm:gap-3" role="list">
+        {STEPS.map((s) => {
           const isDone = currentStep > s.step;
           const isCurrent = currentStep === s.step;
-
           return (
-            <li
-              key={s.step}
-              className="flex-1 flex flex-col items-center"
-              aria-current={isCurrent ? "step" : undefined}
-            >
-              <div className="w-full flex items-center">
-                {idx > 0 && (
-                  <div
-                    className={`h-1 flex-1 transition-step ${
-                      isDone ? "bg-primary" : "bg-border"
-                    }`}
-                  />
-                )}
-                <div
-                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 transition-step ${
-                    isCurrent
-                      ? "bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2 ring-offset-background"
-                      : isDone
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-surface text-muted-foreground border border-border"
-                  }`}
+            <li key={s.step} aria-current={isCurrent ? "step" : undefined} className="min-w-0">
+              <span className={cn("block h-1.5 rounded-full transition-step", isDone ? "bg-pix" : isCurrent ? "bg-ink" : "bg-line")} aria-hidden="true" />
+              <span className={cn("mt-2 hidden items-center gap-1.5 text-sm sm:flex", isCurrent ? "font-semibold text-ink" : isDone ? "text-ink" : "text-muted")}>
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold",
+                    isDone ? "bg-pix text-pix-foreground" : isCurrent ? "bg-ink text-paper" : "border border-line-strong/60 text-muted",
+                  )}
                 >
-                  {isDone ? "✓" : s.step}
-                </div>
-                {idx < STEPS.length - 1 && (
-                  <div
-                    className={`h-1 flex-1 transition-step ${
-                      isDone && currentStep > s.step + 1 ? "bg-primary" : "bg-border"
-                    }`}
-                  />
-                )}
-              </div>
-              <span
-                className={`mt-1.5 text-xs transition-step ${
-                  isCurrent
-                    ? "text-accent-forest dark:text-primary font-bold"
-                    : "text-muted-foreground font-medium"
-                }`}
-              >
-                {s.label}
+                  {isDone ? <Check className="size-3" strokeWidth={3} /> : s.step}
+                </span>
+                <span className="truncate">{s.label}</span>
+              </span>
+              <span className="sr-only">
+                {s.label}: {isDone ? "concluído" : isCurrent ? "etapa atual" : "pendente"}
               </span>
             </li>
           );

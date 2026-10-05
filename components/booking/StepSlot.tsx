@@ -2,7 +2,10 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import type { PublicService, AvailabilitySlot } from "./types";
-import { formatTimeSlot, formatCurrency } from "./formatters";
+import { formatTimeSlot, formatCurrency, formatDateFull } from "./formatters";
+import { ArrowLeft, ArrowRight, CalendarX2, Moon, Sun, Sunrise } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { publicAvailabilityUrl } from "@/lib/public-api";
 
@@ -15,6 +18,23 @@ interface StepSlotProps {
   onBack: () => void;
   onNext: () => void;
   getSlotsForDate?: (dateString: string) => Promise<AvailabilitySlot[]>;
+}
+
+type Period = "morning" | "afternoon" | "evening";
+const PERIODS: { id: Period; label: string; Icon: typeof Sun }[] = [
+  { id: "morning", label: "Manhã", Icon: Sunrise },
+  { id: "afternoon", label: "Tarde", Icon: Sun },
+  { id: "evening", label: "Noite", Icon: Moon },
+];
+
+/** Agrupa horários em manhã (<12h), tarde (12–18h) e noite (≥18h) no fuso do negócio. */
+export function groupSlotsByPeriod(slots: AvailabilitySlot[], timezone: string): Record<Period, AvailabilitySlot[]> {
+  const groups: Record<Period, AvailabilitySlot[]> = { morning: [], afternoon: [], evening: [] };
+  for (const slot of slots) {
+    const hour = Number(formatTimeSlot(slot.startsAt, timezone).slice(0, 2));
+    groups[hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening"].push(slot);
+  }
+  return groups;
 }
 
 interface DayOption {
@@ -231,165 +251,144 @@ export function StepSlot({
 
   const selectedSlot = slots.find((s) => s.startsAt === selectedStartsAt);
 
+  const groups = groupSlotsByPeriod(slots, timezone);
+  const nextDayWithSlots = days.find((day) => day.dateString > selectedDate && (daySlotCounts[day.dateString] ?? 0) > 0);
+
+  const handleDayKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+    if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+    event.preventDefault();
+    const nextIndex = (index + (event.key === "ArrowRight" ? 1 : -1) + days.length) % days.length;
+    rulerRef.current?.querySelectorAll<HTMLButtonElement>("button")[nextIndex]?.focus();
+  };
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold text-foreground">Escolha o horário</h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          {service.name} • {service.depositCents > 0 ? `Sinal: ${formatCurrency(service.depositCents)}` : "Sem sinal"}
+        <h2 className="font-display text-xl font-bold tracking-tight text-ink sm:text-2xl">Escolha o dia e o horário</h2>
+        <p className="mt-1 text-sm text-muted">
+          {service.name} · {service.depositCents > 0 ? `sinal de ${formatCurrency(service.depositCents)} por Pix` : "sem sinal"}
         </p>
       </div>
 
-      {/* Régua Tátil de Dias (Elemento Memorável) */}
+      {/* Faixa horizontal de dias (pills) */}
       <section aria-label="Régua de datas disponíveis">
-        <div className="relative">
-          {/* Fade esquerdo indica mais datas para rolar à esquerda */}
+        <div className="relative -mx-1">
           <div
-            className={`pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-background to-transparent z-10 transition-opening ${
-              canScrollLeft ? "opacity-100" : "opacity-0"
-            }`}
-            aria-hidden="true"
-          />
-          {/* Fade direito indica mais datas para rolar à direita */}
-          <div
-            className={`pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent z-10 transition-opening ${
-              canScrollRight ? "opacity-100" : "opacity-0"
-            }`}
+            className={cn("pointer-events-none absolute inset-y-0 left-0 z-10 w-8 bg-gradient-to-r from-surface to-transparent transition-opening", canScrollLeft ? "opacity-100" : "opacity-0")}
             aria-hidden="true"
           />
           <div
-            ref={rulerRef}
-            className="flex items-center gap-2 overflow-x-auto p-1.5 scroll-p-2 scrollbar-hide scroll-smooth"
-            role="group"
-            aria-label="Selecione uma data"
-          >
-            {days.map((day) => {
+            className={cn("pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l from-surface to-transparent transition-opening", canScrollRight ? "opacity-100" : "opacity-0")}
+            aria-hidden="true"
+          />
+          <div ref={rulerRef} className="flex snap-x gap-2 overflow-x-auto scroll-smooth p-1 scrollbar-hide" role="group" aria-label="Selecione uma data">
+            {days.map((day, index) => {
               const isCurrent = day.dateString === selectedDate;
               const count = daySlotCounts[day.dateString];
-              const hasSlots = count !== undefined && count !== null && count > 0;
               const isZero = count === 0;
-
+              const [dd] = day.dateNumber.split("/");
               return (
                 <button
                   key={day.dateString}
                   type="button"
+                  data-testid="day-option"
                   aria-pressed={isCurrent}
                   aria-current={isCurrent ? "date" : undefined}
+                  aria-label={`${day.dayLabel}, ${formatDateFull(`${day.dateString}T12:00:00Z`, "UTC")}${count == null ? "" : isZero ? ", sem vagas" : `, ${count} ${count === 1 ? "vaga" : "vagas"}`}`}
                   onClick={() => handleSelectDay(day.dateString)}
-                  onFocus={(e) => {
-                    e.currentTarget.scrollIntoView({
-                      behavior: "smooth",
-                      block: "nearest",
-                      inline: "nearest",
-                    });
-                  }}
-                  className={`flex flex-col items-center justify-center min-w-[76px] py-2 px-2.5 rounded-xl border text-center transition-feedback active:scale-[0.98] min-h-11 shrink-0 scroll-mx-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
-                    isCurrent
-                      ? "border-primary bg-primary text-primary-foreground shadow-sm"
-                      : "border-border bg-surface text-foreground hover:bg-muted/60"
-                  }`}
+                  onKeyDown={(event) => handleDayKeyDown(event, index)}
+                  onFocus={(e) => e.currentTarget.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" })}
+                  className={cn(
+                    "flex min-h-[84px] w-[68px] shrink-0 snap-start flex-col items-center justify-center gap-0.5 rounded-2xl border text-center transition-feedback active:scale-[0.98]",
+                    isCurrent ? "border-ink bg-ink text-paper shadow-[var(--shadow-card)]" : "border-line bg-surface text-ink hover:border-line-strong",
+                    isZero && !isCurrent && "text-muted",
+                  )}
                 >
-                  <span className={`text-xs font-semibold ${isCurrent ? "text-primary-foreground" : "text-foreground"}`}>
-                    {day.dayLabel}
-                  </span>
-                  <span className={`text-[11px] mt-0.5 ${isCurrent ? "text-primary-foreground/90" : "text-muted-foreground"}`}>
-                    {day.dateNumber}
-                  </span>
-                  <span
-                    className={`text-[10px] mt-1 font-medium px-1.5 py-0.5 rounded-full transition-feedback ${
-                      isCurrent
-                        ? "bg-primary-foreground/15 text-primary-foreground"
-                        : isZero
-                        ? "bg-muted text-muted-foreground/80"
-                        : hasSlots
-                        ? "bg-primary/10 text-primary font-semibold"
-                        : "bg-muted text-muted-foreground"
-                    }`}
-                  >
-                    {count === undefined || count === null
-                      ? "..."
-                      : isZero
-                      ? "Sem vagas"
-                      : `${count} vaga${count > 1 ? "s" : ""}`}
-                  </span>
+                  <span className={cn("text-xs font-semibold uppercase tracking-wide", isCurrent ? "text-paper/80" : "text-muted")}>{day.dayLabel}</span>
+                  <span className="font-display text-xl font-bold tabular-nums leading-none">{dd}</span>
+                  <span aria-hidden="true" className={cn("mt-1 h-1.5 w-1.5 rounded-full", count == null ? "bg-line" : isZero ? "bg-transparent ring-1 ring-line-strong" : isCurrent ? "bg-pix-bright" : "bg-pix")} />
                 </button>
               );
             })}
           </div>
         </div>
+        <p className="mt-2 flex items-center gap-3 text-xs text-muted" aria-hidden="true">
+          <span className="inline-flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-pix" />com vagas</span>
+          <span className="inline-flex items-center gap-1.5"><span className="size-1.5 rounded-full ring-1 ring-line-strong" />sem vagas</span>
+        </p>
       </section>
 
-      {/* Grade de Horários */}
-      <section aria-label="Horários disponíveis no dia" className="space-y-3">
+      {/* Horários agrupados por período */}
+      <section aria-label="Horários disponíveis no dia" className="space-y-5" aria-busy={isLoadingSlots}>
         {isLoadingSlots ? (
-          <div className="grid grid-cols-3 gap-2.5" role="status" aria-busy="true">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-11 bg-muted animate-pulse rounded-lg" />
-            ))}
+          <div role="status" className="space-y-3">
+            <Skeleton className="h-4 w-20" />
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+              {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-12 rounded-xl" />)}
+            </div>
             <span className="sr-only">Carregando horários disponíveis...</span>
           </div>
         ) : errorSlots ? (
-          <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4 text-center">
-            <p className="text-sm font-medium text-destructive">{errorSlots}</p>
-            <Button
-              variant="outline"
-              onClick={handleRetrySlots}
-              className="mt-3 min-h-11"
-            >
+          <div role="alert" className="rounded-card border border-danger/30 bg-danger-soft p-4 text-center">
+            <p className="text-sm font-semibold text-danger">{errorSlots}</p>
+            <Button type="button" variant="outline" onClick={handleRetrySlots} className="mt-3">
               Tentar novamente
             </Button>
           </div>
         ) : slots.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border p-6 text-center bg-surface/50">
-            <p className="text-sm font-medium text-foreground">Sem horários livres para este dia</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Todos os horários já foram reservados ou o local estará fechado. Toque em outro dia na régua acima.
-            </p>
+          <div role="status" className="flex flex-col items-center rounded-card border border-dashed border-line-strong/60 px-4 py-8 text-center">
+            <CalendarX2 aria-hidden="true" className="size-7 text-muted" />
+            <p className="mt-3 font-semibold text-ink">Sem horários neste dia</p>
+            <p className="mt-1 text-sm text-muted">Escolha outro dia na faixa acima.</p>
+            {nextDayWithSlots && (
+              <Button type="button" variant="outline" className="mt-4" onClick={() => handleSelectDay(nextDayWithSlots.dateString)}>
+                Ver {nextDayWithSlots.dayLabel === "Amanhã" ? "amanhã" : `${nextDayWithSlots.dayLabel.toLowerCase()} ${nextDayWithSlots.dateNumber}`}
+                <ArrowRight aria-hidden="true" />
+              </Button>
+            )}
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-2.5" role="radiogroup" aria-label="Horários disponíveis">
-            {slots.map((slot) => {
-              const isSelected = slot.startsAt === selectedStartsAt;
-              const timeLabel = formatTimeSlot(slot.startsAt, timezone);
-
-              return (
-                <button
-                  key={slot.startsAt}
-                  type="button"
-                  role="radio"
-                  aria-checked={isSelected}
-                  onClick={() => onSelectSlot(slot)}
-                  className={`min-h-11 flex items-center justify-center font-medium text-sm rounded-lg border transition-feedback active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
-                    isSelected
-                      ? "border-primary bg-primary text-primary-foreground font-semibold shadow-sm"
-                      : "border-border bg-surface text-foreground hover:border-primary/40 hover:bg-muted/40"
-                  }`}
-                >
-                  {timeLabel}
-                </button>
-              );
-            })}
+          <div role="radiogroup" aria-label="Horários disponíveis" className="space-y-5">
+            {PERIODS.filter((period) => groups[period.id].length > 0).map(({ id, label, Icon }) => (
+              <div key={id} role="group" aria-label={label}>
+                <h3 className="mb-2 flex items-center gap-2 font-sans text-sm font-semibold text-ink">
+                  <Icon aria-hidden="true" className="size-4 text-muted" />
+                  {label}
+                  <span className="font-normal text-muted">· {groups[id].length}</span>
+                </h3>
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                  {groups[id].map((slot) => {
+                    const isSelected = slot.startsAt === selectedStartsAt;
+                    return (
+                      <button
+                        key={slot.startsAt}
+                        type="button"
+                        role="radio"
+                        aria-checked={isSelected}
+                        onClick={() => onSelectSlot(slot)}
+                        className={cn(
+                          "min-h-12 rounded-xl border text-base font-semibold tabular-nums transition-feedback active:scale-[0.98]",
+                          isSelected ? "border-ink bg-ink text-paper shadow-[var(--shadow-card)]" : "border-line bg-surface text-ink hover:border-ink",
+                        )}
+                      >
+                        {formatTimeSlot(slot.startsAt, timezone)}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </section>
 
-      {/* Ações Voltar / Avançar */}
-      <div className="flex items-center gap-3 pt-3 border-t border-border/60">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onBack}
-          className="flex-1 min-h-12 rounded-full font-semibold transition-feedback active:scale-[0.99]"
-        >
-          Voltar
+      <div className="flex flex-col-reverse gap-3 border-t border-line pt-5 sm:flex-row sm:items-center sm:justify-between">
+        <Button type="button" variant="ghost" onClick={onBack} className="sm:-ml-3">
+          <ArrowLeft aria-hidden="true" /> Voltar
         </Button>
-        <Button
-          type="button"
-          disabled={!selectedSlot}
-          onClick={onNext}
-          className="flex-[2] min-h-12 rounded-full font-bold transition-feedback active:scale-[0.99]"
-        >
-          {selectedSlot ? "Preencher meus dados" : "Selecione um horário"}
+        <Button type="button" size="lg" onClick={onNext} disabled={!selectedSlot} className="w-full sm:w-auto">
+          {selectedSlot ? `Continuar com ${formatTimeSlot(selectedSlot.startsAt, timezone)}` : "Escolha um horário"}
+          <ArrowRight aria-hidden="true" />
         </Button>
       </div>
     </div>
