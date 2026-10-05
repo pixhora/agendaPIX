@@ -39,6 +39,22 @@ pnpm test:db
 O terminal 3 adicionará os fluxos reais quando o agendamento e o Pix existirem.
 `/api/health` verifica o processo HTTP, sem afirmar disponibilidade do banco ou do SMTP.
 
+## Frontend
+
+O produto é um único app Next: as telas e as rotas de API rodam no mesmo processo e na mesma origem. Não há backend separado nem proxy.
+
+| Rota | O que é | Dados |
+| --- | --- | --- |
+| `/` | Landing | Estática |
+| `/[slug]` | Página pública de agendamento com sinal por Pix | `GET/POST /api/public/[slug]/*` (same-origin) |
+| `/onboarding` | Cadastro do negócio em 4 passos; termina com link mágico | `POST /api/auth/sign-in/magic-link` |
+| `/onboarding/concluir` | Destino do link mágico do cadastro; provisiona o negócio | `POST /api/onboarding` (sessão por cookie, `Idempotency-Key`) |
+| `/login` | Entrada do dono por link mágico (volta para `/dashboard`) | `POST /api/auth/sign-in/magic-link` |
+| `/preview/*` | Demonstração com dados falsos (`lib/preview/mock-data.ts`) | Nenhuma chamada ao banco |
+
+As URLs das rotas públicas são montadas em `lib/public-api.ts`, que codifica slug, ids e parâmetros de busca com `encodeURIComponent`/`URLSearchParams`.
+Tokens visuais e a Placa de Valor estão descritos em [docs/design-tokens.md](docs/design-tokens.md).
+
 ## Autenticação
 
 Better Auth oferece email com link mágico em `/api/auth/[...all]`. Configure as variáveis SMTP antes de solicitar um link.
