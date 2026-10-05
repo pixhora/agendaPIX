@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -44,6 +44,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  await database.delete(schema.paymentAudit).where(inArray(schema.paymentAudit.businessId, businessIds));
   const payments = await database.select().from(schema.payments).where(inArray(schema.payments.businessId, businessIds));
   const externalIds = payments.flatMap((payment) => payment.externalId ? [payment.externalId] : []);
   if (externalIds.length) await database.delete(schema.paymentEvents).where(inArray(schema.paymentEvents.externalId, externalIds));
@@ -57,6 +58,11 @@ afterEach(async () => {
   await database.delete(schema.user).where(eq(schema.user.id, ownerId));
 });
 afterAll(async () => { await pool.end(); });
+async function webhookRowCounts() {
+  const [deliveries] = await database.select({ count: sql<number>`count(*)::int` }).from(schema.webhookDeliveries);
+  const [events] = await database.select({ count: sql<number>`count(*)::int` }).from(schema.paymentEvents);
+  return { deliveries: deliveries.count, events: events.count };
+}
 
 describe("reserva e cobrança do sinal", () => {
   it("gera cobrança, protege consulta e repete pedido sem duplicar", async () => {
@@ -97,10 +103,19 @@ describe("reserva e cobrança do sinal", () => {
   });
   it("falha do provider reverte reserva e permite nova tentativa", async () => {
     const key = randomUUID();
-    const broken = { name: "fake", createPixCharge: async () => { throw new Error("Falha simulada"); }, verifyWebhook: provider.verifyWebhook.bind(provider) };
+    const broken = { name: provider.name, createPixCharge: async () => { throw new Error("Falha simulada"); }, getCharge: provider.getCharge.bind(provider), findChargeByReference: provider.findChargeByReference.bind(provider), cancelCharge: provider.cancelCharge.bind(provider), verifyWebhook: provider.verifyWebhook.bind(provider) };
     await expect(createBooking(slugs[0], input(), key, database, broken)).rejects.toMatchObject({ status: 503 });
-    expect(await database.select().from(schema.bookings).where(eq(schema.bookings.businessId, businessIds[0]))).toHaveLength(0);
-    expect((await createBooking(slugs[0], input(), key, database, provider)).data.payment?.amountCents).toBe(1000);
+    const stuck = await database.select().from(schema.bookings).where(eq(schema.bookings.businessId, businessIds[0]));
+    expect(stuck).toHaveLength(1);
+    expect(stuck[0].status).toBe("pending_payment");
+    const [stuckPayment] = await database.select().from(schema.payments).where(eq(schema.payments.bookingId, stuck[0].id));
+    expect(stuckPayment.status).toBe("creating");
+    // Replay com a mesma chave retoma a cobrança fora da transação, sem segunda reserva.
+    const resumed = await createBooking(slugs[0], input(), key, database, provider);
+    expect(resumed.replayed).toBe(true);
+    expect(resumed.data.payment?.amountCents).toBe(1000);
+    expect(resumed.data.payment?.status).toBe("pending");
+    expect(await database.select().from(schema.bookings).where(eq(schema.bookings.businessId, businessIds[0]))).toHaveLength(1);
   });
   it("mesma chave em negócios diferentes não cruza cobranças", async () => {
     const key = randomUUID();
@@ -126,27 +141,44 @@ describe("webhook transacional e auditável", () => {
     });
     await expect(processWebhook(request.clone(), "fake", failingDatabase, provider)).rejects.toMatchObject({ status: 503 });
     expect((await getBookingPayment(slugs[0], data.bookingId, `Bearer ${data.accessToken}`, database)).status).toBe("pending_payment");
+    // Falha reverte também a entrega: nada fica gravado e o reenvio do provedor processa normalmente.
+    expect(await database.select().from(schema.webhookDeliveries).where(eq(schema.webhookDeliveries.bodyHash, bodyHashes[0]))).toHaveLength(0);
     expect(await processWebhook(request.clone(), "fake", database, provider)).toMatchObject({ outcome: "processed" });
     const deliveries = await database.select().from(schema.webhookDeliveries).where(eq(schema.webhookDeliveries.bodyHash, bodyHashes[0]));
-    expect(deliveries.map((delivery) => delivery.outcome).sort()).toEqual(["failed", "processed"]);
+    expect(deliveries.map((delivery) => delivery.outcome)).toEqual(["processed"]);
   });
-  it("processa entregas simultâneas uma vez e registra ambas", async () => {
+  it("processa entregas simultâneas uma vez e grava uma única entrega", async () => {
     const { data } = await createBooking(slugs[0], input(), randomUUID(), database, provider);
     const eventId = randomUUID();
     const request = webhook(data.payment!.externalId!, { eventId });
     const result = await Promise.all([processWebhook(request.clone(), "fake", database, provider), processWebhook(request.clone(), "fake", database, provider)]);
     expect(result.map((item) => item.outcome).sort()).toEqual(["duplicate", "processed"]);
     expect(await database.select().from(schema.paymentEvents).where(eq(schema.paymentEvents.eventId, eventId))).toHaveLength(1);
-    expect(await database.select().from(schema.webhookDeliveries).where(eq(schema.webhookDeliveries.eventId, eventId))).toHaveLength(2);
+    expect(await database.select().from(schema.webhookDeliveries).where(eq(schema.webhookDeliveries.eventId, eventId))).toHaveLength(1);
     const status = await getBookingPayment(slugs[0], data.bookingId, `Bearer ${data.accessToken}`, database);
     expect(status.status).toBe("confirmed"); expect(status.payment?.status).toBe("paid"); expect(status.payment?.copyPaste).toBeNull();
   });
-  it("assinatura inválida fica registrada sem alterar pagamento", async () => {
+  it("assinatura inválida ou evento malformado não gravam nada nem alteram pagamento", async () => {
     const { data } = await createBooking(slugs[0], input(), randomUUID(), database, provider);
-    await expect(processWebhook(webhook(data.payment!.externalId!, {}, false), "fake", database, provider)).rejects.toMatchObject({ status: 401 });
-    const [delivery] = await database.select().from(schema.webhookDeliveries).where(eq(schema.webhookDeliveries.bodyHash, bodyHashes[0]));
-    expect(delivery.outcome).toBe("rejected"); expect(delivery.reason).toBe("invalid_signature");
+    const before = await webhookRowCounts();
+    for (let attempt = 0; attempt < 25; attempt++) {
+      await expect(processWebhook(webhook(data.payment!.externalId!, {}, false), "fake", database, provider)).rejects.toMatchObject({ status: 401 });
+    }
+    await expect(processWebhook(webhook(data.payment!.externalId!, { amountCents: "1000" }), "fake", database, provider)).rejects.toMatchObject({ status: 400 });
+    await expect(processWebhook(webhook(data.payment!.externalId!), "other", database, provider)).rejects.toMatchObject({ status: 404 });
+    expect(await webhookRowCounts()).toEqual(before);
     expect((await getBookingPayment(slugs[0], data.bookingId, `Bearer ${data.accessToken}`, database)).payment?.status).toBe("pending");
+  });
+  it("replay sequencial do mesmo evento é no-op: uma entrega, um evento, resposta duplicate", async () => {
+    const { data } = await createBooking(slugs[0], input(), randomUUID(), database, provider);
+    const eventId = randomUUID();
+    const request = webhook(data.payment!.externalId!, { eventId });
+    expect(await processWebhook(request.clone(), "fake", database, provider)).toMatchObject({ outcome: "processed" });
+    const before = await webhookRowCounts();
+    for (let attempt = 0; attempt < 3; attempt++) expect(await processWebhook(request.clone(), "fake", database, provider)).toMatchObject({ outcome: "duplicate" });
+    expect(await webhookRowCounts()).toEqual(before);
+    const [delivery] = await database.select().from(schema.webhookDeliveries).where(eq(schema.webhookDeliveries.eventId, eventId));
+    expect(delivery.outcome).toBe("processed");
   });
   it("valor incorreto não confirma, e evento posterior correto confirma", async () => {
     const { data } = await createBooking(slugs[0], input(), randomUUID(), database, provider);
@@ -158,16 +190,18 @@ describe("webhook transacional e auditável", () => {
     const { data } = await createBooking(slugs[0], input(), randomUUID(), database, provider);
     const eventId = randomUUID();
     await processWebhook(webhook(data.payment!.externalId!, { eventId }), "fake", database, provider);
+    const before = await webhookRowCounts();
     await expect(processWebhook(webhook(data.payment!.externalId!, { eventId, amountCents: 2000 }), "fake", database, provider)).rejects.toMatchObject({ status: 409 });
+    expect(await webhookRowCounts()).toEqual(before);
   });
   it("pagamento tardio não toma horário reservado novamente", async () => {
     const first = await createBooking(slugs[0], input(), randomUUID(), database, provider);
     await database.update(schema.bookings).set({ createdAt: new Date(Date.now() - 60000), expiresAt: new Date(Date.now() - 1000) }).where(eq(schema.bookings.id, first.data.bookingId));
     await database.update(schema.payments).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(schema.payments.id, first.data.payment!.id));
     const second = await createBooking(slugs[0], input(), randomUUID(), database, provider);
-    expect(await processWebhook(webhook(first.data.payment!.externalId!), "fake", database, provider)).toMatchObject({ outcome: "ignored", reason: "late_payment" });
+    expect(await processWebhook(webhook(first.data.payment!.externalId!), "fake", database, provider)).toMatchObject({ outcome: "ignored", reason: "late_payment_refund_pending" });
     const old = await getBookingPayment(slugs[0], first.data.bookingId, `Bearer ${first.data.accessToken}`, database);
-    expect(old.status).toBe("expired"); expect(old.payment?.status).toBe("paid");
+    expect(old.status).toBe("expired"); expect(old.payment?.status).toBe("refund_pending");
     expect((await getBookingPayment(slugs[0], second.data.bookingId, `Bearer ${second.data.accessToken}`, database)).status).toBe("pending_payment");
   });
   it("evento de um negócio não altera a reserva do outro", async () => {

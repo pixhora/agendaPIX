@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, check, foreignKey, index, integer, pgEnum, pgTable, text, time, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, foreignKey, index, integer, jsonb, pgEnum, pgTable, primaryKey, text, time, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 
 export * from "./auth";
@@ -10,7 +10,8 @@ const timestamps = () => ({
 });
 
 export const bookingStatus = pgEnum("booking_status", ["pending_payment", "confirmed", "cancelled", "expired", "completed"]);
-export const paymentStatus = pgEnum("payment_status", ["pending", "paid", "expired", "failed", "refunded"]);
+export const paymentStatus = pgEnum("payment_status", ["creating", "pending", "paid", "expired", "cancelled", "failed", "refunded", "refund_pending"]);
+export const latePaymentPolicies = ["refund", "rebook_if_free"] as const;
 
 export const businesses = pgTable("businesses", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -18,11 +19,39 @@ export const businesses = pgTable("businesses", {
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   timezone: text("timezone").default("America/Sao_Paulo").notNull(),
+  // Política de pagamento tardio (webhook/reconciliação após o hold vencer): reembolso ou reabre o mesmo horário se livre.
+  latePaymentPolicy: text("late_payment_policy", { enum: latePaymentPolicies }).default("refund").notNull(),
   ...timestamps(),
 }, (table) => [
   index("businesses_owner_idx").on(table.ownerId),
   check("businesses_name_not_empty", sql`length(trim(${table.name})) > 0`),
   check("businesses_slug_format", sql`${table.slug} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`),
+  check("businesses_late_payment_policy_valid", sql`${table.latePaymentPolicy} IN ('refund', 'rebook_if_free')`),
+]);
+
+export const pixKeyTypes = ["cpf", "cnpj", "email", "phone", "evp"] as const;
+
+export const bookingRateLimits = pgTable("booking_rate_limits", {
+  businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "cascade" }),
+  clientHash: text("client_hash").notNull(),
+  windowStartedAt: timestamp("window_started_at", { withTimezone: true }).defaultNow().notNull(),
+  attempts: integer("attempts").notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.businessId, table.clientHash] }),
+  index("booking_rate_window_idx").on(table.windowStartedAt),
+  check("booking_rate_attempts_valid", sql`${table.attempts} >= 1`),
+]);
+export const businessPixKeys = pgTable("business_pix_keys", {
+  businessId: uuid("business_id").primaryKey().references(() => businesses.id, { onDelete: "restrict" }),
+  type: text("type", { enum: pixKeyTypes }).notNull(),
+  ciphertext: text("ciphertext").notNull(),
+  nonce: text("nonce").notNull(),
+  keyVersion: integer("key_version").notNull(),
+  hint: text("hint").notNull(),
+  ...timestamps(),
+}, (table) => [
+  check("business_pix_keys_cipher_valid", sql`length(${table.ciphertext}) > 0 AND length(${table.nonce}) > 0 AND ${table.keyVersion} > 0`),
+  check("business_pix_keys_type_valid", sql`${table.type} IN ('cpf', 'cnpj', 'email', 'phone', 'evp')`),
 ]);
 
 export const services = pgTable("services", {
@@ -76,6 +105,8 @@ export const bookings = pgTable("bookings", {
   requestKey: uuid("request_key"),
   requestHash: text("request_hash"),
   accessTokenHash: text("access_token_hash"),
+  // HMAC por negócio da identidade do cliente (nunca o IP bruto); usado só para limitar reservas pendentes.
+  clientHash: text("client_hash"),
   startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
   endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
   priceCents: integer("price_cents").notNull(),
@@ -87,6 +118,8 @@ export const bookings = pgTable("bookings", {
   unique("bookings_business_id_unique").on(table.businessId, table.id),
   unique("bookings_business_request_unique").on(table.businessId, table.requestKey),
   index("bookings_business_start_idx").on(table.businessId, table.startsAt),
+  index("bookings_pending_hold_idx").on(table.businessId, table.expiresAt).where(sql`${table.status} = 'pending_payment'`),
+  index("bookings_pending_client_idx").on(table.businessId, table.clientHash).where(sql`${table.status} = 'pending_payment'`),
   foreignKey({ name: "bookings_service_tenant_fk", columns: [table.businessId, table.serviceId], foreignColumns: [services.businessId, services.id] }),
   foreignKey({ name: "bookings_customer_tenant_fk", columns: [table.businessId, table.customerId], foreignColumns: [customers.businessId, customers.id] }),
   check("bookings_interval_valid", sql`${table.startsAt} < ${table.endsAt}`),
@@ -104,17 +137,22 @@ export const payments = pgTable("payments", {
   copyPaste: text("copy_paste"),
   idempotencyKey: uuid("idempotency_key").notNull().unique(),
   amountCents: integer("amount_cents").notNull(),
-  status: paymentStatus("status").default("pending").notNull(),
+  status: paymentStatus("status").default("creating").notNull(),
   paidAt: timestamp("paid_at", { withTimezone: true }),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   ...timestamps(),
 }, (table) => [
+  unique("payments_business_id_unique").on(table.businessId, table.id),
   foreignKey({ name: "payments_booking_tenant_fk", columns: [table.businessId, table.bookingId], foreignColumns: [bookings.businessId, bookings.id] }),
   index("payments_business_booking_idx").on(table.businessId, table.bookingId),
+  index("payments_reconcile_status_idx").on(table.status, table.updatedAt),
   unique("payments_provider_external_unique").on(table.provider, table.externalId),
   check("payments_amount_positive", sql`${table.amountCents} > 0`),
   check("payments_provider_not_empty", sql`length(trim(${table.provider})) > 0`),
   check("payments_paid_timestamp_required", sql`${table.status} <> 'paid' OR ${table.paidAt} IS NOT NULL`),
+  // creating: cobrando o gateway; pending: QR anexado; demais estados finais ou de auditoria.
+  check("payments_creating_has_no_qr", sql`${table.status} <> 'creating' OR (${table.qrCodeDataUrl} IS NULL AND ${table.copyPaste} IS NULL AND ${table.externalId} IS NULL)`),
+  check("payments_pending_has_qr", sql`${table.status} <> 'pending' OR (${table.externalId} IS NOT NULL AND ${table.qrCodeDataUrl} IS NOT NULL AND ${table.copyPaste} IS NOT NULL)`),
 ]);
 
 
@@ -130,12 +168,49 @@ export const paymentEvents = pgTable("payment_events", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [unique("payment_events_provider_event_unique").on(table.provider, table.eventId)]);
 
+// Somente entregas com assinatura e formato verificados; uma linha por evento do provedor (replays não gravam).
 export const webhookDeliveries = pgTable("webhook_deliveries", {
   id: uuid("id").defaultRandom().primaryKey(),
   provider: text("provider").notNull(),
-  eventId: text("event_id"),
-  bodyHash: text("body_hash"),
+  eventId: text("event_id").notNull(),
+  bodyHash: text("body_hash").notNull(),
   outcome: text("outcome").default("received").notNull(),
   reason: text("reason"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-}, (table) => [index("webhook_deliveries_event_idx").on(table.provider, table.eventId)]);
+}, (table) => [unique("webhook_deliveries_provider_event_unique").on(table.provider, table.eventId)]);
+
+// Arquivo somente leitura das entregas anteriores à verificação prévia (não verificadas ou duplicadas), preservado para auditoria.
+export const webhookDeliveriesLegacy = pgTable("webhook_deliveries_legacy", {
+  id: uuid("id").primaryKey(),
+  provider: text("provider").notNull(),
+  eventId: text("event_id"),
+  bodyHash: text("body_hash"),
+  outcome: text("outcome").notNull(),
+  reason: text("reason"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+});
+
+// Auditoria de decisões de pagamento (reconciliação, pagamento tardio, cancelamento no gateway). Sem PII.
+export const paymentAudit = pgTable("payment_audit", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "restrict" }),
+  paymentId: uuid("payment_id").notNull(),
+  bookingId: uuid("booking_id").notNull(),
+  action: text("action").notNull(),
+  detail: jsonb("detail").$type<Record<string, unknown>>(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  foreignKey({ name: "payment_audit_payment_tenant_fk", columns: [table.businessId, table.paymentId], foreignColumns: [payments.businessId, payments.id] }),
+  foreignKey({ name: "payment_audit_booking_tenant_fk", columns: [table.businessId, table.bookingId], foreignColumns: [bookings.businessId, bookings.id] }),
+  index("payment_audit_business_created_idx").on(table.businessId, table.createdAt),
+  index("payment_audit_payment_idx").on(table.paymentId),
+  check("payment_audit_action_not_empty", sql`length(trim(${table.action})) > 0`),
+]);
+
+export const onboardingRequests = pgTable("onboarding_requests", {
+  ownerId: text("owner_id").notNull().references(() => user.id, { onDelete: "restrict" }),
+  requestKey: uuid("request_key").notNull(),
+  requestHash: text("request_hash").notNull(),
+  result: jsonb("result").$type<{ businessId: string; slug: string; publicPath: string; serviceId: string }>(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [primaryKey({ columns: [table.ownerId, table.requestKey] })]);

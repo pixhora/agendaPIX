@@ -1,10 +1,12 @@
 import { randomUUID } from "node:crypto";
+import { eq } from "drizzle-orm";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool, type PoolClient } from "pg";
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as schema from "../../db/schema";
 import { databaseEnvSchema } from "../../lib/env";
 import { findOwnedBusiness } from "../../lib/tenancy";
+import { getBusinessPixKey, setBusinessPixKey } from "../../lib/pix-key/service";
 
 const pool = new Pool({ connectionString: databaseEnvSchema.parse(process.env).DATABASE_URL, connectionTimeoutMillis: 5000 });
 let client: PoolClient;
@@ -65,6 +67,21 @@ describe("isolamento entre negócios", () => {
     expect(await findOwnedBusiness(businessB, ownerA, database)).toBeNull();
     expect(await findOwnedBusiness(businessA, ownerB, database)).toBeNull();
     expect(await findOwnedBusiness(randomUUID(), ownerA, database)).toBeNull();
+  });
+  it("cifra chave Pix e só devolve máscara ao dono do negócio", async () => {
+    const previousKey = process.env.PIX_KEY_ENCRYPTION_KEY;
+    process.env.PIX_KEY_ENCRYPTION_KEY = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    try {
+      const saved = await setBusinessPixKey(businessA, ownerA, { type: "email", value: "dono@example.com" }, database);
+      const stored = await database.select().from(schema.businessPixKeys).where(eq(schema.businessPixKeys.businessId, businessA));
+      expect(saved).toEqual({ configured: true, type: "email", hint: "d••••@example.com" });
+      expect(stored[0].ciphertext).not.toContain("dono@example.com");
+      expect(await getBusinessPixKey(businessA, ownerA, database)).toEqual(saved);
+      await expect(getBusinessPixKey(businessA, ownerB, database)).rejects.toMatchObject({ status: 404 });
+    } finally {
+      if (previousKey === undefined) delete process.env.PIX_KEY_ENCRYPTION_KEY;
+      else process.env.PIX_KEY_ENCRYPTION_KEY = previousKey;
+    }
   });
   it.each(["service", "customer"])("impede reserva com %s de outro negócio", async (field) => {
     await expect(client.query(
