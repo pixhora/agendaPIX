@@ -1,3 +1,19 @@
+# Compose único do agendaPIX (funciona com `podman compose` e `docker compose`).
+#
+#   Banco para desenvolvimento:    podman compose up -d --wait postgres   (ou: pnpm db:up)
+#   App completo (imagem de prod): podman compose --profile app up -d --build   (postgres, migrate, app, worker)
+#
+# Todas as credenciais vêm do arquivo .env (copie de .env.example). Nada é publicado fora de 127.0.0.1.
+
+# Base comum dos serviços que usam a imagem do Dockerfile (migrate, app e worker).
+x-app-image: &app-image
+  build: .
+  image: agendapix:local
+
+# Dentro da rede do compose o banco é o serviço "postgres". A senha não pode ter caracteres
+# reservados de URL (@ : / ? #) ou precisa estar percent-encoded.
+x-database-url: &database-url postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+
 services:
   postgres:
     image: docker.io/library/postgres:17-alpine
@@ -14,6 +30,55 @@ services:
       interval: 2s
       timeout: 5s
       retries: 20
+    restart: unless-stopped
+
+  # Aplica as migrations pendentes uma vez e termina (mesma imagem do app).
+  migrate:
+    <<: *app-image
+    profiles: ["app"]
+    command: ["node", "migrate.cjs"]
+    environment:
+      DATABASE_URL: *database-url
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  # App Next.js (páginas + /api). Em produção fica atrás de um proxy HTTPS que define X-Real-IP
+  # (BOOKING_TRUST_PROXY=true); por isso a porta só é publicada em 127.0.0.1.
+  app:
+    <<: *app-image
+    profiles: ["app"]
+    env_file: .env
+    environment:
+      DATABASE_URL: *database-url
+    ports:
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # Reconciliador de cobranças Pix (órfãs, presas em "creating", webhooks perdidos): mesma imagem, processo
+  # separado do web, sem porta publicada. Roda em loop a cada RECONCILE_INTERVAL_SECONDS; várias réplicas são
+  # seguras (advisory lock). Alternativa sem processo contínuo: cron/Scheduled Task com `node reconcile.mjs --once`.
+  worker:
+    <<: *app-image
+    profiles: ["app"]
+    command: ["node", "reconcile.mjs"]
+    env_file: .env
+    environment:
+      DATABASE_URL: *database-url
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    # Sem HTTP: o HEALTHCHECK da imagem (/api/health) não se aplica a este processo.
+    healthcheck:
+      disable: true
     restart: unless-stopped
 
 volumes:

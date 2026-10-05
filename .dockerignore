@@ -1,0 +1,39 @@
+# Mantém o contexto de build pequeno e sem segredos.
+.git
+.github
+node_modules
+.next
+out
+dist
+coverage
+playwright-report
+test-results
+*.tsbuildinfo
+next-env.d.ts
+
+# Segredos: nunca enviar ao contexto de build
+.env*
+!.env.example
+*.pem
+*.key
+
+# Artefatos locais
+.maestri
+.scratch
+dogfood-output
+docs/evidencias
+docs/evidence
+screenshots
+videos
+**/*.mp4
+**/*.webm
+**/*.mov
+**/__pycache__
+
+# Não usados na imagem
+Dockerfile
+.dockerignore
+compose.yaml
+tests
+docs
+*.md
