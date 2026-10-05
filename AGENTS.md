@@ -65,16 +65,15 @@ Antes de dizer que terminou: rode `lint`, `typecheck` e `test`. Se algum falhar,
 
 ## 5. Terminais e papéis (Maestri)
 
-Há 6 agentes em paralelo: 3 Codex e 3 Antigravity CLI (`agy`). **Descubra qual é o seu terminal pela primeira mensagem que receber** ("Você é o terminal X"). Se não souber, pergunte.
+Há 5 terminais em paralelo. Identifique seu papel pelo branch e pela pasta (git worktree) da tabela abaixo. A numeração é uma referência de organização, não o nome do terminal na interface. Pergunte somente se o branch e a pasta não permitirem identificar o papel.
 
 | # | Agente | Papel | Branch / pasta |
 |---|---|---|---|
 | 1 | Codex | Backend, banco, Pix e webhooks | `feat/backend` / `agenda-backend` |
 | 2 | Codex | Painel do dono (agenda, clientes, serviços) | `feat/dashboard` / `agenda-dashboard` |
-| 3 | Codex | Testes e2e e QA do trabalho dos agy 4 e 5 | `feat/tests` / `agenda-tests` |
-| 4 | agy | Página pública de agendamento e design system | `feat/booking-ui` / `agenda-booking-ui` |
-| 5 | agy | Landing de vendas e onboarding | `feat/landing` / `agenda-landing` |
-| 6 | agy | Revisor de código e segurança do trabalho dos Codex 1 e 2 | `feat/review` / `agenda-review` |
+| 3 | Codex | Testes e2e e QA da interface pública | `feat/tests` / `agenda-tests` |
+| 4 | agy | Página pública de agendamento, design system, landing e onboarding | `feat/booking-ui` / `agenda-booking-ui` |
+| 5 | Codex | Revisor de código e segurança do backend e painel | `feat/review` / `agenda-review` |
 | - | Humano (eu) | Decide produto, preço e prioridade | - |
 
 ### Regras de convivência (obrigatórias)
@@ -86,10 +85,10 @@ Há 6 agentes em paralelo: 3 Codex e 3 Antigravity CLI (`agy`). **Descubra qual 
 - **Atualize antes de começar:** `git fetch && git rebase main`. Commits pequenos, mensagem em inglês no formato `feat: ...`, `fix: ...`, `test: ...`.
 - **Merge só no `main` com aprovação:** a mudança precisa de **ok** do revisor designado e de `lint`, `typecheck` e `test` passando. Quem faz o merge é o humano.
 
-### Revisão cruzada (modelos diferentes se revisam)
+### Revisão cruzada
 
-- Terminal 6 (agy) revisa os terminais 1 e 2 (Codex): bugs, segurança, dinheiro em centavos, isolamento entre clientes, estados de erro esquecidos.
-- Terminal 3 (Codex) testa os terminais 4 e 5 (agy): fluxos reais com Playwright, mobile 375px, acessibilidade e regressão visual.
+- Revisor (`feat/review`) revisa backend e painel: bugs, segurança, dinheiro em centavos, isolamento entre clientes, estados de erro esquecidos.
+- QA (`feat/tests`) testa a interface pública (`feat/booking-ui`), incluindo landing e onboarding: fluxos reais com Playwright, mobile 375px, acessibilidade e regressão visual.
 - Resultado da revisão: lista objetiva com **bloqueia** / **melhorar** / **ok**, com arquivo e linha. Revisor não reescreve o código do outro; aponta e quem fez corrige.
 
 ### Como trabalhar cada tarefa

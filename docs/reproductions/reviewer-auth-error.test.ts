@@ -1,0 +1,20 @@
+import { expect, it, vi } from "vitest";
+import { getAuth } from "../../lib/auth";
+import { sendMagicLinkEmail } from "../../lib/email";
+vi.mock("../../lib/email", () => ({ sendMagicLinkEmail: vi.fn() }));
+it("backend handler hides SMTP failure details", async () => {
+ vi.stubEnv("DATABASE_URL", "postgresql://local:example@localhost/agenda");
+ vi.stubEnv("BETTER_AUTH_URL", "http://localhost:3000");
+ vi.stubEnv("BETTER_AUTH_SECRET", "local-test-secret-with-at-least-32-characters");
+ const auth = getAuth();
+ const context = await auth.$context;
+ vi.spyOn(context.internalAdapter, "createVerificationValue").mockResolvedValue({} as never);
+ vi.mocked(sendMagicLinkEmail).mockRejectedValue(new Error("REVIEW_SYNTHETIC_PRIVATE_MARKER"));
+ const error = vi.spyOn(console, "error").mockImplementation(() => {});
+ const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+ const response = await auth.handler(new Request("http://localhost:3000/api/auth/sign-in/magic-link", { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost:3000" }, body: JSON.stringify({ email: "synthetic@example.com" }) }));
+ expect(response.status).toBe(500);
+ expect(await response.text()).not.toContain("REVIEW_SYNTHETIC_PRIVATE_MARKER");
+ expect([...error.mock.calls,...warn.mock.calls].flat().map((value) => value instanceof Error ? value.stack : String(value)).join(" ")).not.toContain("REVIEW_SYNTHETIC_PRIVATE_MARKER");
+ vi.restoreAllMocks(); vi.unstubAllEnvs();
+});
