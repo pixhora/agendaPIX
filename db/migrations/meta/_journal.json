@@ -50,6 +50,13 @@
       "when": 1791139910473,
       "tag": "0006_common_doomsday",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791178274754,
+      "tag": "0007_backend_hardening",
+      "breakpoints": true
     }
   ]
 }

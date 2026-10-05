@@ -35,7 +35,7 @@ export const bookingRateLimits = pgTable("booking_rate_limits", {
 }, (table) => [
   primaryKey({ columns: [table.businessId, table.clientHash] }),
   index("booking_rate_window_idx").on(table.windowStartedAt),
-  check("booking_rate_attempts_valid", sql`${table.attempts} BETWEEN 1 AND 10`),
+  check("booking_rate_attempts_valid", sql`${table.attempts} >= 1`),
 ]);
 export const businessPixKeys = pgTable("business_pix_keys", {
   businessId: uuid("business_id").primaryKey().references(() => businesses.id, { onDelete: "restrict" }),
@@ -101,6 +101,8 @@ export const bookings = pgTable("bookings", {
   requestKey: uuid("request_key"),
   requestHash: text("request_hash"),
   accessTokenHash: text("access_token_hash"),
+  // HMAC por negócio da identidade do cliente (nunca o IP bruto); usado só para limitar reservas pendentes.
+  clientHash: text("client_hash"),
   startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
   endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
   priceCents: integer("price_cents").notNull(),
@@ -112,6 +114,8 @@ export const bookings = pgTable("bookings", {
   unique("bookings_business_id_unique").on(table.businessId, table.id),
   unique("bookings_business_request_unique").on(table.businessId, table.requestKey),
   index("bookings_business_start_idx").on(table.businessId, table.startsAt),
+  index("bookings_pending_hold_idx").on(table.businessId, table.expiresAt).where(sql`${table.status} = 'pending_payment'`),
+  index("bookings_pending_client_idx").on(table.businessId, table.clientHash).where(sql`${table.status} = 'pending_payment'`),
   foreignKey({ name: "bookings_service_tenant_fk", columns: [table.businessId, table.serviceId], foreignColumns: [services.businessId, services.id] }),
   foreignKey({ name: "bookings_customer_tenant_fk", columns: [table.businessId, table.customerId], foreignColumns: [customers.businessId, customers.id] }),
   check("bookings_interval_valid", sql`${table.startsAt} < ${table.endsAt}`),
@@ -155,15 +159,27 @@ export const paymentEvents = pgTable("payment_events", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [unique("payment_events_provider_event_unique").on(table.provider, table.eventId)]);
 
+// Somente entregas com assinatura e formato verificados; uma linha por evento do provedor (replays não gravam).
 export const webhookDeliveries = pgTable("webhook_deliveries", {
   id: uuid("id").defaultRandom().primaryKey(),
   provider: text("provider").notNull(),
-  eventId: text("event_id"),
-  bodyHash: text("body_hash"),
+  eventId: text("event_id").notNull(),
+  bodyHash: text("body_hash").notNull(),
   outcome: text("outcome").default("received").notNull(),
   reason: text("reason"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-}, (table) => [index("webhook_deliveries_event_idx").on(table.provider, table.eventId)]);
+}, (table) => [unique("webhook_deliveries_provider_event_unique").on(table.provider, table.eventId)]);
+
+// Arquivo somente leitura das entregas anteriores à verificação prévia (não verificadas ou duplicadas), preservado para auditoria.
+export const webhookDeliveriesLegacy = pgTable("webhook_deliveries_legacy", {
+  id: uuid("id").primaryKey(),
+  provider: text("provider").notNull(),
+  eventId: text("event_id"),
+  bodyHash: text("body_hash"),
+  outcome: text("outcome").notNull(),
+  reason: text("reason"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+});
 
 export const onboardingRequests = pgTable("onboarding_requests", {
   ownerId: text("owner_id").notNull().references(() => user.id, { onDelete: "restrict" }),
