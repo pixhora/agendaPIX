@@ -8,3 +8,24 @@ test-results/
 !.env.example
 *.tsbuildinfo
 next-env.d.ts
+
+# Private configuration and generated local artifacts
+.env*
+!.env.example
+node_modules/
+.next/
+out/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+next-env.d.ts
+__pycache__/
+*.py[cod]
+.maestri/run-system-logs/
+**/trace.zip
+**/.last-run.json
+*.pem
+*.key
+id_rsa
+id_ed25519
