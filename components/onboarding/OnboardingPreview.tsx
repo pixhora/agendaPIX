@@ -1,6 +1,7 @@
 "use client";
 
 import { Clock3, Eye, Lock } from "lucide-react";
+import { BusinessAvatar } from "@/components/ui/business-avatar";
 import type { OnboardingData } from "./types";
 import { formatCurrency, formatDuration } from "@/components/booking/formatters";
 import { usePublicHost } from "./parts";
@@ -17,7 +18,6 @@ function describeDays(days: number[]) {
 export function OnboardingPreview({ data }: { data: OnboardingData }) {
   const host = usePublicHost();
   const name = data.businessName.trim() || "Seu negócio";
-  const initials = name.split(/\s+/).slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join("");
   return (
     <aside aria-label="Prévia da sua página" className="hidden lg:sticky lg:top-10 lg:block">
       <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-muted"><Eye aria-hidden="true" className="size-4" />Prévia da sua página</p>
@@ -28,7 +28,7 @@ export function OnboardingPreview({ data }: { data: OnboardingData }) {
         </div>
         <div className="space-y-4 p-5">
           <div className="flex items-center gap-3">
-            <span aria-hidden="true" className="flex size-11 items-center justify-center rounded-2xl bg-ink font-display text-sm font-extrabold text-paper">{initials || "A"}</span>
+            <BusinessAvatar name={name} />
             <div className="min-w-0">
               <p className="truncate font-display text-lg font-bold">{name}</p>
               <p className="text-xs text-muted">Agende online · sinal via Pix</p>

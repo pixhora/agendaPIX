@@ -44,7 +44,7 @@ test.describe.configure({ mode: "serial" });
 test("captura booking público (serviço → confirmado)", async ({ page, request }, testInfo) => {
   const slug = meta.businessASlug;
   await page.goto(`/${slug}`);
-  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: /Negócio Icons|Negócio E2E/ })).toBeVisible({ timeout: 20_000 });
   await shot(page, "01-slug-servico");
 
   await page.getByRole("radiogroup", { name: /Serviços/ }).getByRole("radio").first().click();

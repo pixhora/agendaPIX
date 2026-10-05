@@ -18,6 +18,7 @@ import { StepPayment } from "./StepPayment";
 import { BookingConfirmation } from "./BookingConfirmation";
 import { AlertTriangle } from "lucide-react";
 import { Icon } from "@/components/ui/icon";
+import { BusinessAvatar } from "@/components/ui/business-avatar";
 import { BUSINESS_HEADER_ICONS, PIX_ICONS } from "@/lib/icons/registry";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -346,20 +347,12 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
     }
   };
 
-  const initials = (business?.name ?? "")
-    .split(" ")
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
 
   const pageHeader = (
     <header className="border-b border-line bg-surface">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
         <div className="flex min-w-0 items-center gap-3">
-          <span aria-hidden="true" className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-ink font-display text-base font-extrabold text-paper">
-            {business ? initials : ""}
-          </span>
+          <BusinessAvatar name={business?.name} logoUrl={business?.logoUrl} />
           <div className="min-w-0">
             <h1 className="truncate font-display text-lg font-extrabold tracking-tight text-ink sm:text-xl">
               {business?.name ?? <span aria-hidden="true" className="inline-block h-5 w-40 animate-pulse rounded bg-subtle motion-reduce:animate-none" />}

@@ -20,6 +20,7 @@ import { StepSlot } from "@/components/booking/StepSlot";
 import { StepPayment } from "@/components/booking/StepPayment";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { BusinessAvatar } from "@/components/ui/business-avatar";
 
 export function PreviewBookingFlow() {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
@@ -119,9 +120,7 @@ export function PreviewBookingFlow() {
 
         {/* Cabeçalho do Estabelecimento */}
         <header className="flex flex-col items-center text-center space-y-2">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-ink text-primary font-display font-extrabold text-lg shadow-xs ring-2 ring-primary/20">
-            SB
-          </div>
+          <BusinessAvatar name={MOCK_PUBLIC_BUSINESS.name} logoUrl={MOCK_PUBLIC_BUSINESS.logoUrl} size="lg" className="shadow-xs ring-2 ring-pix/20" />
           <div className="space-y-0.5">
             <h1 className="font-display text-2xl font-extrabold text-foreground tracking-tight">
               {MOCK_PUBLIC_BUSINESS.name}

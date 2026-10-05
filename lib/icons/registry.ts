@@ -72,6 +72,9 @@ export const CUSTOMER_FIELD_ICONS = {
 } as const;
 
 /** Cabeçalho do negócio (só se o dado existir). */
+/** Avatar do negócio sem logo (não usar iniciais). */
+export const BUSINESS_AVATAR_ICON = CalendarCheck;
+
 export const BUSINESS_HEADER_ICONS = {
   location: MapPin,
   phone: Phone,
