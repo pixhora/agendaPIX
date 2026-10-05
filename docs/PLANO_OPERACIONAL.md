@@ -59,7 +59,7 @@ Regras: nunca rebase/limpe árvore suja; nunca edite trabalho alheio; reunir em 
 | ID | Dono | Arquivos / alvo | Dep | Critério observável | Status |
 |---|---|---|---|---|---|
 | F-01 | T5 | components/onboarding/StepAccount.tsx:43 (persistir negócio/serviço) | API onboarding T1 | dados do onboarding persistem para o tenant | bloqueado (dep T1) |
-| F-02 | T2 + T5 | canonizar login único (/dashboard/login vs /login) | decisão de integração | rota única com design oficial, tokens e a11y | bloqueado (decisão) |
+| F-02 | T2 + T5 | canonizar login único (/dashboard/login vs /login) | decisão de integração | rota única com design oficial, tokens e a11y | feito em `feat/frontend-consolidation`: `/login` único, `/dashboard/login` redireciona |
 | F-03 | T4 | app/[slug]/page.tsx, BookingFlow.tsx (retomada de sessão Pix) | — | ENTREGUE commit 8c0237d — prova pendente de arquivo | andamento (falta prova) |
 | F-04 | T4 | BookingFlow.tsx:58, StepSlot.tsx:129 (timeout AbortController) | — | timeout 10s -> tela de erro com "Tentar novamente" | pronto |
 | F-05 | T4 | package.json:17 (sync .next/static -> standalone) | — | standalone serve chunks sem cópia manual | pronto |

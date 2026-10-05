@@ -70,7 +70,7 @@ Há 6 agentes numerados: 3 Codex e 3 Antigravity CLI (`agy`). **Descubra qual é
 | # | Agente | Papel | Branch / pasta |
 |---|---|---|---|
 | 1 | Codex | Backend, banco, auth, APIs, Pix e webhooks | `feat/backend` / `agenda-backend` |
-| 2 | Codex | Painel do dono | `feat/dashboard` / `agenda-dashboard` |
+| 2 | Codex | Painel do dono | `feat/dashboard` (PR #1 histórico) / `feat/dashboard-v2` (app único sobre `feat/backend`) |
 | 3 | Codex | QA, E2E e auditoria técnica | `feat/tests` / `agenda-tests` |
 | 4 | agy | Frontend, booking, design system e Preview | `feat/booking-ui` / `agenda-booking-ui` |
 | 5 | agy | Landing, conversão e onboarding | `feat/conversion` / `agenda-conversion` |

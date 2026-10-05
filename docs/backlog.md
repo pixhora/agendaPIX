@@ -347,3 +347,12 @@ Múltiplos profissionais/unidades, relatórios avançados, app/PWA, API oficial 
 O MVP de agendamento exige página pública real, painel operacional, Pix bancário autenticado e idempotente confirmando horário sem dupla reserva. Os gates G e Q05 precisam passar, com evidência de sandbox e prova real autorizada, deploy HTTPS/SMTP, migrations/backup seguros e privacidade/exclusão aprovadas. Trial/assinatura habilitam cobrança do SaaS após validar fluxo crítico, sem ampliar o núcleo. Revisão Terminal 3 sem bloqueia; merge só humano. Nenhuma tarefa fica concluída apenas por possuir arquivo, UI ou teste de mock.
 
 Contagem de unidades pendentes, incluindo fase 0: Terminal 1 **15**; Terminal 2 **7**; Terminal 3 **6**; Terminal 4 **9**. Critérios e dependências não contam como tarefas adicionais.
+
+## 2026-10-05 — Painel v2 (app único)
+
+- [x] Portar painel do dono sobre `feat/backend` sem apagar APIs.
+- [x] Sessão Better Auth in-process + isolamento por negócio.
+- [x] e2e Playwright das jornadas principais do dono.
+- [ ] Rebase do PR de frontend consolidado (que já inclui o painel) sobre o PR de integração do backend quando abrir.
+- [x] Resolver colisão com placeholder `/dashboard` de `feat/conversion` (placeholder não entrou na consolidação).
+- [x] Login único em `/login`; `/dashboard/login` redireciona.

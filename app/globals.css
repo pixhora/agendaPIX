@@ -1,43 +1,246 @@
 @import "tailwindcss";
 
+/* Modo escuro manual: .dark no <html> (script inline em app/layout.tsx aplica antes da pintura). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Tokens v2.1 (ver docs/design-tokens.md e docs/DESIGN_DECISION.md §15)
+ * Base neutra mineral + um único acento: verde-água do Pix.
+ * Regra: `--muted` é cor de TEXTO. Fundos sutis usam `--subtle`.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #0f172a;
-  --primary: #1d4ed8;
-  --primary-foreground: #ffffff;
-  --muted: #f1f5f9;
-  --muted-foreground: #475569;
-  --border: #64748b;
-  --ring: #1d4ed8;
-  --radius: 0.375rem;
+  --paper: #f6f5f2;
+  --surface: #ffffff;
+  --subtle: #efeeea;
+  --ink: #0b0b0c;
+  --ink-hover: #26262a;
+  --muted: #5b5b5f;
+  --line: #dedcd6;
+  --line-strong: #8d8c88;
+  --slab: #0b0b0c;
+  --slab-foreground: #ffffff;
+  --slab-muted: #c9c9cc;
+
+  --pix: #0b7a6e;
+  --pix-hover: #096a60;
+  --pix-foreground: #ffffff;
+  --pix-soft: #e8f6f3;
+  --pix-bright: #3fd0be;
+
+  --success: #156b3a;
+  --success-soft: #e6f4ea;
+  --warning: #8a5300;
+  --warning-soft: #fdf1dc;
+  --danger: #b3261e;
+  --danger-soft: #fbe9e7;
+
+  --ring: #0b0b0c;
+
+  --duration-feedback: 120ms;
+  --duration-opening: 180ms;
+  --duration-step: 240ms;
+  --ease-standard: cubic-bezier(0.16, 1, 0.3, 1);
+  color-scheme: light;
 }
 
+.dark {
+  --paper: #0f0f10;
+  --surface: #19191b;
+  --subtle: #222225;
+  --ink: #f6f5f2;
+  --ink-hover: #e2e1dd;
+  --muted: #a3a3a8;
+  --line: #2c2c2f;
+  --line-strong: #6b6b70;
+  --slab: #000000;
+  --slab-foreground: #ffffff;
+  --slab-muted: #b8b8bd;
+
+  --pix: #3fd0be;
+  --pix-hover: #5fdccc;
+  --pix-foreground: #0b0b0c;
+  --pix-soft: #10302c;
+  --pix-bright: #3fd0be;
+
+  --success: #6fd49a;
+  --success-soft: #133222;
+  --warning: #f2b25a;
+  --warning-soft: #33250f;
+  --danger: #ff8a80;
+  --danger-soft: #3a1714;
+
+  --ring: #3fd0be;
+  color-scheme: dark;
+}
+
+/* Sem JS: segue o sistema, a menos que o usuário tenha escolhido claro. */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0f172a;
-    --foreground: #f8fafc;
-    --primary: #93c5fd;
-    --primary-foreground: #0f172a;
-    --muted: #1e293b;
-    --muted-foreground: #cbd5e1;
-    --border: #94a3b8;
-    --ring: #93c5fd;
+  :root:not(.light):not(.dark) {
+    --paper: #0f0f10;
+    --surface: #19191b;
+    --subtle: #222225;
+    --ink: #f6f5f2;
+    --ink-hover: #e2e1dd;
+    --muted: #a3a3a8;
+    --line: #2c2c2f;
+    --line-strong: #6b6b70;
+    --slab: #000000;
+    --slab-foreground: #ffffff;
+    --slab-muted: #b8b8bd;
+    --pix: #3fd0be;
+    --pix-hover: #5fdccc;
+    --pix-foreground: #0b0b0c;
+    --pix-soft: #10302c;
+    --success: #6fd49a;
+    --success-soft: #133222;
+    --warning: #f2b25a;
+    --warning-soft: #33250f;
+    --danger: #ff8a80;
+    --danger-soft: #3a1714;
+    --ring: #3fd0be;
+    color-scheme: dark;
   }
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-subtle: var(--subtle);
+  --color-ink: var(--ink);
+  --color-ink-hover: var(--ink-hover);
   --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-border: var(--border);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-slab: var(--slab);
+  --color-slab-foreground: var(--slab-foreground);
+  --color-slab-muted: var(--slab-muted);
+  --color-pix: var(--pix);
+  --color-pix-hover: var(--pix-hover);
+  --color-pix-foreground: var(--pix-foreground);
+  --color-pix-soft: var(--pix-soft);
+  --color-pix-bright: var(--pix-bright);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
   --color-ring: var(--ring);
-  --radius-md: var(--radius);
-  --radius-lg: 0.75rem;
-  --radius-xl: 1rem;
-  --font-sans: Arial, Helvetica, sans-serif;
+
+  /* Aliases shadcn/legado (mesmos valores; não criam cores novas) */
+  --color-background: var(--paper);
+  --color-foreground: var(--ink);
+  --color-muted-foreground: var(--muted);
+  --color-border: var(--line);
+  --color-primary: var(--ink);
+  --color-primary-hover: var(--ink-hover);
+  --color-primary-foreground: var(--paper);
+  --color-destructive: var(--danger);
+
+  --radius-frame: 28px;
+  --radius-card: 16px;
+  --radius-field: 12px;
+
+  --font-display: var(--font-display-family), "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  --font-sans: var(--font-sans-family), "Inter", system-ui, -apple-system, sans-serif;
+
+  --shadow-card: 0 1px 2px rgb(11 11 12 / 0.04), 0 1px 1px rgb(11 11 12 / 0.03);
+  --shadow-raised: 0 12px 32px -12px rgb(11 11 12 / 0.18), 0 2px 6px rgb(11 11 12 / 0.05);
 }
 
-body { margin: 0; background: var(--background); color: var(--foreground); font-family: Arial, Helvetica, sans-serif; }
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  text-wrap: balance;
+}
+
+/* Plus Jakarta Sans com tracking negativo encolhe os espaços entre palavras; compensa só o espaço. */
+h1, h2, h3, h4, h5, h6, .font-display {
+  word-spacing: 0.06em;
+}
+
+::selection {
+  background: var(--pix-soft);
+  color: var(--ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+@keyframes stepIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes confirmPop {
+  0% { opacity: 0; transform: scale(0.92); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0s !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide::-webkit-scrollbar,
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .scrollbar-hide,
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+  .transition-feedback {
+    transition: background-color var(--duration-feedback) var(--ease-standard),
+      border-color var(--duration-feedback) var(--ease-standard),
+      color var(--duration-feedback) var(--ease-standard),
+      box-shadow var(--duration-feedback) var(--ease-standard),
+      transform var(--duration-feedback) var(--ease-standard),
+      opacity var(--duration-feedback) var(--ease-standard);
+  }
+  .transition-opening {
+    transition: opacity var(--duration-opening) var(--ease-standard),
+      transform var(--duration-opening) var(--ease-standard),
+      background-color var(--duration-opening) var(--ease-standard),
+      border-color var(--duration-opening) var(--ease-standard);
+  }
+  .transition-step {
+    transition: background-color var(--duration-step) var(--ease-standard),
+      border-color var(--duration-step) var(--ease-standard),
+      color var(--duration-step) var(--ease-standard),
+      width var(--duration-step) var(--ease-standard),
+      box-shadow var(--duration-step) var(--ease-standard);
+  }
+  .animate-step-in { animation: stepIn var(--duration-step) var(--ease-standard) both; }
+  .animate-confirm-pop { animation: confirmPop var(--duration-step) var(--ease-standard) both; }
+  .tabular { font-variant-numeric: tabular-nums; }
+  .bg-dots {
+    background-image: radial-gradient(var(--line) 1px, transparent 1px);
+    background-size: 18px 18px;
+  }
+}
+
+/* Painel no celular: foco e âncoras nunca ficam atrás das barras fixas (WCAG 2.4.11). */
+@media (max-width: 1023.98px) {
+  html:has([data-app-frame]) { scroll-padding-block: 5rem; }
+}
