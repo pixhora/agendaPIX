@@ -402,7 +402,7 @@ A combinação de bibliotecas do §7 **continua valendo**: shadcn/ui `new-york` 
 
 | Ajuste | Antes (v1) | Agora (v1.1) | Por quê |
 | --- | --- | --- | --- |
-| Acento | Lima `#C0F739` como "acento fino" | **Verde-água Pix** `--pix` (`#0B7A6E` claro / `#3FD0BE` escuro) como único acento, de pagamento e "pago" | A pesquisa (16, 34, conclusão 1 e parte 2 §5) pede um único acento ligado ao Pix. A lima não passa AA como texto no claro (1,2:1); o verde-água escuro passa (5,2:1 em branco; 4,8:1 no papel). |
+| Acento | Lima `#C0F739` como "acento fino" | **Verde-água Pix** `--pix` (`#0A6E63` claro / `#3FD0BE` escuro) como único acento, de pagamento e "pago" | A pesquisa (16, 34, conclusão 1 e parte 2 §5) pede um único acento ligado ao Pix. A lima não passa AA como texto no claro (1,2:1); o verde-água escuro passa (6,1:1 em branco; 5,6:1 no papel). |
 | Fundos sutis | `bg-muted` (cor de **texto** `#5B5B5F`) usado como fundo em prefixo de slug e skeletons | Token novo `--subtle` (`#EFEEEA` / `#222225`) para fundos; `muted` só para texto | Pendência 7 do PR #2: contraste ruim de texto sobre `bg-muted`. |
 | Estados | Só cor + ponto | Badge com **ícone + texto + cor** (`--success`, `--warning`, `--danger`, neutro) | WCAG 1.4.1 (uso de cor) e conclusão 9. |
 | Modo escuro | Só `prefers-color-scheme` | Toggle claro/escuro/sistema; classe `.dark`/`.light` aplicada por script inline antes da pintura (sem flash) e salva em `localStorage` | Pendência 5 do PR #2 (MELHORAR da auditoria T6-A). |
