@@ -8,6 +8,7 @@ import { createBooking, getAvailability, getBookingPayment, hash } from "../../l
 import { databaseEnvSchema } from "../../lib/env";
 import { FakePaymentProvider, signFakeWebhook } from "../../lib/payments/fake";
 import { processWebhook } from "../../lib/payments/webhook";
+import { simulateDevFakePayment } from "../../lib/payments/simulate-dev";
 
 const pool = new Pool({ connectionString: databaseEnvSchema.parse(process.env).DATABASE_URL, max: 10, connectionTimeoutMillis: 5000 });
 const database = drizzle(pool, { schema });
@@ -18,7 +19,7 @@ let businessIds: string[];
 let slugs: string[];
 let serviceIds: string[];
 let bodyHashes: string[];
-const input = () => ({ serviceId: serviceIds[0], startsAt: "2030-01-01T12:00:00Z", customer: { name: "Cliente de teste", phone: "+5511999999999" } });
+const input = () => ({ serviceId: serviceIds[0], startsAt: "2030-01-01T12:00:00Z", customer: { name: "Cliente de teste", phone: "+5511999999999" , cpfCnpj: "52998224725" } });
 
 function webhook(externalId: string, overrides: Record<string, unknown> = {}, signed = true) {
   const body = JSON.stringify({ eventId: randomUUID(), type: "payment.paid", externalId, amountCents: 1000, paidAt: new Date().toISOString(), ...overrides });
@@ -210,5 +211,32 @@ describe("webhook transacional e auditável", () => {
     await processWebhook(webhook(first.data.payment!.externalId!), "fake", database, provider);
     const [booking] = await database.select().from(schema.bookings).where(and(eq(schema.bookings.businessId, businessIds[1]), eq(schema.bookings.id, second.data.bookingId)));
     expect(booking.status).toBe("pending_payment");
+  });
+});
+
+describe("simulação de Pix fake em desenvolvimento", () => {
+  it("confirma pagamento pendente pelo mesmo caminho do webhook", async () => {
+    const previousProvider = process.env.PAYMENT_PROVIDER;
+    const previousSecret = process.env.FAKE_WEBHOOK_SECRET;
+    process.env.PAYMENT_PROVIDER = "fake";
+    process.env.FAKE_WEBHOOK_SECRET = secret;
+    try {
+      const { data } = await createBooking(slugs[0], input(), randomUUID(), database, provider);
+      const result = await simulateDevFakePayment({
+        slug: slugs[0],
+        bookingId: data.bookingId,
+        authorization: `Bearer ${data.accessToken}`,
+        database,
+      });
+      expect(result.outcome).toBe("processed");
+      const status = await getBookingPayment(slugs[0], data.bookingId, `Bearer ${data.accessToken}`, database);
+      expect(status.status).toBe("confirmed");
+      expect(status.payment?.status).toBe("paid");
+    } finally {
+      if (previousProvider === undefined) delete process.env.PAYMENT_PROVIDER;
+      else process.env.PAYMENT_PROVIDER = previousProvider;
+      if (previousSecret === undefined) delete process.env.FAKE_WEBHOOK_SECRET;
+      else process.env.FAKE_WEBHOOK_SECRET = previousSecret;
+    }
   });
 });

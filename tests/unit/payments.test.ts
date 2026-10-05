@@ -44,10 +44,12 @@ describe("provider fake e assinatura", () => {
     expect(() => provider.verifyWebhook(body, headers(body), now)).toThrow();
     expect(paidEventSchema.safeParse({ ...event, ownerId: "outro" }).success).toBe(false);
   });
-  it("bloqueia provider fake em produção e sem habilitação explícita", () => {
+  it("bloqueia provider fake em produção; fora de produção o padrão é fake", () => {
     vi.stubEnv("NODE_ENV", "production"); vi.stubEnv("PAYMENT_PROVIDER", "fake"); vi.stubEnv("FAKE_WEBHOOK_SECRET", secret);
     expect(() => getPaymentProvider()).toThrow("Cobrança indisponível");
-    vi.stubEnv("NODE_ENV", "test"); vi.stubEnv("PAYMENT_PROVIDER", "");
+    vi.stubEnv("NODE_ENV", "test"); vi.stubEnv("PAYMENT_PROVIDER", "fake"); vi.stubEnv("FAKE_WEBHOOK_SECRET", secret);
+    expect(getPaymentProvider().name).toBe("fake");
+    vi.stubEnv("PAYMENT_PROVIDER", ""); vi.stubEnv("FAKE_WEBHOOK_SECRET", "replace-this-not-configured-secret-value");
     expect(() => getPaymentProvider()).toThrow("Cobrança indisponível");
     vi.unstubAllEnvs();
   });
