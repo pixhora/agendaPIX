@@ -57,8 +57,11 @@ docker build -t agendapix .
 
 ### Migrations no deploy
 
-O output standalone não inclui `drizzle-kit`, então a imagem traz `migrate.cjs`: `scripts/migrate.ts` empacotado com esbuild
-(`pnpm build:migrate`), que usa o migrator do `drizzle-orm` e a mesma tabela de controle (`drizzle.__drizzle_migrations`) do `pnpm db:migrate`.
+O output standalone não inclui scripts nem `drizzle-kit`, então a imagem traz `migrate.cjs`: `scripts/migrate.mjs` empacotado com esbuild
+(`pnpm build:bundles`). É o mesmo migrador do `pnpm db:migrate`: aplica **cada arquivo na própria transação**, em ordem do journal
+(o migrador do Drizzle junta todas numa transação só, o que quebra `0008` + `0009`: valor novo de ENUM só pode ser usado depois do COMMIT),
+usa um advisory lock contra execuções simultâneas e grava na mesma tabela `drizzle.__drizzle_migrations` (hash + `when`), então é no-op
+num banco já migrado pelo `drizzle-kit migrate`.
 Rode **antes** de subir uma versão nova, como passo separado (não roda automaticamente no start do app):
 
 ```bash
@@ -67,6 +70,7 @@ docker run -d --name agendapix --env-file .env.production -p 127.0.0.1:3000:3000
 ```
 
 No Coolify, use `node migrate.cjs` como *pre-deployment command*. O script é idempotente e só aplica migrations pendentes.
+Para o worker de reconciliação, a mesma imagem roda `node reconcile.mjs` (loop) ou `node reconcile.mjs --once` (uma passagem).
 Migrations devem continuar compatíveis com a versão anterior do app durante a troca (adicionar antes de remover).
 
 ### App completo com compose (imagem de produção local)
@@ -76,8 +80,8 @@ cp .env.example .env   # ajuste segredos; BETTER_AUTH_URL deve casar com APP_POR
 podman compose --profile app up -d --build   # ou: docker compose --profile app up -d --build
 ```
 
-O profile `app` adiciona `migrate` (roda `node migrate.cjs` uma vez) e `app` (sobe depois que o migrate termina com sucesso),
-ambos com a imagem do `Dockerfile`. Dentro do compose a `DATABASE_URL` aponta para o serviço `postgres`; a porta do app
+O profile `app` adiciona `migrate` (roda `node migrate.cjs` uma vez), `app` e `worker` (sobem depois que o migrate termina com sucesso),
+todos com a imagem do `Dockerfile`. Dentro do compose a `DATABASE_URL` aponta para o serviço `postgres`; a porta do app
 fica em `127.0.0.1:${APP_PORT:-3000}`. Para SMTP local, `SMTP_HOST` precisa ser alcançável de dentro do container.
 
 Em produção coloque um proxy com HTTPS (Caddy/Traefik do Coolify) na frente da porta 3000 e configure `BETTER_AUTH_URL` com o domínio público.
@@ -96,22 +100,37 @@ Com o backend endurecido (PRs #4 e #5) o rate limit e os limites de reservas pen
 
 ### Ordem de deploy das migrations
 
-Cada versão roda `node migrate.cjs` **antes** do novo código subir. A migration `0007_backend_hardening` (PR #5) precisa ir junto com o código que a usa:
-publique as duas na mesma versão (pre-deployment command aplica a 0007, depois o app novo sobe). Não faça deploy do código do #5 sem a 0007 aplicada.
+Cada versão roda `node migrate.cjs` **antes** do novo código subir (pre-deployment command). Com o backend atual (PRs #5 e #7):
 
-### Jobs em segundo plano
+1. `0007_backend_hardening` vai junto com o código do #5;
+2. `0008_pix_charge_outside_tx` (só `ALTER TYPE ... ADD VALUE`) e `0009_pix_charge_schema` (usa os valores novos) vão junto com o código do #7.
 
-O job de reconciliação (~1x por minuto) vai rodar **fora do processo web**, com a mesma imagem. O `compose.yaml` já tem um serviço `worker`
-comentado (perfil `app`, sem porta publicada) para quando o script existir; no Coolify a alternativa é uma *Scheduled Task* rodando o comando uma vez por minuto.
+O migrador por arquivo aplica 0007 → 0008 → 0009 em ordem, cada uma com o próprio COMMIT, inclusive quando todas estão pendentes no mesmo deploy.
+**Não use `drizzle-kit migrate`** (nem o migrador do `drizzle-orm`) para essas migrations: ele roda tudo numa transação e a 0009 falha.
+Não publique o código do #5/#7 sem as migrations correspondentes aplicadas.
+
+### Worker de reconciliação
+
+O reconciliador (`scripts/reconcile.ts`, PR #7) recupera cobranças órfãs (presas em `creating`), reservas vencidas e webhooks perdidos.
+**Ele precisa estar rodando antes de contar com a recuperação de cobranças órfãs.** Escolhemos um processo contínuo:
+
+- compose: serviço `worker` (perfil `app`, mesma imagem, sem porta publicada) com `node reconcile.mjs`, uma passagem a cada `RECONCILE_INTERVAL_SECONDS` (padrão 60);
+- Coolify/produção: um segundo serviço com a mesma imagem e comando `node reconcile.mjs`, sem domínio/porta.
+
+Alternativa: cron/systemd timer/*Scheduled Task* do Coolify rodando `node reconcile.mjs --once` a cada minuto (sem o serviço `worker`).
+Mais de uma instância é segura (advisory lock: uma trabalha, as outras pulam a passagem). Variáveis: `PAYMENT_PROVIDER_TIMEOUT_MS`,
+`RECONCILE_INTERVAL_SECONDS`, `RECONCILE_STUCK_SECONDS`, `RECONCILE_BATCH_SIZE` (padrões em `.env.example`).
+Na imagem (`NODE_ENV=production`) o provedor Pix fake é recusado, então cada passagem registra falha até existir um gateway real.
 
 ## CI
 
 `.github/workflows/ci.yml` roda em todo pull request (a partir do momento em que o workflow existe na branch base), em push no `master` e manualmente (`workflow_dispatch`):
 
-- `checks`: `pnpm install --frozen-lockfile` (cache do store do pnpm), `lint`, `typecheck`, `test`, `build`, `build:migrate`.
-- `test-db`: Postgres 17 como service container, `pnpm db:migrate` e `pnpm test:db` (segredos de teste gerados na hora).
+- `checks`: `pnpm install --frozen-lockfile` (cache do store do pnpm), `lint`, `typecheck`, `test`, `build`, `build:bundles`.
+- `test-db`: Postgres 17 como service container, `pnpm db:migrate` (duas vezes: a segunda deve ser no-op) e `pnpm test:db` (segredos de teste gerados na hora).
 - `docker`: hadolint, build da imagem, `node migrate.cjs` pela imagem, app no ar e smoke test HTTP (`/`, `/api/health`, rota pública com banco,
-  `/api/ready` com um SMTP descartável quando a rota existir, usuário não-root) + `HEALTHCHECK`.
+  `/api/ready` com um SMTP descartável quando a rota existir, usuário não-root), reconciliador (`--once` contra o banco e worker em loop,
+  quando `reconcile.mjs` existir) + `HEALTHCHECK`.
 - `audit`: `pnpm audit --prod --audit-level=high`.
 
 ## Autenticação
@@ -136,7 +155,7 @@ Next.js, React, TypeScript, Tailwind, Radix, Drizzle, Better Auth, Zod, Vitest e
 `clsx`, `tailwind-merge` e `class-variance-authority` compõem as classes e variantes do botão shadcn/ui.
 ESLint 9.39.5 está fixado porque o plugin React do Next.js ainda usa APIs removidas no ESLint 10.
 Os scripts de instalação permitidos estão limitados a `esbuild` e `unrs-resolver`, necessários às ferramentas nativas.
-`esbuild` (dev) empacota `scripts/migrate.ts` em `dist/migrate.cjs` para a imagem de produção; já vinha como dependência transitiva do `drizzle-kit`.
+`esbuild` (dev) empacota `scripts/migrate.mjs` em `dist/migrate.cjs` e `scripts/reconcile.ts` em `dist/reconcile.mjs` para a imagem de produção (`scripts/bundle.mjs`); já vinha como dependência transitiva do `drizzle-kit`.
 `pnpm-workspace.yaml` força `esbuild@^0.25` para `@esbuild-kit/core-utils` (usado pelo `drizzle-kit`), que fixava a 0.18 vulnerável (GHSA-67mh-4wv8-2f99).
 
 
