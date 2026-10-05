@@ -1,44 +1,41 @@
 @import "tailwindcss";
 
+/* Modo escuro manual: .dark no <html> (script inline em app/layout.tsx aplica antes da pintura). */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/*
+ * Tokens v2.1 (ver docs/design-tokens.md e docs/DESIGN_DECISION.md §15)
+ * Base neutra mineral + um único acento: verde-água do Pix.
+ * Regra: `--muted` é cor de TEXTO. Fundos sutis usam `--subtle`.
+ */
 :root {
   --paper: #f6f5f2;
   --surface: #ffffff;
+  --subtle: #efeeea;
   --ink: #0b0b0c;
+  --ink-hover: #26262a;
   --muted: #5b5b5f;
   --line: #dedcd6;
-  --lime: #c0f739;
+  --line-strong: #8d8c88;
   --slab: #0b0b0c;
   --slab-foreground: #ffffff;
+  --slab-muted: #c9c9cc;
+
+  --pix: #0b7a6e;
+  --pix-hover: #096a60;
+  --pix-foreground: #ffffff;
+  --pix-soft: #e8f6f3;
+  --pix-bright: #3fd0be;
+
+  --success: #156b3a;
+  --success-soft: #e6f4ea;
+  --warning: #8a5300;
+  --warning-soft: #fdf1dc;
   --danger: #b3261e;
+  --danger-soft: #fbe9e7;
+
   --ring: #0b0b0c;
-  --radius-frame: 32px;
-  --radius-card: 14px;
-  --radius-field: 12px;
 
-  /* Aliases de compatibilidade */
-  --background: var(--paper);
-  --foreground: var(--ink);
-  --muted-foreground: var(--muted);
-  --border: var(--line);
-  --primary: var(--ink);
-  --primary-hover: #262629;
-  --primary-foreground: var(--paper);
-  --accent-lime: var(--lime);
-  --accent-lime-hover: #b0ee24;
-  --accent-forest: var(--ink);
-  --accent-forest-hover: #262629;
-  --dark-card: var(--slab);
-  --pix-success: var(--ink);
-
-  --radius-sm: 0.375rem;
-  --radius: 0.75rem;
-  --radius-lg: 0.875rem;
-  --radius-xl: 2rem;
-  --radius-pill: 9999px;
-
-  /* Tokens de movimento */
   --duration-feedback: 120ms;
   --duration-opening: 180ms;
   --duration-step: 240ms;
@@ -49,33 +46,58 @@
 .dark {
   --paper: #0f0f10;
   --surface: #19191b;
+  --subtle: #222225;
   --ink: #f6f5f2;
+  --ink-hover: #e2e1dd;
   --muted: #a3a3a8;
   --line: #2c2c2f;
-  --lime: #c0f739;
+  --line-strong: #6b6b70;
   --slab: #000000;
   --slab-foreground: #ffffff;
+  --slab-muted: #b8b8bd;
+
+  --pix: #3fd0be;
+  --pix-hover: #5fdccc;
+  --pix-foreground: #0b0b0c;
+  --pix-soft: #10302c;
+  --pix-bright: #3fd0be;
+
+  --success: #6fd49a;
+  --success-soft: #133222;
+  --warning: #f2b25a;
+  --warning-soft: #33250f;
   --danger: #ff8a80;
-  --ring: #c0f739;
-  --primary-hover: #e5e4e0;
-  --primary-foreground: #0b0b0c;
+  --danger-soft: #3a1714;
+
+  --ring: #3fd0be;
   color-scheme: dark;
 }
 
+/* Sem JS: segue o sistema, a menos que o usuário tenha escolhido claro. */
 @media (prefers-color-scheme: dark) {
-  :root:not(.light) {
+  :root:not(.light):not(.dark) {
     --paper: #0f0f10;
     --surface: #19191b;
+    --subtle: #222225;
     --ink: #f6f5f2;
+    --ink-hover: #e2e1dd;
     --muted: #a3a3a8;
     --line: #2c2c2f;
-    --lime: #c0f739;
+    --line-strong: #6b6b70;
     --slab: #000000;
     --slab-foreground: #ffffff;
+    --slab-muted: #b8b8bd;
+    --pix: #3fd0be;
+    --pix-hover: #5fdccc;
+    --pix-foreground: #0b0b0c;
+    --pix-soft: #10302c;
+    --success: #6fd49a;
+    --success-soft: #133222;
+    --warning: #f2b25a;
+    --warning-soft: #33250f;
     --danger: #ff8a80;
-    --ring: #c0f739;
-    --primary-hover: #e5e4e0;
-    --primary-foreground: #0b0b0c;
+    --danger-soft: #3a1714;
+    --ring: #3fd0be;
     color-scheme: dark;
   }
 }
@@ -83,76 +105,89 @@
 @theme inline {
   --color-paper: var(--paper);
   --color-surface: var(--surface);
+  --color-subtle: var(--subtle);
   --color-ink: var(--ink);
+  --color-ink-hover: var(--ink-hover);
   --color-muted: var(--muted);
   --color-line: var(--line);
-  --color-lime: var(--lime);
+  --color-line-strong: var(--line-strong);
   --color-slab: var(--slab);
   --color-slab-foreground: var(--slab-foreground);
+  --color-slab-muted: var(--slab-muted);
+  --color-pix: var(--pix);
+  --color-pix-hover: var(--pix-hover);
+  --color-pix-foreground: var(--pix-foreground);
+  --color-pix-soft: var(--pix-soft);
+  --color-pix-bright: var(--pix-bright);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
   --color-danger: var(--danger);
-  /* Alias usado pelos estados de erro (text-destructive, border-destructive...) */
+  --color-danger-soft: var(--danger-soft);
+  --color-ring: var(--ring);
+
+  /* Aliases shadcn/legado (mesmos valores; não criam cores novas) */
+  --color-background: var(--paper);
+  --color-foreground: var(--ink);
+  --color-muted-foreground: var(--muted);
+  --color-border: var(--line);
+  --color-primary: var(--ink);
+  --color-primary-hover: var(--ink-hover);
+  --color-primary-foreground: var(--paper);
   --color-destructive: var(--danger);
 
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-border: var(--border);
-  --color-primary: var(--primary);
-  --color-primary-hover: var(--primary-hover);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-accent-lime: var(--accent-lime);
-  --color-accent-lime-hover: var(--accent-lime-hover);
-  --color-accent-forest: var(--accent-forest);
-  --color-accent-forest-hover: var(--accent-forest-hover);
-  --color-dark-card: var(--dark-card);
-  --color-ring: var(--ring);
-  --color-pix-success: var(--pix-success);
-
-  --radius-frame: 32px;
-  --radius-card: 14px;
+  --radius-frame: 28px;
+  --radius-card: 16px;
   --radius-field: 12px;
-  --radius-sm: var(--radius-sm);
-  --radius-md: var(--radius);
-  --radius-lg: var(--radius-lg);
-  --radius-xl: var(--radius-xl);
-  --radius-pill: var(--radius-pill);
 
-  --font-display: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
-  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-display: var(--font-display-family), "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  --font-sans: var(--font-sans-family), "Inter", system-ui, -apple-system, sans-serif;
+
+  --shadow-card: 0 1px 2px rgb(11 11 12 / 0.04), 0 1px 1px rgb(11 11 12 / 0.03);
+  --shadow-raised: 0 12px 32px -12px rgb(11 11 12 / 0.18), 0 2px 6px rgb(11 11 12 / 0.05);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   margin: 0;
-  background-color: var(--background);
-  color: var(--foreground);
+  background-color: var(--paper);
+  color: var(--ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display);
+  text-wrap: balance;
+}
+
+::selection {
+  background: var(--pix-soft);
+  color: var(--ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }
 
 @keyframes stepIn {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes confirmPop {
-  0% {
-    opacity: 0;
-    transform: scale(0.96);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
+  0% { opacity: 0; transform: scale(0.92); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -161,21 +196,14 @@ h1, h2, h3, h4, h5, h6 {
     animation-iteration-count: 1 !important;
     transition-duration: 0s !important;
     scroll-behavior: auto !important;
-    transform: none !important;
   }
 }
 
-/* Utilitários de movimento e scroll sincronizados do design system T4 */
 @layer utilities {
   .scrollbar-hide::-webkit-scrollbar,
-  .no-scrollbar::-webkit-scrollbar {
-    display: none;
-  }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
   .scrollbar-hide,
-  .no-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
   .transition-feedback {
     transition: background-color var(--duration-feedback) var(--ease-standard),
@@ -185,14 +213,12 @@ h1, h2, h3, h4, h5, h6 {
       transform var(--duration-feedback) var(--ease-standard),
       opacity var(--duration-feedback) var(--ease-standard);
   }
-
   .transition-opening {
     transition: opacity var(--duration-opening) var(--ease-standard),
       transform var(--duration-opening) var(--ease-standard),
       background-color var(--duration-opening) var(--ease-standard),
       border-color var(--duration-opening) var(--ease-standard);
   }
-
   .transition-step {
     transition: background-color var(--duration-step) var(--ease-standard),
       border-color var(--duration-step) var(--ease-standard),
@@ -200,12 +226,11 @@ h1, h2, h3, h4, h5, h6 {
       width var(--duration-step) var(--ease-standard),
       box-shadow var(--duration-step) var(--ease-standard);
   }
-
-  .animate-step-in {
-    animation: stepIn var(--duration-step) var(--ease-standard) both;
-  }
-
-  .animate-confirm-pop {
-    animation: confirmPop var(--duration-step) var(--ease-standard) both;
+  .animate-step-in { animation: stepIn var(--duration-step) var(--ease-standard) both; }
+  .animate-confirm-pop { animation: confirmPop var(--duration-step) var(--ease-standard) both; }
+  .tabular { font-variant-numeric: tabular-nums; }
+  .bg-dots {
+    background-image: radial-gradient(var(--line) 1px, transparent 1px);
+    background-size: 18px 18px;
   }
 }
