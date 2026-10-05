@@ -353,5 +353,6 @@ Contagem de unidades pendentes, incluindo fase 0: Terminal 1 **15**; Terminal 2 
 - [x] Portar painel do dono sobre `feat/backend` sem apagar APIs.
 - [x] Sessão Better Auth in-process + isolamento por negócio.
 - [x] e2e Playwright das jornadas principais do dono.
-- [ ] Rebase de `feat/dashboard-v2` sobre o PR de integração do backend quando abrir.
-- [ ] Resolver colisão futura com placeholder `/dashboard` em `feat/conversion` (fora do escopo desta branch).
+- [ ] Rebase do PR de frontend consolidado (que já inclui o painel) sobre o PR de integração do backend quando abrir.
+- [x] Resolver colisão com placeholder `/dashboard` de `feat/conversion` (placeholder não entrou na consolidação).
+- [x] Login único em `/login`; `/dashboard/login` redireciona.

@@ -3,10 +3,6 @@
 Esqueleto do produto de agendamento com sinal por Pix. Os fluxos comerciais ainda não estão implementados.
 
 
-## Painel do dono (app único)
-
-A branch `feat/dashboard-v2` incorpora o painel do dono no mesmo app Next do backend (`feat/backend` como base). Não use o modelo antigo de painel em porta `3343` falando HTTP com autoridade separada. Sessão: Better Auth no mesmo processo. O PR #1 (`feat/dashboard`) permanece histórico e não deve ser atualizado por esta linha de trabalho.
-
 ## Requisitos
 
 - Node.js 22.16 ou superior e pnpm 12.8.1.
@@ -63,13 +59,12 @@ pnpm test:db
 ```
 
 `test:db` exige banco iniciado e migrations aplicadas. Os testes de domínio usam transações revertidas ao final. O teste de autenticação remove seus próprios usuários, sessões e verificações ao terminar; o envio SMTP é simulado somente nesse teste.
-`pnpm test:e2e` contém apenas um teste do esqueleto em 375 px. Instale o Chromium do Playwright antes de executá-lo: `pnpm exec playwright install chromium`.
-O terminal 3 adicionará os fluxos reais quando o agendamento e o Pix existirem.
+`pnpm test:e2e` sobe `next dev` em `127.0.0.1:3344` e roda em 375 px: landing, login único, painel do dono (sessão, isolamento entre negócios), login por link mágico até `/dashboard` e cadastro concluído → "Ir para o painel". Precisa de banco migrado (`DATABASE_URL`) e das variáveis de auth; os links mágicos são capturados em arquivo via `MAGIC_LINK_CAPTURE_FILE` (somente testes), sem SMTP. Instale o Chromium do Playwright antes: `pnpm exec playwright install chromium`.
 `/api/health` verifica o processo HTTP, sem afirmar disponibilidade do banco ou do SMTP.
 
 ## Frontend
 
-O produto é um único app Next: as telas e as rotas de API rodam no mesmo processo e na mesma origem. Não há backend separado nem proxy.
+O produto é um único app Next: as telas, o painel do dono e as rotas de API rodam no mesmo processo e na mesma origem. Não há backend separado nem proxy, nem painel em outra porta.
 
 | Rota | O que é | Dados |
 | --- | --- | --- |
@@ -77,7 +72,8 @@ O produto é um único app Next: as telas e as rotas de API rodam no mesmo proce
 | `/[slug]` | Página pública de agendamento com sinal por Pix | `GET/POST /api/public/[slug]/*` (same-origin) |
 | `/onboarding` | Cadastro do negócio em 4 passos; termina com link mágico | `POST /api/auth/sign-in/magic-link` |
 | `/onboarding/concluir` | Destino do link mágico do cadastro; provisiona o negócio | `POST /api/onboarding` (sessão por cookie, `Idempotency-Key`) |
-| `/login` | Entrada do dono por link mágico (volta para `/dashboard`) | `POST /api/auth/sign-in/magic-link` |
+| `/login` | Login único do dono por link mágico (volta para `/dashboard` ou para `?next=` relativo); `/dashboard/login` redireciona para cá | `POST /api/auth/sign-in/magic-link` |
+| `/dashboard` | Painel do dono: agenda do dia/semana, `/dashboard/services`, `/dashboard/customers`, `/dashboard/settings` (funcionamento e chave Pix) | Server Components + Server Actions com sessão Better Auth no mesmo processo; cada consulta filtra pelo negócio do dono |
 | `/preview/*` | Demonstração com dados falsos (`lib/preview/mock-data.ts`) | Nenhuma chamada ao banco |
 
 As URLs das rotas públicas são montadas em `lib/public-api.ts`, que codifica slug, ids e parâmetros de busca com `encodeURIComponent`/`URLSearchParams`.
@@ -86,7 +82,7 @@ Tokens visuais e a Placa de Valor estão descritos em [docs/design-tokens.md](do
 ## Autenticação
 
 Better Auth oferece email com link mágico em `/api/auth/[...all]`. Configure as variáveis SMTP antes de solicitar um link.
-O cliente pode usar `authClient.signIn.magicLink({ email, callbackURL: "/" })` e `authClient.signOut()`.
+As telas usam `requestMagicLink` (`lib/magic-link.ts`), que envia `callbackURL` e `errorCallbackURL` relativos: link expirado ou já usado volta para `/login?error=…` com aviso. Destinos pós-login passam por `safeNextPath` (`lib/safe-redirect.ts`), que só aceita caminhos do próprio app.
 O link expira em cinco minutos, é consumido uma vez e fica armazenado como hash.
 Não há login por senha ou Google nesta etapa. Nenhum link ou token é registrado no terminal.
 
