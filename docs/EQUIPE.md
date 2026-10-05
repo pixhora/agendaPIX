@@ -57,8 +57,8 @@ Você é T6 — UX/UI Auditor. Leia AGENTS.md; consulte somente a tela, rota e c
 
 Maestro confirmado pelo CLI. Dois terminais criados com preset Antigravity e papéis próprios:
 
-- Trilha: T5 — Product/Conversion Designer, `feat/conversion`, `/var/home/matheus/projetos/agenda-conversion`.
-- Prisma: T6 — UX/UI Auditor, `feat/ux-audit`, `/var/home/matheus/projetos/agenda-ux-audit`.
+- Trilha: T5 — Product/Conversion Designer, branch `feat/conversion` (worktree local do agente).
+- Prisma: T6 — UX/UI Auditor, branch `feat/ux-audit` (worktree local do agente).
 - Ambos conectados a Codex e Antigravidade, e entre si; Prisma conectado também a CODEXADO para auditoria de transição do painel.
 - Antigravidade existente segue T4; não foi reiniciado nem duplicado.
 - Base dos novos terminais: `a134216ca473144ff97acbaaf1fd26689002ad83` (frontend atual). Sem cópia de `.env` ou credenciais de outra worktree.
