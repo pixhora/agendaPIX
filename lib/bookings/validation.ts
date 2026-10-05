@@ -38,7 +38,7 @@ export const bookingInputSchema = z.object({
   customer: z.object({
     name: z.string().trim().min(1).max(120),
     phone: z.string().regex(/^\+[1-9][0-9]{7,14}$/),
-    /** CPF do pagador (obrigatório para cobrança Pix / Asaas). Aceita máscara; normaliza para 11 dígitos. */
+    /** CPF do pagador (enviado ao gateway Pix; não persistido). Aceita máscara; normaliza para 11 dígitos. */
     cpfCnpj: z.string().trim().min(11).max(18).transform(cpfDigits).refine(isValidCpf, "CPF inválido."),
   }).strict(),
 }).strict();

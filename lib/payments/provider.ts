@@ -5,18 +5,18 @@ import { centsSchema } from "../validation/service";
 export const chargeCustomerSchema = z.object({
   name: z.string().trim().min(1).max(120),
   phone: z.string().regex(/^\+[1-9][0-9]{7,14}$/),
-  /** CPF com 11 dígitos (Asaas `cpfCnpj`). Obrigatório para o provedor Asaas. */
+  /** CPF com 11 dígitos (enviado à Woovi como `customer.taxID`). */
   cpfCnpj: z.string().regex(/^\d{11}$/).refine(isValidCpf, "CPF inválido."),
   email: z.email().max(120).optional(),
 }).strict();
 
 export const chargeInputSchema = z.object({
   idempotencyKey: z.uuid({ version: "v4" }),
-  /** Nosso id de pagamento, enviado ao gateway como referência externa (Asaas `externalReference`, Mercado Pago `external_reference`). */
+  /** Nosso id de pagamento, enviado ao gateway como referência externa (Woovi `correlationID`). */
   reference: z.uuid(),
   amountCents: centsSchema.refine((value) => value > 0, "A cobrança deve ser positiva."),
   expiresAt: z.date(),
-  /** Dados do pagador; exigidos pelo Asaas (CPF). O fake ignora. */
+  /** Dados do pagador (opcional para o gateway; ausente em retries do reconciliador). */
   customer: chargeCustomerSchema.optional(),
 });
 export const pixChargeSchema = z.object({
@@ -43,11 +43,15 @@ export type ChargeInput = z.infer<typeof chargeInputSchema>;
 export type PixCharge = z.infer<typeof pixChargeSchema>;
 export type ProviderCharge = z.infer<typeof providerChargeSchema>;
 export type PaidEvent = z.infer<typeof paidEventSchema>;
+/** Entrega autenticada de um evento que não confirma pagamento: responde 200 sem gravar nada. */
+export class IgnoredWebhookEvent extends Error {
+  constructor(readonly event: string) { super(`Evento ignorado: ${event}`); this.name = "IgnoredWebhookEvent"; }
+}
 /** Toda chamada de rede recebe um AbortSignal; o domínio aplica timeout e aborta chamadas lentas. */
 export type ProviderCallOptions = { signal?: AbortSignal };
 
 /**
- * Contrato agnóstico de gateway. Implementações reais (Asaas, Mercado Pago) devem:
+ * Contrato agnóstico de gateway. Implementações reais (Woovi/OpenPix, etc.) devem:
  * - ser idempotentes em createPixCharge pela idempotencyKey (nativo ou emulado via findChargeByReference);
  * - devolver null quando o gateway não conhece a cobrança;
  * - nunca cancelar cobrança paga (cancelCharge devolve o estado resultante, inclusive "paid").

@@ -31,7 +31,7 @@ async function withTimeout<T>(config: PaymentsConfig, run: (signal: AbortSignal)
  * processos possam rodar em paralelo com segurança (um trabalha, os outros saem).
  */
 /**
- * Quando o gateway está indisponível (ex.: produção sem Asaas), ainda assim libera
+ * Quando o gateway está indisponível (ex.: produção sem Woovi), ainda assim libera
  * horários e marca cobranças creating/pending vencidas — sem falhar o processo inteiro.
  */
 async function expireLocalHolds(database: Database, now: Date, batchSize: number, report: ReconcileReport) {
@@ -63,7 +63,7 @@ export async function reconcileOnce(
   if (provider === undefined) {
     try { activeProvider = getPaymentProvider(); }
     catch {
-      // Em produção sem Asaas configurado: segue só com passos locais (expirar holds / creating).
+      // Sem provedor configurado: segue só com passos locais (expirar holds / creating).
       activeProvider = null;
     }
   }
