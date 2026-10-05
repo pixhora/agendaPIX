@@ -1,11 +1,11 @@
 # Compose único do agendaPIX (funciona com `podman compose` e `docker compose`).
 #
 #   Banco para desenvolvimento:    podman compose up -d --wait postgres   (ou: pnpm db:up)
-#   App completo (imagem de prod): podman compose --profile app up -d --build
+#   App completo (imagem de prod): podman compose --profile app up -d --build   (postgres, migrate, app, worker)
 #
 # Todas as credenciais vêm do arquivo .env (copie de .env.example). Nada é publicado fora de 127.0.0.1.
 
-# Base comum dos serviços que usam a imagem do Dockerfile (migrate, app e, no futuro, worker).
+# Base comum dos serviços que usam a imagem do Dockerfile (migrate, app e worker).
 x-app-image: &app-image
   build: .
   image: agendapix:local
@@ -61,22 +61,25 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
-  # Reservado para o job de reconciliação (~1x por minuto) que o backend vai entregar: mesma imagem,
-  # processo separado do app, sem porta publicada. Descomente e ajuste o comando quando o script existir
-  # (ex.: um worker em loop, ou um cron externo/"Scheduled Task" do Coolify rodando o comando uma vez).
-  # worker:
-  #   <<: *app-image
-  #   profiles: ["app"]
-  #   command: ["node", "worker.cjs"]
-  #   env_file: .env
-  #   environment:
-  #     DATABASE_URL: *database-url
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #     migrate:
-  #       condition: service_completed_successfully
-  #   restart: unless-stopped
+  # Reconciliador de cobranças Pix (órfãs, presas em "creating", webhooks perdidos): mesma imagem, processo
+  # separado do web, sem porta publicada. Roda em loop a cada RECONCILE_INTERVAL_SECONDS; várias réplicas são
+  # seguras (advisory lock). Alternativa sem processo contínuo: cron/Scheduled Task com `node reconcile.mjs --once`.
+  worker:
+    <<: *app-image
+    profiles: ["app"]
+    command: ["node", "reconcile.mjs"]
+    env_file: .env
+    environment:
+      DATABASE_URL: *database-url
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    # Sem HTTP: o HEALTHCHECK da imagem (/api/health) não se aplica a este processo.
+    healthcheck:
+      disable: true
+    restart: unless-stopped
 
 volumes:
   postgres_data:

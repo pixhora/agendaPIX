@@ -3,8 +3,9 @@
 # Imagem de produção do agendaPIX: um único app Next.js em output standalone.
 #
 #   docker build -t agendapix .
-#   docker run --rm --env-file .env.production agendapix node migrate.cjs   # migrations
+#   docker run --rm --env-file .env.production agendapix node migrate.cjs   # migrations (uma transação por arquivo)
 #   docker run -d --env-file .env.production -p 127.0.0.1:3000:3000 agendapix
+#   docker run -d --env-file .env.production agendapix node reconcile.mjs   # worker de reconciliação (loop)
 #
 # Nenhum segredo entra na imagem: todas as variáveis são lidas em runtime.
 
@@ -23,12 +24,12 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm install --frozen-lockfile --store-dir /pnpm/store
 
-# ---- build: next build (standalone) + migrator empacotado
+# ---- build: next build (standalone) + entrypoints de processo empacotados (migrate, reconcile)
 FROM base AS build
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN pnpm build \
- && pnpm build:migrate \
+ && pnpm build:bundles \
  && mkdir -p public
 
 # ---- runner: só o necessário para executar, usuário não-root
@@ -43,8 +44,8 @@ WORKDIR /app
 COPY --from=build --chown=1000:1000 /app/.next/standalone ./
 COPY --from=build --chown=1000:1000 /app/.next/static ./.next/static
 COPY --from=build --chown=1000:1000 /app/public ./public
-# Migrations: script autocontido (drizzle-orm + pg) e os arquivos SQL versionados.
-COPY --from=build --chown=1000:1000 /app/dist/migrate.cjs ./migrate.cjs
+# Processos auxiliares autocontidos: migrate.cjs (sempre) e reconcile.mjs (quando o backend o tiver) + SQL versionado.
+COPY --from=build --chown=1000:1000 /app/dist/ ./
 COPY --from=build --chown=1000:1000 /app/db/migrations ./db/migrations
 
 # Usuário "node" (uid/gid 1000) já existe na imagem oficial; numérico para runtimes que exigem runAsNonRoot.
