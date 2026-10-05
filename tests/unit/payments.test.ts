@@ -17,7 +17,7 @@ function headers(body: string, timestamp = String(now.getTime() / 1000)) {
 
 describe("provider fake e assinatura", () => {
   it("gera QR Code e copia-e-cola determinísticos e explicitamente fictícios", async () => {
-    const input = { idempotencyKey: randomUUID(), amountCents: 1000, expiresAt: payment.expiresAt };
+    const input = { idempotencyKey: randomUUID(), reference: randomUUID(), amountCents: 1000, expiresAt: payment.expiresAt };
     const first = await provider.createPixCharge(input);
     expect(first).toEqual(await provider.createPixCharge(input));
     expect(first.qrCodeDataUrl).toMatch(/^data:image\/png;base64,/);
@@ -25,7 +25,7 @@ describe("provider fake e assinatura", () => {
     expect(first.amountCents).toBe(1000);
   });
   it.each([0, -1, 0.1, 2147483648])("não cobra %s centavos", async (amountCents) => {
-    await expect(provider.createPixCharge({ idempotencyKey: randomUUID(), amountCents, expiresAt: payment.expiresAt })).rejects.toThrow();
+    await expect(provider.createPixCharge({ idempotencyKey: randomUUID(), reference: randomUUID(), amountCents, expiresAt: payment.expiresAt })).rejects.toThrow();
   });
   it("aceita somente corpo original assinado", () => {
     const body = JSON.stringify(event);
@@ -77,5 +77,23 @@ describe("regras do evento pago", () => {
   });
   it("rejeita data de pagamento no futuro além da tolerância", () => {
     expect(decidePaidEvent(payment, booking, { ...event, paidAt: "2030-01-01T12:06:00Z" }, now)).toMatchObject({ outcome: "rejected", reason: "future_payment" });
+  });
+});
+
+describe("consulta e cancelamento fake", () => {
+  it("é idempotente por chave e localiza por referência", async () => {
+    const reference = randomUUID();
+    const input = { idempotencyKey: randomUUID(), reference, amountCents: 1000, expiresAt: payment.expiresAt };
+    const first = await provider.createPixCharge(input);
+    expect(await provider.createPixCharge(input)).toEqual(first);
+    expect(await provider.findChargeByReference(reference)).toMatchObject({ externalId: first.externalId, status: "pending" });
+    expect(await provider.getCharge(first.externalId)).toMatchObject({ reference });
+  });
+  it("cancela pendente e preserva pago", async () => {
+    const created = await provider.createPixCharge({ idempotencyKey: randomUUID(), reference: randomUUID(), amountCents: 1000, expiresAt: payment.expiresAt });
+    expect(await provider.cancelCharge(created.externalId)).toMatchObject({ status: "cancelled" });
+    const paid = await provider.createPixCharge({ idempotencyKey: randomUUID(), reference: randomUUID(), amountCents: 1000, expiresAt: payment.expiresAt });
+    provider.markPaid(paid.externalId, now);
+    expect(await provider.cancelCharge(paid.externalId)).toMatchObject({ status: "paid" });
   });
 });
