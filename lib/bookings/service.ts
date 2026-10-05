@@ -10,6 +10,7 @@ import { getPaymentProvider } from "../payments";
 import { pixChargeSchema, type PaymentProvider } from "../payments/provider";
 import { availableSlots, localDate } from "./availability";
 import { availabilitySchema, bookingInputSchema, requestKeySchema, slugSchema } from "./validation";
+import { bookingConfig } from "./config";
 import { consumeBookingRateLimit } from "./rate-limit";
 
 type Database = NodePgDatabase<typeof schema>;
@@ -75,12 +76,13 @@ async function bookingView(booking: typeof schema.bookings.$inferSelect, databas
   return { bookingId: booking.id, status: booking.status, startsAt: booking.startsAt, endsAt: booking.endsAt, expiresAt: booking.expiresAt, payment: paymentView(payment, now) };
 }
 
-export async function createBooking(slug: string, body: unknown, key: unknown, database: Database = getDb(), provider?: PaymentProvider, clientIdentity = "anonymous") {
+export async function createBooking(slug: string, body: unknown, key: unknown, database: Database = getDb(), provider?: PaymentProvider, clientIdentity: string | null = null) {
+  const config = bookingConfig();
   const input = bookingInputSchema.parse(body);
   const requestKey = requestKeySchema.parse(key);
   const requestHash = hash(JSON.stringify(input));
   const business = await businessBySlug(slug, database);
-  await consumeBookingRateLimit(database, business.id, clientIdentity);
+  await consumeBookingRateLimit(database, business.id, clientIdentity, config);
   return database.transaction(async (transaction) => {
     await lockBusiness(transaction, business.id);
     const now = new Date();
