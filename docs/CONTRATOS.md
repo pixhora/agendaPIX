@@ -138,7 +138,7 @@ O provider deve criar no máximo uma cobrança por chave e repetir a resposta ap
 `PaymentProvider.verifyWebhook` autentica o corpo bruto e normaliza o evento. O domínio não interpreta protocolo do gateway.
 Somente fake existe nesta etapa. Exige `PAYMENT_PROVIDER=fake`, segredo `FAKE_WEBHOOK_SECRET` exclusivo com ao menos 32 caracteres e ambiente diferente de produção.
 QR Code PNG codifica texto prefixado `FAKE-PIX-NOT-PAYABLE`, não é um Pix bancário. A dependência `qrcode` é necessária para gerar QR Code padrão, sem implementar algoritmo próprio.
-A chamada ao provider ocorre na transação de reserva. Antes de um gateway real, revisar timeout e recuperação de cobranças externas; idempotência da interface já é obrigatória.
+A reserva e o pagamento `creating` (só idempotencyKey/valor/vencimento) ocorrem numa transação curta com lock do negócio; `createPixCharge` roda **fora** de qualquer transação com timeout (`PAYMENT_PROVIDER_TIMEOUT_MS`) e `reference` = id do pagamento. Uma segunda transação curta anexa QR/`externalId` e promove a `pending` somente se ainda `creating`. Falha/timeout → `503` retriável; replay retoma. `expirePending` também expira `creating`. Interface do provider inclui `getCharge`/`findChargeByReference`/`cancelCharge`; `verifyWebhook` pode ser async (pronto para Mercado Pago).
 
 ## Webhook
 
@@ -162,6 +162,12 @@ Provedor, tamanho (Content-Length e leitura limitada a 16 KiB), assinatura e for
 Migration 0007 não é puramente expansiva: torna `event_id`/`body_hash` obrigatórios e únicos em `webhook_deliveries`, que o código anterior não respeita (gravava antes de validar). Aplicar junto com este código. Reversão: voltar ao código anterior e executar `ALTER TABLE webhook_deliveries DROP CONSTRAINT webhook_deliveries_provider_event_unique, ALTER COLUMN event_id DROP NOT NULL, ALTER COLUMN body_hash DROP NOT NULL;` As colunas/índices novos de `bookings` e a tabela legacy podem permanecer; nunca apagar `webhook_deliveries_legacy`, reservas ou pagamentos ao reverter.
 `payment_events` tem identidade única por provider e evento, hash do evento normalizado, identificador da cobrança e resultado. Evento já visto com mesmo conteúdo é duplicado; conteúdo diferente com mesmo identificador responde `409`.
 Deduplicação, alteração do pagamento, confirmação da reserva e resultado do evento ocorrem na mesma transação.
+O efeito de pagamento confirmado vive em `applyPaidEvent` (webhook e reconciliação). Pagamento tardio: `businesses.late_payment_policy` = `refund` → `refund_pending` + linha em `payment_audit`; `rebook_if_free` → tenta confirmar o mesmo horário se a exclusão gist permitir, senão `refund_pending`. Nunca mantém dinheiro em silêncio.
+
+Reconciliador (`pnpm reconcile`): retoma `creating` preso (`RECONCILE_STUCK_SECONDS`), cancela no gateway `pending`/`expired` com `externalId`, consulta `pending` vigentes por webhooks perdidos. Advisory lock de sessão evita trabalho duplicado. Auditoria em `payment_audit` (sem PII).
+
+Migrations 0008 (ADD VALUE do enum, commit isolado) e 0009 (tabela `payment_audit`, `late_payment_policy`, checks de `creating`/`pending`, unique `(business_id,id)` em payments). Reversão 0009: dropar checks/índices/`payment_audit`/`late_payment_policy` e o unique novo; valores de enum (`creating`,`cancelled`,`refund_pending`) são irreversíveis no Postgres — o código antigo simplesmente não os grava. Nunca apagar pagamentos/reservas/audit ao reverter.
+
 Somente cobrança identificada pelo provider e identificador externo pode ser alterada. Valor deve corresponder à cobrança e ao sinal contratado.
 Pagamento válido recebido a tempo confirma somente reserva pendente ainda válida. Pagamento tardio registra dinheiro recebido, mas não reabre horário: resultado `ignored`, motivo `late_payment`, requer avaliação do dono antes de um gateway real.
 Evento de valor divergente é `rejected`, sem alterar cobrança ou reserva. Pagamento já pago é `duplicate`. Cobrança desconhecida é `ignored`.
