@@ -9,7 +9,7 @@ import { databaseEnvSchema } from "../../lib/env";
 import { FakeChargeStore, FakePaymentProvider } from "../../lib/payments/fake";
 import { reconcileOnce } from "../../lib/payments/reconcile";
 import { applyPaidEvent } from "../../lib/payments/apply-paid";
-import { polledPaidEvent } from "../../lib/payments/provider";
+import { polledPaidEvent, type ChargeInput, type PaymentProvider } from "../../lib/payments/provider";
 import { hash } from "../../lib/bookings/service";
 
 const pool = new Pool({ connectionString: databaseEnvSchema.parse(process.env).DATABASE_URL, max: 10, connectionTimeoutMillis: 5000 });
@@ -70,10 +70,12 @@ describe("cobrança fora da transação", () => {
   });
 
   it("falha/timeout do gateway deixa creating e o replay retoma sem segunda cobrança", async () => {
-    vi.stubEnv("PAYMENT_PROVIDER_TIMEOUT_MS", "40");
-    provider.latencyMs = 300;
+    // Mínimo aceito por paymentsConfig é 100 ms (abaixo disso o 503 viria da config, não do timeout).
+    vi.stubEnv("PAYMENT_PROVIDER_TIMEOUT_MS", "150");
+    provider.latencyMs = 400;
     const key = randomUUID();
     await expect(createBooking(slug, input(0), key, database, provider)).rejects.toMatchObject({ status: 503 });
+    expect(store.calls.create).toBe(1);
     const [payment] = await database.select().from(schema.payments).where(eq(schema.payments.businessId, businessId));
     expect(payment.status).toBe("creating");
     expect(payment.externalId).toBeNull();
@@ -83,6 +85,40 @@ describe("cobrança fora da transação", () => {
     const resumed = await createBooking(slug, input(0), key, database, provider);
     expect(resumed.replayed).toBe(true);
     expect(resumed.data.payment?.status).toBe("pending");
+    expect(store.byIdempotencyKey.size).toBe(1);
+  });
+
+  it("retry após timeout reenvia os dados do pagador (CPF) e recupera a cobrança já criada no gateway", async () => {
+    vi.stubEnv("PAYMENT_PROVIDER_TIMEOUT_MS", "150");
+    provider.latencyMs = 400;
+    const inputs: ChargeInput[] = [];
+    // Gateway estrito como a regressão do review: sem CPF, recusa ANTES de consultar a referência.
+    const strict: PaymentProvider = {
+      name: provider.name,
+      createPixCharge: async (charge: ChargeInput) => {
+        inputs.push(charge);
+        if (!charge.customer?.cpfCnpj) throw new Error("cpf_required");
+        // Ignora o abort de propósito: o gateway real conclui a criação mesmo após o timeout local.
+        return provider.createPixCharge(charge);
+      },
+      getCharge: provider.getCharge.bind(provider), findChargeByReference: provider.findChargeByReference.bind(provider),
+      cancelCharge: provider.cancelCharge.bind(provider), verifyWebhook: provider.verifyWebhook.bind(provider),
+    };
+    const key = randomUUID();
+    await expect(createBooking(slug, input(0), key, database, strict)).rejects.toMatchObject({ status: 503 });
+    // O gateway concluiu a criação depois do timeout local.
+    expect(inputs).toHaveLength(1);
+    expect(store.byIdempotencyKey.size).toBe(0);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(store.byIdempotencyKey.size).toBe(1);
+    provider.latencyMs = 0;
+    vi.stubEnv("PAYMENT_PROVIDER_TIMEOUT_MS", "8000");
+    const resumed = await createBooking(slug, input(0), key, database, strict);
+    expect(resumed.replayed).toBe(true);
+    expect(resumed.data.payment?.status).toBe("pending");
+    expect(inputs).toHaveLength(2);
+    expect(inputs[1].customer).toEqual({ name: "Cliente", phone: "+5511999999900", cpfCnpj: "52998224725" });
+    expect(inputs[1].reference).toBe(inputs[0].reference);
     expect(store.byIdempotencyKey.size).toBe(1);
   });
 
@@ -162,6 +198,24 @@ describe("reconciliação", () => {
     });
     const [booking] = await database.select().from(schema.bookings).where(eq(schema.bookings.id, data.bookingId));
     expect(booking.status).toBe("confirmed");
+  });
+
+  it("sem provedor disponível (produção sem Woovi) ainda expira holds e creating vencidos", async () => {
+    const broken = { name: provider.name, createPixCharge: async () => { throw new Error("fail"); }, getCharge: provider.getCharge.bind(provider), findChargeByReference: provider.findChargeByReference.bind(provider), cancelCharge: provider.cancelCharge.bind(provider), verifyWebhook: provider.verifyWebhook.bind(provider) };
+    const { data: pending } = await createBooking(slug, input(0), randomUUID(), database, provider);
+    await expect(createBooking(slug, input(1, "+5511999999901"), randomUUID(), database, broken)).rejects.toMatchObject({ status: 503 });
+    const past = new Date(Date.now() - 1000);
+    await database.update(schema.bookings).set({ createdAt: new Date(Date.now() - 60_000), expiresAt: past }).where(eq(schema.bookings.businessId, businessId));
+    await database.update(schema.payments).set({ expiresAt: past }).where(eq(schema.payments.businessId, businessId));
+    const report = await reconcileOnce(database, null, { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50 });
+    expect(report).toMatchObject({ skippedLock: false, stuckCancelled: 1, expiredCancelled: 1, polledPaid: 0 });
+    const payments = await database.select().from(schema.payments).where(eq(schema.payments.businessId, businessId));
+    expect(payments.map((p) => p.status).sort()).toEqual(["expired", "expired"]);
+    const bookings = await database.select().from(schema.bookings).where(eq(schema.bookings.businessId, businessId));
+    expect(bookings.every((b) => b.status === "expired")).toBe(true);
+    // Gateway não é tocado sem provedor: cancelamento remoto fica para o próximo ciclo (cancelExpiredPending).
+    expect(store.calls.cancel).toBe(0);
+    expect(await provider.getCharge(pending.payment!.externalId!)).toMatchObject({ status: "pending" });
   });
 
   it("reconcilers concorrentes: só um executa o trabalho", async () => {
