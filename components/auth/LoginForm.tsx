@@ -24,6 +24,9 @@ export interface LoginFormProps {
   className?: string;
 }
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const INVALID_EMAIL_MESSAGE = "Digite um e-mail válido, como voce@seunegocio.com.br.";
+
 export function LoginForm({
   title = "Entrar na sua conta",
   subtitle = "Digite seu e-mail profissional. Enviamos um link de acesso, sem senha.",
@@ -39,7 +42,7 @@ export function LoginForm({
   const [wasSimulated, setWasSimulated] = useState(false);
   const sentHeadingRef = useRef<HTMLHeadingElement>(null);
 
-  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const emailRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isSent) sentHeadingRef.current?.focus();
@@ -47,12 +50,20 @@ export function LoginForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isEmailValid || isSubmitting) return;
+    if (isSubmitting) return;
+    // Lê do próprio campo: cobre o e-mail digitado (ou preenchido pelo navegador) antes da hidratação.
+    const typed = (emailRef.current?.value ?? email).trim();
+    if (typed !== email) setEmail(typed);
+    if (!EMAIL_PATTERN.test(typed)) {
+      setErrorMessage(INVALID_EMAIL_MESSAGE);
+      emailRef.current?.focus();
+      return;
+    }
 
     setIsSubmitting(true);
     setErrorMessage(null);
 
-    const result: MagicLinkResult = await requestMagicLink(email.trim(), undefined, callbackURL);
+    const result: MagicLinkResult = await requestMagicLink(typed, undefined, callbackURL);
 
     if (result.ok) {
       setWasSimulated(!!result.simulated);
@@ -115,6 +126,7 @@ export function LoginForm({
       <div className="grid gap-1.5">
         <label htmlFor="login-email" className="text-sm font-semibold">E-mail profissional</label>
         <Input
+          ref={emailRef}
           id="login-email"
           type="email"
           inputMode="email"
@@ -126,12 +138,12 @@ export function LoginForm({
           aria-describedby={errorMessage && errorMessage !== LINK_ERROR_MESSAGE ? "login-error" : undefined}
           placeholder="voce@seunegocio.com.br"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => { setEmail(e.target.value); if (errorMessage === INVALID_EMAIL_MESSAGE) setErrorMessage(null); }}
         />
         {errorMessage && errorMessage !== LINK_ERROR_MESSAGE && <FieldError id="login-error">{errorMessage}</FieldError>}
       </div>
 
-      <Button type="submit" size="lg" disabled={!isEmailValid || isSubmitting} className="w-full">
+      <Button type="submit" size="lg" disabled={isSubmitting} className="w-full">
         {isSubmitting ? "Enviando link…" : "Receber link de acesso"}
       </Button>
 

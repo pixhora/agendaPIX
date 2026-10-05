@@ -52,7 +52,7 @@ export function ServiceForm({ businessId, service }: { businessId: string; servi
     {service && <input type="hidden" name="id" value={service.id} />}
     <label htmlFor={`${prefix}-name`} className={labelClass}>Nome do serviço<Input id={`${prefix}-name`} name="name" required maxLength={120} placeholder="Ex.: Corte masculino" value={values.name} onChange={(event) => setValues({ ...values, name: event.target.value })} /></label>
     <div className="grid grid-cols-2 gap-3">
-      <label htmlFor={`${prefix}-duration`} className={cn(labelClass, "col-span-2")}>Duração (minutos)<Input id={`${prefix}-duration`} name="durationMinutes" type="number" min={1} max={1440} step={5} required className="tabular-nums" value={values.duration} onChange={(event) => setValues({ ...values, duration: event.target.value })} /></label>
+      <label htmlFor={`${prefix}-duration`} className={cn(labelClass, "col-span-2")}>Duração (minutos)<Input id={`${prefix}-duration`} name="durationMinutes" type="number" min={1} max={1440} required className="tabular-nums" value={values.duration} onChange={(event) => setValues({ ...values, duration: event.target.value })} /></label>
       <label htmlFor={`${prefix}-price`} className={labelClass}>Preço<MoneyInput id={`${prefix}-price`} name="price" required placeholder="0,00" value={values.price} onChange={(event) => setValues({ ...values, price: event.target.value })} /></label>
       <label htmlFor={`${prefix}-deposit`} className={labelClass}>Sinal via Pix<MoneyInput id={`${prefix}-deposit`} name="deposit" required value={values.deposit} onChange={(event) => setValues({ ...values, deposit: event.target.value })} /></label>
     </div>
