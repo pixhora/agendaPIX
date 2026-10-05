@@ -43,6 +43,7 @@
   --duration-opening: 180ms;
   --duration-step: 240ms;
   --ease-standard: cubic-bezier(0.16, 1, 0.3, 1);
+  color-scheme: light;
 }
 
 .dark {
@@ -58,6 +59,7 @@
   --ring: #c0f739;
   --primary-hover: #e5e4e0;
   --primary-foreground: #0b0b0c;
+  color-scheme: dark;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -74,6 +76,7 @@
     --ring: #c0f739;
     --primary-hover: #e5e4e0;
     --primary-foreground: #0b0b0c;
+    color-scheme: dark;
   }
 }
 
@@ -105,9 +108,9 @@
   --color-ring: var(--ring);
   --color-pix-success: var(--pix-success);
 
-  --radius-frame: var(--radius-frame);
-  --radius-card: var(--radius-card);
-  --radius-field: var(--radius-field);
+  --radius-frame: 32px;
+  --radius-card: 14px;
+  --radius-field: 12px;
   --radius-sm: var(--radius-sm);
   --radius-md: var(--radius);
   --radius-lg: var(--radius-lg);

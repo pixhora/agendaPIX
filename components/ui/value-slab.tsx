@@ -16,33 +16,33 @@ interface ValueSlabProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "chi
  * Elemento-assinatura v2: Placa de Valor (--slab).
  * Fundo escuro com número grande em tabular-nums e acento fino em lima.
  * Versão única que une a primitiva de feat/booking-ui (atributos HTML repassados,
- * StatusChip com ponto decorativo oculto de leitores de tela) com o `unit` usado
- * pela landing de feat/conversion.
+ * StatusChip com ponto decorativo oculto de leitores de tela), o `unit` usado
+ * pela landing de feat/conversion e as classes por token do painel (feat/dashboard-v2).
  */
 export function ValueSlab({ label, value, unit, sublabel, badge, className, ...props }: ValueSlabProps) {
   const badgeNode = typeof badge === "string" ? <StatusChip active>{badge}</StatusChip> : badge;
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-[24px] sm:rounded-[32px] border border-line bg-slab p-6 sm:p-7 text-slab-foreground shadow-md transition-all",
+        "relative overflow-hidden rounded-[24px] border border-line bg-slab p-6 text-slab-foreground sm:rounded-frame sm:p-7",
         className
       )}
       {...props}
     >
       <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="text-xs font-semibold uppercase tracking-wider text-[#A3A3A8]">{label}</span>
+        <span className="text-sm font-semibold text-slab-foreground/70">{label}</span>
         {badgeNode}
       </div>
 
       <div className="my-1 flex items-baseline gap-2">
-        <span className="font-display text-4xl font-black leading-none tracking-tight text-white tabular-nums sm:text-6xl">
+        <span className="font-display text-4xl font-extrabold leading-none tracking-tight text-slab-foreground tabular-nums sm:text-6xl">
           {value}
         </span>
-        {unit && <span className="text-sm font-semibold text-[#A3A3A8] sm:text-base">{unit}</span>}
+        {unit && <span className="text-sm font-semibold text-slab-foreground/70 sm:text-base">{unit}</span>}
       </div>
 
       {sublabel && (
-        <p className="mt-2 flex items-center gap-1.5 text-xs font-medium leading-relaxed text-[#A3A3A8]">{sublabel}</p>
+        <p className="mt-2 flex items-center gap-1.5 text-sm font-medium leading-relaxed text-slab-foreground/70">{sublabel}</p>
       )}
     </div>
   );
@@ -57,14 +57,14 @@ export function StatusChip({ children, active = false, className, ...props }: St
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors",
-        active ? "border-line bg-surface text-foreground" : "border-line bg-muted/20 text-muted-foreground",
+        "inline-flex min-h-8 items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 text-xs font-semibold text-ink",
+        !active && "text-muted",
         className
       )}
       {...props}
     >
       <span
-        className={cn("h-1.5 w-1.5 shrink-0 rounded-full", active ? "bg-lime" : "bg-muted-foreground/40")}
+        className={cn("h-1.5 w-1.5 shrink-0 rounded-full", active ? "bg-lime" : "bg-muted")}
         aria-hidden="true"
       />
       {children}
