@@ -24,3 +24,10 @@ Capturas atuais do login: [375 claro](evidencias/dashboard-v2/login-375-light.pn
 ## Pendente
 
 Capturar agenda, serviços, clientes e configurações autenticados em 375/1280 claro/escuro quando T2 receber sessão e dados de QA sintéticos válidos. Até lá, a revisão visual integrada dessas rotas não está comprovada. Nenhuma sessão, segredo ou processo alheio foi alterado.
+
+## Plano de continuação — 2026-10-04
+
+1. Reutilizar somente o negócio sintético B02 já existente na base local, sem migrations ou seed.
+2. Emitir uma sessão temporária de fixture para esse dono e validá-la na autoridade real; isso não prova entrega SMTP.
+3. Executar o build atual do painel em processo isolado, com a mesma conexão da autoridade, preservando o preview 3343.
+4. Capturar rotas autenticadas e verificar console, teclado, overflow e movimento reduzido; encerrar somente os recursos de teste criados nesta rodada.
