@@ -239,3 +239,8 @@ h1, h2, h3, h4, h5, h6, .font-display {
     background-size: 18px 18px;
   }
 }
+
+/* Painel no celular: foco e âncoras nunca ficam atrás das barras fixas (WCAG 2.4.11). */
+@media (max-width: 1023.98px) {
+  html:has([data-app-frame]) { scroll-padding-block: 5rem; }
+}

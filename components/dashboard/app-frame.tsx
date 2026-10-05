@@ -76,7 +76,7 @@ function CurrentBusinessName({ businesses }: { businesses: FrameBusiness[] }) {
 export function AppFrame({ ownerName, businesses, children }: { ownerName: string; businesses: FrameBusiness[]; children: ReactNode }) {
   const fallback = <span className="h-11" />;
   return (
-    <div className="min-h-dvh bg-paper lg:grid lg:grid-cols-[16rem_minmax(0,1fr)]">
+    <div data-app-frame className="min-h-dvh bg-paper lg:grid lg:grid-cols-[16rem_minmax(0,1fr)]">
       <a href="#content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-field focus:bg-ink focus:px-4 focus:py-3 focus:text-paper">Ir para o conteúdo</a>
 
       <aside className="hidden min-w-0 border-r border-line bg-surface lg:block">
@@ -104,7 +104,7 @@ export function AppFrame({ ownerName, businesses, children }: { ownerName: strin
       </aside>
 
       <div className="flex min-h-dvh min-w-0 flex-col">
-        <header className="sticky top-0 z-30 flex min-h-16 items-center gap-3 border-b border-line bg-surface/95 px-4 backdrop-blur lg:hidden">
+        <header data-sticky-chrome className="sticky top-0 z-30 flex min-h-16 items-center gap-3 border-b border-line bg-surface/95 px-4 backdrop-blur lg:hidden">
           <Link href="/dashboard" aria-label="Agenda, início do painel" className="rounded-field focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"><BrandMark /></Link>
           <div className="min-w-0 flex-1 leading-tight">
             <p className="truncate text-sm font-bold"><Suspense fallback="Seu painel"><CurrentBusinessName businesses={businesses} /></Suspense></p>
@@ -115,7 +115,7 @@ export function AppFrame({ ownerName, businesses, children }: { ownerName: strin
 
         <div className="flex-1">{children}</div>
 
-        <nav aria-label="Painel" className="sticky bottom-0 z-30 grid grid-cols-4 gap-1 border-t border-line bg-surface/95 px-2 pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-1 backdrop-blur lg:hidden">
+        <nav aria-label="Painel" data-sticky-chrome className="sticky bottom-0 z-30 grid grid-cols-4 gap-1 border-t border-line bg-surface/95 px-2 pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-1 backdrop-blur lg:hidden">
           <Suspense fallback={fallback}><NavLinks businesses={businesses} variant="tabs" /></Suspense>
         </nav>
       </div>

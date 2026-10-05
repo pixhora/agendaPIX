@@ -55,15 +55,18 @@ export function BookingConfirmation({
           <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
             <div className="flex items-start gap-2">
               <CalendarDays aria-hidden="true" className="mt-0.5 size-4 text-muted" />
-              <div><dt className="sr-only">Data</dt><dd className="font-semibold text-ink first-letter:uppercase">{formatDateFull(slot.startsAt, timezone)}</dd></div>
+              <dt className="sr-only">Data</dt>
+              <dd className="font-semibold text-ink first-letter:uppercase">{formatDateFull(slot.startsAt, timezone)}</dd>
             </div>
             <div className="flex items-start gap-2">
               <Clock3 aria-hidden="true" className="mt-0.5 size-4 text-muted" />
-              <div><dt className="sr-only">Horário</dt><dd className="font-semibold tabular-nums text-ink">{formatTimeSlot(slot.startsAt, timezone)} · {formatDuration(service.durationMinutes)}</dd></div>
+              <dt className="sr-only">Horário</dt>
+              <dd className="font-semibold tabular-nums text-ink">{formatTimeSlot(slot.startsAt, timezone)} · {formatDuration(service.durationMinutes)}</dd>
             </div>
             <div className="flex items-start gap-2 sm:col-span-2">
               <User aria-hidden="true" className="mt-0.5 size-4 text-muted" />
-              <div><dt className="sr-only">Cliente</dt><dd className="text-ink"><span className="font-semibold">{customerName}</span> <span className="text-muted">· {customerPhone}</span></dd></div>
+              <dt className="sr-only">Cliente</dt>
+              <dd className="text-ink"><span className="font-semibold">{customerName}</span> <span className="text-muted">· {customerPhone}</span></dd>
             </div>
           </dl>
         </div>

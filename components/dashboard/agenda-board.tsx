@@ -56,17 +56,17 @@ function BookingDetail({ booking, day, businessName, onClose }: { booking: Agend
           <Button variant="ghost" size="icon" onClick={() => ref.current?.close()} aria-label="Fechar detalhes"><X aria-hidden="true" /></Button>
         </div>
         <dl className="grid gap-4 overflow-y-auto px-5 py-5 text-sm sm:px-6">
-          <div className="flex gap-3"><CalendarDays aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted" /><div><dt className="text-muted">Data</dt><dd className="font-semibold capitalize">{day?.label}</dd></div></div>
-          <div className="flex gap-3"><Clock3 aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted" /><div><dt className="text-muted">Horário</dt><dd className="font-semibold tabular-nums">{booking.start} – {booking.end}</dd></div></div>
-          <div className="flex gap-3"><Scissors aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted" /><div><dt className="text-muted">Serviço</dt><dd className="font-semibold">{booking.serviceName}</dd></div></div>
-          <div className="flex gap-3"><Wallet aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted" /><div className="flex-1">
-            <dt className="text-muted">Valores</dt>
-            <dd className="mt-1 grid gap-1.5 rounded-field bg-subtle p-3 tabular-nums">
+          <div className="grid grid-cols-[1rem_1fr] gap-x-3 gap-y-0.5"><dt className="col-span-2 grid grid-cols-subgrid items-center text-muted"><CalendarDays aria-hidden="true" className="size-4" />Data</dt><dd className="col-start-2 font-semibold capitalize">{day?.label}</dd></div>
+          <div className="grid grid-cols-[1rem_1fr] gap-x-3 gap-y-0.5"><dt className="col-span-2 grid grid-cols-subgrid items-center text-muted"><Clock3 aria-hidden="true" className="size-4" />Horário</dt><dd className="col-start-2 font-semibold tabular-nums">{booking.start} – {booking.end}</dd></div>
+          <div className="grid grid-cols-[1rem_1fr] gap-x-3 gap-y-0.5"><dt className="col-span-2 grid grid-cols-subgrid items-center text-muted"><Scissors aria-hidden="true" className="size-4" />Serviço</dt><dd className="col-start-2 font-semibold">{booking.serviceName}</dd></div>
+          <div className="grid grid-cols-[1rem_1fr] gap-x-3 gap-y-0.5">
+            <dt className="col-span-2 grid grid-cols-subgrid items-center text-muted"><Wallet aria-hidden="true" className="size-4" />Valores</dt>
+            <dd className="col-start-2 mt-1 grid gap-1.5 rounded-field bg-subtle p-3 tabular-nums">
               <span className="flex justify-between gap-3"><span>Total do serviço</span><span className="font-semibold">{booking.price}</span></span>
               <span className="flex justify-between gap-3"><span>Sinal via Pix</span><span className="font-semibold">{booking.hasDeposit ? booking.deposit : "Sem sinal"}</span></span>
               <span className="flex justify-between gap-3 border-t border-line pt-1.5"><span>A receber no atendimento</span><span className="font-bold">{booking.remaining}</span></span>
             </dd>
-          </div></div>
+          </div>
         </dl>
         <div className="mt-auto grid grid-cols-2 gap-2 border-t border-line px-5 py-4 sm:px-6">
           <a className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-ink px-4 text-sm font-semibold text-paper hover:bg-ink-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" href={`https://wa.me/${phoneDigits}?text=${encodeURIComponent(`Olá, ${booking.customerName}! Aqui é ${businessName}.`)}`} target="_blank" rel="noopener noreferrer"><MessageCircle aria-hidden="true" className="size-4" />WhatsApp<span className="sr-only"> (abre em nova aba)</span></a>
