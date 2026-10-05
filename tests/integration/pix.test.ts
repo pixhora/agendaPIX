@@ -44,6 +44,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  await database.delete(schema.paymentAudit).where(inArray(schema.paymentAudit.businessId, businessIds));
   const payments = await database.select().from(schema.payments).where(inArray(schema.payments.businessId, businessIds));
   const externalIds = payments.flatMap((payment) => payment.externalId ? [payment.externalId] : []);
   if (externalIds.length) await database.delete(schema.paymentEvents).where(inArray(schema.paymentEvents.externalId, externalIds));
@@ -102,10 +103,19 @@ describe("reserva e cobrança do sinal", () => {
   });
   it("falha do provider reverte reserva e permite nova tentativa", async () => {
     const key = randomUUID();
-    const broken = { name: "fake", createPixCharge: async () => { throw new Error("Falha simulada"); }, verifyWebhook: provider.verifyWebhook.bind(provider) };
+    const broken = { name: provider.name, createPixCharge: async () => { throw new Error("Falha simulada"); }, getCharge: provider.getCharge.bind(provider), findChargeByReference: provider.findChargeByReference.bind(provider), cancelCharge: provider.cancelCharge.bind(provider), verifyWebhook: provider.verifyWebhook.bind(provider) };
     await expect(createBooking(slugs[0], input(), key, database, broken)).rejects.toMatchObject({ status: 503 });
-    expect(await database.select().from(schema.bookings).where(eq(schema.bookings.businessId, businessIds[0]))).toHaveLength(0);
-    expect((await createBooking(slugs[0], input(), key, database, provider)).data.payment?.amountCents).toBe(1000);
+    const stuck = await database.select().from(schema.bookings).where(eq(schema.bookings.businessId, businessIds[0]));
+    expect(stuck).toHaveLength(1);
+    expect(stuck[0].status).toBe("pending_payment");
+    const [stuckPayment] = await database.select().from(schema.payments).where(eq(schema.payments.bookingId, stuck[0].id));
+    expect(stuckPayment.status).toBe("creating");
+    // Replay com a mesma chave retoma a cobrança fora da transação, sem segunda reserva.
+    const resumed = await createBooking(slugs[0], input(), key, database, provider);
+    expect(resumed.replayed).toBe(true);
+    expect(resumed.data.payment?.amountCents).toBe(1000);
+    expect(resumed.data.payment?.status).toBe("pending");
+    expect(await database.select().from(schema.bookings).where(eq(schema.bookings.businessId, businessIds[0]))).toHaveLength(1);
   });
   it("mesma chave em negócios diferentes não cruza cobranças", async () => {
     const key = randomUUID();
@@ -189,9 +199,9 @@ describe("webhook transacional e auditável", () => {
     await database.update(schema.bookings).set({ createdAt: new Date(Date.now() - 60000), expiresAt: new Date(Date.now() - 1000) }).where(eq(schema.bookings.id, first.data.bookingId));
     await database.update(schema.payments).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(schema.payments.id, first.data.payment!.id));
     const second = await createBooking(slugs[0], input(), randomUUID(), database, provider);
-    expect(await processWebhook(webhook(first.data.payment!.externalId!), "fake", database, provider)).toMatchObject({ outcome: "ignored", reason: "late_payment" });
+    expect(await processWebhook(webhook(first.data.payment!.externalId!), "fake", database, provider)).toMatchObject({ outcome: "ignored", reason: "late_payment_refund_pending" });
     const old = await getBookingPayment(slugs[0], first.data.bookingId, `Bearer ${first.data.accessToken}`, database);
-    expect(old.status).toBe("expired"); expect(old.payment?.status).toBe("paid");
+    expect(old.status).toBe("expired"); expect(old.payment?.status).toBe("refund_pending");
     expect((await getBookingPayment(slugs[0], second.data.bookingId, `Bearer ${second.data.accessToken}`, database)).status).toBe("pending_payment");
   });
   it("evento de um negócio não altera a reserva do outro", async () => {

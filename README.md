@@ -78,6 +78,23 @@ Não exclua reservas antigas para resolver erro de sobreposição: revise os reg
 `pnpm test:db` verifica disputa de horário, repetição de cobrança, auditoria, rollback, isolamento e pagamento tardio com Postgres real.
 Os testes Pix removem somente as entidades de teste criadas por eles. Não há gateway real nesta etapa.
 
+
+## Cobrança Pix fora da transação e reconciliação
+
+A reserva segura o horário numa transação curta (status `creating` no pagamento) e só então chama o gateway, com timeout (`PAYMENT_PROVIDER_TIMEOUT_MS`, padrão 8s). Assim o lock do negócio não fica preso à latência do provedor. Se a chamada falhar, a resposta é `503` retriável; o replay com a mesma `Idempotency-Key` retoma a cobrança sem criar segunda reserva.
+
+O reconciliador cobre cobranças órfãs e webhooks perdidos:
+
+```bash
+pnpm reconcile --once          # uma passagem (cron/systemd)
+pnpm reconcile                 # loop contínuo
+pnpm reconcile --once --json   # report estruturado
+```
+
+Variáveis: `RECONCILE_INTERVAL_SECONDS`, `RECONCILE_STUCK_SECONDS`, `RECONCILE_BATCH_SIZE`. Em produção use `--once` a cada minuto atrás de um scheduler; vários processos são seguros (advisory lock de sessão). Política de pagamento tardio por negócio: `businesses.late_payment_policy` = `refund` (padrão) ou `rebook_if_free`.
+
+Migrations `0008` (enum) e `0009` (schema) exigem o migrador em `scripts/migrate.mjs` (`pnpm db:migrate`), que aplica cada arquivo na própria transação — necessário porque o Postgres só libera valores novos de ENUM após o COMMIT.
+
 ## Antiabuso das reservas públicas
 
 Variáveis opcionais (padrões em `.env.example`); valor inválido deixa o agendamento indisponível (`503`) em vez de cair em padrão silencioso.

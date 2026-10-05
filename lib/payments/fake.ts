@@ -2,24 +2,98 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import QRCode from "qrcode";
 import { z } from "zod";
 import { HttpError } from "../http";
-import { chargeInputSchema, paidEventSchema, type PaymentProvider } from "./provider";
+import { chargeInputSchema, paidEventSchema, type ChargeInput, type PaymentProvider, type ProviderCallOptions, type ProviderCharge } from "./provider";
 
 export function signFakeWebhook(body: string, timestamp: string, secret: string) {
   return createHmac("sha256", secret).update(`${timestamp}.${body}`).digest("hex");
 }
 
+type StoredCharge = ProviderCharge & { idempotencyKey: string };
+
+/**
+ * Estado do gateway simulado. O padrão é um armazenamento por processo: o servidor web e o processo de
+ * reconciliação não compartilham cobranças fake (o gateway real é a fonte da verdade entre processos).
+ */
+export class FakeChargeStore {
+  readonly byIdempotencyKey = new Map<string, StoredCharge>();
+  readonly calls = { create: 0, get: 0, find: 0, cancel: 0 };
+  get chargeCount() { return this.byIdempotencyKey.size; }
+  findByExternalId(externalId: string) { return [...this.byIdempotencyKey.values()].find((charge) => charge.externalId === externalId); }
+  findByReference(reference: string) { return [...this.byIdempotencyKey.values()].find((charge) => charge.reference === reference); }
+}
+const processStore = new FakeChargeStore();
+
+function view(charge: StoredCharge, now = new Date()): ProviderCharge {
+  const { idempotencyKey: _key, ...rest } = charge;
+  void _key;
+  return { ...rest, status: rest.status === "pending" && rest.expiresAt <= now ? "expired" : rest.status };
+}
+
+function wait(ms: number, signal?: AbortSignal) {
+  if (ms <= 0 && !signal?.aborted) return Promise.resolve();
+  return new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) return reject(signal.reason);
+    const timer = setTimeout(() => { signal?.removeEventListener("abort", onAbort); resolve(); }, ms);
+    const onAbort = () => { clearTimeout(timer); reject(signal?.reason); };
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
 export class FakePaymentProvider implements PaymentProvider {
   readonly name = "fake";
+  readonly store: FakeChargeStore;
+  latencyMs: number;
   private readonly secret: string;
-  constructor(secret: string) {
+  constructor(secret: string, options: { store?: FakeChargeStore; latencyMs?: number } = {}) {
     this.secret = z.string().min(32).refine((value) => !value.startsWith("replace-this-")).parse(secret);
+    this.store = options.store ?? processStore;
+    this.latencyMs = options.latencyMs ?? 0;
   }
-  async createPixCharge(input: Parameters<PaymentProvider["createPixCharge"]>[0]) {
+  async createPixCharge(input: ChargeInput, options: ProviderCallOptions = {}) {
     const data = chargeInputSchema.parse(input);
+    this.store.calls.create++;
+    await wait(this.latencyMs, options.signal);
+    const existing = this.store.byIdempotencyKey.get(data.idempotencyKey);
+    if (existing) {
+      // Como gateways reais: mesma chave com outros parâmetros é erro, nunca uma segunda cobrança.
+      if (existing.amountCents !== data.amountCents || existing.reference !== data.reference) throw new Error("Chave de idempotência reutilizada com outros dados.");
+      return view(existing);
+    }
     const externalId = `fake_${data.idempotencyKey}`;
     const copyPaste = `FAKE-PIX-NOT-PAYABLE:${externalId}:${data.amountCents}`;
-    return { externalId, amountCents: data.amountCents, expiresAt: data.expiresAt, copyPaste,
-      qrCodeDataUrl: await QRCode.toDataURL(copyPaste, { width: 256, margin: 2 }) };
+    const charge: StoredCharge = { idempotencyKey: data.idempotencyKey, externalId, reference: data.reference, amountCents: data.amountCents, expiresAt: data.expiresAt,
+      copyPaste, qrCodeDataUrl: await QRCode.toDataURL(copyPaste, { width: 256, margin: 2 }), status: "pending", paidAt: null };
+    this.store.byIdempotencyKey.set(data.idempotencyKey, charge);
+    return view(charge);
+  }
+  async getCharge(externalId: string, options: ProviderCallOptions = {}) {
+    this.store.calls.get++;
+    await wait(this.latencyMs, options.signal);
+    const charge = this.store.findByExternalId(externalId);
+    return charge ? view(charge) : null;
+  }
+  async findChargeByReference(reference: string, options: ProviderCallOptions = {}) {
+    this.store.calls.find++;
+    await wait(this.latencyMs, options.signal);
+    const charge = this.store.findByReference(reference);
+    return charge ? view(charge) : null;
+  }
+  async cancelCharge(externalId: string, options: ProviderCallOptions = {}) {
+    this.store.calls.cancel++;
+    await wait(this.latencyMs, options.signal);
+    const charge = this.store.findByExternalId(externalId);
+    if (!charge) return null;
+    if (charge.status !== "paid") charge.status = "cancelled";
+    return view(charge);
+  }
+  /** Simulação local: marca a cobrança como paga, como faria o banco do pagador. Não existe rota pública para isso. */
+  markPaid(externalId: string, paidAt = new Date()) {
+    const charge = this.store.findByExternalId(externalId);
+    if (!charge) throw new Error("Cobrança fake desconhecida.");
+    if (charge.status === "cancelled") throw new Error("Cobrança cancelada não pode ser paga.");
+    charge.status = "paid";
+    charge.paidAt = paidAt;
+    return view(charge);
   }
   verifyWebhook(body: string, headers: Headers, now: Date) {
     const timestamp = headers.get("x-fake-timestamp") ?? "";
