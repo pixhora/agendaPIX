@@ -11,6 +11,9 @@ test.describe("painel do dono — jornadas", () => {
   test("agenda do dia: KPIs, reserva confirmada e detalhe no painel lateral", async ({ page }) => {
     await page.goto(withBusiness("/dashboard"));
     await expect(page.getByRole("heading", { level: 1, name: "Agenda de Negócio E2E A" })).toBeVisible();
+    const agendaHeader = page.locator("header").filter({ has: page.getByRole("heading", { level: 1, name: "Agenda de Negócio E2E A" }) });
+    await expect(agendaHeader).not.toContainText("America/Sao_Paulo");
+    await expect(agendaHeader).not.toContainText("horários em");
     const summary = page.getByRole("region", { name: "Resumo da agenda" });
     await expect(summary.getByText(/Receita via Pix/)).toBeVisible();
     // Hoje há ao menos o sinal da reserva semeada (R$ 10,00); a jornada da página pública pode somar outro.
@@ -77,6 +80,8 @@ test.describe("painel do dono — jornadas", () => {
     await page.goto(withBusiness("/dashboard/settings"));
     await expect(page.getByRole("heading", { name: "Configurações", level: 1 })).toBeVisible();
     await expect(page.getByText(meta.businessASlug).first()).toBeVisible();
+    await expect(page.getByText("Fuso horário: Horário de Brasília.")).toBeVisible();
+    await expect(page.getByText("America/Sao_Paulo")).toHaveCount(0);
 
     const hours = page.getByRole("form", { name: "Horários de funcionamento" });
     await hours.getByLabel("Domingo: aberto").uncheck();

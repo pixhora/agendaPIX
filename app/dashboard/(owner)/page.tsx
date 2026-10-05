@@ -76,8 +76,8 @@ export default async function AgendaPage({ searchParams }: { searchParams: Promi
   const firstDay = days[0];
   const lastDay = days[days.length - 1];
   const description = weekly
-    ? `Semana de ${format({ day: "numeric", month: "short" }).format(utcDay(firstDay.date))} a ${format({ day: "numeric", month: "short" }).format(utcDay(lastDay.date))} · horários em ${timezone}`
-    : `${longLabel(date).replace(/^./, (letter) => letter.toUpperCase())}${date === today ? " · hoje" : ""} · horários em ${timezone}`;
+    ? `Semana de ${format({ day: "numeric", month: "short" }).format(utcDay(firstDay.date))} a ${format({ day: "numeric", month: "short" }).format(utcDay(lastDay.date))}`
+    : `${longLabel(date).replace(/^./, (letter) => letter.toUpperCase())}${date === today ? " · hoje" : ""}`;
   const nextBooking = summary?.nextReservation;
 
   return <DashboardShell title={business ? `Agenda de ${business.name}` : "Sua agenda"} description={description} path="/dashboard" businesses={businesses} businessId={business?.id}>
