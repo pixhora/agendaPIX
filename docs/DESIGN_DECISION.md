@@ -412,3 +412,28 @@ A combinação de bibliotecas do §7 **continua valendo**: shadcn/ui `new-york` 
 | Checagem automática | — | `@axe-core/playwright` no e2e (WCAG 2.2 A/AA) | Critério de aceite do §12. |
 
 Fora do escopo desta rodada (registrado como pendência no PR): colunas por **profissional** na agenda (o modelo de dados ainda não tem profissionais; as colunas são por dia), gráficos de faturamento (Tremor/Recharts) e migração para Base UI.
+
+## 16. Decisões de implementação tomadas no redesign (2026-10-05)
+
+Tomadas sem consulta (o dono estava indisponível), registradas aqui e no PR para revisão:
+
+| Decisão | Motivo |
+| --- | --- |
+| Painel com **sidebar fixa no desktop** e **abas inferiores no celular** (sticky, não `fixed`) | Padrão das referências de agenda (Fresha/Booksy); `sticky` mantém as abas no fluxo e não cobre o fim do conteúdo (WCAG 2.4.11). |
+| Detalhe do agendamento em **painel lateral** (`<dialog>` nativo: lateral no desktop, folha inferior no celular) | Referência da parte 2; `<dialog>` dá foco preso, Esc e retorno de foco sem dependência nova. Ações: WhatsApp e ligar (o backend ainda não tem endpoints para concluir/cancelar). |
+| KPIs do painel: **Receita via Pix** (placa), **Agendamentos**, **Aguardando sinal** | Respondem às três perguntas do dono pela manhã. Receita = sinais de reservas confirmadas/concluídas no período exibido (`dashboardAgendaKpis`, com teste unitário). |
+| Semana em **colunas por dia** (7 colunas no desktop, lista por dia no celular) | Pedido do briefing; colunas por profissional dependem de modelo de dados que não existe. |
+| `dashboardBookings` passa a selecionar também `customerPhone` | Necessário para o WhatsApp no detalhe. Mesmo join com isolamento por negócio; nenhum contrato de API ou Server Action mudou. |
+| Landing com **um CTA** ("Criar minha agenda grátis") e microcopy **"7 dias grátis · sem cartão de crédito"** | A referência pede "Grátis, sem cartão"; o modelo de preços real é teste de 7 dias (docs/PRECOS.md), então o texto diz exatamente isso. |
+| **Print real do produto** na landing (`public/landing/*.webp`, gerado do painel e da página pública com dados de demonstração) | Referências time.fyi/Trafft. Nada de mock desenhado. |
+| **Sem depoimentos nem logos de clientes** na landing; no lugar, fatos do produto (15 min para pagar, 0 comprovantes, 24 h) | Ainda não há clientes reais; inventar prova social seria enganoso. Pendência: trocar por depoimentos reais. |
+| Onboarding com **prévia ao vivo** da página pública no desktop | Mostra o resultado enquanto o dono preenche; some no celular para não alongar o funil. |
+| Login em **tela dividida** (formulário + prévia escura do painel no desktop) | Reforça o valor no momento de entrar; no celular fica só o formulário. |
+| Configurações reúne **link público (copiar), horários, chave Pix e aparência**; título da página vira "Configurações" | A aba já se chamava assim na navegação; "Horários de funcionamento" continua como seção (h2). |
+| `ThemeToggle` também em Configurações | No celular a barra do painel não tem espaço para o alternador. |
+| `buttonVariants` passou a aplicar tailwind-merge | Evita conflito silencioso de classes (`hidden` × `inline-flex`) em links estilizados como botão. |
+| Rotas `/preview/*` só tiveram as classes legadas trocadas pelos tokens v2.1 | São um playground de desenvolvimento; redesenho completo não muda o produto. |
+| Duração do serviço aceita **qualquer minuto** (sem `step=5`) | Com `min=1` e `step=5` o navegador só aceitava 1, 6, 11…, então "30" e "40" travavam o envio sem mensagem. O backend aceita 1–1440. |
+| `<dl>` do detalhe do agendamento e da confirmação com `dt`/`dd` diretos (ícone dentro do `dt` ou decorativo ao lado) | O axe apontava `definition-list`/`dlitem`; leitores de tela agora anunciam os pares rótulo → valor. |
+| `scroll-padding` de 5 rem no painel no celular | Foco e âncoras nunca ficam atrás da barra superior ou das abas inferiores (WCAG 2.4.11). |
+| No e2e, `target-size` (WCAG 2.5.8) roda com as barras sticky do painel no fluxo e sem toasts | As barras sticky "cobrem" o que está rolando por baixo no instante do teste. A cobertura real é tratada pelo `scroll-padding`; todas as outras regras rodam com a página como está. |
