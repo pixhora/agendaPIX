@@ -1,0 +1,397 @@
+"use client";
+
+import React, { useEffect, useState, useMemo } from "react";
+import type { PublicService, AvailabilitySlot } from "./types";
+import { formatTimeSlot, formatCurrency } from "./formatters";
+import { Button } from "@/components/ui/button";
+import { publicAvailabilityUrl } from "@/lib/public-api";
+
+interface StepSlotProps {
+  slug: string;
+  service: PublicService;
+  timezone: string;
+  selectedStartsAt: string | null;
+  onSelectSlot: (slot: AvailabilitySlot) => void;
+  onBack: () => void;
+  onNext: () => void;
+  getSlotsForDate?: (dateString: string) => Promise<AvailabilitySlot[]>;
+}
+
+interface DayOption {
+  dateString: string; // YYYY-MM-DD
+  dayLabel: string;   // "Hoje", "Amanhã", "Sex", "Sáb"...
+  dateNumber: string; // "02/10"
+}
+
+function generateInitialDays(timezone: string): DayOption[] {
+  const list: DayOption[] = [];
+  const now = new Date();
+
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(now.getTime() + i * 86400000);
+    let dateString = "";
+    try {
+      const parts = new Intl.DateTimeFormat("en-CA", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        timeZone: timezone,
+      }).formatToParts(d);
+      const y = parts.find((p) => p.type === "year")?.value;
+      const m = parts.find((p) => p.type === "month")?.value;
+      const day = parts.find((p) => p.type === "day")?.value;
+      dateString = `${y}-${m}-${day}`;
+    } catch {
+      dateString = d.toISOString().slice(0, 10);
+    }
+
+    let dayLabel = "";
+    if (i === 0) dayLabel = "Hoje";
+    else if (i === 1) dayLabel = "Amanhã";
+    else {
+      const weekdayName = new Intl.DateTimeFormat("pt-BR", {
+        weekday: "short",
+        timeZone: timezone,
+      }).format(d);
+      dayLabel = weekdayName.replace(".", "").toUpperCase();
+    }
+
+    const dateNumber = new Intl.DateTimeFormat("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      timeZone: timezone,
+    }).format(d);
+
+    list.push({
+      dateString,
+      dayLabel,
+      dateNumber,
+    });
+  }
+  return list;
+}
+
+export function StepSlot({
+  slug,
+  service,
+  timezone,
+  selectedStartsAt,
+  onSelectSlot,
+  onBack,
+  onNext,
+  getSlotsForDate,
+}: StepSlotProps) {
+  const days = useMemo(() => generateInitialDays(timezone), [timezone]);
+  const [selectedDate, setSelectedDate] = useState<string>(() => days[0]?.dateString || "");
+  const [daySlotCounts, setDaySlotCounts] = useState<Record<string, number | null>>({});
+  const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
+  const [isLoadingSlots, setIsLoadingSlots] = useState<boolean>(true);
+  const [errorSlots, setErrorSlots] = useState<string | null>(null);
+
+  const [slotsRetryCount, setSlotsRetryCount] = useState<number>(0);
+
+  const rulerRef = React.useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState<boolean>(false);
+  const [canScrollRight, setCanScrollRight] = useState<boolean>(false);
+
+  const updateScrollIndicators = React.useCallback(() => {
+    const el = rulerRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    setCanScrollLeft(scrollLeft > 2);
+    setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 2);
+  }, []);
+
+  useEffect(() => {
+    const el = rulerRef.current;
+    if (!el) return;
+    updateScrollIndicators();
+    el.addEventListener("scroll", updateScrollIndicators, { passive: true });
+    window.addEventListener("resize", updateScrollIndicators);
+    return () => {
+      el.removeEventListener("scroll", updateScrollIndicators);
+      window.removeEventListener("resize", updateScrollIndicators);
+    };
+  }, [updateScrollIndicators, days]);
+
+  const getSlotsRef = React.useRef(getSlotsForDate);
+  React.useEffect(() => {
+    getSlotsRef.current = getSlotsForDate;
+  });
+
+  // Carrega contagens de vagas para todos os 7 dias em background
+  useEffect(() => {
+    let isCancelled = false;
+    const controllers: AbortController[] = [];
+
+    days.forEach((day) => {
+      const fetchFn = getSlotsRef.current;
+      const controller = new AbortController();
+      controllers.push(controller);
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+      }, 10000);
+
+      const promise = fetchFn
+        ? fetchFn(day.dateString)
+        : fetch(publicAvailabilityUrl(slug, service.id, day.dateString), {
+            signal: controller.signal,
+          })
+            .then((res) => (res.ok ? res.json() : Promise.reject()))
+            .then((data) => data.slots || [])
+            .finally(() => clearTimeout(timeoutId));
+
+      promise
+        .then((dataSlots: AvailabilitySlot[]) => {
+          if (isCancelled) return;
+          const count = Array.isArray(dataSlots) ? dataSlots.length : 0;
+          setDaySlotCounts((prev) => ({ ...prev, [day.dateString]: count }));
+        })
+        .catch(() => {
+          if (isCancelled) return;
+          setDaySlotCounts((prev) => ({ ...prev, [day.dateString]: 0 }));
+        });
+    });
+
+    return () => {
+      isCancelled = true;
+      controllers.forEach((c) => c.abort());
+    };
+  }, [slug, service.id, days]);
+
+  // Carrega horários detalhados da data selecionada
+  useEffect(() => {
+    if (!selectedDate) return;
+
+    let isCancelled = false;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, 10000);
+
+    const loadSlots = async () => {
+      try {
+        let loadedSlots: AvailabilitySlot[] = [];
+        const fetchFn = getSlotsRef.current;
+        if (fetchFn) {
+          loadedSlots = await fetchFn(selectedDate);
+        } else {
+          const res = await fetch(
+            publicAvailabilityUrl(slug, service.id, selectedDate),
+            {
+              signal: controller.signal,
+            }
+          );
+          if (!res.ok) throw new Error("Não foi possível carregar os horários.");
+          const data = await res.json();
+          loadedSlots = data.slots || [];
+        }
+        if (isCancelled) return;
+        setSlots(loadedSlots);
+        setErrorSlots(null);
+      } catch (err: unknown) {
+        if (isCancelled) return;
+        let msg = "Erro ao consultar horários.";
+        if (err instanceof Error) {
+          if (err.name === "AbortError") {
+            msg = "A consulta de horários demorou muito. Tente novamente.";
+          } else {
+            msg = err.message;
+          }
+        }
+        setErrorSlots(msg);
+      } finally {
+        clearTimeout(timeoutId);
+        if (!isCancelled) {
+          setIsLoadingSlots(false);
+        }
+      }
+    };
+
+    void loadSlots();
+
+    return () => {
+      isCancelled = true;
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [slug, service.id, selectedDate, slotsRetryCount]);
+
+  const handleSelectDay = (dateStr: string) => {
+    if (dateStr === selectedDate) return;
+    setIsLoadingSlots(true);
+    setSelectedDate(dateStr);
+  };
+
+  const handleRetrySlots = () => {
+    setIsLoadingSlots(true);
+    setErrorSlots(null);
+    setSlotsRetryCount((c) => c + 1);
+  };
+
+  const selectedSlot = slots.find((s) => s.startsAt === selectedStartsAt);
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="text-xl font-semibold text-foreground">Escolha o horário</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          {service.name} • {service.depositCents > 0 ? `Sinal: ${formatCurrency(service.depositCents)}` : "Sem sinal"}
+        </p>
+      </div>
+
+      {/* Régua Tátil de Dias (Elemento Memorável) */}
+      <section aria-label="Régua de datas disponíveis">
+        <div className="relative">
+          {/* Fade esquerdo indica mais datas para rolar à esquerda */}
+          <div
+            className={`pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-background to-transparent z-10 transition-opening ${
+              canScrollLeft ? "opacity-100" : "opacity-0"
+            }`}
+            aria-hidden="true"
+          />
+          {/* Fade direito indica mais datas para rolar à direita */}
+          <div
+            className={`pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent z-10 transition-opening ${
+              canScrollRight ? "opacity-100" : "opacity-0"
+            }`}
+            aria-hidden="true"
+          />
+          <div
+            ref={rulerRef}
+            className="flex items-center gap-2 overflow-x-auto p-1.5 scroll-p-2 scrollbar-hide scroll-smooth"
+            role="group"
+            aria-label="Selecione uma data"
+          >
+            {days.map((day) => {
+              const isCurrent = day.dateString === selectedDate;
+              const count = daySlotCounts[day.dateString];
+              const hasSlots = count !== undefined && count !== null && count > 0;
+              const isZero = count === 0;
+
+              return (
+                <button
+                  key={day.dateString}
+                  type="button"
+                  aria-pressed={isCurrent}
+                  aria-current={isCurrent ? "date" : undefined}
+                  onClick={() => handleSelectDay(day.dateString)}
+                  onFocus={(e) => {
+                    e.currentTarget.scrollIntoView({
+                      behavior: "smooth",
+                      block: "nearest",
+                      inline: "nearest",
+                    });
+                  }}
+                  className={`flex flex-col items-center justify-center min-w-[76px] py-2 px-2.5 rounded-xl border text-center transition-feedback active:scale-[0.98] min-h-11 shrink-0 scroll-mx-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
+                    isCurrent
+                      ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                      : "border-border bg-surface text-foreground hover:bg-muted/60"
+                  }`}
+                >
+                  <span className={`text-xs font-semibold ${isCurrent ? "text-primary-foreground" : "text-foreground"}`}>
+                    {day.dayLabel}
+                  </span>
+                  <span className={`text-[11px] mt-0.5 ${isCurrent ? "text-primary-foreground/90" : "text-muted-foreground"}`}>
+                    {day.dateNumber}
+                  </span>
+                  <span
+                    className={`text-[10px] mt-1 font-medium px-1.5 py-0.5 rounded-full transition-feedback ${
+                      isCurrent
+                        ? "bg-primary-foreground/15 text-primary-foreground"
+                        : isZero
+                        ? "bg-muted text-muted-foreground/80"
+                        : hasSlots
+                        ? "bg-primary/10 text-primary font-semibold"
+                        : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    {count === undefined || count === null
+                      ? "..."
+                      : isZero
+                      ? "Sem vagas"
+                      : `${count} vaga${count > 1 ? "s" : ""}`}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* Grade de Horários */}
+      <section aria-label="Horários disponíveis no dia" className="space-y-3">
+        {isLoadingSlots ? (
+          <div className="grid grid-cols-3 gap-2.5" role="status" aria-busy="true">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="h-11 bg-muted animate-pulse rounded-lg" />
+            ))}
+            <span className="sr-only">Carregando horários disponíveis...</span>
+          </div>
+        ) : errorSlots ? (
+          <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4 text-center">
+            <p className="text-sm font-medium text-destructive">{errorSlots}</p>
+            <Button
+              variant="outline"
+              onClick={handleRetrySlots}
+              className="mt-3 min-h-11"
+            >
+              Tentar novamente
+            </Button>
+          </div>
+        ) : slots.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border p-6 text-center bg-surface/50">
+            <p className="text-sm font-medium text-foreground">Sem horários livres para este dia</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Todos os horários já foram reservados ou o local estará fechado. Toque em outro dia na régua acima.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-2.5" role="radiogroup" aria-label="Horários disponíveis">
+            {slots.map((slot) => {
+              const isSelected = slot.startsAt === selectedStartsAt;
+              const timeLabel = formatTimeSlot(slot.startsAt, timezone);
+
+              return (
+                <button
+                  key={slot.startsAt}
+                  type="button"
+                  role="radio"
+                  aria-checked={isSelected}
+                  onClick={() => onSelectSlot(slot)}
+                  className={`min-h-11 flex items-center justify-center font-medium text-sm rounded-lg border transition-feedback active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
+                    isSelected
+                      ? "border-primary bg-primary text-primary-foreground font-semibold shadow-sm"
+                      : "border-border bg-surface text-foreground hover:border-primary/40 hover:bg-muted/40"
+                  }`}
+                >
+                  {timeLabel}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* Ações Voltar / Avançar */}
+      <div className="flex items-center gap-3 pt-3 border-t border-border/60">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onBack}
+          className="flex-1 min-h-12 rounded-full font-semibold transition-feedback active:scale-[0.99]"
+        >
+          Voltar
+        </Button>
+        <Button
+          type="button"
+          disabled={!selectedSlot}
+          onClick={onNext}
+          className="flex-[2] min-h-12 rounded-full font-bold transition-feedback active:scale-[0.99]"
+        >
+          {selectedSlot ? "Preencher meus dados" : "Selecione um horário"}
+        </Button>
+      </div>
+    </div>
+  );
+}
