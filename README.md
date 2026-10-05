@@ -78,4 +78,24 @@ Não exclua reservas antigas para resolver erro de sobreposição: revise os reg
 `pnpm test:db` verifica disputa de horário, repetição de cobrança, auditoria, rollback, isolamento e pagamento tardio com Postgres real.
 Os testes Pix removem somente as entidades de teste criadas por eles. Não há gateway real nesta etapa.
 
+## Antiabuso das reservas públicas
+
+Variáveis opcionais (padrões em `.env.example`); valor inválido deixa o agendamento indisponível (`503`) em vez de cair em padrão silencioso.
+
+| Variável | Padrão | Efeito |
+| --- | --- | --- |
+| `BOOKING_TRUST_PROXY` | `false` | Confia no header de IP do proxy de entrada. Só ative se o Next não for acessível diretamente. |
+| `BOOKING_CLIENT_IP_HEADER` | `x-real-ip` | `x-real-ip` ou `x-forwarded-for`. |
+| `BOOKING_TRUSTED_PROXY_HOPS` | `1` | Com `x-forwarded-for`: número de proxies confiáveis; o IP do cliente é o N-ésimo item a partir da direita. |
+| `BOOKING_RATE_LIMIT_PER_CLIENT` | `10` | Tentativas por minuto por cliente e negócio. |
+| `BOOKING_RATE_LIMIT_PER_BUSINESS` | `120` | Teto de tentativas por minuto por negócio, somando todos os clientes. |
+| `BOOKING_HOLD_MINUTES` | `10` | Tempo de reserva aguardando o Pix (2–30). |
+| `BOOKING_MAX_PENDING_PER_CLIENT` | `3` | Reservas pendentes simultâneas por cliente (IP) e negócio. |
+| `BOOKING_MAX_PENDING_PER_PHONE` | `2` | Reservas pendentes simultâneas por telefone e negócio. |
+| `BOOKING_MAX_PENDING_PER_BUSINESS` | `50` | Reservas pendentes simultâneas por negócio. |
+
+Exemplos de proxy: Nginx com `proxy_set_header X-Real-IP $remote_addr;` usa o padrão. Um balanceador que anexa `X-Forwarded-For` usa `BOOKING_CLIENT_IP_HEADER=x-forwarded-for` e `BOOKING_TRUSTED_PROXY_HOPS=1`; CDN + balanceador, `2`.
+Sem proxy confiável, o servidor usa o endereço do socket que o Next põe em `X-Forwarded-For`. Um cliente pode forjar esse header para escapar do próprio limite, mas não consegue esgotar o limite de outros clientes; o teto por negócio limita o total. Em produção, configure o proxy.
+Endereços nunca são armazenados: só HMAC por negócio. IPv6 é agrupado por /64.
+
 Dependência adicional: `qrcode` gera o QR Code PNG padronizado da simulação; evita implementar codificação de QR manualmente.

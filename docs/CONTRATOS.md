@@ -100,7 +100,7 @@ Não há script automático de DROP ou remoção de volume. Após entrada de dad
 ## Regras desta etapa
 
 O servidor é a autoridade sobre preço, sinal e duração; o cliente envia somente serviço, horário e dados mínimos.
-A reserva com sinal vence em 15 minutos ou no início do atendimento, o que ocorrer primeiro. Sinal zero confirma sem criar pagamento.
+A reserva com sinal vence em `BOOKING_HOLD_MINUTES` (padrão 10, faixa 2–30) ou no início do atendimento, o que ocorrer primeiro. Sinal zero confirma sem criar pagamento.
 Um negócio atende um cliente por vez. Intervalos são semiabertos: um horário pode começar exatamente quando o anterior termina.
 Disponibilidade usa o fuso do negócio e o intervalo de funcionamento do dia. Inícios avançam pela duração do serviço desde a abertura.
 Reservas pendentes vencidas não ocupam disponibilidade. Ao criar nova reserva, elas são marcadas como expiradas antes da disputa pelo horário.
@@ -119,7 +119,17 @@ A chave de idempotência permite recuperar a resposta com o mesmo corpo e deve s
 Repetições não renovam vencimento nem criam segunda cobrança. Campos extras, preço fornecido pelo cliente e datas sem fuso são rejeitados.
 Respostas de domínio usam `Cache-Control: no-store`.
 
-Erros: `{ error: { code, message } }`, sem detalhes pessoais ou internos. `400` entrada inválida; `404` negócio/serviço/reserva inacessível; `409` horário ocupado ou chave reutilizada; `413` corpo acima de 16 KiB; `503` pagamento indisponível; `500` falha interna.
+Erros: `{ error: { code, message } }`, sem detalhes pessoais ou internos. `400` entrada inválida; `404` negócio/serviço/reserva inacessível; `409` horário ocupado, chave reutilizada ou `hold_capacity_reached`; `413` corpo acima de 16 KiB; `429` `rate_limited` ou `pending_hold_limit`; `503` pagamento ou agendamento indisponível; `500` falha interna. `429` e `hold_capacity_reached` trazem `Retry-After` em segundos.
+
+### Limite de reservas pendentes
+
+Reservas com sinal não pago e não vencido (`pending_payment` com `expiresAt` futuro) são limitadas por negócio, sob o lock transacional do negócio e após marcar vencidas, então a contagem é exata sob concorrência:
+
+- por cliente (`BOOKING_MAX_PENDING_PER_CLIENT`, padrão 3): identidade da seção Antiabuso, guardada em `bookings.client_hash` como HMAC por negócio, nunca o IP. Sem identidade, este limite não se aplica; `429 pending_hold_limit`.
+- por telefone (`BOOKING_MAX_PENDING_PER_PHONE`, padrão 2): `429 pending_hold_limit`.
+- por negócio (`BOOKING_MAX_PENDING_PER_BUSINESS`, padrão 50): `409 hold_capacity_reached`.
+
+`Retry-After` aponta o vencimento mais próximo entre as reservas que causaram o limite. Replay idempotente de reserva existente não é bloqueado; reservas confirmadas, vencidas e de sinal zero não contam.
 
 ## PaymentProvider e fake
 
@@ -148,7 +158,8 @@ Headers: `X-Fake-Timestamp` em segundos Unix e `X-Fake-Signature` em hexadecimal
 Assinatura: HMAC-SHA256 de `<timestamp>.<corpo bruto>`, usando `FAKE_WEBHOOK_SECRET`. Comparação constante; tolerância de relógio de cinco minutos.
 Assinatura inválida ou vencida responde `401`. JSON ou evento inválido responde `400`. Não há rota pública de simulação de pagamento.
 
-Cada entrega gera linha em `webhook_deliveries`, inclusive assinatura inválida, corpo inválido e repetição. Guarda provider, identificador validado quando disponível, hash do corpo, resultado e motivo; nunca guarda assinatura ou corpo bruto.
+Provedor, tamanho (Content-Length e leitura limitada a 16 KiB), assinatura e formato são verificados antes de qualquer acesso ao banco: provedor desconhecido `404`, corpo grande `413`, assinatura inválida `401`, evento inválido `400`, sem nenhuma escrita. Somente entregas verificadas geram linha em `webhook_deliveries`, única por `(provider, event_id)` e gravada na mesma transação do processamento: replay é no-op (responde `duplicate` sem novas linhas) e falha de processamento reverte tudo (`503`, o provedor reenvia). Guarda provider, identificador, hash do corpo, resultado e motivo; nunca guarda assinatura ou corpo bruto. A migration 0007 move entregas antigas não verificadas ou duplicadas para `webhook_deliveries_legacy` (arquivo de auditoria, sem exclusão). Rejeições não auditadas no banco devem ser observadas por logs/métricas do proxy.
+Migration 0007 não é puramente expansiva: torna `event_id`/`body_hash` obrigatórios e únicos em `webhook_deliveries`, que o código anterior não respeita (gravava antes de validar). Aplicar junto com este código. Reversão: voltar ao código anterior e executar `ALTER TABLE webhook_deliveries DROP CONSTRAINT webhook_deliveries_provider_event_unique, ALTER COLUMN event_id DROP NOT NULL, ALTER COLUMN body_hash DROP NOT NULL;` As colunas/índices novos de `bookings` e a tabela legacy podem permanecer; nunca apagar `webhook_deliveries_legacy`, reservas ou pagamentos ao reverter.
 `payment_events` tem identidade única por provider e evento, hash do evento normalizado, identificador da cobrança e resultado. Evento já visto com mesmo conteúdo é duplicado; conteúdo diferente com mesmo identificador responde `409`.
 Deduplicação, alteração do pagamento, confirmação da reserva e resultado do evento ocorrem na mesma transação.
 Somente cobrança identificada pelo provider e identificador externo pode ser alterada. Valor deve corresponder à cobrança e ao sinal contratado.
@@ -213,9 +224,9 @@ Erros padrão `{error:{code,message}}`:400 entrada,401 sem sessão,403 origem,40
 
 ## Antiabuso de reservas
 
-POST reservas mantém corpo/chave e respostas201/200/409. Limite técnico inicial:10 chamadas por minuto para par negócio+origem cliente, contador atômico PostgreSQL (compartilhado por processos). Excesso429 `rate_limited`, Retry-After:60; reenvio com mesma Idempotency-Key preserva idempotência de negócio e não renova reserva, mas também consome o limite de tentativas. Não recriar pedido com nova chave por erro transitório.
+POST reservas mantém corpo/chave e respostas201/200/409. Dois baldes por minuto, contador atômico PostgreSQL (compartilhado por processos): por par negócio+cliente (`BOOKING_RATE_LIMIT_PER_CLIENT`, padrão10) e teto do negócio (`BOOKING_RATE_LIMIT_PER_BUSINESS`, padrão120). O balde do cliente é consumido primeiro; tentativas recusadas nele não consomem o teto do negócio, então um cliente sozinho usa no máximo o seu limite. Excesso429 `rate_limited`, Retry-After:60; reenvio com mesma Idempotency-Key preserva idempotência de negócio e não renova reserva, mas também consome o limite de tentativas. Não recriar pedido com nova chave por erro transitório.
 
-Por padrão headers de IP enviados pelo cliente são ignorados e usa-se bucket anônimo por negócio. `BOOKING_TRUST_PROXY=true` habilita somente X-Real-IP válido; usar apenas quando proxy de entrada sobrescreve/remove esse header e impede acesso direto ao Next. Header ausente/inválido volta ao bucket anônimo, sem aceitar X-Forwarded-For arbitrário. Endereço não é armazenado: HMAC com segredo do servidor, combinado ao tenant. Registros obsoletos>24h são removidos oportunisticamente em lotes100; não há corpo/telefone/IP bruto.
+Identidade do cliente: com `BOOKING_TRUST_PROXY=true`, `BOOKING_CLIENT_IP_HEADER=x-real-ip` (padrão) usa X-Real-IP válido; `x-forwarded-for` usa a regra rightmost-trusted, o item na posição `BOOKING_TRUSTED_PROXY_HOPS` (padrão1) a partir da direita. Usar apenas quando o proxy de entrada sobrescreve/anexa esse header e impede acesso direto ao Next. Sem proxy confiável, usa o último item de X-Forwarded-For, que o Next preenche com o endereço do socket quando ausente; um cliente pode forjá-lo, mas só se divide em baldes próprios (o teto do negócio limita o total) e não esgota o balde de outros. IPv6 é agrupado por /64; IPv4 mapeado é normalizado. Header ausente/inválido resulta em identidade nula: só o teto do negócio se aplica, nunca um balde anônimo compartilhado de10. Configuração inválida responde `503 booking_unavailable`. Endereço não é armazenado: HMAC com segredo do servidor, combinado ao tenant. Registros obsoletos>24h são removidos oportunisticamente em lotes100; não há corpo/telefone/IP bruto.
 
 Migration aditiva cria apenas contadores, preservando schema/dados existentes. Aplicar antes do novo código; processos antigos continuam compatíveis mas sem limite até atualização. Reversão preferida: voltar ao commit anterior e manter tabela aditiva; remoção da tabela só depois de nenhum novo leitor/escritor ativo, com aprovação operacional. Nunca remover reservas/pagamentos ao reverter.
 
