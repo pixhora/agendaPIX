@@ -166,6 +166,11 @@ h1, h2, h3, h4, h5, h6 {
   text-wrap: balance;
 }
 
+/* Plus Jakarta Sans com tracking negativo encolhe os espaços entre palavras; compensa só o espaço. */
+h1, h2, h3, h4, h5, h6, .font-display {
+  word-spacing: 0.06em;
+}
+
 ::selection {
   background: var(--pix-soft);
   color: var(--ink);

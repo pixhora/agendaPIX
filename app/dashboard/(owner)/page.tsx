@@ -3,6 +3,7 @@ import { CalendarClock, CalendarPlus, ChevronLeft, ChevronRight, Clock3, ListChe
 import { DashboardShell, Empty } from "@/components/dashboard/shell";
 import { AgendaBoard, type AgendaDay, type AgendaItem } from "@/components/dashboard/agenda-board";
 import { AgendaDatePicker } from "@/components/dashboard/agenda-date-picker";
+import { PublicLink } from "@/components/dashboard/public-link";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { StatusChip, ValueSlab } from "@/components/ui/value-slab";
 import { buttonVariants } from "@/components/ui/button";
@@ -118,8 +119,9 @@ export default async function AgendaPage({ searchParams }: { searchParams: Promi
         <p aria-live="polite" className="text-sm text-muted">{bookings.length} {bookings.length === 1 ? "agendamento" : "agendamentos"}</p>
       </div>
       {!bookings.length && !weekly ? <Empty title="Nenhum atendimento neste dia" icon={<CalendarPlus />}>
-        <p>Compartilhe o link da sua página para receber reservas com sinal via Pix, ou confira seus horários de funcionamento.</p>
-        <Link className={buttonVariants({ variant: "outline", className: "mt-4" })} href={`/dashboard/settings?businessId=${business.id}`}>Conferir funcionamento</Link>
+        <p>Compartilhe o link da sua página para receber reservas com sinal via Pix.</p>
+        <div className="mx-auto mt-4 max-w-sm text-left"><PublicLink slug={business.slug} /></div>
+        <Link className="mt-3 inline-flex min-h-11 items-center font-semibold text-ink underline underline-offset-4" href={`/dashboard/settings?businessId=${business.id}`}>Conferir horários de funcionamento</Link>
       </Empty> : <AgendaBoard days={days} bookings={items} weekly={weekly} businessName={business.name} />}
     </>}
   </DashboardShell>;
