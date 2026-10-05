@@ -1,98 +1,56 @@
-import React from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { LandingHeroVisual } from "./LandingHeroVisual";
+import { ArrowRight, Check } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
 
-const NICHES = [
-  "Barbearias",
-  "Salões de Beleza",
-  "Clínicas",
-  "Manicures",
-  "Personal Trainers",
-  "Estúdios",
-];
+const NICHES = ["Barbearias", "Salões", "Manicures", "Estética", "Clínicas", "Personal trainers"];
 
 export function LandingHero() {
   return (
-    <section className="relative overflow-hidden pt-8 pb-14 sm:pt-14 sm:pb-20 lg:pt-16 lg:pb-24">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-8 items-center">
-          {/* Coluna Esquerda: Narrativa e CTAs */}
-          <div className="lg:col-span-7 text-left max-w-2xl mx-auto lg:mx-0">
-            {/* Chip de Contexto v2 */}
-            <div className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3.5 py-1 text-xs font-semibold text-foreground mb-5 shadow-xs">
-              <span className="flex h-2 w-2 rounded-full bg-lime" />
-              <span>Agenda online com cobrança de sinal por Pix</span>
-            </div>
-
-            {/* Título Principal Editorial */}
-            <h1 className="font-display text-3xl font-extrabold tracking-tight text-foreground sm:text-5xl lg:text-6xl leading-[1.12]">
-              Seu cliente agenda sozinho e paga o{" "}
-              <span className="text-foreground underline decoration-ink decoration-4 underline-offset-4">
-                sinal por Pix
-              </span>
-              .
-            </h1>
-
-            {/* Subtítulo Claro e com Respiro */}
-            <p className="mt-5 text-base sm:text-lg text-muted-foreground leading-relaxed max-w-xl">
-              Envie seu link no WhatsApp ou Instagram. Seu cliente escolhe o serviço e o horário sozinho e garante a vaga pagando o sinal no Pix. Acabe com o prejuízo de horários vazios.
+    <section className="relative overflow-hidden">
+      <div aria-hidden="true" className="bg-dots absolute inset-x-0 top-0 h-[520px] opacity-[0.35] [mask-image:linear-gradient(to_bottom,black,transparent)]" />
+      <div className="relative mx-auto max-w-6xl px-4 pb-12 pt-10 sm:px-6 sm:pt-16 lg:pb-20">
+        <div className="mx-auto max-w-3xl text-center">
+          <p className="inline-flex min-h-8 items-center gap-2 rounded-full border border-line bg-surface px-3.5 text-xs font-semibold shadow-[var(--shadow-card)]">
+            <span aria-hidden="true" className="size-1.5 rounded-full bg-pix" />
+            Agenda online com sinal no Pix
+          </p>
+          <h1 className="mt-5 font-display text-[2.5rem] font-extrabold leading-[1.05] tracking-tight sm:text-6xl lg:text-7xl">
+            Seu cliente agenda sozinho e paga o sinal no <span className="text-pix">Pix</span>.
+          </h1>
+          <p className="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-muted">
+            Mande seu link no WhatsApp ou no Instagram. O cliente escolhe o horário, paga o sinal e a vaga fica confirmada. Sem furo e sem cobrar comprovante.
+          </p>
+          <div className="mt-8 flex flex-col items-center gap-3">
+            <Link href="/onboarding" className={buttonVariants({ size: "lg", className: "w-full px-8 sm:w-auto" })}>
+              Criar minha agenda grátis<ArrowRight aria-hidden="true" />
+            </Link>
+            <p className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm text-muted">
+              {["7 dias grátis", "Sem cartão de crédito", "Pronto em 3 minutos"].map((item) => (
+                <span key={item} className="inline-flex items-center gap-1.5"><Check aria-hidden="true" className="size-4 text-success" />{item}</span>
+              ))}
             </p>
-
-            {/* Botões Pill de Conversão (Preto primário conforme brief v2) */}
-            <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-              <Link
-                href="/onboarding"
-                className="w-full sm:w-auto min-h-12 inline-flex items-center justify-center rounded-full bg-ink hover:opacity-90 text-paper px-7 py-3 text-base font-bold shadow-sm transition-all duration-120 active:scale-[0.98] motion-reduce:transform-none focus:outline-hidden focus:ring-2 focus:ring-ring focus:ring-offset-2 text-center"
-              >
-                Começar teste grátis de 7 dias
-              </Link>
-
-              <a
-                href="#demonstracao"
-                className="w-full sm:w-auto min-h-12 inline-flex items-center justify-center gap-2 rounded-full border border-line bg-surface hover:bg-paper text-foreground px-5 py-3 text-sm font-semibold transition-all duration-120 active:scale-[0.98] motion-reduce:transform-none focus:outline-hidden text-center"
-              >
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-ink text-paper text-[10px] shrink-0">
-                  ▶
-                </span>
-                Ver demonstração ao vivo
-              </a>
-            </div>
-
-            {/* Garantias de Baixo Atrito */}
-            <div className="mt-4 flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-2 sm:gap-x-5 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1.5">
-                <strong className="text-foreground">✓</strong> Sem cartão de crédito
-              </span>
-              <span className="flex items-center gap-1.5">
-                <strong className="text-foreground">✓</strong> Ativação em 3 minutos
-              </span>
-              <span className="flex items-center gap-1.5">
-                <strong className="text-foreground">✓</strong> Cancele quando quiser
-              </span>
-            </div>
-
-            {/* Divisor Fino e Chips de Nichos */}
-            <div className="mt-8 pt-6 border-t border-line">
-              <p className="text-xs font-semibold text-muted-foreground mb-2.5">
-                Feito para quem vive de atendimento:
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {NICHES.map((niche) => (
-                  <span
-                    key={niche}
-                    className="inline-block rounded-full border border-line bg-surface/80 px-3 py-1 text-xs font-medium text-muted-foreground"
-                  >
-                    {niche}
-                  </span>
-                ))}
-              </div>
-            </div>
           </div>
+        </div>
 
-          {/* Coluna Direita: Placa de Valor de Assinatura */}
-          <div className="lg:col-span-5 flex justify-center">
-            <LandingHeroVisual />
-          </div>
+        <div className="relative mx-auto mt-12 max-w-5xl sm:mt-16">
+          <figure className="overflow-hidden rounded-frame border border-line bg-surface shadow-[var(--shadow-raised)]">
+            <div aria-hidden="true" className="flex items-center gap-1.5 border-b border-line bg-subtle/70 px-4 py-2.5">
+              <span className="size-2.5 rounded-full bg-line-strong/70" /><span className="size-2.5 rounded-full bg-line-strong/70" /><span className="size-2.5 rounded-full bg-line-strong/70" />
+            </div>
+            <Image src="/landing/painel-agenda.webp" width={1280} height={800} priority sizes="(min-width: 1024px) 1024px, 100vw" alt="Painel do Agenda: receita via Pix do dia, agendamentos confirmados e a lista de atendimentos com status do sinal." className="h-auto w-full" />
+            <figcaption className="sr-only">Print real do painel do dono do negócio.</figcaption>
+          </figure>
+          <figure className="absolute -bottom-8 right-2 w-[34%] max-w-[220px] overflow-hidden rounded-[28px] border-[6px] border-ink bg-surface shadow-[var(--shadow-raised)] sm:-bottom-10 sm:right-6 lg:-right-8">
+            <Image src="/landing/pagina-publica.webp" width={585} height={1266} sizes="220px" alt="Página pública de agendamento no celular: escolha do dia e dos horários livres." className="h-auto w-full" />
+          </figure>
+        </div>
+
+        <div className="mt-16 text-center sm:mt-20">
+          <p className="text-sm font-semibold text-muted">Feito para quem vive de atendimento</p>
+          <ul className="mt-3 flex flex-wrap justify-center gap-2">
+            {NICHES.map((niche) => <li key={niche} className="rounded-full border border-line bg-surface px-3.5 py-1.5 text-sm font-medium">{niche}</li>)}
+          </ul>
         </div>
       </div>
     </section>
