@@ -23,7 +23,7 @@ export async function verifyWebhookDelivery(request: Request, providerName: stri
   const body = await readBody(request);
   let event: PaidEvent;
   try {
-    event = paidEventSchema.parse(await paymentProvider.verifyWebhook(body, request.headers, now));
+    event = paidEventSchema.parse(await paymentProvider.verifyWebhook(body, request.headers, now, request.url));
   } catch (error) {
     if (error instanceof HttpError || error instanceof IgnoredWebhookEvent) throw error;
     if (error instanceof z.ZodError || error instanceof SyntaxError) throw new HttpError(400, "invalid_event", "Evento inválido.");
@@ -37,7 +37,7 @@ export async function processWebhook(request: Request, providerName: string, dat
   try {
     verified = await verifyWebhookDelivery(request, providerName, provider, now);
   } catch (error) {
-    // Autenticado, mas não é evento de pagamento: 200 sem escrita (evita a Woovi pausar a fila).
+    // Autenticado, mas não é evento de pagamento: 200 sem escrita (evita o gateway pausar a fila).
     if (error instanceof IgnoredWebhookEvent) return { outcome: "ignored", reason: "unsupported_event" };
     throw error;
   }

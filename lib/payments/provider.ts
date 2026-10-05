@@ -5,14 +5,14 @@ import { centsSchema } from "../validation/service";
 export const chargeCustomerSchema = z.object({
   name: z.string().trim().min(1).max(120),
   phone: z.string().regex(/^\+[1-9][0-9]{7,14}$/),
-  /** CPF com 11 dígitos (enviado à Woovi como `customer.taxID`). */
+  /** CPF com 11 dígitos (enviado ao gateway; no MP vai em `payer.identification`). */
   cpfCnpj: z.string().regex(/^\d{11}$/).refine(isValidCpf, "CPF inválido."),
   email: z.email().max(120).optional(),
 }).strict();
 
 export const chargeInputSchema = z.object({
   idempotencyKey: z.uuid({ version: "v4" }),
-  /** Nosso id de pagamento, enviado ao gateway como referência externa (Woovi `correlationID`). */
+  /** Nosso id de pagamento: no MP vira `external_reference` e `X-Idempotency-Key`. */
   reference: z.uuid(),
   amountCents: centsSchema.refine((value) => value > 0, "A cobrança deve ser positiva."),
   expiresAt: z.date(),
@@ -51,7 +51,7 @@ export class IgnoredWebhookEvent extends Error {
 export type ProviderCallOptions = { signal?: AbortSignal };
 
 /**
- * Contrato agnóstico de gateway. Implementações reais (Woovi/OpenPix, etc.) devem:
+ * Contrato agnóstico de gateway. Implementações reais (Mercado Pago, etc.) devem:
  * - ser idempotentes em createPixCharge pela idempotencyKey (nativo ou emulado via findChargeByReference);
  * - devolver null quando o gateway não conhece a cobrança;
  * - nunca cancelar cobrança paga (cancelCharge devolve o estado resultante, inclusive "paid").
@@ -63,7 +63,8 @@ export interface PaymentProvider {
   findChargeByReference(reference: string, options?: ProviderCallOptions): Promise<ProviderCharge | null>;
   cancelCharge(externalId: string, options?: ProviderCallOptions): Promise<ProviderCharge | null>;
   /** Pode ser assíncrono: gateways cujo webhook traz só o id (Mercado Pago) precisam consultar a cobrança para normalizar o evento. */
-  verifyWebhook(body: string, headers: Headers, now: Date): PaidEvent | Promise<PaidEvent>;
+  /** `requestUrl` carrega query params (ex.: data.id do webhook MP) quando a assinatura depende da URL. */
+  verifyWebhook(body: string, headers: Headers, now: Date, requestUrl?: string): PaidEvent | Promise<PaidEvent>;
 }
 
 /** Evento sintético e determinístico para pagamentos descobertos por consulta (reconciliação). */

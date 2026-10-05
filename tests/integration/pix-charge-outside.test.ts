@@ -200,7 +200,7 @@ describe("reconciliação", () => {
     expect(booking.status).toBe("confirmed");
   });
 
-  it("sem provedor disponível (produção sem Woovi) ainda expira holds e creating vencidos", async () => {
+  it("sem provedor disponível (produção sem Mercado Pago) ainda expira holds e creating vencidos", async () => {
     const broken = { name: provider.name, createPixCharge: async () => { throw new Error("fail"); }, getCharge: provider.getCharge.bind(provider), findChargeByReference: provider.findChargeByReference.bind(provider), cancelCharge: provider.cancelCharge.bind(provider), verifyWebhook: provider.verifyWebhook.bind(provider) };
     const { data: pending } = await createBooking(slug, input(0), randomUUID(), database, provider);
     await expect(createBooking(slug, input(1, "+5511999999901"), randomUUID(), database, broken)).rejects.toMatchObject({ status: 503 });
