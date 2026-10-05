@@ -1,0 +1,58 @@
+"use client";
+
+import { useActionState, useEffect, useRef, useState } from "react";
+import styles from "./motion.module.css";
+import { Button } from "@/components/ui/button";
+import { saveHours, saveService } from "@/app/dashboard/(owner)/actions";
+import type { FormState } from "@/lib/dashboard/validation";
+
+export const weekdays = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
+const control = "min-h-11 w-full rounded-field border border-line bg-paper px-3 text-base focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+function Feedback({ state, showSuccess }: { state: FormState; showSuccess: boolean }) {
+  const ref = useRef<HTMLParagraphElement>(null);
+  useEffect(() => { if (state.error) ref.current?.focus(); }, [state]);
+  return <>{state.error && <p ref={ref} tabIndex={-1} role="alert" className={`${styles.feedback} rounded-field border border-line bg-surface p-3 font-medium text-danger`}>{state.error}</p>}{showSuccess && state.success && <p role="status" aria-atomic="true" className={`${styles.feedback} rounded-field border border-line bg-surface p-3 font-medium text-ink`}>{state.success}</p>}</>;
+}
+type Service = { id: string; name: string; durationMinutes: number; priceCents: number; depositCents: number; active: boolean };
+export function ServiceForm({ businessId, service }: { businessId: string; service?: Service }) {
+  const [state, action, pending] = useActionState(saveService, {});
+  const [showSuccess, setShowSuccess] = useState(true);
+  const prefix = service?.id ?? "new";
+  const [values, setValues] = useState({ name: service?.name ?? "", duration: String(service?.durationMinutes ?? 30), price: service ? (service.priceCents / 100).toFixed(2) : "", deposit: service ? (service.depositCents / 100).toFixed(2) : "0,00", active: service?.active ?? true });
+  return <form action={action} onChange={() => setShowSuccess(false)} onSubmit={() => setShowSuccess(true)} className={`${styles.scope} grid gap-4`} aria-busy={pending} aria-label={service ? `Editar ${service.name}` : "Cadastrar serviço"}>
+    <input type="hidden" name="businessId" value={businessId} />
+    {service && <input type="hidden" name="id" value={service.id} />}
+    <label htmlFor={`${prefix}-name`} className="grid gap-2">Nome do serviço<input className={control} id={`${prefix}-name`} name="name" required maxLength={120} value={values.name} onChange={(event) => setValues({ ...values, name: event.target.value })} /></label>
+    <div className="grid gap-4 sm:grid-cols-3">
+      <label htmlFor={`${prefix}-duration`} className="grid gap-2">Duração (minutos)<input className={control} id={`${prefix}-duration`} name="durationMinutes" type="number" min={1} max={1440} required value={values.duration} onChange={(event) => setValues({ ...values, duration: event.target.value })} /></label>
+      <label htmlFor={`${prefix}-price`} className="grid gap-2">Preço (R$)<input className={control} id={`${prefix}-price`} name="price" inputMode="decimal" pattern="[0-9]+([,.][0-9]{1,2})?" required value={values.price} onChange={(event) => setValues({ ...values, price: event.target.value })} /></label>
+      <label htmlFor={`${prefix}-deposit`} className="grid gap-2">Sinal (R$)<input className={control} id={`${prefix}-deposit`} name="deposit" inputMode="decimal" pattern="[0-9]+([,.][0-9]{1,2})?" required value={values.deposit} onChange={(event) => setValues({ ...values, deposit: event.target.value })} /></label>
+    </div>
+    <p className="text-sm text-muted-foreground">O sinal deve ser menor ou igual ao preço. Sinal zero confirma o horário sem cobrança.</p>
+    <label className="flex min-h-11 items-center gap-3"><input className="size-5 accent-primary" type="checkbox" name="active" checked={values.active} onChange={(event) => setValues({ ...values, active: event.target.checked })} />Disponível para agendamento</label>
+    <div className="min-h-12">{pending ? <p role="status" className="p-3 text-sm text-muted-foreground">Salvando alterações…</p> : <Feedback state={state} showSuccess={showSuccess} />}</div>
+    <Button type="submit" disabled={pending} className="justify-self-start">{pending ? "Salvando serviço…" : service ? "Salvar serviço" : "Cadastrar serviço"}</Button>
+  </form>;
+}
+export function HoursForm({ businessId, hours }: { businessId: string; hours: { weekday: number; opensAt: string; closesAt: string }[] }) {
+  const [state, action, pending] = useActionState(saveHours, {});
+  const [showSuccess, setShowSuccess] = useState(true);
+  const [days, setDays] = useState(weekdays.map((_, weekday) => { const value = hours.find((hour) => hour.weekday === weekday); return { open: !!value, start: value?.opensAt.slice(0, 5) ?? "09:00", end: value?.closesAt.slice(0, 5) ?? "18:00" }; }));
+  function changeDay(weekday: number, value: Partial<(typeof days)[number]>) { setDays(days.map((day, index) => index === weekday ? { ...day, ...value } : day)); }
+  return <form action={action} onChange={() => setShowSuccess(false)} onSubmit={() => setShowSuccess(true)} className={`${styles.scope} grid gap-4`} aria-busy={pending} aria-label="Horários de funcionamento">
+    <input type="hidden" name="businessId" value={businessId} />
+    {weekdays.map((day, weekday) => {
+      const value = days[weekday];
+      return <fieldset key={day} className="grid min-w-0 grid-cols-2 items-center gap-x-3 gap-y-2 border-b border-border py-3 last:border-0 sm:grid-cols-[minmax(7rem,1fr)_minmax(7rem,1fr)_minmax(8rem,1fr)_minmax(8rem,1fr)] sm:gap-3 sm:py-2">
+        <legend className="w-fit max-w-full py-2 font-semibold">{day}</legend>
+        <label className="flex min-h-11 items-center justify-end gap-2 text-sm sm:justify-start"><input className="size-5 accent-primary" type="checkbox" name={`open-${weekday}`} checked={value.open} onChange={(event) => changeDay(weekday, { open: event.target.checked })} />Aberto</label>
+        <label className="grid gap-2" htmlFor={`start-${weekday}`}>Abre às<input className={control} id={`start-${weekday}`} name={`start-${weekday}`} type="time" value={value.start} onChange={(event) => changeDay(weekday, { start: event.target.value })} disabled={!value.open} required /></label>
+        <label className="grid gap-2" htmlFor={`end-${weekday}`}>Fecha às<input className={control} id={`end-${weekday}`} name={`end-${weekday}`} type="time" value={value.end} onChange={(event) => changeDay(weekday, { end: event.target.value })} disabled={!value.open} required /></label>
+      </fieldset>;
+    })}
+    <p className="text-sm text-muted-foreground">Desmarque “Aberto” nos dias sem atendimento.</p>
+    {!days.some((day) => day.open) && <p role="status" className="rounded-field border border-dashed border-line bg-surface p-3 text-sm text-muted-foreground">Nenhum dia selecionado. Ao salvar, sua agenda ficará fechada para novos agendamentos.</p>}
+    <div className="min-h-12">{pending ? <p role="status" className="p-3 text-sm text-muted-foreground">Salvando alterações…</p> : <Feedback state={state} showSuccess={showSuccess} />}</div>
+    <Button type="submit" disabled={pending} className="justify-self-start">{pending ? "Salvando horários…" : "Salvar horários de funcionamento"}</Button>
+  </form>;
+}

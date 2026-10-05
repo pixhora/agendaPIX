@@ -5,7 +5,7 @@ export function trustedAppOrigins() {
   const env = authEnvSchema.safeParse(process.env);
   if (!env.success) throw new HttpError(503, "auth_unavailable", "O acesso está indisponível. Tente novamente mais tarde.");
   const origin = new URL(env.data.BETTER_AUTH_URL).origin;
-  const local = process.env.NODE_ENV === "production" ? [] : [3000, 3001, 3005, 3343].map((port) => `http://localhost:${port}`);
+  const local = process.env.NODE_ENV === "production" ? [] : [3000, 3001, 3005, 3343, 3344].map((port) => `http://localhost:${port}`);
   return [...new Set([origin, ...local])];
 }
 

@@ -1,0 +1,8 @@
+/* O formulário consome a identidade declarada nos tokens globais do painel. */
+.root {
+  font-family: var(--font-sans);
+}
+
+.surface { background-color: var(--surface); }
+.display { font-family: var(--font-display); }
+.brand { background-color: var(--ink); color: var(--paper); }

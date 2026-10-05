@@ -1,3 +1,5 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 import nodemailer from "nodemailer";
 import { smtpEnvSchema } from "./env";
 
@@ -16,12 +18,19 @@ function emailTransport() {
 }
 
 export async function verifyEmailTransport() {
+  if (process.env.MAGIC_LINK_CAPTURE_FILE) return;
   const { transporter } = emailTransport();
   try { await transporter.verify(); }
   finally { transporter.close(); }
 }
 
 export async function sendMagicLinkEmail(email: string, url: string) {
+  const capture = process.env.MAGIC_LINK_CAPTURE_FILE;
+  if (capture) {
+    await mkdir(path.dirname(capture), { recursive: true });
+    await writeFile(capture, `${email}\n${url}\n`, "utf8");
+    return;
+  }
   const { env, transporter } = emailTransport();
   await transporter.sendMail({
     from: env.SMTP_FROM,
