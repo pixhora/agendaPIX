@@ -3,8 +3,9 @@ name: CI
 on:
   push:
     branches: [master]
+  # Todos os PRs (master e branches de integração como feat/backend), assim que o workflow existir na base.
   pull_request:
-    branches: [master]
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -112,6 +113,11 @@ jobs:
           --health-interval 2s
           --health-timeout 5s
           --health-retries 30
+      # SMTP descartável para o /api/ready (verifica banco + transporte de email).
+      mailpit:
+        image: axllent/mailpit:v1.31
+        ports:
+          - 1025:1025
     steps:
       - uses: actions/checkout@v7
       - name: Lint Dockerfile (hadolint)
@@ -140,10 +146,12 @@ jobs:
             -e DATABASE_URL=postgresql://agenda@localhost:5432/agenda \
             -e BETTER_AUTH_URL=http://localhost:3000 \
             -e BETTER_AUTH_SECRET="$(openssl rand -base64 32)" \
+            -e SMTP_HOST=localhost -e SMTP_PORT=1025 -e SMTP_SECURE=false \
+            -e "SMTP_FROM=Agenda <ci@example.com>" \
             agendapix:ci
       - name: Smoke test HTTP
         run: |
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             curl -fsS http://localhost:3000/api/health && break
             sleep 1
           done
@@ -152,11 +160,15 @@ jobs:
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/)" = 200
           # Rota que consulta o banco: negócio inexistente deve responder 404 (não 500).
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/public/nao-existe/services)" = 404
+          # /api/ready (banco + SMTP) chega com o backend integrado (PR #4); antes disso responde 404.
+          ready="$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/ready)"
+          echo "/api/ready -> $ready"
+          if [ "$ready" != 404 ]; then test "$ready" = 200; fi
           docker exec agendapix id -u | grep -qv '^0$'
           echo "Image size: $(docker image inspect agendapix:ci --format '{{.Size}}' | numfmt --to=iec)"
       - name: Wait for HEALTHCHECK
         run: |
-          for i in $(seq 1 45); do
+          for _ in $(seq 1 45); do
             status="$(docker inspect --format '{{.State.Health.Status}}' agendapix)"
             echo "health=$status"; [ "$status" = healthy ] && exit 0
             sleep 2
