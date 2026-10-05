@@ -53,6 +53,12 @@ async function ensureBusiness(ownerId: string, name: string, slug: string, seedB
       startsAt: new Date(`${today}T07:00:00-03:00`), endsAt: new Date(`${today}T07:30:00-03:00`),
       priceCents: 5000, depositCents: 1000, status: "confirmed",
     });
+    // Cancelada no mesmo dia: o axe do painel cobre texto muted sem opacity empilhada.
+    await database.insert(bookings).values({
+      businessId: created.id, serviceId: service.id, customerId: customer.id,
+      startsAt: new Date(`${today}T08:00:00-03:00`), endsAt: new Date(`${today}T08:30:00-03:00`),
+      priceCents: 5000, depositCents: 1000, status: "cancelled",
+    });
   }
   return created;
 }

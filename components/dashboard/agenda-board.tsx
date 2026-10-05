@@ -87,15 +87,16 @@ function DayRow({ booking, onOpen }: { booking: AgendaItem; onOpen: () => void }
         className={cn(
           "group grid w-full grid-cols-[4rem_minmax(0,1fr)] items-center gap-x-4 gap-y-2 rounded-card border border-line bg-surface p-4 text-left transition-feedback hover:border-line-strong hover:bg-subtle/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
           "md:grid-cols-[5rem_minmax(0,1.4fr)_minmax(0,1fr)_7rem_minmax(0,13rem)] md:rounded-none md:border-0 md:border-b md:px-5 md:py-3.5 md:last:border-b-0",
-          inactive(booking.status) && "opacity-70",
+          // Sem opacity: muted@0.7 sobre surface cai ~3,3:1 (abaixo de AA). Inativo fica com riscado + text-muted.
+          inactive(booking.status) && "bg-subtle",
         )}
       >
         <span className="row-span-2 self-start border-r border-line pr-3 tabular-nums md:row-span-1 md:self-center md:border-0 md:pr-0">
-          <span className="block font-display text-lg font-bold leading-tight">{booking.start}</span>
+          <span className={cn("block font-display text-lg font-bold leading-tight", inactive(booking.status) && "text-muted")}>{booking.start}</span>
           <span className="block text-xs text-muted">até {booking.end}</span>
         </span>
         <span className="min-w-0">
-          <span className={cn("block truncate font-semibold", inactive(booking.status) && "line-through decoration-muted/60")}>{booking.customerName}</span>
+          <span className={cn("block truncate font-semibold", inactive(booking.status) && "text-muted line-through decoration-muted")}>{booking.customerName}</span>
           <span className="block truncate text-sm text-muted md:hidden">{booking.serviceName}</span>
         </span>
         <span className="hidden truncate text-sm text-muted md:block">{booking.serviceName}</span>
@@ -117,11 +118,11 @@ function WeekCard({ booking, onOpen }: { booking: AgendaItem; onOpen: () => void
           "grid w-full gap-1.5 rounded-field border border-line bg-surface p-3 text-left transition-feedback hover:border-line-strong hover:bg-subtle/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
           booking.status === "confirmed" && "border-l-4 border-l-pix",
           booking.status === "pending_payment" && "border-l-4 border-l-warning",
-          inactive(booking.status) && "opacity-70",
+          inactive(booking.status) && "bg-subtle",
         )}
       >
         <span className="text-xs font-bold tabular-nums text-muted">{booking.start}–{booking.end}</span>
-        <span className="truncate text-sm font-semibold">{booking.customerName}</span>
+        <span className={cn("truncate text-sm font-semibold", inactive(booking.status) && "text-muted line-through decoration-muted")}>{booking.customerName}</span>
         <span className="truncate text-xs text-muted">{booking.serviceName}</span>
         <StatusBadge status={booking.status} compact className="justify-self-start" />
       </button>
