@@ -1,3 +1,5 @@
+import { DEFAULT_AFTER_LOGIN, loginErrorPath } from "./safe-redirect";
+
 export type MagicLinkResult =
   | { ok: true; simulated?: boolean }
   | { ok: false; code: "auth_unavailable" | "invalid_email" | "unknown"; message: string };
@@ -15,7 +17,8 @@ export const MAGIC_LINK_ENDPOINT = "/api/auth/sign-in/magic-link";
 export async function requestMagicLink(
   email: string,
   pathname = typeof window !== "undefined" ? window.location.pathname : "",
-  callbackURL = "/dashboard",
+  callbackURL = DEFAULT_AFTER_LOGIN,
+  errorCallbackURL = loginErrorPath(callbackURL),
 ): Promise<MagicLinkResult> {
   const isPreview = pathname.startsWith("/preview");
 
@@ -24,7 +27,7 @@ export async function requestMagicLink(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "same-origin",
-      body: JSON.stringify({ email: email.trim().toLowerCase(), callbackURL }),
+      body: JSON.stringify({ email: email.trim().toLowerCase(), callbackURL, errorCallbackURL }),
     });
 
     if (res.ok) return { ok: true };

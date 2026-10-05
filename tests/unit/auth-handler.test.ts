@@ -74,7 +74,7 @@ it.each([3001, 3005, 3343])("aceita origem e callback absoluto da UI na porta %i
   const origin = `http://localhost:${port}`;
   const response = await auth.handler(new Request("http://localhost:3000/api/auth/sign-in/magic-link", {
     method: "POST", headers: { origin, "content-type": "application/json" },
-    body: JSON.stringify({ email: "synthetic@example.com", callbackURL: `${origin}/dashboard`, errorCallbackURL: `${origin}/dashboard/login?error=link` }),
+    body: JSON.stringify({ email: "synthetic@example.com", callbackURL: `${origin}/dashboard`, errorCallbackURL: `${origin}/login` }),
   }));
   expect(response.status).toBe(200);
   expect(sendMagicLinkEmail).toHaveBeenCalled();

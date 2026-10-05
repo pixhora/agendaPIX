@@ -36,7 +36,7 @@ describe("autorização do painel", () => {
     mocks.session.mockResolvedValue(null);
     mocks.redirect.mockImplementation(() => { throw new Error("redirect"); });
     await expect(requireOwner()).rejects.toThrow("redirect");
-    expect(mocks.redirect).toHaveBeenCalledWith("/dashboard/login");
+    expect(mocks.redirect).toHaveBeenCalledWith("/login");
     expect(mocks.db.select).not.toHaveBeenCalled();
   });
   it.each([

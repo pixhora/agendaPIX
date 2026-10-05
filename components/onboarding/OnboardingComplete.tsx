@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { provisionBusiness, type ProvisioningResult } from "@/lib/provisioning";
 import {
   IDEMPOTENCY_KEY,
+  ONBOARDING_COMPLETE_PATH,
   clearCompletedSetup,
   ensureOnboardingIdempotencyKey,
   readCompletedSetup,
@@ -109,7 +110,7 @@ export function OnboardingComplete() {
                 Tentar novamente
               </Button>
             ) : state.result.code === "unauthorized" ? (
-              <Link href="/login" className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-foreground px-5 text-sm font-semibold text-background">
+              <Link href={`/login?next=${encodeURIComponent(ONBOARDING_COMPLETE_PATH)}`} className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-foreground px-5 text-sm font-semibold text-background">
                 Entrar novamente
               </Link>
             ) : (

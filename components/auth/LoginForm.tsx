@@ -4,11 +4,18 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { requestMagicLink, type MagicLinkResult } from "@/lib/magic-link";
+import { DEFAULT_AFTER_LOGIN } from "@/lib/safe-redirect";
+
+export const LINK_ERROR_MESSAGE =
+  "Este link de acesso expirou ou já foi usado. Peça um novo link abaixo.";
 
 export interface LoginFormProps {
   title?: string;
   subtitle?: string;
+  /** Caminho relativo já validado (ver `safeNextPath`). */
   callbackURL?: string;
+  /** Veio de um link mágico inválido/expirado (`/login?error=...`). */
+  linkError?: boolean;
   showCreateAccountLink?: boolean;
   className?: string;
 }
@@ -16,13 +23,14 @@ export interface LoginFormProps {
 export function LoginForm({
   title = "Entrar na sua conta",
   subtitle = "Digite seu e-mail profissional para receber o link de acesso sem senha.",
-  callbackURL = "/dashboard",
+  callbackURL = DEFAULT_AFTER_LOGIN,
+  linkError = false,
   showCreateAccountLink = true,
   className = "",
 }: LoginFormProps) {
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(linkError ? LINK_ERROR_MESSAGE : null);
   const [isSent, setIsSent] = useState(false);
   const [wasSimulated, setWasSimulated] = useState(false);
 
