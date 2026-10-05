@@ -25,3 +25,7 @@ export function publicBookingsUrl(slug: string) {
 export function publicBookingPaymentUrl(slug: string, bookingId: string) {
   return `/api/public/${seg(slug)}/bookings/${seg(bookingId)}/payment`;
 }
+
+export function devSimulatePixUrl() {
+  return "/api/dev/simulate-pix";
+}

@@ -23,7 +23,8 @@
     "reconcile": "node --experimental-transform-types --import ./scripts/ts-register.mjs scripts/reconcile.ts",
     "build:bundles": "node scripts/bundle.mjs",
     "db:migrate:prod": "node dist/migrate.cjs",
-    "reconcile:prod": "node dist/reconcile.mjs"
+    "reconcile:prod": "node dist/reconcile.mjs",
+    "pix:simulate": "node --env-file=.env scripts/simulate-pix.mjs"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "1.7.7",
