@@ -33,7 +33,7 @@ export async function dashboardBookings(ownerId: string, businessId: string, dat
   const first = dateSchema.parse(dates[0]);
   const last = shiftDate(dateSchema.parse(dates[dates.length - 1]), 1);
   // Intervalo amplo de UTC cobre o dia local em qualquer offset; filtro final usa o fuso do negócio.
-  const rows = await database.select({ id: bookings.id, startsAt: bookings.startsAt, endsAt: bookings.endsAt, status: bookings.status, expiresAt: bookings.expiresAt, priceCents: bookings.priceCents, depositCents: bookings.depositCents, serviceName: services.name, customerName: customers.name })
+  const rows = await database.select({ id: bookings.id, startsAt: bookings.startsAt, endsAt: bookings.endsAt, status: bookings.status, expiresAt: bookings.expiresAt, priceCents: bookings.priceCents, depositCents: bookings.depositCents, serviceName: services.name, customerName: customers.name, customerPhone: customers.phone })
     .from(bookings)
     .innerJoin(services, and(eq(services.id, bookings.serviceId), eq(services.businessId, bookings.businessId)))
     .innerJoin(customers, and(eq(customers.id, bookings.customerId), eq(customers.businessId, bookings.businessId)))

@@ -1,14 +1,6 @@
-import { StatusChip } from "../ui/value-slab";
+import { StatusBadge } from "@/components/ui/status-badge";
 import type { bookings } from "@/db/schema";
 
-const labels = {
-  pending_payment: "Aguardando sinal",
-  confirmed: "Confirmado",
-  cancelled: "Cancelado",
-  expired: "Prazo do sinal encerrado",
-  completed: "Concluído",
-} satisfies Record<typeof bookings.$inferSelect.status, string>;
-
-export function BookingStatus({ status }: { status: typeof bookings.$inferSelect.status }) {
-  return <StatusChip active={status === "confirmed"}>{labels[status]}</StatusChip>;
+export function BookingStatus({ status, compact }: { status: typeof bookings.$inferSelect.status; compact?: boolean }) {
+  return <StatusBadge status={status} compact={compact} />;
 }

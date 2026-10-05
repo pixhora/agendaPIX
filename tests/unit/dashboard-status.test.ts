@@ -7,18 +7,24 @@ describe("status da reserva na agenda", () => {
     vi.useFakeTimers();
     try {
       vi.setSystemTime(new Date("2030-01-01T12:00:00Z"));
-      expect(renderToStaticMarkup(BookingStatus({ status: "pending_payment" })).replace(/<[^>]*>/g, "")).toBe("Aguardando sinal");
+      expect(renderToStaticMarkup(BookingStatus({ status: "pending_payment" })).replace(/<[^>]*>/g, "")).toBe("Aguardando sinal Pix");
     } finally {
       vi.useRealTimers();
     }
   });
 
   it.each([
-    ["confirmed", "Confirmado"],
+    ["confirmed", "Confirmado · sinal pago"],
     ["cancelled", "Cancelado"],
     ["expired", "Prazo do sinal encerrado"],
     ["completed", "Concluído"],
   ] as const)("apresenta o estado %s recebido do servidor", (status, label) => {
     expect(renderToStaticMarkup(BookingStatus({ status })).replace(/<[^>]*>/g, "")).toBe(label);
+  });
+
+  it("modo compacto mantém o rótulo completo para leitores de tela", () => {
+    const html = renderToStaticMarkup(BookingStatus({ status: "confirmed", compact: true }));
+    expect(html).toContain("Pago");
+    expect(html).toContain('class="sr-only">Confirmado · sinal pago<');
   });
 });

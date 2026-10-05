@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DashboardBooking } from "../../lib/dashboard/data";
-import { dashboardAgendaSummary, formatBrlCents } from "../../lib/dashboard/summary";
+import { dashboardAgendaKpis, dashboardAgendaSummary, formatBrlCents } from "../../lib/dashboard/summary";
 
 const booking = (overrides: Partial<DashboardBooking>): DashboardBooking => ({
   id: "booking-1",
@@ -12,6 +12,7 @@ const booking = (overrides: Partial<DashboardBooking>): DashboardBooking => ({
   depositCents: 1200,
   serviceName: "Corte",
   customerName: "Cliente de teste",
+  customerPhone: "+5511999990000",
   ...overrides,
 });
 
@@ -46,5 +47,31 @@ describe("dashboard agenda summary", () => {
 
   it("formata centavos inteiros sem converter para ponto flutuante", () => {
     expect(formatBrlCents(123456n)).toBe("R$\u00a01.234,56");
+  });
+});
+
+describe("dashboard agenda kpis", () => {
+  const now = new Date("2030-01-02T12:00:00.000Z");
+  it("conta reservas ativas, receita via Pix e pendentes no prazo", () => {
+    const kpis = dashboardAgendaKpis([
+      booking({ id: "a", status: "confirmed", depositCents: 1500 }),
+      booking({ id: "b", status: "completed", depositCents: 1000 }),
+      booking({ id: "c", status: "confirmed", depositCents: 0 }),
+      booking({ id: "d", status: "pending_payment", depositCents: 800, expiresAt: new Date("2030-01-02T12:10:00.000Z") }),
+      booking({ id: "e", status: "pending_payment", depositCents: 800, expiresAt: new Date("2030-01-02T11:50:00.000Z") }),
+      booking({ id: "f", status: "cancelled", depositCents: 900 }),
+      booking({ id: "g", status: "expired", depositCents: 900 }),
+    ], now);
+    expect(kpis).toEqual({
+      bookingCount: 5,
+      confirmedCount: 3,
+      pendingCount: 1,
+      pendingSignalCents: 800n,
+      pixRevenueCents: 2500n,
+      pixRevenueCount: 2,
+    });
+  });
+  it("retorna zeros sem reservas", () => {
+    expect(dashboardAgendaKpis([], now)).toMatchObject({ bookingCount: 0, pendingCount: 0, pixRevenueCents: 0n });
   });
 });

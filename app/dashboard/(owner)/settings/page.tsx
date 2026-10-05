@@ -1,13 +1,32 @@
-import { DashboardShell, Empty } from "@/components/dashboard/shell";
+import { DashboardShell, Empty, SectionCard } from "@/components/dashboard/shell";
 import { HoursForm } from "@/components/dashboard/forms";
 import { PixKeyForm } from "@/components/dashboard/pix-key-form";
+import { PublicLink } from "@/components/dashboard/public-link";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { ownerContext } from "@/lib/dashboard/session";
 import { dashboardHours } from "@/lib/dashboard/data";
+
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ businessId?: string }> }) {
   const { businessId } = await searchParams;
   const { businesses, business, owner } = await ownerContext(businessId);
   const hours = business ? await dashboardHours(owner.id, business.id) : [];
-  return <DashboardShell title="Horários de funcionamento" description={business ? `Defina seus dias de atendimento. Fuso: ${business.timezone}.` : "Defina seus dias de atendimento."} path="/dashboard/settings" businesses={businesses} businessId={business?.id}>
-    {business && <div className="max-w-3xl space-y-5">{!hours.length && <Empty title="Sua agenda está fechada">Marque os dias de atendimento e salve os horários para receber agendamentos.</Empty>}<section className="rounded-card border border-line bg-surface p-4 sm:p-6"><div className="mb-5 border-b border-line pb-4"><h2 className="text-lg font-semibold">Dias e horários</h2><p className="mt-1 text-sm text-muted-foreground">Cada dia pode ter um intervalo de atendimento.</p></div><HoursForm key={business.id} businessId={business.id} hours={hours} /></section><PixKeyForm key={`pix-${business.id}`} businessId={business.id} /></div>}
+  return <DashboardShell title="Configurações" description="Link público, dias de atendimento, chave Pix e aparência do painel." path="/dashboard/settings" businesses={businesses} businessId={business?.id}>
+    {business && <div className="grid gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(18rem,0.7fr)] lg:items-start">
+      <div className="grid min-w-0 gap-6">
+        {!hours.length && <Empty title="Sua agenda está fechada">Ligue os dias de atendimento e salve os horários para receber agendamentos.</Empty>}
+        <SectionCard title="Horários de funcionamento" headingId="hours-title" description={`Fuso horário: ${business.timezone}.`}>
+          <HoursForm key={business.id} businessId={business.id} hours={hours} />
+        </SectionCard>
+        <PixKeyForm key={`pix-${business.id}`} businessId={business.id} />
+      </div>
+      <div className="grid min-w-0 gap-6 lg:sticky lg:top-8">
+        <SectionCard title="Sua página pública" headingId="public-link-title" description="Compartilhe este link para receber reservas com sinal via Pix.">
+          <PublicLink slug={business.slug} />
+        </SectionCard>
+        <SectionCard title="Aparência" headingId="appearance-title" description="Claro, escuro ou seguir o sistema. Vale para este aparelho.">
+          <ThemeToggle />
+        </SectionCard>
+      </div>
+    </div>}
   </DashboardShell>;
 }

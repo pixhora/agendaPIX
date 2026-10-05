@@ -1,82 +1,126 @@
 import Link from "next/link";
-import { BookingStatus } from "@/components/dashboard/booking-status";
+import { CalendarClock, CalendarPlus, ChevronLeft, ChevronRight, Clock3, ListChecks } from "lucide-react";
 import { DashboardShell, Empty } from "@/components/dashboard/shell";
+import { AgendaBoard, type AgendaDay, type AgendaItem } from "@/components/dashboard/agenda-board";
+import { AgendaDatePicker } from "@/components/dashboard/agenda-date-picker";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { StatusChip, ValueSlab } from "@/components/ui/value-slab";
 import { buttonVariants } from "@/components/ui/button";
 import { dashboardBookings } from "@/lib/dashboard/data";
-import { dashboardAgendaSummary, formatBrlCents } from "@/lib/dashboard/summary";
+import { dashboardAgendaKpis, dashboardAgendaSummary, formatBrlCents } from "@/lib/dashboard/summary";
 import { ownerContext } from "@/lib/dashboard/session";
 import { dateSchema, shiftDate, weekDates } from "@/lib/dashboard/validation";
 import { localDate } from "@/lib/bookings/availability";
+import { cn } from "@/lib/utils";
+
+const utcDay = (day: string) => new Date(`${day}T12:00:00Z`);
+const format = (options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC", ...options });
+
+function KpiCard({ label, value, hint, icon, tone = "default" }: { label: string; value: string; hint: string; icon: React.ReactNode; tone?: "default" | "warning" }) {
+  return <div className="rounded-card border border-line bg-surface p-4 sm:p-5">
+    <div className="flex items-center justify-between gap-2">
+      <p className="text-sm font-semibold text-muted">{label}</p>
+      <span aria-hidden="true" className={cn("flex size-8 items-center justify-center rounded-full [&_svg]:size-4", tone === "warning" ? "bg-warning-soft text-warning" : "bg-subtle text-ink")}>{icon}</span>
+    </div>
+    <p className="mt-2 font-display text-3xl font-extrabold tabular-nums tracking-tight">{value}</p>
+    <p className="mt-1 text-xs text-muted sm:text-sm">{hint}</p>
+  </div>;
+}
 
 export default async function AgendaPage({ searchParams }: { searchParams: Promise<{ businessId?: string; date?: string; view?: string }> }) {
   const query = await searchParams;
   const { businesses, business, owner } = await ownerContext(query.businessId);
   const now = new Date();
+  const timezone = business?.timezone ?? "America/Sao_Paulo";
   const parsedDate = dateSchema.safeParse(query.date);
-  const date = parsedDate.success ? parsedDate.data : localDate(now, business?.timezone ?? "America/Sao_Paulo");
+  const today = localDate(now, timezone);
+  const date = parsedDate.success ? parsedDate.data : today;
   const weekly = query.view === "week";
   const dates = weekly ? weekDates(date) : [date];
   const bookings = business ? await dashboardBookings(owner.id, business.id, dates) : [];
-  const summary = business ? dashboardAgendaSummary(bookings, date, business.timezone, now) : null;
-  const time = new Intl.DateTimeFormat("pt-BR", { timeZone: business?.timezone ?? "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
-  const dayLabel = (day: string) => new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC", weekday: "long", day: "2-digit", month: "2-digit" }).format(new Date(`${day}T12:00:00Z`));
-  const shortDayLabel = (day: string) => new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC", weekday: "short", day: "2-digit", month: "short" }).format(new Date(`${day}T12:00:00Z`));
-  const href = (day: string, view = weekly ? "week" : "day") => `/dashboard?businessId=${business?.id}&date=${day}&view=${view}`;
-  const today = business ? localDate(now, business.timezone) : date;
-  const summaryDate = shortDayLabel(date);
-  const nextBooking = summary?.nextReservation;
-  const nextBookingStatus = nextBooking?.status === "confirmed" ? "Confirmada" : "Aguardando sinal";
-  const nextBookingSignal = nextBooking
-    ? nextBooking.depositCents === 0
-      ? "Sem sinal previsto"
-      : `${nextBooking.status === "confirmed" ? "Sinal confirmado" : "Sinal pendente"}: ${formatBrlCents(BigInt(nextBooking.depositCents))}`
-    : "";
+  const summary = business ? dashboardAgendaSummary(bookings, date, timezone, now) : null;
+  const kpis = dashboardAgendaKpis(bookings, now);
 
-  return <DashboardShell title={business ? `Agenda de ${business.name}` : "Sua agenda"} description="Veja seus atendimentos e saiba quais horários já estão confirmados." path="/dashboard" businesses={businesses} businessId={business?.id}>
+  const time = new Intl.DateTimeFormat("pt-BR", { timeZone: timezone, hour: "2-digit", minute: "2-digit" });
+  const longLabel = (day: string) => format({ weekday: "long", day: "numeric", month: "long" }).format(utcDay(day));
+  const pickerLabel = (day: string) => format({ weekday: "short", day: "numeric", month: "short" }).format(utcDay(day)).replace(/^./, (letter) => letter.toUpperCase());
+  const view = weekly ? "week" : "day";
+  const hrefBase = `/dashboard?businessId=${business?.id}&view=${view}`;
+  const href = (day: string, nextView = view) => `/dashboard?businessId=${business?.id}&date=${day}&view=${nextView}`;
+  const money = (cents: number) => formatBrlCents(BigInt(cents));
+
+  const days: AgendaDay[] = dates.map((day) => ({
+    date: day,
+    label: longLabel(day),
+    weekday: format({ weekday: "short" }).format(utcDay(day)).replace(".", ""),
+    dayNumber: format({ day: "numeric" }).format(utcDay(day)),
+    isToday: day === today,
+  }));
+  const items: AgendaItem[] = bookings.map((booking) => ({
+    id: booking.id,
+    day: localDate(booking.startsAt, timezone),
+    start: time.format(booking.startsAt),
+    end: time.format(booking.endsAt),
+    customerName: booking.customerName,
+    customerPhone: booking.customerPhone,
+    serviceName: booking.serviceName,
+    status: booking.status,
+    price: money(booking.priceCents),
+    deposit: money(booking.depositCents),
+    remaining: money(Math.max(0, booking.priceCents - booking.depositCents)),
+    hasDeposit: booking.depositCents > 0,
+  }));
+
+  const periodWord = weekly ? "na semana" : date === today ? "hoje" : "no dia";
+  const firstDay = days[0];
+  const lastDay = days[days.length - 1];
+  const description = weekly
+    ? `Semana de ${format({ day: "numeric", month: "short" }).format(utcDay(firstDay.date))} a ${format({ day: "numeric", month: "short" }).format(utcDay(lastDay.date))} · horários em ${timezone}`
+    : `${longLabel(date).replace(/^./, (letter) => letter.toUpperCase())}${date === today ? " · hoje" : ""} · horários em ${timezone}`;
+  const nextBooking = summary?.nextReservation;
+
+  return <DashboardShell title={business ? `Agenda de ${business.name}` : "Sua agenda"} description={description} path="/dashboard" businesses={businesses} businessId={business?.id}>
     {business && summary && <>
-      <div className="grid gap-4 rounded-card border border-line bg-surface p-4 sm:flex sm:flex-wrap sm:items-end sm:justify-between sm:p-5">
-        <form action="/dashboard" className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <input type="hidden" name="businessId" value={business.id} /><input type="hidden" name="view" value={weekly ? "week" : "day"} />
-          <label htmlFor="agenda-date" className="grid gap-2 text-sm font-medium">Data<input key={date} id="agenda-date" type="date" name="date" defaultValue={date} required className="min-h-11 rounded-field border border-line bg-paper px-3 text-base focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" /></label>
-          <button type="submit" className={buttonVariants({ variant: "outline", className: "w-full justify-center sm:w-auto" })}>Ver horários</button>
-        </form>
-        <nav aria-label="Visualização da agenda" className="grid grid-cols-2 gap-2 sm:flex">
-          <Link className={buttonVariants({ variant: weekly ? "outline" : "default", className: "justify-center" })} aria-current={!weekly ? "page" : undefined} href={href(date, "day")}>Dia</Link>
-          <Link className={buttonVariants({ variant: weekly ? "default" : "outline", className: "justify-center" })} aria-current={weekly ? "page" : undefined} href={href(date, "week")}>Semana</Link>
+      <div className="flex flex-wrap items-center gap-2">
+        <nav aria-label="Navegar por datas" className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
+          <Link className={buttonVariants({ variant: "outline", size: "icon" })} href={href(shiftDate(date, weekly ? -7 : -1))} aria-label={weekly ? "Semana anterior" : "Dia anterior"}><ChevronLeft aria-hidden="true" /></Link>
+          <Link className={buttonVariants({ variant: date === today ? "default" : "outline", className: "px-4" })} href={href(today)} aria-current={date === today ? "date" : undefined}>Hoje</Link>
+          <Link className={buttonVariants({ variant: "outline", size: "icon" })} href={href(shiftDate(date, weekly ? 7 : 1))} aria-label={weekly ? "Próxima semana" : "Próximo dia"}><ChevronRight aria-hidden="true" /></Link>
+          <AgendaDatePicker key={date} date={date} label={pickerLabel(date)} hrefBase={hrefBase} />
+        </nav>
+        <nav aria-label="Visualização da agenda" className="grid w-full grid-cols-2 rounded-full border border-line bg-surface p-1 sm:ml-auto sm:inline-flex sm:w-auto">
+          {(["day", "week"] as const).map((option) => <Link key={option} href={href(date, option)} aria-current={view === option ? "page" : undefined} className={cn("inline-flex min-h-9 items-center justify-center rounded-full px-4 text-sm font-semibold transition-feedback focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring", view === option ? "bg-ink text-paper" : "text-muted hover:text-ink")}>{option === "day" ? "Dia" : "Semana"}</Link>)}
         </nav>
       </div>
-      {query.date && !parsedDate.success && <p role="alert" className="rounded-card border border-line bg-surface p-4 text-sm">Data inválida. Mostrando a agenda de hoje; escolha uma data válida.</p>}
-      <nav aria-label="Navegar por datas" className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-        <Link className={buttonVariants({ variant: "outline", className: "justify-center px-2 text-center text-xs sm:px-4 sm:text-sm" })} href={href(shiftDate(date, weekly ? -7 : -1))}>{weekly ? "Semana anterior" : "Dia anterior"}</Link>
-        <Link className={buttonVariants({ variant: "default", className: "justify-center px-3 sm:px-4" })} href={href(localDate(now, business.timezone))}>Hoje</Link>
-        <Link className={buttonVariants({ variant: "outline", className: "justify-center px-2 text-center text-xs sm:px-4 sm:text-sm" })} href={href(shiftDate(date, weekly ? 7 : 1))}>{weekly ? "Próxima semana" : "Próximo dia"}</Link>
-      </nav>
+      {query.date && !parsedDate.success && <p role="alert" className="rounded-card border border-warning/30 bg-warning-soft p-4 text-sm text-warning">Data inválida. Mostrando a agenda de hoje; escolha uma data válida.</p>}
 
-      <div className="grid gap-4 md:grid-cols-2" aria-label="Resumo da agenda">
-        <section aria-label="Sinais confirmados do dia">
-          <ValueSlab
-            label={date === today ? "Sinais confirmados hoje" : "Sinais confirmados no dia"}
-            value={formatBrlCents(summary.confirmedSignalCents)}
-            badge={<StatusChip active={summary.confirmedSignalCount > 0}>{summary.confirmedSignalCount ? `${summary.confirmedSignalCount} confirmados` : "Sem sinais"}</StatusChip>}
-            sublabel={summary.confirmedSignalCount ? `Sinais confirmados em ${summaryDate}` : `Nenhum sinal confirmado em ${summaryDate}`}
-            className="shadow-none transition-none"
-          />
-        </section>
-        <section aria-label="Próxima reserva">
-          {nextBooking ? <ValueSlab
-            label="Próxima reserva"
-            value={time.format(nextBooking.startsAt)}
-            badge={<StatusChip active={nextBooking.status === "confirmed"}>{nextBookingStatus}</StatusChip>}
-            sublabel={`${shortDayLabel(localDate(nextBooking.startsAt, business.timezone))} · ${nextBooking.customerName} · ${nextBooking.serviceName} · ${nextBookingSignal}`}
-            className="shadow-none transition-none"
-          /> : <Empty title="Sem próximas reservas"><p>Não há reserva futura neste período.</p></Empty>}
-        </section>
+      <section aria-label="Resumo da agenda" className="grid grid-cols-2 gap-3 lg:grid-cols-[1.35fr_1fr_1fr] lg:gap-4">
+        <ValueSlab
+          size="compact"
+          className="col-span-2 lg:col-span-1"
+          label={`Receita via Pix ${periodWord}`}
+          value={formatBrlCents(kpis.pixRevenueCents)}
+          badge={<StatusChip tone="slab" active={kpis.pixRevenueCount > 0}>{kpis.pixRevenueCount === 1 ? "1 sinal pago" : `${kpis.pixRevenueCount} sinais pagos`}</StatusChip>}
+          sublabel="Sinais confirmados pelo Pix. O restante você recebe no atendimento."
+        />
+        <KpiCard label={`Agendamentos ${periodWord}`} value={String(kpis.bookingCount)} hint={`${kpis.confirmedCount} confirmados`} icon={<ListChecks />} />
+        <KpiCard label="Aguardando sinal" value={String(kpis.pendingCount)} hint={kpis.pendingCount ? `${formatBrlCents(kpis.pendingSignalCents)} a confirmar` : "Nenhum Pix pendente"} icon={<Clock3 />} tone={kpis.pendingCount ? "warning" : "default"} />
+      </section>
+
+      {nextBooking && <section aria-label="Próximo atendimento" className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-card border border-pix/25 bg-pix-soft px-4 py-3 text-sm sm:px-5">
+        <CalendarClock aria-hidden="true" className="size-5 shrink-0 text-pix" />
+        <p className="min-w-0 flex-1 basis-[calc(100%-2.25rem)] sm:basis-0"><span className="font-semibold">Próximo atendimento: </span><span className="tabular-nums">{date === localDate(nextBooking.startsAt, timezone) ? "" : `${pickerLabel(localDate(nextBooking.startsAt, timezone))}, `}{time.format(nextBooking.startsAt)}</span> · {nextBooking.customerName} · {nextBooking.serviceName}</p>
+        <StatusBadge status={nextBooking.status} />
+      </section>}
+
+      <div className="flex items-baseline justify-between gap-2">
+        <h2 className="font-display text-lg font-bold">{weekly ? "Semana" : "Atendimentos"}</h2>
+        <p aria-live="polite" className="text-sm text-muted">{bookings.length} {bookings.length === 1 ? "agendamento" : "agendamentos"}</p>
       </div>
-
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-3 text-sm text-muted-foreground"><p>Horários em {business.timezone}</p><p aria-live="polite">{bookings.length} {bookings.length === 1 ? "agendamento" : "agendamentos"}</p></div>
-      {!bookings.length && <Empty title="Nenhum atendimento neste período"><p>Confira o funcionamento para disponibilizar horários aos clientes.</p><Link className="inline-flex min-h-11 items-center font-medium text-ink underline underline-offset-4" href={`/dashboard/settings?businessId=${business.id}`}>Conferir funcionamento</Link></Empty>}
-      <div className={weekly ? "grid gap-5 md:grid-cols-2 xl:grid-cols-3" : "grid gap-5"}>{dates.map((day) => <section key={day} aria-label={dayLabel(day)} className="min-w-0 border-t border-line pt-4"><h2 className="mb-3 text-lg font-semibold capitalize">{dayLabel(day)}</h2><ol className="space-y-2">{bookings.filter((booking) => localDate(booking.startsAt, business.timezone) === day).map((booking) => <li key={booking.id} className="grid grid-cols-[3.75rem_minmax(0,1fr)] gap-3 rounded-card border border-line bg-surface p-3 sm:grid-cols-[4.5rem_minmax(0,1fr)] sm:gap-4 sm:p-4"><div className="border-r border-line pr-3 font-sans tabular-nums sm:pr-4"><p className="text-lg font-semibold">{time.format(booking.startsAt)}</p><p className="mt-1 text-sm text-muted-foreground">{time.format(booking.endsAt)}</p></div><div className="min-w-0 self-center"><h3 className="break-words font-semibold">{booking.customerName}</h3><p className="break-words text-sm text-muted-foreground">{booking.serviceName}</p><p className="mt-2 text-sm font-medium"><BookingStatus status={booking.status} /></p></div></li>)}</ol>{weekly && !bookings.some((booking) => localDate(booking.startsAt, business.timezone) === day) && <p className="py-4 text-sm text-muted-foreground">Sem atendimentos.</p>}</section>)}</div>
+      {!bookings.length && !weekly ? <Empty title="Nenhum atendimento neste dia" icon={<CalendarPlus />}>
+        <p>Compartilhe o link da sua página para receber reservas com sinal via Pix, ou confira seus horários de funcionamento.</p>
+        <Link className={buttonVariants({ variant: "outline", className: "mt-4" })} href={`/dashboard/settings?businessId=${business.id}`}>Conferir funcionamento</Link>
+      </Empty> : <AgendaBoard days={days} bookings={items} weekly={weekly} businessName={business.name} />}
     </>}
   </DashboardShell>;
 }

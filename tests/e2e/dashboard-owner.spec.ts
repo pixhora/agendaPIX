@@ -30,9 +30,9 @@ test.describe("painel do dono — autenticado", () => {
   test("agenda carrega com o negócio do dono", async ({ page }) => {
     await page.goto("/dashboard");
     await expect(page).toHaveURL(/\/dashboard/);
-    await expect(page.getByText(meta.ownerName)).toBeVisible();
+    await expect(page.getByText(meta.ownerName).filter({ visible: true })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Painel" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Agenda" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Agenda", exact: true })).toBeVisible();
   });
 
   test("jornada: serviços, clientes e funcionamento", async ({ page }) => {

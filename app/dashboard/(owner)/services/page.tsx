@@ -1,8 +1,11 @@
 import Link from "next/link";
-import { DashboardShell, Empty } from "@/components/dashboard/shell";
+import { Clock3, Pencil, Plus, Scissors } from "lucide-react";
+import { DashboardShell, Empty, SectionCard } from "@/components/dashboard/shell";
 import { ServiceForm } from "@/components/dashboard/forms";
+import { buttonVariants } from "@/components/ui/button";
 import { ownerContext } from "@/lib/dashboard/session";
 import { dashboardServices } from "@/lib/dashboard/data";
+import { cn } from "@/lib/utils";
 
 export default async function ServicesPage({ searchParams }: { searchParams: Promise<{ businessId?: string }> }) {
   const { businessId } = await searchParams;
@@ -10,41 +13,52 @@ export default async function ServicesPage({ searchParams }: { searchParams: Pro
   const services = business ? await dashboardServices(owner.id, business.id) : [];
   const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
-  return <DashboardShell title="Serviços e preços" description="Defina o que seus clientes podem agendar e o sinal de cada atendimento." path="/dashboard/services" businesses={businesses} businessId={business?.id}>
-    {business && <div className="grid gap-6 lg:grid-cols-[minmax(18rem,0.85fr)_minmax(0,1.15fr)] lg:gap-8">
-      <section id="new-service" className="h-fit rounded-card border border-line bg-surface p-4 sm:p-6">
-        <h2 className="mb-5 text-lg font-semibold">Cadastrar serviço</h2>
-        <ServiceForm businessId={business.id} />
-      </section>
-      <section className="min-w-0">
+  return <DashboardShell
+    title="Serviços e preços"
+    description="Defina o que seus clientes podem agendar e o sinal via Pix de cada atendimento."
+    path="/dashboard/services"
+    businesses={businesses}
+    businessId={business?.id}
+    actions={business && services.length > 0 ? <Link href="#new-service" className={buttonVariants({ className: "w-full sm:w-auto" })}><Plus aria-hidden="true" />Novo serviço</Link> : undefined}
+  >
+    {business && <div className="grid gap-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(20rem,0.75fr)] lg:items-start lg:gap-8">
+      <section aria-labelledby="services-title" className="min-w-0">
         <div className="mb-3 flex items-baseline justify-between gap-3">
-          <h2 className="text-lg font-semibold">Seus serviços</h2>
-          <p className="text-sm tabular-nums text-muted-foreground">{services.length}</p>
+          <h2 id="services-title" className="font-display text-lg font-bold">Seus serviços</h2>
+          <p className="text-sm tabular-nums text-muted">{services.length} {services.length === 1 ? "serviço" : "serviços"}</p>
         </div>
-        {!services.length ? <Empty title="Seu primeiro serviço começa aqui">
+        {!services.length ? <Empty title="Seu primeiro serviço começa aqui" icon={<Scissors />}>
           <p>Cadastre um serviço para abrir a agenda aos clientes.</p>
-          <Link href="#new-service" className="mt-2 inline-flex min-h-11 items-center font-medium text-ink underline underline-offset-4">Cadastrar primeiro serviço</Link>
-        </Empty> : <ul className="divide-y divide-line rounded-card border border-line bg-surface px-4 sm:px-5">
-          {services.map((service) => <li key={service.id} className="py-5 first:pt-4 last:pb-4">
+          <Link href="#new-service" className={buttonVariants({ variant: "outline", className: "mt-4" })}>Cadastrar primeiro serviço</Link>
+        </Empty> : <ul className="grid gap-3">
+          {services.map((service) => <li key={service.id} className="rounded-card border border-line bg-surface p-4 sm:p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
-                <h3 className="break-words text-lg font-semibold">{service.name}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">{service.durationMinutes} minutos · {service.active ? "Disponível" : "Indisponível"}</p>
+                <h3 className="break-words font-display text-lg font-bold tracking-tight">{service.name}</h3>
+                <p className="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-muted">
+                  <span className="inline-flex items-center gap-1"><Clock3 aria-hidden="true" className="size-3.5" />{service.durationMinutes} min</span>
+                  <span className={cn("inline-flex min-h-6 items-center gap-1.5 rounded-full px-2 text-xs font-semibold", service.active ? "bg-success-soft text-success" : "bg-subtle text-muted")}>
+                    <span aria-hidden="true" className={cn("size-1.5 rounded-full", service.active ? "bg-success" : "bg-line-strong")} />{service.active ? "Disponível" : "Indisponível"}
+                  </span>
+                </p>
               </div>
-              <div className="text-right font-sans tabular-nums">
-                <p className="font-semibold">{money.format(service.priceCents / 100)}</p>
-                <p className="text-sm text-muted-foreground">Sinal {money.format(service.depositCents / 100)}</p>
+              <div className="text-right tabular-nums">
+                <p className="font-display text-xl font-extrabold">{money.format(service.priceCents / 100)}</p>
+                <p className="text-sm font-semibold text-pix">{service.depositCents > 0 ? `Sinal Pix ${money.format(service.depositCents / 100)}` : "Sem sinal"}</p>
               </div>
             </div>
-            <details className="mt-2">
-              <summary className="flex min-h-11 w-fit cursor-pointer items-center font-medium text-ink underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Editar serviço</summary>
-              <div className="mt-3 rounded-card border border-line bg-paper p-3 sm:p-4">
+            <details className="group mt-3 border-t border-line pt-1">
+              <summary className="flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-field text-sm font-semibold text-ink hover:text-pix focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden"><Pencil aria-hidden="true" className="size-4" />Editar serviço<span className="sr-only"> {service.name}</span></summary>
+              <div className="mt-2 rounded-field bg-subtle/60 p-3 sm:p-4">
                 <ServiceForm key={service.id} businessId={business.id} service={service} />
               </div>
             </details>
           </li>)}
         </ul>}
       </section>
+      <SectionCard id="new-service" title="Cadastrar serviço" description="Aparece na sua página pública assim que estiver disponível." className="scroll-mt-24 lg:sticky lg:top-8">
+        <ServiceForm businessId={business.id} />
+      </SectionCard>
     </div>}
   </DashboardShell>;
 }
