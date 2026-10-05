@@ -1,0 +1,62 @@
+[
+  {
+    "width": 375,
+    "status": "PASS",
+    "stage": "confirmação",
+    "checks": [
+      {
+        "stage": "serviço",
+        "overflow": false
+      },
+      {
+        "stage": "horário",
+        "overflow": false
+      },
+      {
+        "stage": "dados",
+        "overflow": false
+      },
+      {
+        "stage": "sinal",
+        "overflow": false
+      },
+      {
+        "stage": "confirmação",
+        "overflow": false
+      }
+    ],
+    "api": [],
+    "errors": [],
+    "mode": "Preview simulado"
+  },
+  {
+    "width": 1280,
+    "status": "PASS",
+    "stage": "confirmação",
+    "checks": [
+      {
+        "stage": "serviço",
+        "overflow": false
+      },
+      {
+        "stage": "horário",
+        "overflow": false
+      },
+      {
+        "stage": "dados",
+        "overflow": false
+      },
+      {
+        "stage": "sinal",
+        "overflow": false
+      },
+      {
+        "stage": "confirmação",
+        "overflow": false
+      }
+    ],
+    "api": [],
+    "errors": [],
+    "mode": "Preview simulado"
+  }
+]

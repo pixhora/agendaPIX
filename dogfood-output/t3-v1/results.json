@@ -1,0 +1,14 @@
+[
+  {
+    "case": "T02",
+    "width": 375,
+    "overflow": false,
+    "inputHeight": 44
+  },
+  {
+    "case": "T02",
+    "width": 1280,
+    "overflow": false,
+    "inputHeight": 44
+  }
+]

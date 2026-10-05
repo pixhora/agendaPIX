@@ -1,0 +1,1773 @@
+{
+  "baseURL": "http://127.0.0.1:3006",
+  "commit": "9791651",
+  "profile": {
+    "width": 375,
+    "height": 812,
+    "latencyMs": 150,
+    "downloadBitsPerSecond": 1600000,
+    "uploadBitsPerSecond": 750000,
+    "cpuThrottle": 1
+  },
+  "observationWindow": "load + 3000ms; cache disabled; fresh browser context; HTTP encoded transfer, WebSocket payload excluded",
+  "results": [
+    {
+      "route": "/preview",
+      "sample": 1,
+      "status": 200,
+      "timing": {
+        "ttfbMs": 3.099999999627471,
+        "firstByteFromNavigationMs": 5,
+        "domContentLoadedMs": 636.4000000003725,
+        "loadMs": 1547.5,
+        "fcpMs": 820,
+        "lcpObservedMs": 820,
+        "documentTransferBytes": 5619
+      },
+      "requests": 22,
+      "transferBytes": 275743,
+      "javascriptRequests": 12,
+      "javascriptTransferBytes": 164589,
+      "unfinishedRequests": 0,
+      "externalRequests": 0,
+      "websocketCount": 0,
+      "navigationError": null,
+      "errors": {
+        "console": [],
+        "page": [],
+        "http": [],
+        "failedRequests": []
+      },
+      "resources": [
+        {
+          "path": "/preview",
+          "external": false,
+          "type": "Document",
+          "bytes": 5786,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/636a5ac981f94f8b-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 27572,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/e4af272ccee01ff0-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 48732,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/css/ac1bb55d7b29a100.css",
+          "external": false,
+          "type": "Stylesheet",
+          "bytes": 11339,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/webpack-607c9c7b4c24692e.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 2068,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/0bdf0dc0-8a55cec99697e4b3.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 63736,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/544-cc4ffcb304165eb0.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 66429,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/main-app-7647c632f06cc4d7.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 860,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/829-f724e9bb48223144.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 3959,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/preview/layout-171ecf250be338f3.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 1784,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/preview/page-ea5124e1c4a0207e.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 539,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/preview/booking",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 704,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/preview/dashboard",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 704,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/preview/landing",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 702,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/preview/booking",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 1886,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/preview/dashboard",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 4381,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/preview/landing",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 9348,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/541-844230a5253ef750.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 10485,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/85-cfe13167284b0921.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 7958,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/preview/booking/page-1116bb6249e4e9f1.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 3317,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/758-04488edb7753d420.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 2976,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/preview/landing/page-4ffc191ecc4b560c.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 478,
+          "finished": true,
+          "status": 200
+        }
+      ]
+    },
+    {
+      "route": "/preview",
+      "sample": 2,
+      "status": 200,
+      "timing": {
+        "ttfbMs": 2.599999999627471,
+        "firstByteFromNavigationMs": 3.599999999627471,
+        "domContentLoadedMs": 615.5999999996275,
+        "loadMs": 1538.699999999255,
+        "fcpMs": 776,
+        "lcpObservedMs": 776,
+        "documentTransferBytes": 5619
+      },
+      "requests": 22,
+      "transferBytes": 275743,
+      "javascriptRequests": 12,
+      "javascriptTransferBytes": 164589,
+      "unfinishedRequests": 0,
+      "externalRequests": 0,
+      "websocketCount": 0,
+      "navigationError": null,
+      "errors": {
+        "console": [],
+        "page": [],
+        "http": [],
+        "failedRequests": []
+      },
+      "resources": [
+        {
+          "path": "/preview",
+          "external": false,
+          "type": "Document",
+          "bytes": 5786,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/636a5ac981f94f8b-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 27572,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/e4af272ccee01ff0-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 48732,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/css/ac1bb55d7b29a100.css",
+          "external": false,
+          "type": "Stylesheet",
+          "bytes": 11339,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/webpack-607c9c7b4c24692e.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 2068,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/0bdf0dc0-8a55cec99697e4b3.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 63736,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/544-cc4ffcb304165eb0.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 66429,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/main-app-7647c632f06cc4d7.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 860,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/829-f724e9bb48223144.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 3959,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/preview/layout-171ecf250be338f3.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 1784,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/preview/page-ea5124e1c4a0207e.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 539,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/preview/booking",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 704,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/preview/dashboard",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 704,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/preview/landing",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 702,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/preview/booking",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 1886,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/preview/dashboard",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 4381,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/preview/landing",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 9348,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/541-844230a5253ef750.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 10485,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/85-cfe13167284b0921.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 7958,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/preview/booking/page-1116bb6249e4e9f1.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 3317,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/758-04488edb7753d420.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 2976,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/preview/landing/page-4ffc191ecc4b560c.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 478,
+          "finished": true,
+          "status": 200
+        }
+      ]
+    },
+    {
+      "route": "/preview",
+      "sample": 3,
+      "status": 200,
+      "timing": {
+        "ttfbMs": 3.099999999627471,
+        "firstByteFromNavigationMs": 4.400000000372529,
+        "domContentLoadedMs": 623.1000000014901,
+        "loadMs": 1584.1000000014901,
+        "fcpMs": 776,
+        "lcpObservedMs": 776,
+        "documentTransferBytes": 5619
+      },
+      "requests": 22,
+      "transferBytes": 275743,
+      "javascriptRequests": 12,
+      "javascriptTransferBytes": 164589,
+      "unfinishedRequests": 0,
+      "externalRequests": 0,
+      "websocketCount": 0,
+      "navigationError": null,
+      "errors": {
+        "console": [],
+        "page": [],
+        "http": [],
+        "failedRequests": []
+      },
+      "resources": [
+        {
+          "path": "/preview",
+          "external": false,
+          "type": "Document",
+          "bytes": 5786,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/636a5ac981f94f8b-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 27572,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/e4af272ccee01ff0-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 48732,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/css/ac1bb55d7b29a100.css",
+          "external": false,
+          "type": "Stylesheet",
+          "bytes": 11339,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/webpack-607c9c7b4c24692e.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 2068,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/0bdf0dc0-8a55cec99697e4b3.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 63736,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/544-cc4ffcb304165eb0.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 66429,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/main-app-7647c632f06cc4d7.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 860,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/829-f724e9bb48223144.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 3959,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/preview/layout-171ecf250be338f3.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 1784,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/preview/page-ea5124e1c4a0207e.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 539,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/preview/booking",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 704,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/preview/dashboard",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 704,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/preview/landing",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 702,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/preview/booking",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 1886,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/preview/dashboard",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 4381,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/preview/landing",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 9348,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/541-844230a5253ef750.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 10485,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/85-cfe13167284b0921.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 7958,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/preview/booking/page-1116bb6249e4e9f1.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 3317,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/758-04488edb7753d420.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 2976,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/preview/landing/page-4ffc191ecc4b560c.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 478,
+          "finished": true,
+          "status": 200
+        }
+      ]
+    },
+    {
+      "route": "/preview/landing",
+      "sample": 1,
+      "status": 200,
+      "timing": {
+        "ttfbMs": 4.299999998882413,
+        "firstByteFromNavigationMs": 5.5,
+        "domContentLoadedMs": 608.5,
+        "loadMs": 1596.4000000003725,
+        "fcpMs": 848,
+        "lcpObservedMs": 848,
+        "documentTransferBytes": 17366
+      },
+      "requests": 23,
+      "transferBytes": 286000,
+      "javascriptRequests": 13,
+      "javascriptTransferBytes": 170919,
+      "unfinishedRequests": 0,
+      "externalRequests": 0,
+      "websocketCount": 0,
+      "navigationError": null,
+      "errors": {
+        "console": [],
+        "page": [],
+        "http": [],
+        "failedRequests": []
+      },
+      "resources": [
+        {
+          "path": "/preview/landing",
+          "external": false,
+          "type": "Document",
+          "bytes": 17541,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/636a5ac981f94f8b-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 27572,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/e4af272ccee01ff0-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 48732,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/css/ac1bb55d7b29a100.css",
+          "external": false,
+          "type": "Stylesheet",
+          "bytes": 11339,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/webpack-607c9c7b4c24692e.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 2068,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/0bdf0dc0-8a55cec99697e4b3.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 63736,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/544-cc4ffcb304165eb0.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 66429,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/main-app-7647c632f06cc4d7.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 860,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/829-f724e9bb48223144.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 3959,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/preview/layout-171ecf250be338f3.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 1784,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/541-844230a5253ef750.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 10485,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/758-04488edb7753d420.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 2976,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/preview/landing/page-4ffc191ecc4b560c.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 478,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/preview",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 695,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/preview/booking",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 704,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/onboarding",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 697,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/preview",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 4044,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/preview/booking",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 1886,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/onboarding",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 1871,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/preview/page-ea5124e1c4a0207e.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 539,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/85-cfe13167284b0921.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 7958,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/preview/booking/page-1116bb6249e4e9f1.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 3317,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/onboarding/page-60f5c6a7bd0dcd9c.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 6330,
+          "finished": true,
+          "status": 200
+        }
+      ]
+    },
+    {
+      "route": "/preview/landing",
+      "sample": 2,
+      "status": 200,
+      "timing": {
+        "ttfbMs": 3.400000000372529,
+        "firstByteFromNavigationMs": 4.400000000372529,
+        "domContentLoadedMs": 608.5999999996275,
+        "loadMs": 1604.5,
+        "fcpMs": 808,
+        "lcpObservedMs": 808,
+        "documentTransferBytes": 17366
+      },
+      "requests": 23,
+      "transferBytes": 286000,
+      "javascriptRequests": 13,
+      "javascriptTransferBytes": 170919,
+      "unfinishedRequests": 0,
+      "externalRequests": 0,
+      "websocketCount": 0,
+      "navigationError": null,
+      "errors": {
+        "console": [],
+        "page": [],
+        "http": [],
+        "failedRequests": []
+      },
+      "resources": [
+        {
+          "path": "/preview/landing",
+          "external": false,
+          "type": "Document",
+          "bytes": 17541,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/636a5ac981f94f8b-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 27572,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/e4af272ccee01ff0-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 48732,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/css/ac1bb55d7b29a100.css",
+          "external": false,
+          "type": "Stylesheet",
+          "bytes": 11339,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/webpack-607c9c7b4c24692e.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 2068,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/0bdf0dc0-8a55cec99697e4b3.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 63736,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/544-cc4ffcb304165eb0.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 66429,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/main-app-7647c632f06cc4d7.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 860,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/829-f724e9bb48223144.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 3959,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/preview/layout-171ecf250be338f3.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 1784,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/541-844230a5253ef750.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 10485,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/758-04488edb7753d420.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 2976,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/preview/landing/page-4ffc191ecc4b560c.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 478,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/preview",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 695,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/preview/booking",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 704,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/onboarding",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 697,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/preview",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 4044,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/preview/booking",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 1886,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/onboarding",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 1871,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/preview/page-ea5124e1c4a0207e.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 539,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/85-cfe13167284b0921.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 7958,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/preview/booking/page-1116bb6249e4e9f1.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 3317,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/onboarding/page-60f5c6a7bd0dcd9c.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 6330,
+          "finished": true,
+          "status": 200
+        }
+      ]
+    },
+    {
+      "route": "/preview/landing",
+      "sample": 3,
+      "status": 200,
+      "timing": {
+        "ttfbMs": 5.099999999627471,
+        "firstByteFromNavigationMs": 6.099999999627471,
+        "domContentLoadedMs": 609.0999999996275,
+        "loadMs": 1595.199999999255,
+        "fcpMs": 828,
+        "lcpObservedMs": 828,
+        "documentTransferBytes": 17366
+      },
+      "requests": 23,
+      "transferBytes": 286000,
+      "javascriptRequests": 13,
+      "javascriptTransferBytes": 170919,
+      "unfinishedRequests": 0,
+      "externalRequests": 0,
+      "websocketCount": 0,
+      "navigationError": null,
+      "errors": {
+        "console": [],
+        "page": [],
+        "http": [],
+        "failedRequests": []
+      },
+      "resources": [
+        {
+          "path": "/preview/landing",
+          "external": false,
+          "type": "Document",
+          "bytes": 17541,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/636a5ac981f94f8b-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 27572,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/e4af272ccee01ff0-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 48732,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/css/ac1bb55d7b29a100.css",
+          "external": false,
+          "type": "Stylesheet",
+          "bytes": 11339,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/webpack-607c9c7b4c24692e.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 2068,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/0bdf0dc0-8a55cec99697e4b3.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 63736,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/544-cc4ffcb304165eb0.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 66429,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/main-app-7647c632f06cc4d7.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 860,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/829-f724e9bb48223144.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 3959,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/preview/layout-171ecf250be338f3.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 1784,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/541-844230a5253ef750.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 10485,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/758-04488edb7753d420.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 2976,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/preview/landing/page-4ffc191ecc4b560c.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 478,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/preview",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 695,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/preview/booking",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 704,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/onboarding",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 697,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/preview",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 4044,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/preview/booking",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 1886,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/onboarding",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 1871,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/preview/page-ea5124e1c4a0207e.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 539,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/85-cfe13167284b0921.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 7958,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/preview/booking/page-1116bb6249e4e9f1.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 3317,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/onboarding/page-60f5c6a7bd0dcd9c.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 6330,
+          "finished": true,
+          "status": 200
+        }
+      ]
+    },
+    {
+      "route": "/",
+      "sample": 1,
+      "status": 200,
+      "timing": {
+        "ttfbMs": 8.099999999627471,
+        "firstByteFromNavigationMs": 9.900000000372529,
+        "domContentLoadedMs": 609,
+        "loadMs": 1587,
+        "fcpMs": 804,
+        "lcpObservedMs": 804,
+        "documentTransferBytes": 16872
+      },
+      "requests": 17,
+      "transferBytes": 274419,
+      "javascriptRequests": 9,
+      "javascriptTransferBytes": 157321,
+      "unfinishedRequests": 0,
+      "externalRequests": 0,
+      "websocketCount": 0,
+      "navigationError": null,
+      "errors": {
+        "console": [],
+        "page": [],
+        "http": [],
+        "failedRequests": []
+      },
+      "resources": [
+        {
+          "path": "/",
+          "external": false,
+          "type": "Document",
+          "bytes": 17046,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/636a5ac981f94f8b-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 27572,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/e4af272ccee01ff0-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 48732,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/css/ac1bb55d7b29a100.css",
+          "external": false,
+          "type": "Stylesheet",
+          "bytes": 11339,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/webpack-607c9c7b4c24692e.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 2068,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/0bdf0dc0-8a55cec99697e4b3.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 63736,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/544-cc4ffcb304165eb0.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 66429,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/main-app-7647c632f06cc4d7.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 860,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/829-f724e9bb48223144.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 3959,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/541-844230a5253ef750.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 10485,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/758-04488edb7753d420.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 2976,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/page-06871a70d406c6bd.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 478,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 682,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/onboarding",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 697,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 9159,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/onboarding",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 1871,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/onboarding/page-60f5c6a7bd0dcd9c.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 6330,
+          "finished": true,
+          "status": 200
+        }
+      ]
+    },
+    {
+      "route": "/",
+      "sample": 2,
+      "status": 200,
+      "timing": {
+        "ttfbMs": 2.400000000372529,
+        "firstByteFromNavigationMs": 3.300000000745058,
+        "domContentLoadedMs": 608.5,
+        "loadMs": 1606.5999999996275,
+        "fcpMs": 792,
+        "lcpObservedMs": 792,
+        "documentTransferBytes": 16872
+      },
+      "requests": 17,
+      "transferBytes": 274419,
+      "javascriptRequests": 9,
+      "javascriptTransferBytes": 157321,
+      "unfinishedRequests": 0,
+      "externalRequests": 0,
+      "websocketCount": 0,
+      "navigationError": null,
+      "errors": {
+        "console": [],
+        "page": [],
+        "http": [],
+        "failedRequests": []
+      },
+      "resources": [
+        {
+          "path": "/",
+          "external": false,
+          "type": "Document",
+          "bytes": 17046,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/636a5ac981f94f8b-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 27572,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/e4af272ccee01ff0-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 48732,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/css/ac1bb55d7b29a100.css",
+          "external": false,
+          "type": "Stylesheet",
+          "bytes": 11339,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/webpack-607c9c7b4c24692e.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 2068,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/0bdf0dc0-8a55cec99697e4b3.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 63736,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/544-cc4ffcb304165eb0.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 66429,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/main-app-7647c632f06cc4d7.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 860,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/829-f724e9bb48223144.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 3959,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/541-844230a5253ef750.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 10485,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/758-04488edb7753d420.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 2976,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/page-06871a70d406c6bd.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 478,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 682,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/onboarding",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 697,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 9159,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/onboarding",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 1871,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/onboarding/page-60f5c6a7bd0dcd9c.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 6330,
+          "finished": true,
+          "status": 200
+        }
+      ]
+    },
+    {
+      "route": "/",
+      "sample": 3,
+      "status": 200,
+      "timing": {
+        "ttfbMs": 4,
+        "firstByteFromNavigationMs": 4.900000000372529,
+        "domContentLoadedMs": 608.3000000007451,
+        "loadMs": 1581.4000000003725,
+        "fcpMs": 808,
+        "lcpObservedMs": 808,
+        "documentTransferBytes": 16872
+      },
+      "requests": 17,
+      "transferBytes": 274419,
+      "javascriptRequests": 9,
+      "javascriptTransferBytes": 157321,
+      "unfinishedRequests": 0,
+      "externalRequests": 0,
+      "websocketCount": 0,
+      "navigationError": null,
+      "errors": {
+        "console": [],
+        "page": [],
+        "http": [],
+        "failedRequests": []
+      },
+      "resources": [
+        {
+          "path": "/",
+          "external": false,
+          "type": "Document",
+          "bytes": 17046,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/636a5ac981f94f8b-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 27572,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/media/e4af272ccee01ff0-s.p.woff2",
+          "external": false,
+          "type": "Font",
+          "bytes": 48732,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/css/ac1bb55d7b29a100.css",
+          "external": false,
+          "type": "Stylesheet",
+          "bytes": 11339,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/webpack-607c9c7b4c24692e.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 2068,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/0bdf0dc0-8a55cec99697e4b3.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 63736,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/544-cc4ffcb304165eb0.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 66429,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/main-app-7647c632f06cc4d7.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 860,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/829-f724e9bb48223144.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 3959,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/541-844230a5253ef750.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 10485,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/758-04488edb7753d420.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 2976,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/page-06871a70d406c6bd.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 478,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 682,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/onboarding",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 697,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 9159,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/onboarding",
+          "external": false,
+          "type": "Fetch",
+          "bytes": 1871,
+          "finished": true,
+          "status": 200
+        },
+        {
+          "path": "/_next/static/chunks/app/onboarding/page-60f5c6a7bd0dcd9c.js",
+          "external": false,
+          "type": "Script",
+          "bytes": 6330,
+          "finished": true,
+          "status": 200
+        }
+      ]
+    }
+  ]
+}
