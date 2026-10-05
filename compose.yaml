@@ -1,3 +1,10 @@
+# Compose único do agendaPIX (funciona com `podman compose` e `docker compose`).
+#
+#   Banco para desenvolvimento:    podman compose up -d --wait postgres   (ou: pnpm db:up)
+#   App completo (imagem de prod): podman compose --profile app up -d --build
+#
+# Todas as credenciais vêm do arquivo .env (copie de .env.example). Nada é publicado fora de 127.0.0.1.
+
 services:
   postgres:
     image: docker.io/library/postgres:17-alpine
@@ -14,6 +21,37 @@ services:
       interval: 2s
       timeout: 5s
       retries: 20
+    restart: unless-stopped
+
+  # Aplica as migrations pendentes uma vez e termina (mesma imagem do app).
+  migrate:
+    profiles: ["app"]
+    build: .
+    image: agendapix:local
+    command: ["node", "migrate.cjs"]
+    environment:
+      # Dentro da rede do compose o banco é o serviço "postgres". A senha não pode ter caracteres
+      # reservados de URL (@ : / ? #) ou precisa estar percent-encoded.
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    profiles: ["app"]
+    build: .
+    image: agendapix:local
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    ports:
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
 
 volumes:
