@@ -52,3 +52,7 @@ T1 concluir contrato/origens/CORS da composição escolhida; T2/T4/T5 integrar c
 ## Revalidação posterior — B02 e fundamentos implementados
 
 O relatório acima preserva a auditoria somente leitura em cafc5b2. Em tarefa posterior autorizada pelo Hermes:29f3b75/1332daa corrigiram whitelist/CORS e fixture operacional; revisão B02 OK. Provas HTTP de sessão,preflights,GET/PUT/DELETE Pix e origem externa confirmadas com dados sintéticos. c407968 adicionou contador atômico PostgreSQL e/api/ready;82unit/27DB/build/lint/typecheck aprovados. Ready200 verificado com DB/SMTP configurados, sem envio de e-mail;11 chamadas com data passada produziram10x409+429/Retry60,sem criar reserva/cobrança. Endpoint onboarding segue ausente (contrato F01 definido). Pix bancário segue bloqueador independente. A tabela inicial não descreve o estado posterior dessas correções.
+
+## Atualização 2026-10-05 — `feat/dashboard-v2`
+
+O painel do dono passou a viver no **mesmo app** que as rotas `app/api/**` acima. As rotas HTTP listadas nesta verificação permanecem; o painel não as apaga. Sessão administrativa deixa de depender de HTTP cross-origin para `/api/auth/get-session` e usa `getAuth().api.getSession` no servidor. Páginas `/dashboard/*` e Server Actions ficam no App Router; isolamento tenant coberto por testes. Esta nota não substitui a auditoria HTTP original de 2026-10-04.

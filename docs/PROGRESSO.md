@@ -1,5 +1,13 @@
 # PROGRESSO
 
+## 2026-10-05 — Painel do dono em app único (`feat/dashboard-v2`)
+
+- Base: `origin/feat/backend`. Branch nova `feat/dashboard-v2` (não altera PR #1 / `feat/dashboard`).
+- Portado o painel (agenda, serviços, clientes, funcionamento, login, visual v2) preservando APIs e `lib/auth.ts` do backend.
+- Sessão do dono via Better Auth in-process; isolamento por negócio com testes unitários + integração PostgreSQL + e2e Playwright.
+- Nota: `feat/conversion` tem `/dashboard` placeholder que colide com este painel — não alterada nesta entrega.
+- Nota: `feat/tests` (~414 artefatos QA) não foi mexida.
+
 ## Integração do Cursor Tech Lead — 2026-10-03
 
 Configurado no Maestri o agente persistente `cursor-tech-lead`, conectado a T2–T6. Papel consultivo de Tech Lead / Integration Architect, classificação `OK` / `MELHORAR` / `BLOQUEIA` e fluxo de revisão cruzada registrados em `AGENTS.md` e `docs/EQUIPE.md`. Nenhum código do produto foi alterado. A configuração não executou auditoria de código nem testes.
