@@ -281,7 +281,7 @@ export function StepSlot({
             className={cn("pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l from-surface to-transparent transition-opening", canScrollRight ? "opacity-100" : "opacity-0")}
             aria-hidden="true"
           />
-          <div ref={rulerRef} className="flex snap-x gap-2 overflow-x-auto scroll-smooth p-1 scrollbar-hide" role="group" aria-label="Selecione uma data">
+          <div ref={rulerRef} className="flex snap-x gap-2 overflow-x-auto scroll-smooth scroll-px-1 p-1 scrollbar-hide" role="group" aria-label="Selecione uma data">
             {days.map((day, index) => {
               const isCurrent = day.dateString === selectedDate;
               const count = daySlotCounts[day.dateString];
