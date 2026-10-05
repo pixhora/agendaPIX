@@ -7,7 +7,7 @@ import { hash } from "../bookings/service";
 import { HttpError, MAX_BODY_BYTES, readBody } from "../http";
 import { applyPaidEvent } from "./apply-paid";
 import { getPaymentProvider } from "./index";
-import { paidEventSchema, type PaidEvent, type PaymentProvider } from "./provider";
+import { IgnoredWebhookEvent, paidEventSchema, type PaidEvent, type PaymentProvider } from "./provider";
 
 type Database = NodePgDatabase<typeof schema>;
 
@@ -23,9 +23,9 @@ export async function verifyWebhookDelivery(request: Request, providerName: stri
   const body = await readBody(request);
   let event: PaidEvent;
   try {
-    event = paidEventSchema.parse(await paymentProvider.verifyWebhook(body, request.headers, now));
+    event = paidEventSchema.parse(await paymentProvider.verifyWebhook(body, request.headers, now, request.url));
   } catch (error) {
-    if (error instanceof HttpError) throw error;
+    if (error instanceof HttpError || error instanceof IgnoredWebhookEvent) throw error;
     if (error instanceof z.ZodError || error instanceof SyntaxError) throw new HttpError(400, "invalid_event", "Evento inválido.");
     throw new HttpError(401, "invalid_signature", "Assinatura inválida ou vencida.");
   }
@@ -33,7 +33,14 @@ export async function verifyWebhookDelivery(request: Request, providerName: stri
 }
 
 export async function processWebhook(request: Request, providerName: string, database: Database = getDb(), provider?: PaymentProvider, now = new Date()) {
-  const verified = await verifyWebhookDelivery(request, providerName, provider, now);
+  let verified: Awaited<ReturnType<typeof verifyWebhookDelivery>>;
+  try {
+    verified = await verifyWebhookDelivery(request, providerName, provider, now);
+  } catch (error) {
+    // Autenticado, mas não é evento de pagamento: 200 sem escrita (evita o gateway pausar a fila).
+    if (error instanceof IgnoredWebhookEvent) return { outcome: "ignored", reason: "unsupported_event" };
+    throw error;
+  }
   const { event } = verified;
   try {
     return await database.transaction(async (transaction) => {

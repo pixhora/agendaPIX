@@ -30,16 +30,43 @@ async function withTimeout<T>(config: PaymentsConfig, run: (signal: AbortSignal)
  * Uma passagem de reconciliação. Segura advisory lock de sessão para que vários
  * processos possam rodar em paralelo com segurança (um trabalha, os outros saem).
  */
+/**
+ * Quando o gateway está indisponível (ex.: produção sem Mercado Pago), ainda assim libera
+ * horários e marca cobranças creating/pending vencidas — sem falhar o processo inteiro.
+ */
+async function expireLocalHolds(database: Database, now: Date, batchSize: number, report: ReconcileReport) {
+  const due = await database.select().from(schema.payments).where(and(
+    inArray(schema.payments.status, ["creating", "pending"]),
+    lte(schema.payments.expiresAt, now),
+  )).limit(batchSize);
+  const businessIds = [...new Set(due.map((row) => row.businessId))];
+  for (const businessId of businessIds) {
+    await database.transaction(async (tx) => {
+      await lockBusiness(tx, businessId);
+      await expirePending(tx, businessId, now);
+    });
+  }
+  report.stuckCancelled += due.filter((row) => row.status === "creating").length;
+  report.expiredCancelled += due.filter((row) => row.status === "pending").length;
+}
+
 export async function reconcileOnce(
   database?: PoolDatabase,
-  provider?: PaymentProvider,
+  provider?: PaymentProvider | null,
   config?: PaymentsConfig,
   now = new Date(),
 ): Promise<ReconcileReport> {
   const { getDb } = await import("../../db");
   database ??= getDb() as PoolDatabase;
-  provider ??= getPaymentProvider();
   config ??= paymentsConfig();
+  let activeProvider: PaymentProvider | null = provider === undefined ? null : provider;
+  if (provider === undefined) {
+    try { activeProvider = getPaymentProvider(); }
+    catch {
+      // Sem provedor configurado: segue só com passos locais (expirar holds / creating).
+      activeProvider = null;
+    }
+  }
   const report: ReconcileReport = { stuckRetried: 0, stuckCancelled: 0, expiredCancelled: 0, polledPaid: 0, audits: 0, skippedLock: false };
   // Lock de sessão exige a mesma conexão PG durante toda a passagem (o Pool do Drizzle alternaria conexões).
   const client: PoolClient = await database.$client.connect();
@@ -49,9 +76,13 @@ export async function reconcileOnce(
     const { drizzle } = await import("drizzle-orm/node-postgres");
     const scoped: Database = drizzle(client, { schema });
     try {
-      report.stuckRetried += await retryStuckCreating(scoped, provider, config, now, report);
-      report.expiredCancelled += await cancelExpiredPending(scoped, provider, config, now, report);
-      report.polledPaid += await pollPendingForMissedWebhooks(scoped, provider, config, now, report);
+      if (!activeProvider) {
+        await expireLocalHolds(scoped, now, config.RECONCILE_BATCH_SIZE, report);
+        return report;
+      }
+      report.stuckRetried += await retryStuckCreating(scoped, activeProvider, config, now, report);
+      report.expiredCancelled += await cancelExpiredPending(scoped, activeProvider, config, now, report);
+      report.polledPaid += await pollPendingForMissedWebhooks(scoped, activeProvider, config, now, report);
     } finally {
       await client.query("SELECT pg_advisory_unlock($1)", [RECONCILE_LOCK_KEY]);
     }

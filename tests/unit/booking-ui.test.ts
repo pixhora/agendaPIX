@@ -3,7 +3,9 @@ import {
   formatCurrency,
   formatDuration,
   formatPhoneMask,
+  formatCpfMask,
   isValidBrazilianPhone,
+  isValidCpf,
   normalizePhoneToE164,
   formatTimeSlot,
   formatDateFull,
@@ -52,6 +54,15 @@ describe("Booking UI formatters and helpers", () => {
     expect(normalizePhoneToE164("5511987654321")).toBe("+5511987654321");
   });
 
+  it("applies CPF mask and validates check digits", () => {
+    expect(formatCpfMask("52998224725")).toBe("529.982.247-25");
+    expect(formatCpfMask("529982247")).toBe("529.982.247");
+    expect(isValidCpf("529.982.247-25")).toBe(true);
+    expect(isValidCpf("52998224725")).toBe(true);
+    expect(isValidCpf("111.111.111-11")).toBe(false);
+    expect(isValidCpf("123")).toBe(false);
+  });
+
   it("formats time slots and full dates with given timezone", () => {
     const iso = "2026-10-02T18:30:00.000Z";
     const timezone = "America/Sao_Paulo";
@@ -60,5 +71,43 @@ describe("Booking UI formatters and helpers", () => {
 
     const dateFormatted = formatDateFull(iso, timezone);
     expect(dateFormatted).toContain("outubro");
+  });
+});
+
+import { pixUiPhase, isPixQrUsable } from "../../components/booking/pix-status";
+
+describe("Pix UI status helpers (contrato PixCharge)", () => {
+  it("maps booking/payment statuses to pending|paid|expired|cancelled", () => {
+    expect(pixUiPhase({ status: "pending_payment", payment: { status: "pending" } as never })).toBe("pending");
+    expect(pixUiPhase({ status: "confirmed", payment: { status: "paid" } as never })).toBe("paid");
+    expect(pixUiPhase({ status: "pending_payment", payment: { status: "paid" } as never })).toBe("paid");
+    expect(pixUiPhase({ status: "expired", payment: { status: "expired" } as never })).toBe("expired");
+    expect(pixUiPhase({ status: "pending_payment", payment: { status: "expired" } as never })).toBe("expired");
+    expect(pixUiPhase({ status: "cancelled", payment: { status: "cancelled" } as never })).toBe("cancelled");
+    expect(pixUiPhase({ status: "pending_payment", payment: { status: "failed" } as never })).toBe("cancelled");
+  });
+
+  it("accepts only PNG data URLs with copyPaste while pending", () => {
+    expect(
+      isPixQrUsable({
+        status: "pending",
+        qrCodeDataUrl: "data:image/png;base64,abc",
+        copyPaste: "FAKE-PIX-NOT-PAYABLE:x",
+      }),
+    ).toBe(true);
+    expect(
+      isPixQrUsable({
+        status: "pending",
+        qrCodeDataUrl: "data:image/svg+xml;utf8,<svg/>",
+        copyPaste: "FAKE-PIX-NOT-PAYABLE:x",
+      }),
+    ).toBe(false);
+    expect(
+      isPixQrUsable({
+        status: "expired",
+        qrCodeDataUrl: "data:image/png;base64,abc",
+        copyPaste: "FAKE-PIX-NOT-PAYABLE:x",
+      }),
+    ).toBe(false);
   });
 });

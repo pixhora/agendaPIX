@@ -21,7 +21,7 @@ describe("disponibilidade pública", () => {
     expect(slots).toEqual([]);
   });
   it("rejeita preço fornecido pelo cliente e data sem fuso", () => {
-    const body = { serviceId: "550e8400-e29b-41d4-a716-446655440000", startsAt: "2030-01-01T12:00:00Z", customer: { name: "Cliente", phone: "+5511999999999" } };
+    const body = { serviceId: "550e8400-e29b-41d4-a716-446655440000", startsAt: "2030-01-01T12:00:00Z", customer: { name: "Cliente", phone: "+5511999999999" , cpfCnpj: "52998224725" } };
     expect(bookingInputSchema.safeParse({ ...body, priceCents: 1 }).success).toBe(false);
     expect(bookingInputSchema.safeParse({ ...body, startsAt: "2030-01-01T12:00:00" }).success).toBe(false);
     expect(bookingInputSchema.parse({ ...body, startsAt: "2030-01-01T09:00:00-03:00" }).startsAt).toBe("2030-01-01T12:00:00.000Z");
