@@ -45,8 +45,8 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
-      - name: Bundle migrator
-        run: pnpm build:migrate
+      - name: Bundle process entrypoints (migrate, reconcile)
+        run: pnpm build:bundles
 
   test-db:
     name: test:db (Postgres 17)
@@ -91,7 +91,9 @@ jobs:
         run: |
           secret="$(openssl rand -base64 32)"; echo "::add-mask::$secret"; echo "BETTER_AUTH_SECRET=$secret" >> "$GITHUB_ENV"
           secret="$(openssl rand -hex 32)"; echo "::add-mask::$secret"; echo "FAKE_WEBHOOK_SECRET=$secret" >> "$GITHUB_ENV"
-      - name: Apply migrations (drizzle-kit)
+      - name: Apply migrations (per-file migrator)
+        run: pnpm db:migrate
+      - name: Migrator is idempotent
         run: pnpm db:migrate
       - run: pnpm test:db
 
@@ -134,11 +136,13 @@ jobs:
           tags: agendapix:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Run migrations from the image
+      - name: Run migrations from the image (twice, second run is a no-op)
         run: |
-          docker run --rm --network host \
-            -e DATABASE_URL=postgresql://agenda@localhost:5432/agenda \
-            agendapix:ci node migrate.cjs
+          for _ in 1 2; do
+            docker run --rm --network host \
+              -e DATABASE_URL=postgresql://agenda@localhost:5432/agenda \
+              agendapix:ci node migrate.cjs
+          done
       - name: Start app container
         run: |
           docker run -d --name agendapix --network host \
@@ -166,6 +170,27 @@ jobs:
           if [ "$ready" != 404 ]; then test "$ready" = 200; fi
           docker exec agendapix id -u | grep -qv '^0$'
           echo "Image size: $(docker image inspect agendapix:ci --format '{{.Size}}' | numfmt --to=iec)"
+      - name: Reconciliation worker
+        run: |
+          # reconcile.mjs só existe na imagem quando o backend traz scripts/reconcile.ts (PR #7).
+          if ! docker run --rm --entrypoint test agendapix:ci -f /app/reconcile.mjs; then
+            echo "reconcile.mjs ausente nesta versão; etapa ignorada"; exit 0
+          fi
+          # Uma passagem real contra o banco (provedor fake só fora de NODE_ENV=production).
+          docker run --rm --network host \
+            -e NODE_ENV=development \
+            -e DATABASE_URL=postgresql://agenda@localhost:5432/agenda \
+            -e PAYMENT_PROVIDER=fake -e FAKE_WEBHOOK_SECRET="$(openssl rand -hex 32)" \
+            agendapix:ci node reconcile.mjs --once --json
+          # Worker em loop, como no compose: precisa continuar de pé.
+          docker run -d --name agendapix-worker --network host \
+            -e DATABASE_URL=postgresql://agenda@localhost:5432/agenda \
+            -e RECONCILE_INTERVAL_SECONDS=5 \
+            agendapix:ci node reconcile.mjs
+          sleep 12
+          docker logs agendapix-worker
+          test "$(docker inspect --format '{{.State.Running}}' agendapix-worker)" = true
+          docker logs agendapix-worker 2>&1 | grep -q 'reconcile: loop'
       - name: Wait for HEALTHCHECK
         run: |
           for _ in $(seq 1 45); do
@@ -176,7 +201,9 @@ jobs:
           exit 1
       - name: Container logs
         if: always()
-        run: docker logs agendapix || true
+        run: |
+          docker logs agendapix || true
+          docker logs agendapix-worker 2>/dev/null || true
 
   audit:
     name: pnpm audit (prod, high)
