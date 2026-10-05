@@ -30,7 +30,7 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: R
         day_button: "inline-flex size-10 items-center justify-center rounded-full font-medium tabular-nums text-ink hover:bg-subtle focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring aria-selected:bg-ink aria-selected:text-paper",
         today: "[&>button]:ring-1 [&>button]:ring-pix [&>button]:font-bold",
         selected: "",
-        outside: "[&>button]:text-muted/70",
+        outside: "[&>button]:text-muted",
         disabled: "[&>button]:opacity-40",
         hidden: "invisible",
         ...classNames,

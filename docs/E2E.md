@@ -24,7 +24,7 @@ Os specs novos importam `test` de `tests/e2e/helpers.ts`, que esconde o indicado
 
 O `webServer` do `playwright.config.ts` sobe `pnpm exec next dev --hostname 127.0.0.1 --port 3344` e força `BETTER_AUTH_URL=http://127.0.0.1:3344`, `PAYMENT_PROVIDER=fake` e `MAGIC_LINK_CAPTURE_FILE=tests/e2e/.auth/magic-link-runtime.txt` (os links mágicos vão para esse arquivo; SMTP não é usado). Fora do CI ele reaproveita um servidor que já esteja na porta.
 
-`tests/e2e/global-setup.ts` cria, a cada execução, dois donos e dois negócios (A com reserva confirmada de hoje às 07:00, B de outro dono), gera a sessão do dono A em `tests/e2e/.auth/owner.json` e grava `meta.json`. Não precisa de seed.
+`tests/e2e/global-setup.ts` cria, a cada execução, dois donos e dois negócios (A com reserva confirmada às 07:00 e uma cancelada às 08:00 no mesmo dia, B de outro dono), gera a sessão do dono A em `tests/e2e/.auth/owner.json` e grava `meta.json`. Não precisa de seed.
 
 ## Requisitos para um job de CI
 
