@@ -1,0 +1,1 @@
+ALTER TABLE "business_pix_keys" ADD CONSTRAINT "business_pix_keys_type_valid" CHECK ("business_pix_keys"."type" IN ('cpf', 'cnpj', 'email', 'phone', 'evp'));

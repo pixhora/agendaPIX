@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, check, foreignKey, index, integer, pgEnum, pgTable, text, time, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, foreignKey, index, integer, jsonb, pgEnum, pgTable, primaryKey, text, time, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 
 export * from "./auth";
@@ -23,6 +23,31 @@ export const businesses = pgTable("businesses", {
   index("businesses_owner_idx").on(table.ownerId),
   check("businesses_name_not_empty", sql`length(trim(${table.name})) > 0`),
   check("businesses_slug_format", sql`${table.slug} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`),
+]);
+
+export const pixKeyTypes = ["cpf", "cnpj", "email", "phone", "evp"] as const;
+
+export const bookingRateLimits = pgTable("booking_rate_limits", {
+  businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "cascade" }),
+  clientHash: text("client_hash").notNull(),
+  windowStartedAt: timestamp("window_started_at", { withTimezone: true }).defaultNow().notNull(),
+  attempts: integer("attempts").notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.businessId, table.clientHash] }),
+  index("booking_rate_window_idx").on(table.windowStartedAt),
+  check("booking_rate_attempts_valid", sql`${table.attempts} BETWEEN 1 AND 10`),
+]);
+export const businessPixKeys = pgTable("business_pix_keys", {
+  businessId: uuid("business_id").primaryKey().references(() => businesses.id, { onDelete: "restrict" }),
+  type: text("type", { enum: pixKeyTypes }).notNull(),
+  ciphertext: text("ciphertext").notNull(),
+  nonce: text("nonce").notNull(),
+  keyVersion: integer("key_version").notNull(),
+  hint: text("hint").notNull(),
+  ...timestamps(),
+}, (table) => [
+  check("business_pix_keys_cipher_valid", sql`length(${table.ciphertext}) > 0 AND length(${table.nonce}) > 0 AND ${table.keyVersion} > 0`),
+  check("business_pix_keys_type_valid", sql`${table.type} IN ('cpf', 'cnpj', 'email', 'phone', 'evp')`),
 ]);
 
 export const services = pgTable("services", {
@@ -139,3 +164,11 @@ export const webhookDeliveries = pgTable("webhook_deliveries", {
   reason: text("reason"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [index("webhook_deliveries_event_idx").on(table.provider, table.eventId)]);
+
+export const onboardingRequests = pgTable("onboarding_requests", {
+  ownerId: text("owner_id").notNull().references(() => user.id, { onDelete: "restrict" }),
+  requestKey: uuid("request_key").notNull(),
+  requestHash: text("request_hash").notNull(),
+  result: jsonb("result").$type<{ businessId: string; slug: string; publicPath: string; serviceId: string }>(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [primaryKey({ columns: [table.ownerId, table.requestKey] })]);

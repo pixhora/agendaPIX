@@ -21,6 +21,7 @@ Tabelas de domínio têm `id`, `created_at` e `updated_at`. Tabelas de auditoria
 | Tabela | Campos principais | Regras |
 | --- | --- | --- |
 | `businesses` | `owner_id`, `name`, `slug`, `timezone` | Dono referencia `user`; slug único em minúsculas, números e hífens; nome não vazio. |
+| `business_pix_keys` | `business_id`, `type`, `ciphertext`, `nonce`, `key_version`, `hint` | Uma chave por negócio; AES-256-GCM; chave mestra só em `PIX_KEY_ENCRYPTION_KEY`; nunca incluir ciphertext ou chave completa em resposta/log. |
 | `services` | `business_id`, `name`, `duration_minutes`, `price_cents`, `deposit_cents`, `active` | Duração positiva; preço e sinal não negativos; sinal não supera preço. |
 | `business_hours` | `business_id`, `weekday`, `opens_at`, `closes_at` | Domingo = 0; sábado = 6; um intervalo por dia; abertura anterior ao fechamento. Ausência do dia significa fechado. |
 | `customers` | `business_id`, `name`, `phone`, `email` opcional | Telefone normalizado em E.164, único dentro do negócio; sem CPF ou endereço. |
@@ -58,9 +59,17 @@ A exclusão de conta e a política de retenção LGPD ainda precisam de definiç
 | `GET /api/auth/magic-link/verify` | Consome link válido e cria sessão. |
 | `GET /api/auth/get-session` | Sessão atual ou ausência de sessão. |
 | `POST /api/auth/sign-out` | Encerra a sessão atual. |
+| `GET /api/businesses/{businessId}/pix-key` | Exige sessão do dono. Retorna `{ configured, type, hint }`; nunca retorna chave nem ciphertext. |
+| `PUT /api/businesses/{businessId}/pix-key` | Exige sessão do dono, origem da aplicação e JSON `{ type, value }`. Valida tipo/chave, cifra com AES-256-GCM e retorna `{ configured, type, hint }`. |
+| `DELETE /api/businesses/{businessId}/pix-key` | Exige sessão do dono e origem da aplicação. Remove chave do negócio; resposta `{ configured: false, type: null, hint: null }`. |
 
 A configuração é validada com Zod quando usada. Build não abre conexão ao banco nem exige segredos.
 Solicitação de link com SMTP inválido falha; nunca simula envio nem revela link no terminal.
+Falhas inesperadas de SMTP/adapter e `APIError` interno no handler de autenticação respondem `500` com `{ "code": "AUTHENTICATION_FAILED", "message": "Não foi possível concluir o acesso. Tente novamente." }`. O hook nativo `onAPIError` transforma erros inesperados antes do catch do Better Call; `onResponse` saneia também respostas 5xx produzidas diretamente por endpoints, preservando status/cookies e forçando JSON com `Cache-Control: no-store`. O console recebe apenas uma mensagem fixa, sem erro bruto, stack, SQL, token ou email. Erros esperados de autenticação conservam status e formato do Better Auth, incluindo validação, origem proibida e redirecionamentos. A verificação de origem fica explicitamente habilitada, inclusive nos testes.
+Falha ao inicializar a configuração de auth/banco responde `503` no Route Handler com `{ "error": { "code": "auth_unavailable", "message": "O acesso está indisponível. Tente novamente mais tarde." } }` e `Cache-Control: no-store`; nenhum segredo/configuração é publicado.
+As rotas de chave Pix respondem `404` para negócio inexistente ou alheio, `401` sem sessão, `403` para origem inválida, `400` para chave inválida e `503` quando a cifra não está configurada. `type` aceita `cpf`, `cnpj`, `email`, `phone` ou `evp`. A chave é normalizada e cifrada com AES-256-GCM antes de persistir; o `business_id` autentica o ciphertext. `hint` contém somente máscara. Configure `PIX_KEY_ENCRYPTION_KEY` com 32 bytes aleatórios em hexadecimal (`openssl rand -hex 32`) fora do repositório. `key_version` atual é 1; trocar a chave exige recriptografar os registros antes da troca. Não use a chave de exemplo em produção. Esta API não cria cobrança Pix nem confirma pagamento.
+
+Um QR estático/copia-e-cola Pix contém a própria chave de recebimento, necessária para o pagador enviar o dinheiro. A chave não deve aparecer no catálogo público; gerá-la como cobrança não prova liquidação. Reserva só confirma por evento autenticado do provedor. Confirmação manual vs. provedor ainda aguarda decisão do humano.
 
 ## Rotas previstas
 
@@ -158,3 +167,58 @@ Aplicar migrations antes do novo código. Reversão: voltar ao código anterior,
 A chave enviada ao provider é derivada da identidade do negócio e da chave do pedido, em formato UUID. Assim, a mesma chave pública usada em negócios diferentes não cruza cobranças.
 O endpoint público não altera o nome de um cliente já cadastrado ao encontrar o mesmo telefone; atualização de cadastro fica a cargo do painel autenticado.
 QR Code e copia-e-cola são retornados somente enquanto a cobrança está pendente e válida; tornam-se `null` após vencimento ou pagamento.
+
+
+## Dados de demonstração
+
+Execute `pnpm db:seed` após `pnpm db:up` e `pnpm db:migrate`. O comando usa o driver Postgres já instalado, sem nova dependência.
+O seed é transacional e idempotente: repetir não duplica dono, negócio, serviços ou horários. Execuções simultâneas são serializadas.
+Não redefine cadastros já existentes, não troca o dono de um slug ocupado e não cria reservas ou pagamentos. Fica bloqueado em produção.
+
+- Negócio: **Barbearia Demo**.
+- Slug: **`barbearia-demo`**. API de serviços: `/api/public/barbearia-demo/services`; página prevista: `/barbearia-demo`.
+- Dono de teste: **`dono-demo@example.com`**.
+- Login: **link mágico, sem senha**. Configure SMTP de testes para capturar o email e solicite `POST /api/auth/sign-in/magic-link` com `{ "email": "dono-demo@example.com", "callbackURL": "/" }`. Abra o link recebido. O domínio `example.com` é fictício; não há caixa de email real nem senha padrão.
+- Funcionamento: segunda a sábado, **09:00–18:00**, no fuso **America/Sao_Paulo**. Domingo fechado.
+
+| Serviço fictício | Duração | Preço em centavos | Sinal em centavos |
+| --- | --- | --- | --- |
+| Corte | 30 minutos | 3500 | 1000 |
+| Barba | 30 minutos | 2500 | 500 |
+| Corte e barba | 60 minutos | 5500 | 1500 |
+
+Preços e horários acima são dados de teste, não uma definição comercial do produto.
+
+## B02 — autoridade auth/Pix e origens locais
+
+Autoridade: http://localhost:3000. Em desenvolvimento, origem exata permitida: localhost na porta3000 (app único). Usar localhost, nunca alternar com127.0.0.1. Em produção somente origem de BETTER_AUTH_URL; portas locais não são automaticamente confiáveis. Cookies Better Auth permanecem HttpOnly, SameSite=Lax e host-only (sem Domain; Secure em HTTPS). Browser deve usar credentials: include; Server Components encaminham Cookie somente à autoridade fixa. Callbacks absolutos das origens permitidas aceitos pela biblioteca.
+
+GET/POST auth e GET/PUT/DELETE pix-key recebem CORS credenciado somente para origem exata permitida. OPTIONS valida origem, método e headers solicitados; devolve204 com Allow-Origin específico, Allow-Credentials:true, Allow-Methods e Allow-Headers(Content-Type,Authorization). Origem externa/método/header alheio responde403 sem Allow-Origin. Respostas têm Vary:Origin e no-store. CORS não substitui sessão, tenant, CSRF ou cifragem; mutações Pix continuam exigindo Origin válido. Chamadas server-side GET sem Origin permanecem permitidas.
+
+Fixture B02: `NODE_ENV=development node scripts/create_backend_fixture.mjs /caminho/privado/fixture.json`. Exige banco local, autoridade localhost3000 e segredo Pix válido; cria somente usuário/negócio/serviço/horários sintéticos e sessão de1h. Arquivo0600 exclusivo contém Cookie/IDs, nunca versionar nem copiar para frontend/logs. Prova sessão/tenant/Pix; não valida link mágico nem entrega SMTP. Cookie do servidor continua sem Domain, sem tornar endpoint público de bypass. Fixture operacional disponível nesta máquina em `/tmp/agenda-backend-b02-fixture.json`; expira em1h.
+
+## F01 — contrato de provisionamento pós-auth (implementado no backend)
+
+Origem de produção única: `BETTER_AUTH_URL` define a origem canônica (protocolo, host e porta). Em produção não são adicionadas portas de desenvolvimento nem domínios de consumidores. O app final deve publicar interface e autoridade nessa mesma origem; :3000 permanece a única autoridade local. Não usar wildcard nem abrir origens extras para contornar a integração.
+
+Migration 0006 é expansiva: adiciona somente `onboarding_requests`, preservando tabelas e dados existentes. Aplicar antes de habilitar POST onboarding. Reversão operacional: voltar ao código anterior e manter a tabela/registro de migration; o código anterior não a utiliza. Não apagar a tabela nem suas chaves/resultados no rollback. Remoção posterior exige tarefa própria de retenção de dados. Prova isolada: `node scripts/verify_onboarding.mjs` aplica migrations duas vezes, testa concorrência/replay/isolamento e remove somente o banco temporário criado pelo próprio script.
+
+Implementado por T1; consumo T5 após aplicar migration 0006 na autoridade. `POST /api/onboarding`, JSON estrito `{business:{name,slug,timezone?},service:{name,durationMinutes,priceCents,depositCents},hours:[{weekday,opensAt,closesAt}]}`. Nome do negócio e serviço com trim,1..120 caracteres; slug1..100 caracteres no padrão /^[a-z0-9]+(-[a-z0-9]+)*$/, rejeitando reservados (login, onboarding, preview, dashboard, api, admin, auth, health, ready, webhooks, _next, static, favicon.ico; case-insensitive); serviço conforme lib/validation/service.ts (inteiros até2147483647); timezone IANA válido, default existente America/Sao_Paulo se omitido; hours com1..7 dias, weekday inteiro0..6 sem duplicatas; horas HH:mm, abertura<fechamento, somente dias escolhidos. Dinheiro em inteiros centavos, preço>=0 e0<=sinal<=preço; duração inteira positiva. Não enviar ownerId, businessId, status, trialEndsAt ou plano; rejeitar campos extras.
+
+Exige sessão Better Auth validada pela autoridade, Origin permitido e `Idempotency-Key` UUIDv4. Derivar ownerId da sessão, nunca do formulário. Criar negócio, primeiro serviço e horários em uma transação: ou todos persistem, ou nenhum. Não criar cobrança/assinatura/chave Pix neste endpoint. Trial/assinatura são contrato separado; não assumir ativação apenas por cadastro.
+
+Primeiro pedido responde201 `{businessId,slug,publicPath,serviceId}` (publicPath=`/[slug]`); replay idêntico por mesmo owner+chave responde200 com o mesmo resultado; mesma chave/corpo diferente409 `idempotency_conflict`; slug indisponível409 `slug_unavailable`. Nenhum replay de outro dono lê tenant alheio. O contrato não impõe limite inventado de negócios por dono. Persistir chave/hash/resultado vinculado ao dono para replay; migration 0006 cria onboarding_requests com chave composta ownerId/requestKey e resultado transacional.
+
+Erros padrão `{error:{code,message}}`:400 entrada,401 sem sessão,403 origem,409 conflito,413 corpo>16KiB,503 infraestrutura; no-store. GET/PUT/DELETE não definidos. Após201/200, T5 exibe link real e pode encaminhar para http://localhost:3000/dashboard (mesmo host da autoridade); não duplicar login/UI nem simular sucesso fora de Preview. Testes cobrem conflito slug com rollback do pedido, replay concorrente e isolamento de dois donos. CORS das APIs públicas e onboarding permite somente as origens locais já contratadas; preflight aceita Idempotency-Key. Nenhum consumidor deve remover APIs locais antes da prova autenticada.
+
+## Antiabuso de reservas
+
+POST reservas mantém corpo/chave e respostas201/200/409. Limite técnico inicial:10 chamadas por minuto para par negócio+origem cliente, contador atômico PostgreSQL (compartilhado por processos). Excesso429 `rate_limited`, Retry-After:60; reenvio com mesma Idempotency-Key preserva idempotência de negócio e não renova reserva, mas também consome o limite de tentativas. Não recriar pedido com nova chave por erro transitório.
+
+Por padrão headers de IP enviados pelo cliente são ignorados e usa-se bucket anônimo por negócio. `BOOKING_TRUST_PROXY=true` habilita somente X-Real-IP válido; usar apenas quando proxy de entrada sobrescreve/remove esse header e impede acesso direto ao Next. Header ausente/inválido volta ao bucket anônimo, sem aceitar X-Forwarded-For arbitrário. Endereço não é armazenado: HMAC com segredo do servidor, combinado ao tenant. Registros obsoletos>24h são removidos oportunisticamente em lotes100; não há corpo/telefone/IP bruto.
+
+Migration aditiva cria apenas contadores, preservando schema/dados existentes. Aplicar antes do novo código; processos antigos continuam compatíveis mas sem limite até atualização. Reversão preferida: voltar ao commit anterior e manter tabela aditiva; remoção da tabela só depois de nenhum novo leitor/escritor ativo, com aprovação operacional. Nunca remover reservas/pagamentos ao reverter.
+
+## Readiness
+
+`GET /api/health` permanece liveness200. `GET /api/ready` (novo):200 `{status:"ready"}` se SELECT1 PostgreSQL e autenticação/conexão SMTP passam;503 `{status:"unavailable"}` em qualquer falha. Sem autenticação, no-store, sem nomes de servidores, credenciais, erros brutos ou PII. Não envia e-mail, não cria cobrança, não testa domínio/remetente ou entrega do destinatário; pagamento bancário continua gate separado.

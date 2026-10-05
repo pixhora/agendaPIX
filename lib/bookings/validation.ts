@@ -1,6 +1,35 @@
 import { z } from "zod";
 
-export const slugSchema = z.string().min(1).max(100).regex(/^[a-z0-9]+(-[a-z0-9]+)*$/);
+/** Slugs de sistema / rotas reservados; fonte única de verdade (comparação case-insensitive). */
+export const RESERVED_BUSINESS_SLUGS = [
+  "login",
+  "onboarding",
+  "preview",
+  "dashboard",
+  "api",
+  "admin",
+  "auth",
+  "health",
+  "ready",
+  "webhooks",
+  "_next",
+  "static",
+  "favicon.ico",
+] as const;
+
+const reservedSlugSet = new Set<string>(RESERVED_BUSINESS_SLUGS.map((slug) => slug.toLowerCase()));
+
+export function isReservedBusinessSlug(slug: string) {
+  return reservedSlugSet.has(slug.toLowerCase());
+}
+
+export const slugSchema = z
+  .string()
+  .min(1)
+  .max(100)
+  .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/)
+  .refine((value) => !isReservedBusinessSlug(value), { message: "slug_reserved" });
+
 export const availabilitySchema = z.object({ serviceId: z.uuid(), date: z.iso.date() }).strict();
 export const bookingInputSchema = z.object({
   serviceId: z.uuid(),

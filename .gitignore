@@ -22,7 +22,7 @@ test-results/
 next-env.d.ts
 __pycache__/
 *.py[cod]
-.maestri/run-system-logs/
+.maestri/
 **/trace.zip
 **/.last-run.json
 *.pem

@@ -22,6 +22,34 @@
       "when": 1790987400913,
       "tag": "0002_prevent_overlapping_bookings",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791077763519,
+      "tag": "0003_thin_johnny_blaze",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791078028455,
+      "tag": "0004_wild_dracula",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791126877511,
+      "tag": "0005_messy_tempest",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791139910473,
+      "tag": "0006_common_doomsday",
+      "breakpoints": true
     }
   ]
 }

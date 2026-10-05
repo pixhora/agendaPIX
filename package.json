@@ -18,7 +18,8 @@
     "db:up": "podman compose up -d --wait",
     "db:down": "podman compose down",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "db:seed": "node --experimental-strip-types db/seed.mjs"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "1.7.7",
