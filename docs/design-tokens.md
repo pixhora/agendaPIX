@@ -22,7 +22,7 @@
 | `--muted` | `#5B5B5F` | `#A3A3A8` | Texto secundário (só texto) |
 | `--line` / `--line-strong` | `#DEDCD6` / `#8D8C88` | `#2C2C2F` / `#6B6B70` | Divisores / borda de campo (3:1 contra a superfície) |
 | `--slab` / `--slab-foreground` / `--slab-muted` | `#0B0B0C` / `#FFF` / `#C9C9CC` | `#000` / `#FFF` / `#B8B8BD` | Placa de Valor e faixas escuras |
-| `--pix` / `--pix-hover` / `--pix-foreground` | `#0B7A6E` / `#096A60` / `#FFF` | `#3FD0BE` / `#5FDCCC` / `#0B0B0C` | Acento único: Pix, dinheiro, estado ativo |
+| `--pix` / `--pix-hover` / `--pix-foreground` | `#0A6E63` / `#085A52` / `#FFF` | `#3FD0BE` / `#5FDCCC` / `#0B0B0C` | Acento único: Pix, dinheiro, estado ativo |
 | `--pix-soft` | `#E8F6F3` | `#10302C` | Fundo de destaque Pix (aviso, próximo atendimento) |
 | `--pix-bright` | `#3FD0BE` | `#3FD0BE` | Ponto "ao vivo" sobre a placa escura |
 | `--success` / `--success-soft` | `#156B3A` / `#E6F4EA` | `#6FD49A` / `#133222` | Confirmado, salvo |
@@ -38,8 +38,8 @@ Aliases shadcn mantidos para compatibilidade: `background`, `foreground`, `prima
 |---|---|---|
 | `ink` sobre `paper` | 18,1:1 | 17,6:1 |
 | `muted` sobre `paper` / `surface` / `subtle` | 6,2 / 6,8 / 5,8:1 | 7,6 / 7,0 / 6,3:1 |
-| `pix` sobre `paper` / `surface` / `pix-soft` | 4,8 / 5,2 / 4,7:1 | 10,0 / 9,2 / 7,4:1 |
-| `pix-foreground` sobre `pix` (botão Pix) | 5,2:1 | 10,3:1 |
+| `pix` sobre `paper` / `surface` / `pix-soft` | 5,6 / 6,1 / 5,5:1 | 10,0 / 9,2 / 7,4:1 |
+| `pix-foreground` sobre `pix` (botão Pix) | 6,1:1 | 10,3:1 |
 | `success` / `warning` / `danger` sobre o `-soft` | 5,8 / 5,7 / 5,6:1 | 7,7 / 8,0 / 7,0:1 |
 | `slab-muted` sobre `slab` | 11,9:1 | — |
 | `line-strong` sobre `surface` (borda de campo, 1.4.11) | 3,4:1 | 3,3:1 |
