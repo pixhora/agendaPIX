@@ -22,14 +22,32 @@ export interface AvailabilityResponse {
   slots: AvailabilitySlot[];
 }
 
+/**
+ * Espelho do contrato público de pagamento (ver docs/CONTRATOS.md + PixCharge).
+ * Status do provider: pending | paid | expired | cancelled.
+ * O DB pode ainda expor creating / failed / refunded / refund_pending na API pública.
+ */
+export type PixPaymentStatus =
+  | "pending"
+  | "paid"
+  | "expired"
+  | "cancelled"
+  | "creating"
+  | "failed"
+  | "refunded"
+  | "refund_pending";
+
 export interface PixPaymentData {
   id: string;
   provider: string;
+  /** Id da cobrança no gateway (order ORDTST…/ORD… no Mercado Pago). */
   externalId: string;
   amountCents: number;
-  status: "pending" | "paid" | "expired" | "failed" | "refunded";
+  status: PixPaymentStatus;
   expiresAt: string;
+  /** PNG gerado no backend a partir do EMV (`data:image/png;base64,…`). */
   qrCodeDataUrl: string | null;
+  /** EMV copia-e-cola (`payment_method.qr_code` no Orders). */
   copyPaste: string | null;
 }
 

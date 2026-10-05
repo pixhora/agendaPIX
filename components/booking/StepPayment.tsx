@@ -3,7 +3,8 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import type { BookingResponse, PaymentStatusResponse } from "./types";
 import { formatCurrency } from "./formatters";
-import { Check, Copy, FlaskConical, Loader2, RefreshCw, Timer, TimerOff } from "lucide-react";
+import { pixUiPhase } from "./pix-status";
+import { Ban, Check, Copy, FlaskConical, Loader2, RefreshCw, Timer, TimerOff } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ValueSlab, StatusChip } from "@/components/ui/value-slab";
@@ -31,7 +32,7 @@ export function StepPayment({
 }: StepPaymentProps) {
   const [copied, setCopied] = useState(false);
   const [timeLeft, setTimeLeft] = useState<string>("");
-  const [isExpired, setIsExpired] = useState(false);
+  const [phase, setPhase] = useState(() => pixUiPhase(booking));
   const [isChecking, setIsChecking] = useState(false);
   const [checkError, setCheckError] = useState<string | null>(null);
 
@@ -40,6 +41,19 @@ export function StepPayment({
 
   const payment = booking.payment;
   const expiresAt = payment?.expiresAt || booking.expiresAt;
+  const isTerminal = phase === "expired" || phase === "cancelled";
+
+  const applyStatus = useCallback(
+    (data: PaymentStatusResponse | null | undefined) => {
+      if (!data) return;
+      const next = pixUiPhase(data);
+      setPhase(next);
+      if (next === "paid" || data.status === "confirmed") {
+        onPaymentConfirmed(data);
+      }
+    },
+    [onPaymentConfirmed],
+  );
 
   // Função para verificar status do pagamento via API pública ou mock
   const checkStatus = useCallback(async () => {
@@ -51,11 +65,7 @@ export function StepPayment({
     try {
       if (checkStatusFn) {
         const data = await checkStatusFn();
-        if (data?.status === "expired" || data?.payment?.status === "expired") {
-          setIsExpired(true);
-        } else if (data?.status === "confirmed") {
-          onPaymentConfirmed(data);
-        }
+        applyStatus(data);
         return;
       }
 
@@ -75,22 +85,18 @@ export function StepPayment({
       }
 
       const data: PaymentStatusResponse = await res.json();
-      if (data.status === "expired" || data?.payment?.status === "expired") {
-        setIsExpired(true);
-      } else if (data.status === "confirmed") {
-        onPaymentConfirmed(data);
-      }
+      applyStatus(data);
     } catch {
       setCheckError("Não foi possível verificar no momento. Tentaremos novamente.");
     } finally {
       setIsChecking(false);
       isCheckingRef.current = false;
     }
-  }, [slug, booking.bookingId, booking.accessToken, onPaymentConfirmed, checkStatusFn]);
+  }, [slug, booking.bookingId, booking.accessToken, checkStatusFn, applyStatus]);
 
   // Atualiza contador regressivo a cada segundo
   useEffect(() => {
-    if (!expiresAt) return;
+    if (!expiresAt || isTerminal) return;
 
     const targetTime = new Date(expiresAt).getTime();
 
@@ -103,7 +109,7 @@ export function StepPayment({
         // Consulta o servidor antes de anunciar a expiração local
         if (!hasCheckedOnExpireRef.current) {
           hasCheckedOnExpireRef.current = true;
-          checkStatus();
+          void checkStatus();
         }
         return;
       }
@@ -119,18 +125,18 @@ export function StepPayment({
     updateTimer();
     const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
-  }, [expiresAt, checkStatus]);
+  }, [expiresAt, checkStatus, isTerminal]);
 
   // Polling automático a cada 4 segundos
   useEffect(() => {
-    if (isExpired) return;
+    if (isTerminal) return;
 
     const interval = setInterval(() => {
-      checkStatus();
+      void checkStatus();
     }, 4000);
 
     return () => clearInterval(interval);
-  }, [checkStatus, isExpired]);
+  }, [checkStatus, isTerminal]);
 
   const handleCopy = async () => {
     if (!payment?.copyPaste) return;
@@ -140,16 +146,29 @@ export function StepPayment({
       toast.success("Código Pix copiado", { description: "Cole no app do seu banco, em Pix › Copia e Cola." });
       setTimeout(() => setCopied(false), 2500);
     } catch {
-      // Fallback para seleção manual
+      // Fallback: o input readonly abaixo permite seleção manual
     }
   };
 
-  if (isExpired) {
+  if (phase === "expired") {
     return (
-      <div role="alert" className="space-y-4 rounded-card border border-danger/30 bg-danger-soft p-6 text-center">
+      <div role="alert" aria-live="assertive" className="space-y-4 rounded-card border border-danger/30 bg-danger-soft p-6 text-center">
         <TimerOff aria-hidden="true" className="mx-auto size-8 text-danger" />
         <h2 className="font-display text-xl font-bold text-ink">Tempo de reserva esgotado</h2>
-        <p className="text-sm text-ink">O prazo de 15 minutos para pagar o sinal acabou e o horário foi liberado para outros clientes.</p>
+        <p className="text-sm text-ink">O prazo para pagar o sinal acabou e o horário foi liberado para outros clientes.</p>
+        <Button onClick={onRestart} size="lg" className="w-full">
+          Fazer novo agendamento
+        </Button>
+      </div>
+    );
+  }
+
+  if (phase === "cancelled") {
+    return (
+      <div role="alert" aria-live="assertive" className="space-y-4 rounded-card border border-danger/30 bg-danger-soft p-6 text-center">
+        <Ban aria-hidden="true" className="mx-auto size-8 text-danger" />
+        <h2 className="font-display text-xl font-bold text-ink">Pagamento cancelado</h2>
+        <p className="text-sm text-ink">Esta cobrança Pix foi cancelada. Escolha outro horário para gerar um novo sinal.</p>
         <Button onClick={onRestart} size="lg" className="w-full">
           Fazer novo agendamento
         </Button>
@@ -158,6 +177,10 @@ export function StepPayment({
   }
 
   const expiresLabel = expiresAt ? formatTimeSlot(expiresAt, summary?.timezone ?? "America/Sao_Paulo") : null;
+  const liveStatus =
+    isChecking
+      ? "Verificando o pagamento…"
+      : "Horário pré-reservado. Aguardando o pagamento do Pix.";
 
   return (
     <div className="space-y-6">
@@ -168,7 +191,7 @@ export function StepPayment({
             <span className="absolute inline-flex size-full animate-ping rounded-full bg-pix opacity-60 motion-reduce:animate-none" />
             <span className="relative inline-flex size-2.5 rounded-full bg-pix" />
           </span>
-          {isChecking ? "Verificando o pagamento…" : "Horário pré-reservado. Aguardando o pagamento do Pix."}
+          {liveStatus}
         </p>
       </div>
 
@@ -204,7 +227,7 @@ export function StepPayment({
 
       <div className="rounded-card border border-line bg-surface p-5 sm:p-6">
         <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-start">
-          {payment?.qrCodeDataUrl ? (
+          {payment?.qrCodeDataUrl?.startsWith("data:image/png;base64,") ? (
             <div className="shrink-0 rounded-2xl border border-line bg-white p-3">
               {/* QR sempre sobre branco, inclusive no modo escuro. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -221,7 +244,7 @@ export function StepPayment({
             </ol>
             {payment?.copyPaste && (
               <div className="space-y-2">
-                <Button type="button" variant="pix" size="lg" onClick={handleCopy} className="w-full">
+                <Button type="button" variant="pix" size="lg" onClick={handleCopy} className="w-full" data-testid="pix-copy-button">
                   {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
                   {copied ? "Código copiado" : "Copiar código Pix"}
                 </Button>
@@ -229,6 +252,7 @@ export function StepPayment({
                 <label htmlFor="pix-copypaste" className="block text-xs font-semibold text-muted">Pix copia e cola</label>
                 <input
                   id="pix-copypaste"
+                  data-testid="pix-copypaste"
                   type="text"
                   readOnly
                   value={payment.copyPaste}
@@ -248,7 +272,7 @@ export function StepPayment({
       )}
 
       <div className="space-y-2">
-        <Button type="button" variant="outline" disabled={isChecking} onClick={checkStatus} className="w-full">
+        <Button type="button" variant="outline" disabled={isChecking} onClick={() => void checkStatus()} className="w-full">
           {isChecking ? <Loader2 aria-hidden="true" className="animate-spin" /> : <RefreshCw aria-hidden="true" />}
           {isChecking ? "Verificando confirmação…" : "Já paguei, verificar agora"}
         </Button>

@@ -172,8 +172,13 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
       .then((paymentData) => {
         if (isCancelled) return;
 
-        // Invariante: expirado permanece expirado
-        if (paymentData.status === "expired" || paymentData.payment?.status === "expired") {
+        // Invariante: expirado/cancelado permanece terminal
+        if (
+          paymentData.status === "expired"
+          || paymentData.status === "cancelled"
+          || paymentData.payment?.status === "expired"
+          || paymentData.payment?.status === "cancelled"
+        ) {
           try {
             sessionStorage.removeItem(`booking_session_${slug}`);
             window.history.replaceState(null, "", publicBookingPagePath(slug));
@@ -520,7 +525,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
           <BookingSummary service={selectedService} slot={selectedSlot} timezone={business.timezone} />
           <p className="mt-4 flex gap-2 px-1 text-xs leading-relaxed text-muted">
             <ShieldCheck aria-hidden="true" className="size-4 shrink-0 text-pix" />
-            Você paga só o sinal agora. O horário fica reservado por 15 minutos enquanto o Pix é feito.
+            Você paga só o sinal agora. O horário fica pré-reservado enquanto o Pix é feito. O prazo aparece no contador da cobrança.
           </p>
         </aside>
       </main>
