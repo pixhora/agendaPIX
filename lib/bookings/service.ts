@@ -6,8 +6,10 @@ import { getDb } from "../../db";
 import * as schema from "../../db/schema";
 import { authEnvSchema } from "../env";
 import { HttpError } from "../http";
+import { paymentsConfig } from "../payments/config";
 import { getPaymentProvider } from "../payments";
-import { pixChargeSchema, type PaymentProvider } from "../payments/provider";
+import { pixChargeSchema, type PaymentProvider, type PixCharge } from "../payments/provider";
+import { callProvider, ProviderTimeoutError } from "../payments/timeout";
 import { availableSlots, localDate } from "./availability";
 import { availabilitySchema, bookingInputSchema, requestKeySchema, slugSchema } from "./validation";
 import { bookingConfig, type BookingConfig } from "./config";
@@ -32,7 +34,11 @@ export async function lockBusiness(database: Database, businessId: string) {
 }
 export async function expirePending(database: Database, businessId: string, now: Date) {
   await database.update(schema.bookings).set({ status: "expired" }).where(and(eq(schema.bookings.businessId, businessId), eq(schema.bookings.status, "pending_payment"), lte(schema.bookings.expiresAt, now)));
-  await database.update(schema.payments).set({ status: "expired" }).where(and(eq(schema.payments.businessId, businessId), eq(schema.payments.status, "pending"), lte(schema.payments.expiresAt, now)));
+  await database.update(schema.payments).set({ status: "expired" }).where(and(
+    eq(schema.payments.businessId, businessId),
+    inArray(schema.payments.status, ["creating", "pending"]),
+    lte(schema.payments.expiresAt, now),
+  ));
 }
 async function businessBySlug(slug: string, database: Database) {
   const [business] = await database.select().from(schema.businesses).where(eq(schema.businesses.slug, slugSchema.parse(slug))).limit(1);
@@ -70,6 +76,42 @@ function paymentView(payment: typeof schema.payments.$inferSelect | undefined, n
   const usable = payment.status === "pending" && payment.expiresAt > now;
   return { id: payment.id, provider: payment.provider, externalId: payment.externalId, amountCents: payment.amountCents, status: payment.status, expiresAt: payment.expiresAt,
     qrCodeDataUrl: usable ? payment.qrCodeDataUrl : null, copyPaste: usable ? payment.copyPaste : null };
+}
+
+/** Anexa QR/externalId somente se o pagamento ainda está em creating (evita corrida com reconciliação/expiração). */
+export async function attachCreatedCharge(database: Database, payment: typeof schema.payments.$inferSelect, charge: PixCharge) {
+  if (charge.amountCents !== payment.amountCents) throw new Error("Cobrança divergente.");
+  const [updated] = await database.update(schema.payments).set({
+    status: "pending", externalId: charge.externalId, qrCodeDataUrl: charge.qrCodeDataUrl, copyPaste: charge.copyPaste,
+    // Mantém o vencimento da reserva (não o do gateway, que pode ser mais longo).
+    expiresAt: payment.expiresAt,
+  }).where(and(eq(schema.payments.businessId, payment.businessId), eq(schema.payments.id, payment.id), eq(schema.payments.status, "creating"))).returning();
+  return updated ?? null;
+}
+
+async function createChargeOutsideTx(payment: typeof schema.payments.$inferSelect, provider: PaymentProvider) {
+  const timeoutMs = paymentsConfig().PAYMENT_PROVIDER_TIMEOUT_MS;
+  try {
+    return pixChargeSchema.parse(await callProvider(timeoutMs, (signal) => provider.createPixCharge({
+      idempotencyKey: payment.idempotencyKey, reference: payment.id, amountCents: payment.amountCents, expiresAt: payment.expiresAt,
+    }, { signal })));
+  } catch (error) {
+    if (error instanceof ProviderTimeoutError) throw new HttpError(503, "payment_unavailable", "Não foi possível criar a cobrança. Tente novamente com a mesma chave.");
+    throw new HttpError(503, "payment_unavailable", "Não foi possível criar a cobrança. Tente novamente com a mesma chave.");
+  }
+}
+
+async function finalizeCreatingPayment(database: Database, payment: typeof schema.payments.$inferSelect, provider: PaymentProvider) {
+  const charge = await createChargeOutsideTx(payment, provider);
+  // Transação curta, sem lock do negócio: só anexa se ainda creating.
+  const attached = await database.transaction(async (transaction) => attachCreatedCharge(transaction, payment, charge));
+  if (!attached) {
+    // Outro processo anexou, expirou ou reconciliou. Recarrega.
+    const [current] = await database.select().from(schema.payments).where(and(eq(schema.payments.businessId, payment.businessId), eq(schema.payments.id, payment.id))).limit(1);
+    if (!current || current.status === "creating") throw new HttpError(503, "payment_unavailable", "Não foi possível criar a cobrança. Tente novamente com a mesma chave.");
+    return current;
+  }
+  return attached;
 }
 async function bookingView(booking: typeof schema.bookings.$inferSelect, database: Database, now: Date) {
   const [payment] = await database.select().from(schema.payments).where(and(eq(schema.payments.businessId, booking.businessId), eq(schema.payments.bookingId, booking.id))).limit(1);
@@ -113,14 +155,18 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
   const business = await businessBySlug(slug, database);
   await consumeBookingRateLimit(database, business.id, clientIdentity, config);
   const clientHash = clientIdentity ? tenantScopedHash("booking-client:v1", business.id, clientIdentity) : null;
-  return database.transaction(async (transaction) => {
+  const paymentProvider = provider ?? (undefined as PaymentProvider | undefined);
+
+  // Transação curta com lock: reserva o horário e, se houver sinal, cria pagamento em "creating" sem chamar o gateway.
+  const reserved = await database.transaction(async (transaction) => {
     await lockBusiness(transaction, business.id);
     const now = new Date();
     await expirePending(transaction, business.id, now);
     const [existing] = await transaction.select().from(schema.bookings).where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.requestKey, requestKey))).limit(1);
     if (existing) {
       if (existing.requestHash !== requestHash) throw new HttpError(409, "idempotency_conflict", "Essa chave já foi usada em outro agendamento.");
-      return { replayed: true, data: { ...await bookingView(existing, transaction, now), accessToken: accessToken(business.id, existing.id) } };
+      const [payment] = await transaction.select().from(schema.payments).where(and(eq(schema.payments.businessId, business.id), eq(schema.payments.bookingId, existing.id))).limit(1);
+      return { kind: "existing" as const, booking: existing, payment, token: accessToken(business.id, existing.id), now };
     }
     const service = await serviceById(business.id, input.serviceId, transaction);
     const date = localDate(new Date(input.startsAt), business.timezone);
@@ -136,18 +182,26 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
       priceCents: service.priceCents, depositCents: service.depositCents, status: expiresAt ? "pending_payment" : "confirmed", expiresAt, createdAt: now }).returning();
     const token = accessToken(business.id, booking.id);
     await transaction.update(schema.bookings).set({ accessTokenHash: hash(token) }).where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.id, booking.id)));
+    let payment: typeof schema.payments.$inferSelect | undefined;
     if (expiresAt) {
-      const paymentProvider = provider ?? getPaymentProvider();
-      let charge;
-      try {
-        charge = pixChargeSchema.parse(await paymentProvider.createPixCharge({ idempotencyKey: chargeIdempotencyKey(business.id, requestKey), amountCents: service.depositCents, expiresAt }));
-        if (charge.amountCents !== service.depositCents || charge.expiresAt.getTime() !== expiresAt.getTime()) throw new Error("Cobrança divergente.");
-      } catch { throw new HttpError(503, "payment_unavailable", "Não foi possível criar a cobrança. Tente novamente com a mesma chave."); }
-      await transaction.insert(schema.payments).values({ businessId: business.id, bookingId: booking.id, provider: paymentProvider.name, externalId: charge.externalId, idempotencyKey: chargeIdempotencyKey(business.id, requestKey),
-        amountCents: charge.amountCents, expiresAt: charge.expiresAt, qrCodeDataUrl: charge.qrCodeDataUrl, copyPaste: charge.copyPaste });
+      const activeProvider = paymentProvider ?? getPaymentProvider();
+      [payment] = await transaction.insert(schema.payments).values({
+        businessId: business.id, bookingId: booking.id, provider: activeProvider.name, idempotencyKey: chargeIdempotencyKey(business.id, requestKey),
+        amountCents: service.depositCents, expiresAt, status: "creating",
+      }).returning();
     }
-    return { replayed: false, data: { ...await bookingView(booking, transaction, now), accessToken: token } };
+    return { kind: "created" as const, booking, payment, token, now, providerName: expiresAt ? (paymentProvider ?? getPaymentProvider()).name : null };
   });
+
+  // Fora de qualquer transação: cobra o gateway. O horário já está preso pela exclusão gist.
+  if (reserved.payment?.status === "creating") {
+    const activeProvider = paymentProvider ?? getPaymentProvider();
+    await finalizeCreatingPayment(database, reserved.payment, activeProvider);
+  }
+
+  const now = new Date();
+  const [booking] = await database.select().from(schema.bookings).where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.id, reserved.booking.id))).limit(1);
+  return { replayed: reserved.kind === "existing", data: { ...await bookingView(booking, database, now), accessToken: reserved.token } };
 }
 
 export async function getBookingPayment(slug: string, id: string, authorization: string | null, database: Database = getDb()) {
