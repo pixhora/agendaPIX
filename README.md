@@ -83,13 +83,35 @@ fica em `127.0.0.1:${APP_PORT:-3000}`. Para SMTP local, `SMTP_HOST` precisa ser 
 Em produção coloque um proxy com HTTPS (Caddy/Traefik do Coolify) na frente da porta 3000 e configure `BETTER_AUTH_URL` com o domínio público.
 A imagem roda com `NODE_ENV=production`, então o provedor Pix simulado (`PAYMENT_PROVIDER=fake`) fica bloqueado e a cobrança responde 503 até existir um gateway real.
 
+### Proxy e antiabuso das reservas (produção)
+
+Com o backend endurecido (PRs #4 e #5) o rate limit e os limites de reservas pendentes usam o IP do cliente informado pelo proxy:
+
+- Rode o app **sempre atrás do proxy**, sem acesso direto à porta 3000 (o compose só publica em `127.0.0.1`), e configure `BOOKING_TRUST_PROXY=true`.
+- O proxy precisa **sobrescrever** `X-Real-IP` com o endereço real do cliente (nunca repassar o valor recebido). Ex.: Nginx `proxy_set_header X-Real-IP $remote_addr;`,
+  Caddy `header_up X-Real-IP {remote_host}` dentro do bloco `reverse_proxy`. No Traefik/Coolify, confirme que o header chega reescrito antes de ativar.
+  Se só houver `X-Forwarded-For`, use `BOOKING_CLIENT_IP_HEADER=x-forwarded-for` e `BOOKING_TRUSTED_PROXY_HOPS` = número de proxies confiáveis.
+- `BOOKING_RATE_LIMIT_*`, `BOOKING_HOLD_MINUTES` e `BOOKING_MAX_PENDING_*` são opcionais (padrões em `.env.example`). Valor inválido deixa o agendamento em `503`
+  de propósito: depois de mudar variáveis, confira uma reserva de teste.
+
+### Ordem de deploy das migrations
+
+Cada versão roda `node migrate.cjs` **antes** do novo código subir. A migration `0007_backend_hardening` (PR #5) precisa ir junto com o código que a usa:
+publique as duas na mesma versão (pre-deployment command aplica a 0007, depois o app novo sobe). Não faça deploy do código do #5 sem a 0007 aplicada.
+
+### Jobs em segundo plano
+
+O job de reconciliação (~1x por minuto) vai rodar **fora do processo web**, com a mesma imagem. O `compose.yaml` já tem um serviço `worker`
+comentado (perfil `app`, sem porta publicada) para quando o script existir; no Coolify a alternativa é uma *Scheduled Task* rodando o comando uma vez por minuto.
+
 ## CI
 
-`.github/workflows/ci.yml` roda em pull requests para `master` e em push no `master`:
+`.github/workflows/ci.yml` roda em todo pull request (a partir do momento em que o workflow existe na branch base), em push no `master` e manualmente (`workflow_dispatch`):
 
 - `checks`: `pnpm install --frozen-lockfile` (cache do store do pnpm), `lint`, `typecheck`, `test`, `build`, `build:migrate`.
 - `test-db`: Postgres 17 como service container, `pnpm db:migrate` e `pnpm test:db` (segredos de teste gerados na hora).
-- `docker`: hadolint, build da imagem, `node migrate.cjs` pela imagem, app no ar e smoke test HTTP + `HEALTHCHECK`.
+- `docker`: hadolint, build da imagem, `node migrate.cjs` pela imagem, app no ar e smoke test HTTP (`/`, `/api/health`, rota pública com banco,
+  `/api/ready` com um SMTP descartável quando a rota existir, usuário não-root) + `HEALTHCHECK`.
 - `audit`: `pnpm audit --prod --audit-level=high`.
 
 ## Autenticação
