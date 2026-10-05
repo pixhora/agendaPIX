@@ -336,7 +336,7 @@ Ordem: fundação → contratos/banco/backend/auth → API pública existente e 
 4. Revisão histórica direcionada a terminal inexistente: remapeada ao Terminal 3 (P01). Não há ok atual registrado.
 5. `main` ausente, branch-base/integracao requer confirmação operacional do humano (P02); nenhum merge desta auditoria.
 6. SMTP real, deploy HTTPS, backup e regras de retenção/exclusão não comprovados (P03/P05/P07).
-7. Trial/assinatura dependem de regras de plano/acesso/renovação aprovadas (P06); preços R$29/R$59 no AGENTS são referência existente, não novos planos definidos aqui.
+7. Trial/assinatura dependem de regras de plano/acesso/renovação aprovadas (P06); preços R$49/R$79 aprovados pelo humano e registrados em docs/PRECOS.md são referência existente, não novos planos definidos aqui.
 
 # FORA DO MVP
 
