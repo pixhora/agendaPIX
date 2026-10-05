@@ -13,7 +13,7 @@ Comandos: `python3 scripts/run_system.py --check` e GETs diretos em 3000/3001/30
 - `GET /api/ready` → 200 `{"status":"ready"}` (DB + SMTP configurados; sem envio de e-mail).
 - `GET /api/public/barbearia-demo/services` → 200, 3 serviços, centavos inteiros (Corte 3500/sinal 1000).
 - `GET /api/public/barbearia-demo/availability?serviceId=...&date=2026-10-06` → 200, 18 slots reais.
-- Porta 3006 (snapshot estático antigo) e túnel trycloudflare anteriores estão MORTOS.
+- Porta 3006 (snapshot estático antigo) e túneis temporários anteriores estão MORTOS.
 - `maestri list` indisponível nesta sessão (`MAESTRI_SOCKET not set`): não reporto por canvas.
 
 ### URLs apresentáveis agora

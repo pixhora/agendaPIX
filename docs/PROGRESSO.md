@@ -100,7 +100,7 @@ Diagnóstico: túnel antigo aponta Next dev Webpack em 3001. Preview inclui 14.4
 
 Mitigação sem interromper agentes: snapshot do frontend commit 9791651 em /tmp/agenda-mobile-production, dependências existentes por symlink, build Webpack de produção aprovado, servidor em 127.0.0.1:3006. JavaScript da mesma rota: 570.633 bytes (redução de aproximadamente 96%). Preview local HTTP200 em 0,033 s; túnel externo HTTP200 com primeira resposta em 0,764 s nesta amostra. Navegação mobile 375px do hub verificada no navegador, sem erros listados. CODEFICADO recebeu comparação com rede lenta.
 
-Link otimizado temporário: https://poison-href-web-later.trycloudflare.com/preview. Servidor dev3001 e túnel anterior preservados. Snapshot é estático no commit informado, não acompanha futuras edições; novos commits exigem reconstrução coordenada. Não é deploy de produção nem prova de Pix bancário real.
+Link de túnel temporário usado naquele dia foi desativado e removido desta nota. Servidor dev3001 e túnel anterior preservados à época. Snapshot é estático no commit informado, não acompanha futuras edições; novos commits exigem reconstrução coordenada. Não é deploy de produção nem prova de Pix bancário real.
 
 ## Launcher local — 2026-10-04
 
@@ -146,7 +146,7 @@ Prisma reclassificou o bloqueio visual de T2-A de BLOQUEIA para OK no commit `71
 
 ## 2026-10-04 — Parecer de integração frontend revalidado
 
-Recebido parecer: `.maestri/roles/b2fc8c28-cd52-468a-b8b8-3e531c43a124/docs/PARECER_INTEGRACAO_FRONTEND.md`. O arquivo lido ainda contém a versão anterior (T4 aberto e nenhum POST); a revalidação recebida por mensagem atualiza T4 para OK em `4269d51`/`d6f523a`, com auth/get-session e webhook 404 em :3001. Não confundir o arquivo anterior com essa prova posterior.
+Recebido parecer de integração frontend via artefato local de agente (não versionado). O arquivo lido ainda contém a versão anterior (T4 aberto e nenhum POST); a revalidação recebida por mensagem atualiza T4 para OK em `4269d51`/`d6f523a`, com auth/get-session e webhook 404 em :3001. Não confundir o arquivo anterior com essa prova posterior.
 
 Integração segue BLOQUEIA: T5 :3005 mantém criação de reserva, auth e webhook locais, booking duplicado e callback fixo; T2 :3343 mantém APIs auth/public/webhooks locais e tokens globais divergentes. OK visual T2-A permanece limitado ao login `7175251`. T1 deve preservar autoridade :3000 e composição com origem única de produção; leitura atual de `lib/origins.ts` confirma que produção aceita somente a origem de BETTER_AUTH_URL, não comprova implantação. T6/T2 ainda têm documentação não rastreada segundo a revalidação. Pendências já encaminhadas pelo autor aos donos; não duplicado o envio.
 

@@ -1,6 +1,6 @@
 # Plano de backend e integração para Hermes
 
-Data: 04/10/2026. Autor: Codex/T1. Worktree: `/var/home/matheus/projetos/agenda-backend`, branch `feat/backend`, base auditada `0d6858f`.
+Data: 04/10/2026. Autor: Codex/T1. Worktree do backend (`feat/backend`), base auditada `0d6858f`.
 
 ## Objetivo e limite
 

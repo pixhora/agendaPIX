@@ -42,4 +42,4 @@ Data: 2026-10-03. Revisão inicial; não equivale a aprovação de produção.
 
 O Tech Lead classificou o recorte de autenticação como **MELHORAR**, sem vulnerabilidade crítica comprovada. Confirmou no código da biblioteca cookies HttpOnly/SameSite=Lax, rejeição de callback externo, expiração de 300 segundos e rate limit do magic link de 5 solicitações por 60 segundos quando o limitador está habilitado. Encontrou ausência de testes próprios de expiração, origem, callback externo e limite. A simulação do login de conversão deve ser removida do fluxo real. Revisão estática não prova entrega SMTP nem segurança completa de tenants/pagamentos; esses gates continuam pendentes.
 
-Relatório fonte local: `.maestri/roles/b2fc8c28-cd52-468a-b8b8-3e531c43a124/AUDITORIA-AUTH.md`. Nenhum teste foi executado pelo revisor.
+Relatório fonte local: auditoria de auth entregue via artefato de agente (não versionado). Nenhum teste foi executado pelo revisor.

@@ -36,7 +36,7 @@ Todos: caveman para mensagens concisas. lean-build para tarefas com risco de esc
 - Codex: `~/.codex/skills`, 13 entradas selecionadas disponíveis.
 - Antigravity atual: `~/.gemini/config/skills`, 11 entradas. Caminho confirmado pela documentação local `agy-customizations`.
 - Cursor: `~/.cursor/skills`, 8 entradas.
-- Registro local: `/var/home/matheus/.agents/agenda-skills-installation.json`.
+- Registro local: arquivo privado do operador em `~/.agents/agenda-skills-installation.json` (não versionado).
 - Foram verificados 32 caminhos nativos com SKILL.md acessível; instalações preexistentes preservadas. Links apontam para pacotes locais completos, com referências/scripts mantidos.
 - Instalação é por cliente e usuário compartilhado. Terminais do mesmo cliente enxergam o mesmo catálogo; a tabela orienta especialização por papel.
 - Skills ficam disponíveis para descoberta no próximo turno. Descoberta automática e uso efetivo por cada sessão precisam de confirmação; nenhuma sessão foi reiniciada.
