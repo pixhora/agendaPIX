@@ -76,8 +76,32 @@ Um QR estático/copia-e-cola Pix contém a própria chave de recebimento, necess
 | Área | Rotas propostas | Responsável |
 | --- | --- | --- |
 | Página pública | `GET /[slug]` | Terminal 4 |
-| Painel | `/dashboard` e `/dashboard/services`, `/dashboard/customers`, `/dashboard/settings` | Terminal 2 |
-| Dados do painel | `/api/businesses/[businessId]/bookings`, `/services`, `/customers`, `/hours` | Terminal 1 com terminal 2 |
+| Painel | `/dashboard`, `/dashboard/login`, `/dashboard/services`, `/dashboard/customers`, `/dashboard/settings` | mesmo app Next (antes Terminal 2) |
+| Dados do painel | Server Components + Server Actions (`lib/dashboard/data.ts`, `app/dashboard/(owner)/actions.ts`) no mesmo app; reutiliza schema/migrations do backend | app único |
+
+## Painel do dono — app único (`feat/dashboard-v2`)
+
+Decisão do dono: um único app Next.js, sem backend separado. Em relação ao PR #1 (`feat/dashboard`):
+
+- Todas as rotas `app/api` de auth, public, webhooks, onboarding e pix-key permanecem intactas.
+- A sessão do dono é validada **no mesmo processo** via `getAuth().api.getSession` (Better Auth), sem chamada HTTP a outra origem.
+- Leituras/gravações usam Drizzle com `findOwnedBusiness`; dono A não acessa dados do negócio B (páginas, actions e testes de isolamento).
+- Login/logout usam `authClient` na mesma origem; chave Pix continua em `/api/businesses/[businessId]/pix-key`.
+- Base atual: `feat/backend`. Quando o PR de integração do backend entrar no master, esta branch será rebaseada.
+
+### Leituras e sessão
+
+- `/dashboard`: agenda do dia ou semana (`businessId`, `date=YYYY-MM-DD`, `view=week`).
+- `/dashboard/services`, `/dashboard/customers`, `/dashboard/settings`: serviços, clientes e funcionamento.
+- `requireOwner()` usa Better Auth local; sem sessão redireciona para `/dashboard/login`.
+- `ownerContext()` lista só negócios do dono; negócio alheio aparece como indisponível.
+
+### Gravações
+
+| Ação | Comportamento |
+| --- | --- |
+| `saveService` | Cria/atualiza serviço do negócio autorizado; Zod + centavos no servidor. |
+| `saveHours` | Substitui horários em transação com lock do negócio. |
 
 Queries de disponibilidade não revelam dados pessoais. A criação de reserva impede concorrência de horários no banco.
 O webhook fake valida assinatura, registra entregas e confirma de forma idempotente.

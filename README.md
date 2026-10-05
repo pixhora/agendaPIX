@@ -2,6 +2,11 @@
 
 Esqueleto do produto de agendamento com sinal por Pix. Os fluxos comerciais ainda não estão implementados.
 
+
+## Painel do dono (app único)
+
+A branch `feat/dashboard-v2` incorpora o painel do dono no mesmo app Next do backend (`feat/backend` como base). Não use o modelo antigo de painel em porta `3343` falando HTTP com autoridade separada. Sessão: Better Auth no mesmo processo. O PR #1 (`feat/dashboard`) permanece histórico e não deve ser atualizado por esta linha de trabalho.
+
 ## Requisitos
 
 - Node.js 22.16 ou superior e pnpm 12.8.1.
