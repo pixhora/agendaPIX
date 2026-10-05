@@ -10,7 +10,15 @@ import { Button } from "@/components/ui/button";
 import { ValueSlab, StatusChip } from "@/components/ui/value-slab";
 import type { AvailabilitySlot, PublicService } from "./types";
 import { formatDateFull, formatTimeSlot } from "./formatters";
-import { publicBookingPaymentUrl } from "@/lib/public-api";
+import { devSimulatePixUrl, publicBookingPaymentUrl } from "@/lib/public-api";
+import {
+  PAYMENT_CHECK_ERROR_MESSAGE,
+  PAYMENT_CHECK_TIMEOUT_MESSAGE,
+  PAYMENT_CHECK_TIMEOUT_MS,
+  canShowDevSimulatePix,
+  pendingMessageForAttempts,
+  withPaymentCheckTimeout,
+} from "./payment-check";
 
 interface StepPaymentProps {
   slug: string;
@@ -33,66 +41,118 @@ export function StepPayment({
   const [copied, setCopied] = useState(false);
   const [timeLeft, setTimeLeft] = useState<string>("");
   const [phase, setPhase] = useState(() => pixUiPhase(booking));
-  const [isChecking, setIsChecking] = useState(false);
+  /** Spinner do botão "Já paguei" — só em verificação manual. */
+  const [isManualChecking, setIsManualChecking] = useState(false);
+  /** Indicador suave no status (polling em segundo plano). */
+  const [isBackgroundChecking, setIsBackgroundChecking] = useState(false);
   const [checkError, setCheckError] = useState<string | null>(null);
+  const [isSimulating, setIsSimulating] = useState(false);
 
   const isCheckingRef = useRef(false);
   const hasCheckedOnExpireRef = useRef(false);
+  const manualAttemptsRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
 
   const payment = booking.payment;
   const expiresAt = payment?.expiresAt || booking.expiresAt;
+  const showDevSimulate = canShowDevSimulatePix(payment?.provider);
   const isTerminal = phase === "expired" || phase === "cancelled";
 
   const applyStatus = useCallback(
-    (data: PaymentStatusResponse | null | undefined) => {
-      if (!data) return;
+    (data: PaymentStatusResponse | null | undefined, source: "manual" | "background") => {
+      if (!data) {
+        if (source === "manual") {
+          manualAttemptsRef.current += 1;
+          setCheckError(pendingMessageForAttempts(manualAttemptsRef.current));
+        }
+        return;
+      }
+
       const next = pixUiPhase(data);
       setPhase(next);
+
       if (next === "paid" || data.status === "confirmed") {
+        setCheckError(null);
         onPaymentConfirmed(data);
+        return;
+      }
+
+      if (next === "expired" || next === "cancelled") {
+        setCheckError(null);
+        return;
+      }
+
+      if (source === "manual") {
+        manualAttemptsRef.current += 1;
+        setCheckError(pendingMessageForAttempts(manualAttemptsRef.current));
       }
     },
     [onPaymentConfirmed],
   );
 
-  // Função para verificar status do pagamento via API pública ou mock
-  const checkStatus = useCallback(async () => {
-    if (isCheckingRef.current) return;
-    isCheckingRef.current = true;
-    setIsChecking(true);
-    setCheckError(null);
-
-    try {
-      if (checkStatusFn) {
-        const data = await checkStatusFn();
-        applyStatus(data);
-        return;
+  const checkStatus = useCallback(
+    async (source: "manual" | "background" = "background") => {
+      if (isCheckingRef.current) return;
+      isCheckingRef.current = true;
+      if (source === "manual") {
+        setIsManualChecking(true);
+        setCheckError(null);
+      } else {
+        setIsBackgroundChecking(true);
       }
 
-      if (!booking.accessToken) return;
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      const timeoutId = setTimeout(() => controller.abort(), PAYMENT_CHECK_TIMEOUT_MS);
 
-      const res = await fetch(
-        publicBookingPaymentUrl(slug, booking.bookingId),
-        {
-          headers: {
-            Authorization: `Bearer ${booking.accessToken}`,
-          },
+      try {
+        let data: PaymentStatusResponse | null | undefined;
+
+        if (checkStatusFn) {
+          data = await withPaymentCheckTimeout(checkStatusFn(), controller.signal);
+        } else {
+          if (!booking.accessToken) {
+            if (source === "manual") {
+              setCheckError(PAYMENT_CHECK_ERROR_MESSAGE);
+            }
+            return;
+          }
+
+          const res = await fetch(publicBookingPaymentUrl(slug, booking.bookingId), {
+            headers: { Authorization: `Bearer ${booking.accessToken}` },
+            signal: controller.signal,
+          });
+
+          if (!res.ok) {
+            throw new Error("Erro ao verificar pagamento.");
+          }
+
+          data = (await res.json()) as PaymentStatusResponse;
         }
-      );
 
-      if (!res.ok) {
-        throw new Error("Erro ao verificar pagamento.");
+        applyStatus(data, source);
+      } catch (error) {
+        const aborted = error instanceof DOMException
+          ? error.name === "AbortError"
+          : error instanceof Error && error.name === "AbortError";
+        if (source === "manual") {
+          setCheckError(aborted ? PAYMENT_CHECK_TIMEOUT_MESSAGE : PAYMENT_CHECK_ERROR_MESSAGE);
+        } else if (aborted) {
+          // Polling silencioso: não sobrescreve mensagem manual com timeout de fundo.
+        } else {
+          setCheckError((prev) => prev ?? PAYMENT_CHECK_ERROR_MESSAGE);
+        }
+      } finally {
+        clearTimeout(timeoutId);
+        if (abortRef.current === controller) abortRef.current = null;
+        setIsManualChecking(false);
+        setIsBackgroundChecking(false);
+        isCheckingRef.current = false;
       }
-
-      const data: PaymentStatusResponse = await res.json();
-      applyStatus(data);
-    } catch {
-      setCheckError("Não foi possível verificar no momento. Tentaremos novamente.");
-    } finally {
-      setIsChecking(false);
-      isCheckingRef.current = false;
-    }
-  }, [slug, booking.bookingId, booking.accessToken, checkStatusFn, applyStatus]);
+    },
+    [slug, booking.bookingId, booking.accessToken, checkStatusFn, applyStatus],
+  );
 
   // Atualiza contador regressivo a cada segundo
   useEffect(() => {
@@ -109,7 +169,7 @@ export function StepPayment({
         // Consulta o servidor antes de anunciar a expiração local
         if (!hasCheckedOnExpireRef.current) {
           hasCheckedOnExpireRef.current = true;
-          void checkStatus();
+          void checkStatus("background");
         }
         return;
       }
@@ -118,7 +178,7 @@ export function StepPayment({
       const minutes = Math.floor(totalSeconds / 60);
       const seconds = totalSeconds % 60;
       setTimeLeft(
-        `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
+        `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`,
       );
     };
 
@@ -132,11 +192,17 @@ export function StepPayment({
     if (isTerminal) return;
 
     const interval = setInterval(() => {
-      void checkStatus();
+      void checkStatus("background");
     }, 4000);
 
     return () => clearInterval(interval);
   }, [checkStatus, isTerminal]);
+
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
 
   const handleCopy = async () => {
     if (!payment?.copyPaste) return;
@@ -147,6 +213,36 @@ export function StepPayment({
       setTimeout(() => setCopied(false), 2500);
     } catch {
       // Fallback: o input readonly abaixo permite seleção manual
+    }
+  };
+
+  const handleSimulateDev = async () => {
+    if (!showDevSimulate || !booking.accessToken || isSimulating) return;
+    setIsSimulating(true);
+    setCheckError(null);
+    try {
+      const res = await fetch(devSimulatePixUrl(), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${booking.accessToken}`,
+        },
+        body: JSON.stringify({ slug, bookingId: booking.bookingId }),
+      });
+      if (!res.ok) {
+        throw new Error("Falha ao simular");
+      }
+      // Lê o status fora do mutex do polling para avançar mesmo se houver verificação em curso.
+      const statusRes = await fetch(publicBookingPaymentUrl(slug, booking.bookingId), {
+        headers: { Authorization: `Bearer ${booking.accessToken}` },
+      });
+      if (!statusRes.ok) throw new Error("Falha ao ler status");
+      const data = (await statusRes.json()) as PaymentStatusResponse;
+      applyStatus(data, "manual");
+    } catch {
+      setCheckError("Não foi possível simular o pagamento. Verifique o ambiente de desenvolvimento.");
+    } finally {
+      setIsSimulating(false);
     }
   };
 
@@ -177,10 +273,7 @@ export function StepPayment({
   }
 
   const expiresLabel = expiresAt ? formatTimeSlot(expiresAt, summary?.timezone ?? "America/Sao_Paulo") : null;
-  const liveStatus =
-    isChecking
-      ? "Verificando o pagamento…"
-      : "Horário pré-reservado. Aguardando o pagamento do Pix.";
+  const statusBusy = isManualChecking || isBackgroundChecking;
 
   return (
     <div className="space-y-6">
@@ -191,7 +284,7 @@ export function StepPayment({
             <span className="absolute inline-flex size-full animate-ping rounded-full bg-pix opacity-60 motion-reduce:animate-none" />
             <span className="relative inline-flex size-2.5 rounded-full bg-pix" />
           </span>
-          {liveStatus}
+          {statusBusy ? "Verificando o pagamento…" : "Horário pré-reservado. Aguardando o pagamento do Pix."}
         </p>
       </div>
 
@@ -272,12 +365,36 @@ export function StepPayment({
       )}
 
       <div className="space-y-2">
-        <Button type="button" variant="outline" disabled={isChecking} onClick={() => void checkStatus()} className="w-full">
-          {isChecking ? <Loader2 aria-hidden="true" className="animate-spin" /> : <RefreshCw aria-hidden="true" />}
-          {isChecking ? "Verificando confirmação…" : "Já paguei, verificar agora"}
+        <Button
+          type="button"
+          variant="outline"
+          disabled={isManualChecking || isSimulating}
+          onClick={() => void checkStatus("manual")}
+          className="w-full"
+        >
+          {isManualChecking ? <Loader2 aria-hidden="true" className="animate-spin" /> : <RefreshCw aria-hidden="true" />}
+          {isManualChecking ? "Verificando confirmação…" : "Já paguei, verificar agora"}
         </Button>
         <p className="text-center text-xs text-muted">Verificamos automaticamente a cada poucos segundos. Guarde o comprovante.</p>
       </div>
+
+      {showDevSimulate && (
+        <div role="note" className="space-y-2 rounded-card border border-dashed border-warning/40 bg-warning-soft/60 p-4">
+          <p className="text-center text-xs font-semibold text-warning">
+            Somente desenvolvimento · provedor fake
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isSimulating || isManualChecking}
+            onClick={() => void handleSimulateDev()}
+            className="w-full border-warning/40"
+          >
+            {isSimulating ? <Loader2 aria-hidden="true" className="animate-spin" /> : <FlaskConical aria-hidden="true" />}
+            {isSimulating ? "Simulando…" : "Simular pagamento (dev)"}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

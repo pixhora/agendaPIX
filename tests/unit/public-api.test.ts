@@ -5,6 +5,7 @@ import {
   publicBookingPaymentUrl,
   publicBookingsUrl,
   publicServicesUrl,
+  devSimulatePixUrl,
 } from "../../lib/public-api";
 
 describe("public API URLs", () => {
@@ -15,6 +16,7 @@ describe("public API URLs", () => {
       "/api/public/studio-bella/availability?serviceId=srv-1&date=2026-10-05",
     );
     expect(publicBookingPaymentUrl("studio-bella", "bk-1")).toBe("/api/public/studio-bella/bookings/bk-1/payment");
+    expect(devSimulatePixUrl()).toBe("/api/dev/simulate-pix");
   });
 
   it("encodes user-controlled segments so they cannot change the path or query", () => {

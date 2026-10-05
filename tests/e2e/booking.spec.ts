@@ -118,6 +118,13 @@ test("cliente agenda pela página pública, paga o sinal Pix (fake) e vê a rese
   await expect(copyPaste).toHaveValue(/FAKE-PIX-NOT-PAYABLE:/);
   await expectNoAxeViolations(page, "página pública: Pix");
 
+  // 4b. Sem webhook, "Já paguei" não gira para sempre: mostra aviso e libera o botão.
+  const checkButton = page.getByRole("button", { name: /Já paguei, verificar agora/ });
+  await checkButton.click();
+  await expect(page.getByRole("alert").filter({ hasText: /Ainda não recebemos a confirmação do Pix/ })).toBeVisible({ timeout: 10_000 });
+  await expect(checkButton).toBeEnabled({ timeout: 10_000 });
+  await expect(page.getByRole("button", { name: /Simular pagamento \(dev\)/ })).toBeVisible();
+
   // Copia-e-cola: botão escreve o EMV no clipboard
   await page.getByTestId("pix-copy-button").click();
   await expect(page.getByRole("button", { name: /Código copiado/ })).toBeVisible();
