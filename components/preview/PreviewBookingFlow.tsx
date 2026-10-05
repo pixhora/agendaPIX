@@ -108,17 +108,17 @@ export function PreviewBookingFlow() {
       <div className="w-full max-w-md mx-auto space-y-6">
         {/* Barra Superior do Preview */}
         <div className="flex items-center justify-between text-xs text-muted-foreground pb-2 border-b border-border">
-          <Link href="/preview" className="font-bold text-accent-forest dark:text-primary hover:underline">
+          <Link href="/preview" className="font-bold text-pix dark:text-primary hover:underline">
             ← Voltar ao Hub Preview
           </Link>
-          <span className="rounded-full bg-muted border border-border px-2.5 py-0.5 text-[10px] font-mono font-semibold">
+          <span className="rounded-full bg-subtle border border-border px-2.5 py-0.5 text-[10px] font-mono font-semibold">
             {MOCK_PUBLIC_BUSINESS.name}
           </span>
         </div>
 
         {/* Cabeçalho do Estabelecimento */}
         <header className="flex flex-col items-center text-center space-y-2">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent-forest text-primary font-display font-extrabold text-lg shadow-xs ring-2 ring-primary/20">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-ink text-primary font-display font-extrabold text-lg shadow-xs ring-2 ring-primary/20">
             SB
           </div>
           <div className="space-y-0.5">
@@ -126,7 +126,7 @@ export function PreviewBookingFlow() {
               {MOCK_PUBLIC_BUSINESS.name}
             </h1>
             <p className="text-xs text-muted-foreground flex items-center justify-center gap-1.5 font-medium">
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-success" />
               São Paulo, SP · Agendamento com sinal Pix garantido
             </p>
           </div>
@@ -218,8 +218,8 @@ export function PreviewBookingFlow() {
                   />
 
                   {/* Atalho de Demonstração para Confirmar o Pix Imediatamente */}
-                  <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-center space-y-2">
-                    <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+                  <div className="rounded-xl border border-success/30 bg-success-soft p-3 text-center space-y-2">
+                    <p className="text-xs font-semibold text-success ">
                       Simulador de Pagamento Instantâneo (Preview)
                     </p>
                     <Button
@@ -245,7 +245,7 @@ export function PreviewBookingFlow() {
                         );
                         setIsCompleted(true);
                       }}
-                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white min-h-11 text-xs font-bold shadow-sm cursor-pointer"
+                      className="w-full bg-success hover:bg-ink-hover text-white min-h-11 text-xs font-bold shadow-sm cursor-pointer"
                     >
                       ⚡ Simular Pix Pago no Banco
                     </Button>

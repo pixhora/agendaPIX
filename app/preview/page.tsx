@@ -61,7 +61,7 @@ export default function PreviewHubPage() {
         <div className="mx-auto max-w-6xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
-              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent-forest text-xs font-black text-primary">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-ink text-xs font-black text-primary">
                 A
               </span>
               <h1 className="font-display text-xl font-extrabold tracking-tight text-foreground">
@@ -79,13 +79,13 @@ export default function PreviewHubPage() {
           <div className="flex items-center gap-2">
             <Link
               href="/preview/booking"
-              className="inline-flex items-center justify-center rounded-full border border-border bg-surface hover:bg-muted px-4 py-2 text-xs font-bold text-foreground transition-colors"
+              className="inline-flex items-center justify-center rounded-full border border-border bg-surface hover:bg-subtle px-4 py-2 text-xs font-bold text-foreground transition-colors"
             >
               Testar Booking
             </Link>
             <Link
               href="/preview/dashboard"
-              className="inline-flex items-center justify-center rounded-full bg-primary hover:bg-primary-hover px-4 py-2 text-xs font-extrabold text-primary-foreground shadow-xs transition-transform active:scale-95"
+              className="inline-flex items-center justify-center rounded-full bg-primary hover:bg-ink-hover px-4 py-2 text-xs font-extrabold text-primary-foreground shadow-xs transition-transform active:scale-95"
             >
               Abrir Painel
             </Link>
@@ -101,7 +101,7 @@ export default function PreviewHubPage() {
           className="rounded-3xl border border-border bg-surface p-6 sm:p-8 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6"
         >
           <div className="space-y-1.5">
-            <span className="inline-block rounded-full bg-accent-forest text-primary px-3 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+            <span className="inline-block rounded-full bg-ink text-primary px-3 py-0.5 text-[10px] font-bold uppercase tracking-wider">
               Estabelecimento Ativo
             </span>
             <h2 className="font-display text-2xl sm:text-3xl font-extrabold text-foreground">
@@ -119,7 +119,7 @@ export default function PreviewHubPage() {
             </div>
             <div>
               <p className="text-[10px] text-muted-foreground uppercase font-bold">Sinal Pix Pago</p>
-              <p className="text-base sm:text-lg font-black text-accent-forest dark:text-primary mt-0.5">{formatCurrency(totalSinaisCents)}</p>
+              <p className="text-base sm:text-lg font-black text-pix dark:text-primary mt-0.5">{formatCurrency(totalSinaisCents)}</p>
             </div>
             <div>
               <p className="text-[10px] text-muted-foreground uppercase font-bold">Confirmadas</p>
@@ -149,7 +149,7 @@ export default function PreviewHubPage() {
                     <span className="text-base font-extrabold text-foreground group-hover:text-primary transition-colors">
                       {card.title}
                     </span>
-                    <span className="rounded-full bg-muted border border-border px-2.5 py-0.5 text-[10px] font-bold text-muted-foreground">
+                    <span className="rounded-full bg-subtle border border-border px-2.5 py-0.5 text-[10px] font-bold text-muted-foreground">
                       {card.badge}
                     </span>
                   </div>
@@ -158,7 +158,7 @@ export default function PreviewHubPage() {
                   </p>
                 </div>
 
-                <div className="pt-4 flex items-center text-xs font-bold text-accent-forest dark:text-primary">
+                <div className="pt-4 flex items-center text-xs font-bold text-pix dark:text-primary">
                   <span>Visualizar tela</span>
                   <span className="ml-1.5 transition-transform group-hover:translate-x-1">→</span>
                 </div>
@@ -173,21 +173,21 @@ export default function PreviewHubPage() {
             <h3 className="font-display text-base font-bold text-foreground">
               Serviços Determinísticos ({MOCK_SERVICES.length})
             </h3>
-            <Link href="/preview/servicos" className="text-xs font-bold text-accent-forest dark:text-primary hover:underline">
+            <Link href="/preview/servicos" className="text-xs font-bold text-pix dark:text-primary hover:underline">
               Ver todos os detalhes →
             </Link>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
             {MOCK_SERVICES.map((s) => (
-              <div key={s.id} className="rounded-2xl border border-border bg-muted/30 p-4 space-y-1.5 text-xs">
+              <div key={s.id} className="rounded-2xl border border-border bg-subtle p-4 space-y-1.5 text-xs">
                 <div className="flex justify-between font-bold text-foreground">
                   <span>{s.name}</span>
                   <span>{formatCurrency(s.priceCents)}</span>
                 </div>
                 <div className="flex justify-between text-muted-foreground text-[11px]">
                   <span>⏱ {formatDuration(s.durationMinutes)}</span>
-                  <span className="text-accent-forest dark:text-primary font-bold">Sinal: {formatCurrency(s.depositCents)}</span>
+                  <span className="text-pix dark:text-primary font-bold">Sinal: {formatCurrency(s.depositCents)}</span>
                 </div>
               </div>
             ))}

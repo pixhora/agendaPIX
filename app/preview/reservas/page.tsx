@@ -39,7 +39,7 @@ export default function PreviewReservasPage() {
                 className={`flex items-center justify-center min-h-11 rounded-lg px-2.5 sm:px-3.5 py-2 text-center transition-colors cursor-pointer text-[11px] sm:text-xs ${
                   filter === "all"
                     ? "bg-foreground text-background font-bold shadow-xs"
-                    : "bg-surface text-muted-foreground border border-border hover:bg-muted"
+                    : "bg-surface text-muted-foreground border border-border hover:bg-subtle"
                 }`}
               >
                 Todas ({MOCK_BOOKINGS.length})
@@ -52,7 +52,7 @@ export default function PreviewReservasPage() {
                 className={`flex items-center justify-center min-h-11 rounded-lg px-2.5 sm:px-3.5 py-2 text-center transition-colors cursor-pointer text-[11px] sm:text-xs ${
                   filter === "confirmed"
                     ? "bg-foreground text-background font-bold shadow-xs"
-                    : "bg-surface text-muted-foreground border border-border hover:bg-muted"
+                    : "bg-surface text-muted-foreground border border-border hover:bg-subtle"
                 }`}
               >
                 Confirmadas ({MOCK_BOOKINGS.filter((b) => b.status === "confirmed").length})
@@ -65,7 +65,7 @@ export default function PreviewReservasPage() {
                 className={`flex items-center justify-center min-h-11 rounded-lg px-2.5 sm:px-3.5 py-2 text-center transition-colors cursor-pointer text-[11px] sm:text-xs ${
                   filter === "pending_payment"
                     ? "bg-foreground text-background font-bold shadow-xs"
-                    : "bg-surface text-muted-foreground border border-border hover:bg-muted"
+                    : "bg-surface text-muted-foreground border border-border hover:bg-subtle"
                 }`}
               >
                 Sinal Pendente ({MOCK_BOOKINGS.filter((b) => b.status === "pending_payment").length})
@@ -105,8 +105,8 @@ export default function PreviewReservasPage() {
                   <span
                     className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold self-start sm:self-auto ${
                       isConfirmed
-                        ? "bg-emerald-500/10 text-emerald-600"
-                        : "bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                        ? "bg-success-soft text-success"
+                        : "bg-warning-soft text-warning "
                     }`}
                   >
                     {isConfirmed ? "✓ Confirmada · Sinal Pago no Pix" : "⏳ Aguardando Sinal Pix"}
@@ -132,7 +132,7 @@ export default function PreviewReservasPage() {
                     <p className="text-muted-foreground">Financeiro</p>
                     <p className="font-semibold text-foreground mt-0.5">
                       Total: {formatCurrency(booking.priceCents)} ·{" "}
-                      <span className="text-emerald-600">Sinal: {formatCurrency(booking.depositCents)}</span>
+                      <span className="text-success">Sinal: {formatCurrency(booking.depositCents)}</span>
                       {remainingCents > 0 && ` (Restam ${formatCurrency(remainingCents)} no local)`}
                     </p>
                   </div>
@@ -143,7 +143,7 @@ export default function PreviewReservasPage() {
                     href={waLink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-full sm:w-auto inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                    className="w-full sm:w-auto inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-success/30 bg-success-soft px-4 text-xs font-semibold text-success hover:bg-success-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                   >
                     <span>💬</span> Conversar no WhatsApp
                   </a>

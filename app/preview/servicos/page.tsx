@@ -18,7 +18,7 @@ export default function PreviewServicosPage() {
           <p className="text-xs text-muted-foreground">
             3 serviços determinísticos cadastrados para o Studio Bella.
           </p>
-          <span className="rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-600">
+          <span className="rounded-md bg-success-soft px-2 py-1 text-xs font-semibold text-success">
             Valores em Centavos (BRL)
           </span>
         </div>
@@ -32,7 +32,7 @@ export default function PreviewServicosPage() {
               <div className="space-y-3">
                 <div className="flex items-start justify-between gap-2">
                   <h2 className="text-base font-bold text-foreground">{s.name}</h2>
-                  <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">
+                  <span className="rounded-full bg-success-soft px-2 py-0.5 text-[10px] font-semibold text-success">
                     Ativo
                   </span>
                 </div>
@@ -46,7 +46,7 @@ export default function PreviewServicosPage() {
                     <span>💰 Preço total:</span>
                     <strong className="text-foreground">{formatCurrency(s.priceCents)}</strong>
                   </div>
-                  <div className="flex justify-between text-accent-forest dark:text-primary">
+                  <div className="flex justify-between text-pix dark:text-primary">
                     <span className="font-semibold">⚡ Sinal no Pix:</span>
                     <strong className="font-bold">{formatCurrency(s.depositCents)}</strong>
                   </div>

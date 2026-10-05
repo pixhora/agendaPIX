@@ -75,7 +75,7 @@ export function PreviewBadge() {
                     className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 transition-colors ${
                       isActive
                         ? "bg-primary text-primary-foreground font-semibold"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        : "text-muted-foreground hover:bg-subtle hover:text-foreground"
                     }`}
                   >
                     <span>{link.label}</span>
@@ -98,7 +98,7 @@ export function PreviewBadge() {
           aria-expanded={isOpen}
           className="inline-flex min-h-11 items-center gap-2 rounded-full border border-border bg-surface/90 px-3.5 py-2 text-xs font-semibold text-foreground shadow-md backdrop-blur hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-all cursor-pointer"
         >
-          <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="flex h-2 w-2 rounded-full bg-success animate-pulse" />
           <span className="tracking-wide">MODO PREVIEW</span>
           <span className="text-muted-foreground text-[10px]">
             {isOpen ? "✕" : "▾"}

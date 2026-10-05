@@ -24,35 +24,35 @@ export default function PreviewConfiguracoesPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
             <div>
               <label className="block text-muted-foreground mb-1 font-medium">Nome do Negócio</label>
-              <div className="rounded-lg border border-border bg-muted/40 p-2.5 font-bold text-foreground">
+              <div className="rounded-lg border border-border bg-subtle p-2.5 font-bold text-foreground">
                 {MOCK_BUSINESS_INFO.name}
               </div>
             </div>
 
             <div>
               <label className="block text-muted-foreground mb-1 font-medium">Link Público (Slug)</label>
-              <div className="rounded-lg border border-border bg-muted/40 p-2.5 font-mono text-primary font-bold">
+              <div className="rounded-lg border border-border bg-subtle p-2.5 font-mono text-primary font-bold">
                 agenda.com.br/{MOCK_BUSINESS_INFO.slug}
               </div>
             </div>
 
             <div>
               <label className="block text-muted-foreground mb-1 font-medium">Cidade / Estado</label>
-              <div className="rounded-lg border border-border bg-muted/40 p-2.5 text-foreground">
+              <div className="rounded-lg border border-border bg-subtle p-2.5 text-foreground">
                 {MOCK_BUSINESS_INFO.city}
               </div>
             </div>
 
             <div>
               <label className="block text-muted-foreground mb-1 font-medium">Fuso Horário</label>
-              <div className="rounded-lg border border-border bg-muted/40 p-2.5 font-mono text-foreground">
+              <div className="rounded-lg border border-border bg-subtle p-2.5 font-mono text-foreground">
                 {MOCK_BUSINESS_INFO.timezone} (Horário de Brasília)
               </div>
             </div>
 
             <div className="sm:col-span-2">
               <label className="block text-muted-foreground mb-1 font-medium">Endereço Completo</label>
-              <div className="rounded-lg border border-border bg-muted/40 p-2.5 text-foreground">
+              <div className="rounded-lg border border-border bg-subtle p-2.5 text-foreground">
                 {MOCK_BUSINESS_INFO.address}
               </div>
             </div>
@@ -68,21 +68,21 @@ export default function PreviewConfiguracoesPage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
             <div>
               <label className="block text-muted-foreground mb-1 font-medium">Dias da Semana</label>
-              <div className="rounded-lg border border-border bg-muted/40 p-2.5 font-semibold text-foreground">
+              <div className="rounded-lg border border-border bg-subtle p-2.5 font-semibold text-foreground">
                 {MOCK_BUSINESS_INFO.openDaysText}
               </div>
             </div>
 
             <div>
               <label className="block text-muted-foreground mb-1 font-medium">Abertura</label>
-              <div className="rounded-lg border border-border bg-muted/40 p-2.5 font-bold text-foreground">
+              <div className="rounded-lg border border-border bg-subtle p-2.5 font-bold text-foreground">
                 {MOCK_BUSINESS_INFO.opensAt}
               </div>
             </div>
 
             <div>
               <label className="block text-muted-foreground mb-1 font-medium">Fechamento</label>
-              <div className="rounded-lg border border-border bg-muted/40 p-2.5 font-bold text-foreground">
+              <div className="rounded-lg border border-border bg-subtle p-2.5 font-bold text-foreground">
                 {MOCK_BUSINESS_INFO.closesAt}
               </div>
             </div>
@@ -106,13 +106,13 @@ export default function PreviewConfiguracoesPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
             <div>
               <label className="block text-muted-foreground mb-1 font-medium">Tipo de Chave</label>
-              <div className="rounded-lg border border-border bg-muted/40 p-2.5 font-semibold text-foreground">
+              <div className="rounded-lg border border-border bg-subtle p-2.5 font-semibold text-foreground">
                 CNPJ
               </div>
             </div>
             <div>
               <label className="block text-muted-foreground mb-1 font-medium">Chave Cadastrada</label>
-              <div className="rounded-lg border border-border bg-muted/40 p-2.5 font-mono text-foreground">
+              <div className="rounded-lg border border-border bg-subtle p-2.5 font-mono text-foreground">
                 12.345.678/0001-90
               </div>
             </div>

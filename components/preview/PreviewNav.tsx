@@ -28,7 +28,7 @@ export function PreviewNav({ currentPath }: PreviewNavProps) {
             className={`flex min-h-11 items-center justify-center rounded-lg px-3 py-1.5 transition-colors sm:min-h-0 sm:shrink-0 ${
               isActive
                 ? "bg-primary text-primary-foreground font-bold shadow-xs"
-                : "border border-border bg-surface text-muted-foreground hover:text-foreground hover:bg-muted"
+                : "border border-border bg-surface text-muted-foreground hover:text-foreground hover:bg-subtle"
             }`}
           >
             {item.label}

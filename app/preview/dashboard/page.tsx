@@ -51,7 +51,7 @@ export default function PreviewDashboardPage() {
         >
           <div className="space-y-0.5">
             <p className="font-semibold text-foreground">Seu link público de agendamento:</p>
-            <p className="font-mono text-accent-forest dark:text-primary font-bold">agenda.com.br/{MOCK_BUSINESS_INFO.slug}</p>
+            <p className="font-mono text-pix dark:text-primary font-bold">agenda.com.br/{MOCK_BUSINESS_INFO.slug}</p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <Button
@@ -106,10 +106,10 @@ export default function PreviewDashboardPage() {
           </div>
 
           <div className="rounded-2xl border border-border bg-surface p-4 space-y-1 shadow-sm">
-            <span className="text-[11px] font-semibold text-accent-forest dark:text-primary uppercase">
+            <span className="text-[11px] font-semibold text-pix dark:text-primary uppercase">
               Confirmadas
             </span>
-            <p className="text-xl sm:text-2xl font-extrabold text-accent-forest dark:text-primary">
+            <p className="text-xl sm:text-2xl font-extrabold text-pix dark:text-primary">
               {confirmadas} / {MOCK_BOOKINGS.length}
             </p>
             <p className="text-[11px] text-muted-foreground">1 aguardando sinal</p>
@@ -122,7 +122,7 @@ export default function PreviewDashboardPage() {
             <p className="text-xl sm:text-2xl font-extrabold text-foreground">
               100%
             </p>
-            <p className="text-[11px] text-emerald-600 font-medium">Zero no-show hoje</p>
+            <p className="text-[11px] text-success font-medium">Zero no-show hoje</p>
           </div>
         </section>
 
@@ -155,7 +155,7 @@ export default function PreviewDashboardPage() {
                     className={`rounded-xl border p-4 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
                       isConfirmed
                         ? "border-border bg-surface hover:border-primary/40"
-                        : "border-amber-500/30 bg-amber-500/[0.02]"
+                        : "border-warning/30 bg-warning-soft/40"
                     }`}
                   >
                     <div className="flex items-start gap-3">
@@ -163,7 +163,7 @@ export default function PreviewDashboardPage() {
                         className={`rounded-lg p-2 text-center text-xs font-bold shrink-0 min-w-[70px] ${
                           isConfirmed
                             ? "bg-primary/10 text-primary"
-                            : "bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                            : "bg-warning-soft text-warning "
                         }`}
                       >
                         {booking.timeFormatted.split(" ")[0]}
@@ -177,8 +177,8 @@ export default function PreviewDashboardPage() {
                           <span
                             className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
                               isConfirmed
-                                ? "bg-emerald-500/10 text-emerald-600"
-                                : "bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                                ? "bg-success-soft text-success"
+                                : "bg-warning-soft text-warning "
                             }`}
                           >
                             {isConfirmed ? "Confirmada (Pix Pago)" : "Aguardando Sinal"}
@@ -198,7 +198,7 @@ export default function PreviewDashboardPage() {
                         href={waLink}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex min-h-11 items-center justify-center rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20 cursor-pointer"
+                        className="inline-flex min-h-11 items-center justify-center rounded-lg border border-success/30 bg-success-soft px-3.5 text-xs font-semibold text-success hover:bg-success-soft cursor-pointer"
                       >
                         💬 WhatsApp
                       </a>
@@ -230,7 +230,7 @@ export default function PreviewDashboardPage() {
                     </div>
                     <div className="flex justify-between text-muted-foreground text-[11px]">
                       <span>{formatDuration(s.durationMinutes)}</span>
-                      <span className="text-emerald-600 font-medium">Sinal: {formatCurrency(s.depositCents)}</span>
+                      <span className="text-success font-medium">Sinal: {formatCurrency(s.depositCents)}</span>
                     </div>
                   </div>
                 ))}
