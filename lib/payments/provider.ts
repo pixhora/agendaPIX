@@ -1,5 +1,14 @@
 import { z } from "zod";
+import { isValidCpf } from "../validation/cpf";
 import { centsSchema } from "../validation/service";
+
+export const chargeCustomerSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  phone: z.string().regex(/^\+[1-9][0-9]{7,14}$/),
+  /** CPF com 11 dígitos (Asaas `cpfCnpj`). Obrigatório para o provedor Asaas. */
+  cpfCnpj: z.string().regex(/^\d{11}$/).refine(isValidCpf, "CPF inválido."),
+  email: z.email().max(120).optional(),
+}).strict();
 
 export const chargeInputSchema = z.object({
   idempotencyKey: z.uuid({ version: "v4" }),
@@ -7,6 +16,8 @@ export const chargeInputSchema = z.object({
   reference: z.uuid(),
   amountCents: centsSchema.refine((value) => value > 0, "A cobrança deve ser positiva."),
   expiresAt: z.date(),
+  /** Dados do pagador; exigidos pelo Asaas (CPF). O fake ignora. */
+  customer: chargeCustomerSchema.optional(),
 });
 export const pixChargeSchema = z.object({
   externalId: z.string().min(1).max(200),

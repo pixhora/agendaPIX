@@ -89,20 +89,31 @@ export async function attachCreatedCharge(database: Database, payment: typeof sc
   return updated ?? null;
 }
 
-async function createChargeOutsideTx(payment: typeof schema.payments.$inferSelect, provider: PaymentProvider) {
+async function createChargeOutsideTx(
+  payment: typeof schema.payments.$inferSelect,
+  provider: PaymentProvider,
+  customer?: { name: string; phone: string; cpfCnpj: string },
+) {
   const timeoutMs = paymentsConfig().PAYMENT_PROVIDER_TIMEOUT_MS;
   try {
     return pixChargeSchema.parse(await callProvider(timeoutMs, (signal) => provider.createPixCharge({
       idempotencyKey: payment.idempotencyKey, reference: payment.id, amountCents: payment.amountCents, expiresAt: payment.expiresAt,
+      customer,
     }, { signal })));
   } catch (error) {
+    if (error instanceof HttpError) throw error;
     if (error instanceof ProviderTimeoutError) throw new HttpError(503, "payment_unavailable", "Não foi possível criar a cobrança. Tente novamente com a mesma chave.");
     throw new HttpError(503, "payment_unavailable", "Não foi possível criar a cobrança. Tente novamente com a mesma chave.");
   }
 }
 
-async function finalizeCreatingPayment(database: Database, payment: typeof schema.payments.$inferSelect, provider: PaymentProvider) {
-  const charge = await createChargeOutsideTx(payment, provider);
+async function finalizeCreatingPayment(
+  database: Database,
+  payment: typeof schema.payments.$inferSelect,
+  provider: PaymentProvider,
+  customer?: { name: string; phone: string; cpfCnpj: string },
+) {
+  const charge = await createChargeOutsideTx(payment, provider, customer);
   // Transação curta, sem lock do negócio: só anexa se ainda creating.
   const attached = await database.transaction(async (transaction) => attachCreatedCharge(transaction, payment, charge));
   if (!attached) {
@@ -166,7 +177,7 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
     if (existing) {
       if (existing.requestHash !== requestHash) throw new HttpError(409, "idempotency_conflict", "Essa chave já foi usada em outro agendamento.");
       const [payment] = await transaction.select().from(schema.payments).where(and(eq(schema.payments.businessId, business.id), eq(schema.payments.bookingId, existing.id))).limit(1);
-      return { kind: "existing" as const, booking: existing, payment, token: accessToken(business.id, existing.id), now };
+      return { kind: "existing" as const, booking: existing, payment, token: accessToken(business.id, existing.id), now, chargeCustomer: null };
     }
     const service = await serviceById(business.id, input.serviceId, transaction);
     const date = localDate(new Date(input.startsAt), business.timezone);
@@ -174,7 +185,8 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
     const slot = slots.find((candidate) => candidate.startsAt.toISOString() === input.startsAt);
     if (!slot) throw new HttpError(409, "slot_unavailable", "Esse horário não está disponível. Escolha outro.");
     if (service.depositCents > 0) await enforcePendingHoldLimits(transaction, business.id, { clientHash, phone: input.customer.phone }, now, config);
-    const [insertedCustomer] = await transaction.insert(schema.customers).values({ businessId: business.id, ...input.customer }).onConflictDoNothing({ target: [schema.customers.businessId, schema.customers.phone] }).returning({ id: schema.customers.id });
+    const { cpfCnpj, ...customerRow } = input.customer;
+    const [insertedCustomer] = await transaction.insert(schema.customers).values({ businessId: business.id, ...customerRow }).onConflictDoNothing({ target: [schema.customers.businessId, schema.customers.phone] }).returning({ id: schema.customers.id });
     const [existingCustomer] = insertedCustomer ? [] : await transaction.select({ id: schema.customers.id }).from(schema.customers).where(and(eq(schema.customers.businessId, business.id), eq(schema.customers.phone, input.customer.phone))).limit(1);
     const customerId = (insertedCustomer ?? existingCustomer).id;
     const expiresAt = service.depositCents > 0 ? new Date(Math.min(now.getTime() + config.BOOKING_HOLD_MINUTES * 60000, slot.startsAt.getTime())) : null;
@@ -190,13 +202,17 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
         amountCents: service.depositCents, expiresAt, status: "creating",
       }).returning();
     }
-    return { kind: "created" as const, booking, payment, token, now, providerName: expiresAt ? (paymentProvider ?? getPaymentProvider()).name : null };
+    return {
+      kind: "created" as const, booking, payment, token, now,
+      providerName: expiresAt ? (paymentProvider ?? getPaymentProvider()).name : null,
+      chargeCustomer: expiresAt ? { name: input.customer.name, phone: input.customer.phone, cpfCnpj } : null,
+    };
   });
 
   // Fora de qualquer transação: cobra o gateway. O horário já está preso pela exclusão gist.
   if (reserved.payment?.status === "creating") {
     const activeProvider = paymentProvider ?? getPaymentProvider();
-    await finalizeCreatingPayment(database, reserved.payment, activeProvider);
+    await finalizeCreatingPayment(database, reserved.payment, activeProvider, reserved.chargeCustomer ?? undefined);
   }
 
   const now = new Date();

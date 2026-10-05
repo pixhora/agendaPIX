@@ -23,7 +23,7 @@ let store: FakeChargeStore;
 let provider: FakePaymentProvider;
 
 const slot = (index: number) => new Date(Date.UTC(2030, 0, 1, 12, 0) + index * 1800000).toISOString();
-const input = (index = 0, phone = "+5511999999900") => ({ serviceId, startsAt: slot(index), customer: { name: "Cliente", phone } });
+const input = (index = 0, phone = "+5511999999900") => ({ serviceId, startsAt: slot(index), customer: { name: "Cliente", phone, cpfCnpj: "52998224725" } });
 
 beforeEach(async () => {
   ownerId = randomUUID(); businessId = randomUUID(); serviceId = randomUUID(); slug = `out-${businessId}`;

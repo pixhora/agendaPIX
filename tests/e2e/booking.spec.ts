@@ -45,9 +45,10 @@ test("cliente agenda pela página pública, paga o sinal Pix (fake) e vê a rese
   await expectNoAxeViolations(page, "página pública: horários");
   await page.getByRole("button", { name: /Continuar com \d{2}:\d{2}/ }).filter({ visible: true }).first().click();
 
-  // 3. Só nome e WhatsApp antes do Pix
+  // 3. Nome, WhatsApp e CPF antes do Pix
   await page.locator("#customer-name").fill(`Cliente Pix ${testInfo.project.name}`);
   await page.locator("#customer-phone").fill("11987654321");
+  await page.locator("#customer-cpf").fill("52998224725");
   await expectNoAxeViolations(page, "página pública: dados");
   await page.getByRole("button", { name: /Gerar Pix de R\$\s?10,00/ }).filter({ visible: true }).first().click();
 

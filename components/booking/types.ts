@@ -53,4 +53,5 @@ export interface PaymentStatusResponse {
 export interface CustomerFormData {
   name: string;
   phone: string;
+  cpfCnpj: string;
 }

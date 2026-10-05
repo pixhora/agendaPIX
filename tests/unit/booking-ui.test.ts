@@ -3,7 +3,9 @@ import {
   formatCurrency,
   formatDuration,
   formatPhoneMask,
+  formatCpfMask,
   isValidBrazilianPhone,
+  isValidCpf,
   normalizePhoneToE164,
   formatTimeSlot,
   formatDateFull,
@@ -50,6 +52,15 @@ describe("Booking UI formatters and helpers", () => {
     expect(normalizePhoneToE164("11987654321")).toBe("+5511987654321");
     expect(normalizePhoneToE164("+5511987654321")).toBe("+5511987654321");
     expect(normalizePhoneToE164("5511987654321")).toBe("+5511987654321");
+  });
+
+  it("applies CPF mask and validates check digits", () => {
+    expect(formatCpfMask("52998224725")).toBe("529.982.247-25");
+    expect(formatCpfMask("529982247")).toBe("529.982.247");
+    expect(isValidCpf("529.982.247-25")).toBe(true);
+    expect(isValidCpf("52998224725")).toBe(true);
+    expect(isValidCpf("111.111.111-11")).toBe(false);
+    expect(isValidCpf("123")).toBe(false);
   });
 
   it("formats time slots and full dates with given timezone", () => {

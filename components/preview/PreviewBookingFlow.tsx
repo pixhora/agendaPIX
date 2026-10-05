@@ -35,6 +35,7 @@ export function PreviewBookingFlow() {
   });
   const [customerName, setCustomerName] = useState("Juliana Mendes");
   const [customerPhone, setCustomerPhone] = useState("(11) 98234-5678");
+  const [customerCpf, setCustomerCpf] = useState("529.982.247-25");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bookingResponse, setBookingResponse] = useState<BookingResponse | null>(null);
@@ -187,6 +188,8 @@ export function PreviewBookingFlow() {
                   errorMessage={null}
                   onChangeName={setCustomerName}
                   onChangePhone={setCustomerPhone}
+                  cpf={customerCpf}
+                  onChangeCpf={setCustomerCpf}
                   onBack={() => setStep(2)}
                   onSubmit={handleCreateMockBooking}
                 />

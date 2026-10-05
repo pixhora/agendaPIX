@@ -8,7 +8,7 @@ import type {
   AvailabilitySlot,
   BookingResponse,
 } from "./types";
-import { normalizePhoneToE164 } from "./formatters";
+import { cpfDigitsOnly, normalizePhoneToE164 } from "./formatters";
 import { publicBookingPagePath, publicBookingPaymentUrl, publicBookingsUrl, publicServicesUrl } from "@/lib/public-api";
 import { StepProgress } from "./StepProgress";
 import { StepService } from "./StepService";
@@ -43,6 +43,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
   const [selectedSlot, setSelectedSlot] = useState<AvailabilitySlot | null>(null);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [customerCpf, setCustomerCpf] = useState("");
 
   // Submissão da Reserva
   const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
@@ -122,6 +123,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
       serviceId?: string;
       customerName?: string;
       customerPhone?: string;
+      customerCpf?: string;
       expiresAt?: string;
     } | null = null;
 
@@ -197,6 +199,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
 
         if (stored?.customerName) setCustomerName(stored.customerName);
         if (stored?.customerPhone) setCustomerPhone(stored.customerPhone);
+        if (stored?.customerCpf) setCustomerCpf(stored.customerCpf);
 
         if (paymentData.status === "confirmed") {
           setIsCompleted(true);
@@ -250,6 +253,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
       customer: {
         name: customerName.trim(),
         phone: normalizePhoneToE164(customerPhone),
+        cpfCnpj: cpfDigitsOnly(customerCpf),
       },
     };
 
@@ -292,6 +296,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
                 serviceId: selectedService.id,
                 customerName: customerName.trim(),
                 customerPhone: customerPhone.trim(),
+                customerCpf: customerCpf.trim(),
                 expiresAt: booking.expiresAt,
               })
             );
@@ -317,6 +322,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
     setSelectedSlot(null);
     setCustomerName("");
     setCustomerPhone("");
+    setCustomerCpf("");
     setBookingResponse(null);
     setIsCompleted(false);
     setStep(1);
@@ -476,10 +482,12 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
                 timezone={business.timezone}
                 name={customerName}
                 phone={customerPhone}
+                cpf={customerCpf}
                 isSubmitting={isSubmittingBooking}
                 errorMessage={bookingError}
                 onChangeName={setCustomerName}
                 onChangePhone={setCustomerPhone}
+                onChangeCpf={setCustomerCpf}
                 onBack={() => setStep(2)}
                 onSubmit={handleCreateBooking}
                 summaryClassName="lg:hidden"
