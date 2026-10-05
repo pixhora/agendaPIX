@@ -194,3 +194,8 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## Ajuste de terminais (vale mais que a tabela da seção 5)
+
+Por enquanto só existem os terminais 1, 2, 3 e 4. O revisor será o terminal 5 (Codex) e ainda não está ligado. O terminal 6 não existe.
+Não peça revisão pelo Maestri a terminal que não está conectado. Ao terminar uma tarefa, apenas me avise com um resumo curto.
