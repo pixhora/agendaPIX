@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { CalendarDays, ExternalLink, Scissors, Settings, Users } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
+import { DASHBOARD_NAV_ICONS } from "@/lib/icons/registry";
 import { BrandLink, BrandMark } from "@/components/ui/brand";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { cn } from "@/lib/utils";
@@ -12,10 +13,10 @@ import { Logout } from "./logout";
 type FrameBusiness = { id: string; name: string; slug: string };
 
 const routes = [
-  { href: "/dashboard", label: "Agenda", Icon: CalendarDays },
-  { href: "/dashboard/services", label: "Serviços", Icon: Scissors },
-  { href: "/dashboard/customers", label: "Clientes", Icon: Users },
-  { href: "/dashboard/settings", label: "Configurações", Icon: Settings },
+  { href: "/dashboard", label: "Agenda", Icon: DASHBOARD_NAV_ICONS.agenda },
+  { href: "/dashboard/services", label: "Serviços", Icon: DASHBOARD_NAV_ICONS.services },
+  { href: "/dashboard/customers", label: "Clientes", Icon: DASHBOARD_NAV_ICONS.customers },
+  { href: "/dashboard/settings", label: "Configurações", Icon: DASHBOARD_NAV_ICONS.settings },
 ] as const;
 
 function useFrameState(businesses: FrameBusiness[]) {
@@ -29,7 +30,7 @@ function useFrameState(businesses: FrameBusiness[]) {
 
 function NavLinks({ businesses, variant }: { businesses: FrameBusiness[]; variant: "sidebar" | "tabs" }) {
   const { pathname, suffix } = useFrameState(businesses);
-  return routes.map(({ href, label, Icon }) => {
+  return routes.map(({ href, label, Icon: NavIcon }) => {
     const current = pathname === href;
     return (
       <Link
@@ -44,7 +45,7 @@ function NavLinks({ businesses, variant }: { businesses: FrameBusiness[]; varian
         )}
       >
         <span className={cn(variant === "tabs" && "flex h-7 w-12 items-center justify-center rounded-full", variant === "tabs" && current && "bg-ink text-paper")}>
-          <Icon aria-hidden="true" className="size-[18px]" />
+          <Icon icon={NavIcon} size="lg" />
         </span>
         <span className={cn(variant === "tabs" && "max-w-full truncate")}>{label}</span>
       </Link>
@@ -57,7 +58,7 @@ function PublicPageLink({ businesses, className }: { businesses: FrameBusiness[]
   if (!business) return null;
   return (
     <Link href={`/${business.slug}`} target="_blank" className={cn("flex min-h-11 items-center gap-2 rounded-field px-3 text-sm font-semibold text-pix hover:bg-pix-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring", className)}>
-      <ExternalLink aria-hidden="true" className="size-4" />
+      <Icon icon={DASHBOARD_NAV_ICONS.publicPage} />
       Ver página pública<span className="sr-only"> (abre em nova aba)</span>
     </Link>
   );

@@ -10,6 +10,10 @@ export interface PublicBusinessData {
   name: string;
   timezone: string;
   services: PublicService[];
+  /** Endereço/cidade exibidos no cabeçalho se o backend enviar. */
+  address?: string | null;
+  /** Telefone/WhatsApp do negócio (só dígitos ou formatado). */
+  phone?: string | null;
 }
 
 export interface AvailabilitySlot {

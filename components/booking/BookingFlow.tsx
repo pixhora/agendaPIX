@@ -16,7 +16,9 @@ import { StepSlot } from "./StepSlot";
 import { StepCustomer } from "./StepCustomer";
 import { StepPayment } from "./StepPayment";
 import { BookingConfirmation } from "./BookingConfirmation";
-import { AlertTriangle, Lock, ShieldCheck } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
+import { BUSINESS_HEADER_ICONS, PIX_ICONS } from "@/lib/icons/registry";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
@@ -362,9 +364,29 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
             <h1 className="truncate font-display text-lg font-extrabold tracking-tight text-ink sm:text-xl">
               {business?.name ?? <span aria-hidden="true" className="inline-block h-5 w-40 animate-pulse rounded bg-subtle motion-reduce:animate-none" />}
             </h1>
-            <p className="flex items-center gap-1.5 text-xs font-medium text-muted sm:text-sm">
-              <ShieldCheck aria-hidden="true" className="size-3.5 text-pix" />
-              Agendamento online · sinal por Pix
+            <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-muted sm:text-sm">
+              <span className="inline-flex items-center gap-1.5">
+                <Icon icon={BUSINESS_HEADER_ICONS.secure} className="text-pix" />
+                Agendamento online · sinal por Pix
+              </span>
+              {business?.address ? (
+                <span className="inline-flex items-center gap-1">
+                  <Icon icon={BUSINESS_HEADER_ICONS.location} />
+                  <span className="truncate max-w-[28ch]">{business.address}</span>
+                </span>
+              ) : null}
+              {business?.phone ? (
+                <a
+                  href={`https://wa.me/${business.phone.replace(/\D/g, "")}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 font-semibold text-ink hover:text-pix focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                >
+                  <Icon icon={BUSINESS_HEADER_ICONS.whatsapp} />
+                  WhatsApp
+                  <span className="sr-only"> do estabelecimento (abre em nova aba)</span>
+                </a>
+              ) : null}
             </p>
           </div>
         </div>
@@ -376,7 +398,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
   const pageFooter = (
     <footer className="mx-auto flex max-w-5xl flex-col items-center gap-3 px-4 pb-10 pt-4 text-center text-xs text-muted sm:flex-row sm:justify-between sm:px-6 sm:text-left">
       <p className="inline-flex items-center gap-1.5">
-        <Lock aria-hidden="true" className="size-3.5" />
+        <Icon icon={PIX_ICONS.lock} />
         O sinal garante o horário. Seus dados são usados só para este agendamento.
       </p>
       <div className="flex items-center gap-3">
@@ -524,7 +546,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
         <aside aria-label="Seu pedido" className="hidden lg:sticky lg:top-6 lg:block">
           <BookingSummary service={selectedService} slot={selectedSlot} timezone={business.timezone} />
           <p className="mt-4 flex gap-2 px-1 text-xs leading-relaxed text-muted">
-            <ShieldCheck aria-hidden="true" className="size-4 shrink-0 text-pix" />
+            <Icon icon={BUSINESS_HEADER_ICONS.secure} className="shrink-0 text-pix" />
             Você paga só o sinal agora. O horário fica pré-reservado enquanto o Pix é feito. O prazo aparece no contador da cobrança.
           </p>
         </aside>

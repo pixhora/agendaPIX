@@ -3,7 +3,9 @@
 import React, { useEffect, useState, useMemo } from "react";
 import type { PublicService, AvailabilitySlot } from "./types";
 import { formatTimeSlot, formatCurrency, formatDateFull } from "./formatters";
-import { ArrowLeft, ArrowRight, CalendarX2, Moon, Sun, Sunrise } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarX2 } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
+import { PERIOD_ICONS } from "@/lib/icons/registry";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -21,10 +23,10 @@ interface StepSlotProps {
 }
 
 type Period = "morning" | "afternoon" | "evening";
-const PERIODS: { id: Period; label: string; Icon: typeof Sun }[] = [
-  { id: "morning", label: "Manhã", Icon: Sunrise },
-  { id: "afternoon", label: "Tarde", Icon: Sun },
-  { id: "evening", label: "Noite", Icon: Moon },
+const PERIODS: { id: Period; label: string; Icon: (typeof PERIOD_ICONS)[Period] }[] = [
+  { id: "morning", label: "Manhã", Icon: PERIOD_ICONS.morning },
+  { id: "afternoon", label: "Tarde", Icon: PERIOD_ICONS.afternoon },
+  { id: "evening", label: "Noite", Icon: PERIOD_ICONS.evening },
 ];
 
 /** Agrupa horários em manhã (<12h), tarde (12–18h) e noite (≥18h) no fuso do negócio. */
@@ -349,10 +351,10 @@ export function StepSlot({
           </div>
         ) : (
           <div role="radiogroup" aria-label="Horários disponíveis" className="space-y-5">
-            {PERIODS.filter((period) => groups[period.id].length > 0).map(({ id, label, Icon }) => (
+            {PERIODS.filter((period) => groups[period.id].length > 0).map(({ id, label, Icon: PeriodIcon }) => (
               <div key={id} role="group" aria-label={label}>
                 <h3 className="mb-2 flex items-center gap-2 font-sans text-sm font-semibold text-ink">
-                  <Icon aria-hidden="true" className="size-4 text-muted" />
+                  <Icon icon={PeriodIcon} className="text-muted" />
                   {label}
                   <span className="font-normal text-muted">· {groups[id].length}</span>
                 </h3>

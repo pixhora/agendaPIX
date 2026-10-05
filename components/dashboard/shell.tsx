@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { Building2 } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
+import { ACTION_ICONS } from "@/lib/icons/registry";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -34,7 +35,7 @@ export function DashboardShell({ title, description, path, businesses, businessI
     </header>
 
     {businessId ? children : <section className="rounded-card border border-line bg-surface p-6 sm:p-8">
-      <Building2 aria-hidden="true" className="mb-4 size-8 text-muted" />
+      <Icon icon={ACTION_ICONS.emptyBusiness} size="xl" className="mb-4 text-muted" />
       <h2 className="font-display text-xl font-bold">{businesses.length ? "Negócio indisponível" : "Seu negócio ainda não foi cadastrado"}</h2>
       <p className="mt-2 max-w-[60ch] text-muted">{businesses.length ? "Este negócio não está disponível para sua conta. Escolha um dos seus negócios para continuar." : "Conclua o cadastro do negócio para começar a organizar seus horários."}</p>
       {businesses.length > 0 ? <Link href={path} className={`${buttonVariants()} mt-5`}>Abrir meu negócio</Link> : <Link href="/onboarding" className={`${buttonVariants()} mt-5`}>Cadastrar meu negócio</Link>}
@@ -50,12 +51,15 @@ export function Empty({ title, children, icon, className }: { title: string; chi
   </section>;
 }
 
-export function SectionCard({ title, description, children, className, id, headingId, actions }: { title: string; description?: ReactNode; children: ReactNode; className?: string; id?: string; headingId?: string; actions?: ReactNode }) {
+export function SectionCard({ title, description, children, className, id, headingId, actions, icon }: { title: string; description?: ReactNode; children: ReactNode; className?: string; id?: string; headingId?: string; actions?: ReactNode; icon?: ReactNode }) {
   return <section id={id} aria-labelledby={headingId} className={cn("rounded-card border border-line bg-surface", className)}>
     <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line px-5 py-4 sm:px-6">
-      <div className="min-w-0">
-        <h2 id={headingId} className="font-display text-lg font-bold tracking-tight">{title}</h2>
-        {description && <p className="mt-0.5 text-sm text-muted">{description}</p>}
+      <div className="flex min-w-0 items-start gap-3">
+        {icon && <span aria-hidden="true" className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full bg-subtle text-muted">{icon}</span>}
+        <div className="min-w-0">
+          <h2 id={headingId} className="font-display text-lg font-bold tracking-tight">{title}</h2>
+          {description && <p className="mt-0.5 text-sm text-muted">{description}</p>}
+        </div>
       </div>
       {actions}
     </div>

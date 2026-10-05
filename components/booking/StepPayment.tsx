@@ -4,7 +4,9 @@ import React, { useEffect, useState, useCallback, useRef } from "react";
 import type { BookingResponse, PaymentStatusResponse } from "./types";
 import { formatCurrency } from "./formatters";
 import { pixUiPhase } from "./pix-status";
-import { Ban, Check, Copy, FlaskConical, Loader2, RefreshCw, Timer, TimerOff } from "lucide-react";
+import { FlaskConical } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
+import { PIX_ICONS, PIX_STATUS_ICONS } from "@/lib/icons/registry";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ValueSlab, StatusChip } from "@/components/ui/value-slab";
@@ -249,7 +251,7 @@ export function StepPayment({
   if (phase === "expired") {
     return (
       <div role="alert" aria-live="assertive" className="space-y-4 rounded-card border border-danger/30 bg-danger-soft p-6 text-center">
-        <TimerOff aria-hidden="true" className="mx-auto size-8 text-danger" />
+        <Icon icon={PIX_STATUS_ICONS.expired} size="xl" className="mx-auto text-danger" />
         <h2 className="font-display text-xl font-bold text-ink">Tempo de reserva esgotado</h2>
         <p className="text-sm text-ink">O prazo para pagar o sinal acabou e o horário foi liberado para outros clientes.</p>
         <Button onClick={onRestart} size="lg" className="w-full">
@@ -262,7 +264,7 @@ export function StepPayment({
   if (phase === "cancelled") {
     return (
       <div role="alert" aria-live="assertive" className="space-y-4 rounded-card border border-danger/30 bg-danger-soft p-6 text-center">
-        <Ban aria-hidden="true" className="mx-auto size-8 text-danger" />
+        <Icon icon={PIX_STATUS_ICONS.cancelled} size="xl" className="mx-auto text-danger" />
         <h2 className="font-display text-xl font-bold text-ink">Pagamento cancelado</h2>
         <p className="text-sm text-ink">Esta cobrança Pix foi cancelada. Escolha outro horário para gerar um novo sinal.</p>
         <Button onClick={onRestart} size="lg" className="w-full">
@@ -305,7 +307,7 @@ export function StepPayment({
         badge={
           timeLeft ? (
             <StatusChip active tone="slab">
-              <Timer aria-hidden="true" className="size-3.5" />
+              <Icon icon={PIX_ICONS.timer} className="size-3.5" />
               <span aria-hidden="true" className="font-mono tabular-nums">{timeLeft}</span>
               <span className="sr-only">{expiresLabel ? `Expira às ${expiresLabel}` : "Prazo em andamento"}</span>
             </StatusChip>
@@ -338,7 +340,7 @@ export function StepPayment({
             {payment?.copyPaste && (
               <div className="space-y-2">
                 <Button type="button" variant="pix" size="lg" onClick={handleCopy} className="w-full" data-testid="pix-copy-button">
-                  {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
+                  {copied ? <Icon icon={PIX_ICONS.copied} size="md" /> : <Icon icon={PIX_ICONS.copy} size="md" />}
                   {copied ? "Código copiado" : "Copiar código Pix"}
                 </Button>
                 <span className="sr-only" aria-live="polite">{copied ? "Código Pix copiado." : ""}</span>
@@ -372,11 +374,17 @@ export function StepPayment({
           onClick={() => void checkStatus("manual")}
           className="w-full"
         >
-          {isManualChecking ? <Loader2 aria-hidden="true" className="animate-spin" /> : <RefreshCw aria-hidden="true" />}
+          {isManualChecking ? <Icon icon={PIX_ICONS.loading} size="md" className="animate-spin" /> : <Icon icon={PIX_ICONS.refresh} size="md" />}
           {isManualChecking ? "Verificando confirmação…" : "Já paguei, verificar agora"}
         </Button>
         <p className="text-center text-xs text-muted">Verificamos automaticamente a cada poucos segundos. Guarde o comprovante.</p>
       </div>
+
+
+      <p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted">
+        <Icon icon={PIX_ICONS.secure} />
+        Pagamento seguro via Pix · o sinal confirma seu horário
+      </p>
 
       {showDevSimulate && (
         <div role="note" className="space-y-2 rounded-card border border-dashed border-warning/40 bg-warning-soft/60 p-4">
@@ -390,7 +398,7 @@ export function StepPayment({
             onClick={() => void handleSimulateDev()}
             className="w-full border-warning/40"
           >
-            {isSimulating ? <Loader2 aria-hidden="true" className="animate-spin" /> : <FlaskConical aria-hidden="true" />}
+            {isSimulating ? <Icon icon={PIX_ICONS.loading} size="md" className="animate-spin" /> : <Icon icon={FlaskConical} size="md" />}
             {isSimulating ? "Simulando…" : "Simular pagamento (dev)"}
           </Button>
         </div>

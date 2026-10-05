@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { CalendarClock, CalendarPlus, ChevronLeft, ChevronRight, Clock3, ListChecks } from "lucide-react";
+import { CalendarClock, ChevronLeft, ChevronRight } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
+import { ACTION_ICONS, KPI_ICONS } from "@/lib/icons/registry";
 import { DashboardShell, Empty } from "@/components/dashboard/shell";
 import { AgendaBoard, type AgendaDay, type AgendaItem } from "@/components/dashboard/agenda-board";
 import { AgendaDatePicker } from "@/components/dashboard/agenda-date-picker";
@@ -21,7 +23,7 @@ function KpiCard({ label, value, hint, icon, tone = "default" }: { label: string
   return <div className="rounded-card border border-line bg-surface p-4 sm:p-5">
     <div className="flex items-center justify-between gap-2">
       <p className="text-sm font-semibold text-muted">{label}</p>
-      <span aria-hidden="true" className={cn("flex size-8 items-center justify-center rounded-full [&_svg]:size-4", tone === "warning" ? "bg-warning-soft text-warning" : "bg-subtle text-ink")}>{icon}</span>
+      <span aria-hidden="true" className={cn("flex size-9 items-center justify-center rounded-xl sm:size-10", tone === "warning" ? "bg-warning-soft text-warning" : "bg-pix-soft text-pix")}>{icon}</span>
     </div>
     <p className="mt-2 font-display text-3xl font-extrabold tabular-nums tracking-tight">{value}</p>
     <p className="mt-1 text-xs text-muted sm:text-sm">{hint}</p>
@@ -104,8 +106,8 @@ export default async function AgendaPage({ searchParams }: { searchParams: Promi
           badge={<StatusChip tone="slab" active={kpis.pixRevenueCount > 0}>{kpis.pixRevenueCount === 1 ? "1 sinal pago" : `${kpis.pixRevenueCount} sinais pagos`}</StatusChip>}
           sublabel="Sinais confirmados pelo Pix. O restante você recebe no atendimento."
         />
-        <KpiCard label={`Agendamentos ${periodWord}`} value={String(kpis.bookingCount)} hint={`${kpis.confirmedCount} confirmados`} icon={<ListChecks />} />
-        <KpiCard label="Aguardando sinal" value={String(kpis.pendingCount)} hint={kpis.pendingCount ? `${formatBrlCents(kpis.pendingSignalCents)} a confirmar` : "Nenhum Pix pendente"} icon={<Clock3 />} tone={kpis.pendingCount ? "warning" : "default"} />
+        <KpiCard label={`Agendamentos ${periodWord}`} value={String(kpis.bookingCount)} hint={`${kpis.confirmedCount} confirmados`} icon={<Icon icon={KPI_ICONS.bookings} size="md" />} />
+        <KpiCard label="Aguardando sinal" value={String(kpis.pendingCount)} hint={kpis.pendingCount ? `${formatBrlCents(kpis.pendingSignalCents)} a confirmar` : "Nenhum Pix pendente"} icon={<Icon icon={KPI_ICONS.pending} size="md" />} tone={kpis.pendingCount ? "warning" : "default"} />
       </section>
 
       {nextBooking && <section aria-label="Próximo atendimento" className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-card border border-pix/25 bg-pix-soft px-4 py-3 text-sm sm:px-5">
@@ -118,7 +120,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Promi
         <h2 className="font-display text-lg font-bold">{weekly ? "Semana" : "Atendimentos"}</h2>
         <p aria-live="polite" className="text-sm text-muted">{bookings.length} {bookings.length === 1 ? "agendamento" : "agendamentos"}</p>
       </div>
-      {!bookings.length && !weekly ? <Empty title="Nenhum atendimento neste dia" icon={<CalendarPlus />}>
+      {!bookings.length && !weekly ? <Empty title="Nenhum atendimento neste dia" icon={<Icon icon={ACTION_ICONS.emptyAgenda} size="md" />}>
         <p>Compartilhe o link da sua página para receber reservas com sinal via Pix.</p>
         <div className="mx-auto mt-4 max-w-sm text-left"><PublicLink slug={business.slug} /></div>
         <Link className="mt-3 inline-flex min-h-11 items-center font-semibold text-ink underline underline-offset-4" href={`/dashboard/settings?businessId=${business.id}`}>Conferir horários de funcionamento</Link>

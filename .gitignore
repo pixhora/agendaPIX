@@ -38,3 +38,6 @@ videos/
 # Python (scripts locais)
 __pycache__/
 *.py[cod]
+
+# Captura local de link mágico / storage e2e
+tests/e2e/.auth/

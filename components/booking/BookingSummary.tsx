@@ -1,4 +1,5 @@
-import { CalendarDays, Clock3, Scissors } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
+import { SUMMARY_ICONS } from "@/lib/icons/registry";
 import type { AvailabilitySlot, PublicService } from "./types";
 import { formatCurrency, formatDateFull, formatDuration, formatTimeSlot } from "./formatters";
 import { cn } from "@/lib/utils";
@@ -31,18 +32,18 @@ export function BookingSummary({ service, slot, timezone, variant = "hero", clas
       <dl className="space-y-3 p-5 text-sm">
         <div className="flex items-start gap-3">
           <dt className="sr-only">Serviço</dt>
-          <Scissors aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted" />
+          <Icon icon={SUMMARY_ICONS.service} className="mt-0.5 size-4 shrink-0 text-muted" />
           <dd className="min-w-0 flex-1 font-semibold text-ink">{service ? service.name : <span className="font-normal text-muted">Escolha um serviço</span>}</dd>
           {service && <dd className="text-muted">{formatDuration(service.durationMinutes)}</dd>}
         </div>
         <div className="flex items-start gap-3">
           <dt className="sr-only">Data</dt>
-          <CalendarDays aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted" />
+          <Icon icon={SUMMARY_ICONS.date} className="mt-0.5 size-4 shrink-0 text-muted" />
           <dd className={cn("first-letter:uppercase", slot ? "font-semibold text-ink" : "text-muted")}>{slot ? formatDateFull(slot.startsAt, timezone) : "Escolha o dia"}</dd>
         </div>
         <div className="flex items-start gap-3">
           <dt className="sr-only">Horário</dt>
-          <Clock3 aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted" />
+          <Icon icon={SUMMARY_ICONS.time} className="mt-0.5 size-4 shrink-0 text-muted" />
           <dd className={cn("tabular-nums", slot ? "font-semibold text-ink" : "text-muted")}>
             {slot ? `${formatTimeSlot(slot.startsAt, timezone)} – ${formatTimeSlot(slot.endsAt, timezone)}` : "Escolha o horário"}
           </dd>

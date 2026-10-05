@@ -437,3 +437,59 @@ Tomadas sem consulta (o dono estava indisponível), registradas aqui e no PR par
 | `<dl>` do detalhe do agendamento e da confirmação com `dt`/`dd` diretos (ícone dentro do `dt` ou decorativo ao lado) | O axe apontava `definition-list`/`dlitem`; leitores de tela agora anunciam os pares rótulo → valor. |
 | `scroll-padding` de 5 rem no painel no celular | Foco e âncoras nunca ficam atrás da barra superior ou das abas inferiores (WCAG 2.4.11). |
 | No e2e, `target-size` (WCAG 2.5.8) roda com as barras sticky do painel no fluxo e sem toasts | As barras sticky "cobrem" o que está rolando por baixo no instante do teste. A cobertura real é tratada pelo `scroll-padding`; todas as outras regras rodam com a página como está. |
+
+---
+
+## Ícones (v1.2 — enriquecimento UI)
+
+| Campo | Valor |
+|---|---|
+| Data | 2026-10-05 (America/Sao_Paulo) |
+| Status | **Decisão aplicada** |
+| Biblioteca | **Somente `lucide-react`** (já no `package.json`; estilo shadcn new-york). Sem Heroicons/Phosphor/Tabler no código. |
+| Referências | `docs/design-refs/icons/` (15 capturas WebP + README). Dribbble (captcha) e Mobbin (login) pulados. |
+
+### Princípios
+
+1. **Pouco e consistente** — página pública no espírito Stripe Checkout: ícones onde adicionam reconhecimento (duração, Pix, status), sem decorar cada linha.
+2. **Stroke** — `strokeWidth={1.75}` com `absoluteStrokeWidth`; cantos padrão Lucide.
+3. **Tamanhos** — 16px inline e dentro de campos; 20px em botões e itens de lista; **24px na nav** do painel. KPIs: ícone 20px num quadrado **36–40px** (`rounded-xl`) com fundo accent claro (`bg-pix-soft` / warning-soft).
+4. **Cor** — herda o texto; padrão de apoio `text-muted`. Cor só para **status** e **item ativo** da nav.
+5. **Acessibilidade** — decorativos com `aria-hidden`; botões só de ícone com `aria-label`; significado nunca só pelo ícone (texto ou `sr-only` junto).
+6. **API de código** — wrapper `components/ui/icon.tsx` (`Icon`, `ICON_STROKE`, `ICON_SIZE`) + mapas em `lib/icons/registry.ts`.
+
+### Mapeamento (lucide)
+
+| Uso | Ícone Lucide | Nota |
+|---|---|---|
+| Passo serviço | `Scissors` | |
+| Passo data / resumo data | `CalendarDays` | |
+| Horário / duração | `Clock` | Preferido a `Clock3` |
+| Passo dados / campo nome | `User` | |
+| Passo Pix / QR | `QrCode` | |
+| Confirmado (herói) | `CircleCheckBig` | |
+| Preço | `Banknote` | |
+| Períodos | `Sunrise` / `Sun` / `Moon` | Manhã / tarde / noite |
+| WhatsApp | `MessageCircle` | Sem logo de marca |
+| Telefone | `Phone` | |
+| CPF | `IdCard` | |
+| Copiar → copiado | `Copy` → `Check` | Feedback no botão |
+| Timer Pix | `Timer` | |
+| Selo seguro | `ShieldCheck` | |
+| Status pago | `CircleCheck` | Verde (`text-success`) |
+| Status pendente | `Hourglass` | Âmbar |
+| Status expirado | `TimerOff` | Cinza |
+| Status cancelado | `CircleX` | Vermelho/muted |
+| Nav agenda | `CalendarDays` | Seções existentes apenas |
+| Nav serviços | `Scissors` | |
+| Nav clientes | `Users` | |
+| Nav configurações | `Settings` | |
+| Sair | `LogOut` | |
+| KPI agendamentos | `CalendarCheck` | |
+| KPI aguardando Pix | `Hourglass` | |
+| Endereço | `MapPin` | Só se o backend enviar |
+| Voltar | `ChevronLeft` | |
+
+**Não aplicados ainda (sem seção/KPI no produto):** `LayoutDashboard`, nav `Wallet` (financeiro), KPIs `TrendingUp` / `UserPlus` / `CalendarX` — ficam documentados no registry para quando existirem.
+
+**Equivalências de nome:** Lucide moderno usa `CircleCheck` (não `CheckCircle`); `CircleX` (não `XCircle`). Todos os glifos acima existem em `lucide-react@^1.51.0` instalado.

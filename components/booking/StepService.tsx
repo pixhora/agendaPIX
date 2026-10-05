@@ -1,7 +1,9 @@
 "use client";
 
 import React from "react";
-import { ArrowRight, Check, Clock3 } from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
+import { SUMMARY_ICONS } from "@/lib/icons/registry";
 import type { PublicService } from "./types";
 import { formatCurrency, formatDuration } from "./formatters";
 import { Button } from "@/components/ui/button";
@@ -75,7 +77,7 @@ export function StepService({ services, selectedServiceId, onSelectService, onNe
               <span className="min-w-0 flex-1">
                 <span className="block font-semibold text-ink">{service.name}</span>
                 <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
-                  <span className="inline-flex items-center gap-1"><Clock3 aria-hidden="true" className="size-3.5" />{formatDuration(service.durationMinutes)}</span>
+                  <span className="inline-flex items-center gap-1"><Icon icon={SUMMARY_ICONS.duration} className="size-3.5" />{formatDuration(service.durationMinutes)}</span>
                   {service.depositCents > 0 ? (
                     <span className="inline-flex items-center rounded-full bg-pix-soft px-2 py-0.5 text-xs font-semibold text-pix">Sinal {formatCurrency(service.depositCents)} no Pix</span>
                   ) : (
@@ -84,7 +86,10 @@ export function StepService({ services, selectedServiceId, onSelectService, onNe
                 </span>
               </span>
               <span className="shrink-0 text-right">
-                <span className="block font-display text-lg font-bold tabular-nums text-ink">{formatCurrency(service.priceCents)}</span>
+                <span className="inline-flex items-center justify-end gap-1 font-display text-lg font-bold tabular-nums text-ink">
+                  <Icon icon={SUMMARY_ICONS.price} className="size-3.5 text-muted" />
+                  {formatCurrency(service.priceCents)}
+                </span>
               </span>
             </button>
           );

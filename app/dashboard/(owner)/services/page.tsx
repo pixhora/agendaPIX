@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { Clock3, Pencil, Plus, Scissors } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
+import { ACTION_ICONS, SUMMARY_ICONS } from "@/lib/icons/registry";
 import { DashboardShell, Empty, SectionCard } from "@/components/dashboard/shell";
 import { ServiceForm } from "@/components/dashboard/forms";
 import { buttonVariants } from "@/components/ui/button";
@@ -27,7 +29,7 @@ export default async function ServicesPage({ searchParams }: { searchParams: Pro
           <h2 id="services-title" className="font-display text-lg font-bold">Seus serviços</h2>
           <p className="text-sm tabular-nums text-muted">{services.length} {services.length === 1 ? "serviço" : "serviços"}</p>
         </div>
-        {!services.length ? <Empty title="Seu primeiro serviço começa aqui" icon={<Scissors />}>
+        {!services.length ? <Empty title="Seu primeiro serviço começa aqui" icon={<Icon icon={ACTION_ICONS.emptyServices} size="md" />}>
           <p>Cadastre um serviço para abrir a agenda aos clientes.</p>
           <Link href="#new-service" className={buttonVariants({ variant: "outline", className: "mt-4" })}>Cadastrar primeiro serviço</Link>
         </Empty> : <ul className="grid gap-3">
@@ -36,7 +38,7 @@ export default async function ServicesPage({ searchParams }: { searchParams: Pro
               <div className="min-w-0">
                 <h3 className="break-words font-display text-lg font-bold tracking-tight">{service.name}</h3>
                 <p className="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-muted">
-                  <span className="inline-flex items-center gap-1"><Clock3 aria-hidden="true" className="size-3.5" />{service.durationMinutes} min</span>
+                  <span className="inline-flex items-center gap-1"><Icon icon={SUMMARY_ICONS.duration} className="text-muted" />{service.durationMinutes} min</span>
                   <span className={cn("inline-flex min-h-6 items-center gap-1.5 rounded-full px-2 text-xs font-semibold", service.active ? "bg-success-soft text-success" : "bg-subtle text-muted")}>
                     <span aria-hidden="true" className={cn("size-1.5 rounded-full", service.active ? "bg-success" : "bg-line-strong")} />{service.active ? "Disponível" : "Indisponível"}
                   </span>

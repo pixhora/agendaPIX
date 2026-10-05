@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CalendarDays, Clock3, MessageCircle, Phone, Scissors, Wallet, X } from "lucide-react";
+import { Wallet, X } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
+import { ACTION_ICONS, SUMMARY_ICONS } from "@/lib/icons/registry";
 import { StatusBadge, type BookingStatusValue } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -56,9 +58,9 @@ function BookingDetail({ booking, day, businessName, onClose }: { booking: Agend
           <Button variant="ghost" size="icon" onClick={() => ref.current?.close()} aria-label="Fechar detalhes"><X aria-hidden="true" /></Button>
         </div>
         <dl className="grid gap-4 overflow-y-auto px-5 py-5 text-sm sm:px-6">
-          <div className="grid grid-cols-[1rem_1fr] gap-x-3 gap-y-0.5"><dt className="col-span-2 grid grid-cols-subgrid items-center text-muted"><CalendarDays aria-hidden="true" className="size-4" />Data</dt><dd className="col-start-2 font-semibold capitalize">{day?.label}</dd></div>
-          <div className="grid grid-cols-[1rem_1fr] gap-x-3 gap-y-0.5"><dt className="col-span-2 grid grid-cols-subgrid items-center text-muted"><Clock3 aria-hidden="true" className="size-4" />Horário</dt><dd className="col-start-2 font-semibold tabular-nums">{booking.start} – {booking.end}</dd></div>
-          <div className="grid grid-cols-[1rem_1fr] gap-x-3 gap-y-0.5"><dt className="col-span-2 grid grid-cols-subgrid items-center text-muted"><Scissors aria-hidden="true" className="size-4" />Serviço</dt><dd className="col-start-2 font-semibold">{booking.serviceName}</dd></div>
+          <div className="grid grid-cols-[1rem_1fr] gap-x-3 gap-y-0.5"><dt className="col-span-2 grid grid-cols-subgrid items-center text-muted"><Icon icon={SUMMARY_ICONS.date} className="text-muted" />Data</dt><dd className="col-start-2 font-semibold capitalize">{day?.label}</dd></div>
+          <div className="grid grid-cols-[1rem_1fr] gap-x-3 gap-y-0.5"><dt className="col-span-2 grid grid-cols-subgrid items-center text-muted"><Icon icon={SUMMARY_ICONS.time} className="text-muted" />Horário</dt><dd className="col-start-2 font-semibold tabular-nums">{booking.start} – {booking.end}</dd></div>
+          <div className="grid grid-cols-[1rem_1fr] gap-x-3 gap-y-0.5"><dt className="col-span-2 grid grid-cols-subgrid items-center text-muted"><Icon icon={SUMMARY_ICONS.service} className="text-muted" />Serviço</dt><dd className="col-start-2 font-semibold">{booking.serviceName}</dd></div>
           <div className="grid grid-cols-[1rem_1fr] gap-x-3 gap-y-0.5">
             <dt className="col-span-2 grid grid-cols-subgrid items-center text-muted"><Wallet aria-hidden="true" className="size-4" />Valores</dt>
             <dd className="col-start-2 mt-1 grid gap-1.5 rounded-field bg-subtle p-3 tabular-nums">
@@ -69,8 +71,8 @@ function BookingDetail({ booking, day, businessName, onClose }: { booking: Agend
           </div>
         </dl>
         <div className="mt-auto grid grid-cols-2 gap-2 border-t border-line px-5 py-4 sm:px-6">
-          <a className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-ink px-4 text-sm font-semibold text-paper hover:bg-ink-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" href={`https://wa.me/${phoneDigits}?text=${encodeURIComponent(`Olá, ${booking.customerName}! Aqui é ${businessName}.`)}`} target="_blank" rel="noopener noreferrer"><MessageCircle aria-hidden="true" className="size-4" />WhatsApp<span className="sr-only"> (abre em nova aba)</span></a>
-          <a className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-line bg-surface px-4 text-sm font-semibold hover:bg-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" href={`tel:${booking.customerPhone}`}><Phone aria-hidden="true" className="size-4" />Ligar</a>
+          <a className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-ink px-4 text-sm font-semibold text-paper hover:bg-ink-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" href={`https://wa.me/${phoneDigits}?text=${encodeURIComponent(`Olá, ${booking.customerName}! Aqui é ${businessName}.`)}`} target="_blank" rel="noopener noreferrer"><Icon icon={ACTION_ICONS.whatsapp} size="md" />WhatsApp<span className="sr-only"> (abre em nova aba)</span></a>
+          <a className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-line bg-surface px-4 text-sm font-semibold hover:bg-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" href={`tel:${booking.customerPhone}`}><Icon icon={ACTION_ICONS.phone} size="md" />Ligar</a>
         </div>
       </div>}
     </dialog>

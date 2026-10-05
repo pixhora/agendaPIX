@@ -56,6 +56,8 @@ export const MOCK_PUBLIC_BUSINESS: PublicBusinessData = {
   name: MOCK_BUSINESS_INFO.name,
   timezone: MOCK_BUSINESS_INFO.timezone,
   services: MOCK_SERVICES,
+  address: MOCK_BUSINESS_INFO.city,
+  phone: MOCK_BUSINESS_INFO.phone,
 };
 
 // Gera slots de disponibilidade mockados para uma data e duração de serviço
