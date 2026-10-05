@@ -4,7 +4,7 @@ Suíte em `tests/e2e/`, dois projetos: **mobile** (390×844, perfil iPhone 13 no
 
 | Arquivo | Cobre |
 | --- | --- |
-| `booking.spec.ts` | Página pública: serviço → dia/horário → nome e WhatsApp → Pix (provedor fake) → webhook assinado → "Horário confirmado!", com axe em cada etapa |
+| `booking.spec.ts` | Página pública: serviço → dia/horário → nome, WhatsApp e CPF → Pix (QR PNG + copia-e-cola do contrato `PixCharge`, provedor fake) → webhook assinado → "Horário confirmado!"; também cobre expiração do hold; axe em cada etapa |
 | `owner-journeys.spec.ts` | Login por link mágico (`/login` → `/dashboard`, link reutilizado volta com aviso) e onboarding completo → painel |
 | `painel.spec.ts` | Agenda do dia (KPIs, detalhe no painel lateral), semana/navegação/calendário, cadastro de serviço, clientes, configurações (horários e chave Pix), isolamento entre negócios (A não vê B, inclusive na API da chave Pix) |
 | `dashboard-owner.spec.ts`, `dashboard-login.spec.ts` | Redirecionamentos, cabeçalhos e acesso negado |

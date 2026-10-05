@@ -35,6 +35,7 @@ export function PreviewBookingFlow() {
   });
   const [customerName, setCustomerName] = useState("Juliana Mendes");
   const [customerPhone, setCustomerPhone] = useState("(11) 98234-5678");
+  const [customerCpf, setCustomerCpf] = useState("529.982.247-25");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bookingResponse, setBookingResponse] = useState<BookingResponse | null>(null);
@@ -56,11 +57,11 @@ export function PreviewBookingFlow() {
     await new Promise((resolve) => setTimeout(resolve, 400));
 
     const mockBookingId = `bk-preview-${Date.now()}`;
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
-    // QR Code em SVG/DataURL determinístico para o preview
+    // PNG 1×1 (data URL) — mesmo prefixo do contrato PixCharge (`data:image/png;base64,`)
     const sampleQr =
-      "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='white'/><rect x='10' y='10' width='30' height='30' fill='black'/><rect x='60' y='10' width='30' height='30' fill='black'/><rect x='10' y='60' width='30' height='30' fill='black'/><rect x='20' y='20' width='10' height='10' fill='white'/><rect x='70' y='20' width='10' height='10' fill='white'/><rect x='20' y='70' width='10' height='10' fill='white'/><rect x='45' y='45' width='10' height='10' fill='black'/><rect x='65' y='65' width='15' height='15' fill='black'/></svg>";
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
     const mockResponse: BookingResponse = {
       bookingId: mockBookingId,
@@ -187,6 +188,8 @@ export function PreviewBookingFlow() {
                   errorMessage={null}
                   onChangeName={setCustomerName}
                   onChangePhone={setCustomerPhone}
+                  cpf={customerCpf}
+                  onChangeCpf={setCustomerCpf}
                   onBack={() => setStep(2)}
                   onSubmit={handleCreateMockBooking}
                 />
