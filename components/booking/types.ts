@@ -10,6 +10,12 @@ export interface PublicBusinessData {
   name: string;
   timezone: string;
   services: PublicService[];
+  /** Endereço/cidade exibidos no cabeçalho se o backend enviar. */
+  address?: string | null;
+  /** Telefone/WhatsApp do negócio (só dígitos ou formatado). */
+  phone?: string | null;
+  /** Logo do negócio; se ausente, o avatar usa ícone CalendarCheck. */
+  logoUrl?: string | null;
 }
 
 export interface AvailabilitySlot {

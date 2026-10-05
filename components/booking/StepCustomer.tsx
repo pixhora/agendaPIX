@@ -3,7 +3,9 @@
 import React, { useState } from "react";
 import type { PublicService, AvailabilitySlot } from "./types";
 import { formatCurrency, formatCpfMask, formatPhoneMask, isValidBrazilianPhone, isValidCpf } from "./formatters";
-import { ArrowLeft, Lock, MessageCircle } from "lucide-react";
+import { ArrowLeft, Lock } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
+import { CUSTOMER_FIELD_ICONS } from "@/lib/icons/registry";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -83,24 +85,28 @@ export function StepCustomer({
       <div className="space-y-5">
         <div className="space-y-2">
           <Label htmlFor="customer-name">Seu nome</Label>
-          <Input
-            id="customer-name"
-            required
-            autoComplete="name"
-            placeholder="Como podemos te chamar?"
-            value={name}
-            onChange={(e) => onChangeName(e.target.value)}
-            onBlur={() => setTouched((prev) => ({ ...prev, name: true }))}
-            aria-invalid={nameError ? true : undefined}
-            aria-describedby={nameError ? "name-error" : undefined}
-          />
+          <div className="relative">
+            <Icon icon={CUSTOMER_FIELD_ICONS.name} className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
+            <Input
+              id="customer-name"
+              required
+              autoComplete="name"
+              placeholder="Como podemos te chamar?"
+              value={name}
+              onChange={(e) => onChangeName(e.target.value)}
+              onBlur={() => setTouched((prev) => ({ ...prev, name: true }))}
+              aria-invalid={nameError ? true : undefined}
+              aria-describedby={nameError ? "name-error" : undefined}
+              className="pl-10"
+            />
+          </div>
           <FieldError id="name-error">{nameError}</FieldError>
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="customer-phone">WhatsApp</Label>
           <div className="relative">
-            <MessageCircle aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
+            <Icon icon={CUSTOMER_FIELD_ICONS.whatsapp} className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
             <Input
               id="customer-phone"
               type="tel"
@@ -122,19 +128,23 @@ export function StepCustomer({
 
         <div className="space-y-2">
           <Label htmlFor="customer-cpf">CPF</Label>
-          <Input
-            id="customer-cpf"
-            type="text"
-            inputMode="numeric"
-            required
-            autoComplete="off"
-            placeholder="000.000.000-00"
-            value={cpf}
-            onChange={handleCpfChange}
-            onBlur={() => setTouched((prev) => ({ ...prev, cpf: true }))}
-            aria-invalid={cpfError ? true : undefined}
-            aria-describedby={cpfError ? "cpf-error cpf-hint" : "cpf-hint"}
-          />
+          <div className="relative">
+            <Icon icon={CUSTOMER_FIELD_ICONS.cpf} className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
+            <Input
+              id="customer-cpf"
+              type="text"
+              inputMode="numeric"
+              required
+              autoComplete="off"
+              placeholder="000.000.000-00"
+              value={cpf}
+              onChange={handleCpfChange}
+              onBlur={() => setTouched((prev) => ({ ...prev, cpf: true }))}
+              aria-invalid={cpfError ? true : undefined}
+              aria-describedby={cpfError ? "cpf-error cpf-hint" : "cpf-hint"}
+              className="pl-10"
+            />
+          </div>
           <FieldHint id="cpf-hint">Exigido para emitir a cobrança Pix em seu nome.</FieldHint>
           <FieldError id="cpf-error">{cpfError}</FieldError>
         </div>

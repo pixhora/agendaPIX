@@ -1,10 +1,11 @@
 import React from "react";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ICON_STROKE } from "@/components/ui/icon";
+import { BOOKING_STEP_ICONS } from "@/lib/icons/registry";
 
 interface StepProgressProps {
   currentStep: 1 | 2 | 3 | 4;
-  /** Rótulos das 4 etapas (padrão: fluxo de agendamento). */
   steps?: readonly { step: number; label: string }[];
   label?: string;
 }
@@ -16,7 +17,7 @@ const BOOKING_STEPS = [
   { step: 4, label: "Pix" },
 ] as const;
 
-/** Stepper serviço → data/hora → dados → Pix. */
+/** Stepper com um ícone por passo (mapa em lib/icons/registry). */
 export function StepProgress({ currentStep, steps = BOOKING_STEPS, label = "Etapas do agendamento" }: StepProgressProps) {
   const STEPS = steps;
   const current = STEPS[currentStep - 1];
@@ -30,6 +31,7 @@ export function StepProgress({ currentStep, steps = BOOKING_STEPS, label = "Etap
         {STEPS.map((s) => {
           const isDone = currentStep > s.step;
           const isCurrent = currentStep === s.step;
+          const StepIcon = BOOKING_STEP_ICONS[s.step as 1 | 2 | 3 | 4];
           return (
             <li key={s.step} aria-current={isCurrent ? "step" : undefined} className="min-w-0">
               <span className={cn("block h-1.5 rounded-full transition-step", isDone ? "bg-pix" : isCurrent ? "bg-ink" : "bg-line")} aria-hidden="true" />
@@ -37,11 +39,15 @@ export function StepProgress({ currentStep, steps = BOOKING_STEPS, label = "Etap
                 <span
                   aria-hidden="true"
                   className={cn(
-                    "flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold",
+                    "flex size-5 shrink-0 items-center justify-center rounded-full",
                     isDone ? "bg-pix text-pix-foreground" : isCurrent ? "bg-ink text-paper" : "border border-line-strong/60 text-muted",
                   )}
                 >
-                  {isDone ? <Check className="size-3" strokeWidth={3} /> : s.step}
+                  {isDone ? (
+                    <Check className="size-3" strokeWidth={3} absoluteStrokeWidth />
+                  ) : (
+                    <StepIcon size={12} strokeWidth={ICON_STROKE} absoluteStrokeWidth aria-hidden="true" />
+                  )}
                 </span>
                 <span className="truncate">{s.label}</span>
               </span>
