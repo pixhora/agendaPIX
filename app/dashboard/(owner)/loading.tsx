@@ -1,0 +1,3 @@
+export default function Loading() {
+  return <main id="content" role="status" aria-label="Carregando painel" className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-8 sm:py-8"><p className="text-sm text-muted-foreground">Carregando painel…</p><div aria-hidden="true" className="grid grid-cols-2 gap-2 sm:flex">{[0, 1, 2, 3].map((item) => <div key={item} className="h-11 rounded-full bg-line/60 motion-safe:animate-pulse" />)}</div><div aria-hidden="true" className="h-44 rounded-frame border border-line bg-surface motion-safe:animate-pulse" />{[0, 1, 2].map((item) => <div key={item} aria-hidden="true" className="h-24 rounded-card border border-line bg-surface motion-safe:animate-pulse" />)}</main>;
+}

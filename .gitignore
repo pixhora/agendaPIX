@@ -29,3 +29,6 @@ __pycache__/
 *.key
 id_rsa
 id_ed25519
+
+# Estado local do Playwright para e2e do painel
+tests/e2e/.auth/
