@@ -5,6 +5,7 @@ import { PublicLink } from "@/components/dashboard/public-link";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { ownerContext } from "@/lib/dashboard/session";
 import { dashboardHours } from "@/lib/dashboard/data";
+import { friendlyTimezoneLabel } from "@/lib/dashboard/timezone-label";
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ businessId?: string }> }) {
   const { businessId } = await searchParams;
@@ -14,7 +15,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     {business && <div className="grid gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(18rem,0.7fr)] lg:items-start">
       <div className="grid min-w-0 gap-6">
         {!hours.length && <Empty title="Sua agenda está fechada">Ligue os dias de atendimento e salve os horários para receber agendamentos.</Empty>}
-        <SectionCard title="Horários de funcionamento" headingId="hours-title" description={`Fuso horário: ${business.timezone}.`}>
+        <SectionCard title="Horários de funcionamento" headingId="hours-title" description={`Fuso horário: ${friendlyTimezoneLabel(business.timezone)}.`}>
           <HoursForm key={business.id} businessId={business.id} hours={hours} />
         </SectionCard>
         <PixKeyForm key={`pix-${business.id}`} businessId={business.id} />
