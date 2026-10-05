@@ -10,8 +10,8 @@ import { getPaymentProvider } from "../payments";
 import { pixChargeSchema, type PaymentProvider } from "../payments/provider";
 import { availableSlots, localDate } from "./availability";
 import { availabilitySchema, bookingInputSchema, requestKeySchema, slugSchema } from "./validation";
-import { bookingConfig } from "./config";
-import { consumeBookingRateLimit } from "./rate-limit";
+import { bookingConfig, type BookingConfig } from "./config";
+import { consumeBookingRateLimit, tenantScopedHash } from "./rate-limit";
 
 type Database = NodePgDatabase<typeof schema>;
 export function hash(value: string) { return createHash("sha256").update(value).digest("hex"); }
@@ -76,6 +76,35 @@ async function bookingView(booking: typeof schema.bookings.$inferSelect, databas
   return { bookingId: booking.id, status: booking.status, startsAt: booking.startsAt, endsAt: booking.endsAt, expiresAt: booking.expiresAt, payment: paymentView(payment, now) };
 }
 
+function retryAfter(next: string | Date | null, now: Date) {
+  return next ? Math.max(1, Math.ceil((new Date(next).getTime() - now.getTime()) / 1000)) : 60;
+}
+
+/**
+ * Limita reservas pendentes (não pagas e não vencidas) para que ninguém bloqueie a agenda com sinais não pagos.
+ * Executa sob o lock do negócio e depois de expirePending, então a contagem é exata e livre de corrida.
+ */
+async function enforcePendingHoldLimits(database: Database, businessId: string, holder: { clientHash: string | null; phone: string }, now: Date, config: BookingConfig) {
+  const pending = and(eq(schema.bookings.businessId, businessId), eq(schema.bookings.status, "pending_payment"), gt(schema.bookings.expiresAt, now));
+  const stats = { count: sql<number>`count(*)::int`, next: sql<string | null>`min(${schema.bookings.expiresAt})` };
+  if (holder.clientHash) {
+    const [client] = await database.select(stats).from(schema.bookings).where(and(pending, eq(schema.bookings.clientHash, holder.clientHash)));
+    if (client.count >= config.BOOKING_MAX_PENDING_PER_CLIENT) {
+      throw new HttpError(429, "pending_hold_limit", "Você já tem reservas aguardando pagamento. Pague ou aguarde o vencimento para reservar outro horário.", retryAfter(client.next, now));
+    }
+  }
+  const [phone] = await database.select(stats).from(schema.bookings)
+    .innerJoin(schema.customers, and(eq(schema.customers.businessId, schema.bookings.businessId), eq(schema.customers.id, schema.bookings.customerId)))
+    .where(and(pending, eq(schema.customers.phone, holder.phone)));
+  if (phone.count >= config.BOOKING_MAX_PENDING_PER_PHONE) {
+    throw new HttpError(429, "pending_hold_limit", "Este telefone já tem reservas aguardando pagamento. Pague ou aguarde o vencimento para reservar outro horário.", retryAfter(phone.next, now));
+  }
+  const [business] = await database.select(stats).from(schema.bookings).where(pending);
+  if (business.count >= config.BOOKING_MAX_PENDING_PER_BUSINESS) {
+    throw new HttpError(409, "hold_capacity_reached", "Muitas reservas aguardando pagamento neste momento. Tente novamente em alguns minutos.", retryAfter(business.next, now));
+  }
+}
+
 export async function createBooking(slug: string, body: unknown, key: unknown, database: Database = getDb(), provider?: PaymentProvider, clientIdentity: string | null = null) {
   const config = bookingConfig();
   const input = bookingInputSchema.parse(body);
@@ -83,6 +112,7 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
   const requestHash = hash(JSON.stringify(input));
   const business = await businessBySlug(slug, database);
   await consumeBookingRateLimit(database, business.id, clientIdentity, config);
+  const clientHash = clientIdentity ? tenantScopedHash("booking-client:v1", business.id, clientIdentity) : null;
   return database.transaction(async (transaction) => {
     await lockBusiness(transaction, business.id);
     const now = new Date();
@@ -97,11 +127,12 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
     const slots = await slotsFor(business, service, date, now, transaction);
     const slot = slots.find((candidate) => candidate.startsAt.toISOString() === input.startsAt);
     if (!slot) throw new HttpError(409, "slot_unavailable", "Esse horário não está disponível. Escolha outro.");
+    if (service.depositCents > 0) await enforcePendingHoldLimits(transaction, business.id, { clientHash, phone: input.customer.phone }, now, config);
     const [insertedCustomer] = await transaction.insert(schema.customers).values({ businessId: business.id, ...input.customer }).onConflictDoNothing({ target: [schema.customers.businessId, schema.customers.phone] }).returning({ id: schema.customers.id });
     const [existingCustomer] = insertedCustomer ? [] : await transaction.select({ id: schema.customers.id }).from(schema.customers).where(and(eq(schema.customers.businessId, business.id), eq(schema.customers.phone, input.customer.phone))).limit(1);
     const customerId = (insertedCustomer ?? existingCustomer).id;
-    const expiresAt = service.depositCents > 0 ? new Date(Math.min(now.getTime() + 900000, slot.startsAt.getTime())) : null;
-    const [booking] = await transaction.insert(schema.bookings).values({ businessId: business.id, serviceId: service.id, customerId, requestKey, requestHash, ...slot,
+    const expiresAt = service.depositCents > 0 ? new Date(Math.min(now.getTime() + config.BOOKING_HOLD_MINUTES * 60000, slot.startsAt.getTime())) : null;
+    const [booking] = await transaction.insert(schema.bookings).values({ businessId: business.id, serviceId: service.id, customerId, requestKey, requestHash, clientHash, ...slot,
       priceCents: service.priceCents, depositCents: service.depositCents, status: expiresAt ? "pending_payment" : "confirmed", expiresAt, createdAt: now }).returning();
     const token = accessToken(business.id, booking.id);
     await transaction.update(schema.bookings).set({ accessTokenHash: hash(token) }).where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.id, booking.id)));
