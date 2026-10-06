@@ -10,6 +10,7 @@ import {
   MercadoPagoPaymentProvider,
   signMercadoPagoWebhook,
 } from "../../lib/payments/mercadopago";
+import { InMemoryChargeReferenceStore } from "../../lib/payments/reference-store";
 
 const accessToken = "TEST-access-token-not-real";
 const webhookSecret = "test-only-mercadopago-webhook-secret-32chars";
@@ -514,5 +515,35 @@ describe("seleção do provedor", () => {
       "https://api.mercadopago.com/v1/orders/ORDTST2",
       "https://api.mp-test.example/v1/orders/ORDTST3",
     ]);
+  });
+
+  it("persiste reference → orderId no store: outra instância (serverless) encontra a cobrança sem recriar", async () => {
+    const mock = mpMock();
+    const referenceStore = new InMemoryChargeReferenceStore();
+    const make = () => new MercadoPagoPaymentProvider({ accessToken, webhookSecret, baseUrl, fetchImpl: mock.fetchImpl, now: () => now, referenceStore });
+    const reference = randomUUID();
+    const created = await make().createPixCharge({
+      idempotencyKey: randomUUID(), reference, amountCents: 1000,
+      expiresAt: new Date(now.getTime() + 40 * 60_000), customer,
+    });
+    expect(await referenceStore.get(reference)).toBe(created.externalId.toLowerCase());
+
+    const other = make();
+    expect(await other.findChargeByReference(reference)).toMatchObject({ externalId: created.externalId, status: "pending" });
+    const replay = await other.createPixCharge({
+      idempotencyKey: randomUUID(), reference, amountCents: 1000,
+      expiresAt: new Date(now.getTime() + 40 * 60_000),
+    });
+    expect(replay.externalId).toBe(created.externalId);
+    expect(mock.calls.filter((c) => c.method === "POST" && c.url.endsWith("/v1/orders"))).toHaveLength(1);
+  });
+
+  it("findChargeByReference respeita AbortSignal antes de consultar o store", async () => {
+    const get = vi.fn(async () => "ordtst1");
+    const mp = new MercadoPagoPaymentProvider({ accessToken, webhookSecret, baseUrl, fetchImpl: mpMock().fetchImpl, referenceStore: { get, save: async () => {} } });
+    const controller = new AbortController();
+    controller.abort(new Error("timeout"));
+    await expect(mp.findChargeByReference(randomUUID(), { signal: controller.signal })).rejects.toThrow("timeout");
+    expect(get).not.toHaveBeenCalled();
   });
 });
