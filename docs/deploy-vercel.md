@@ -48,7 +48,7 @@ Holds vencidos já expiram sozinhos em cada leitura/criação de reserva.
 ## Ordem
 
 1. `neonctl auth` → criar projeto (Postgres 17, `aws-sa-east-1`); copiar URLs pooled e direta.
-2. `DATABASE_URL=<direta> pnpm db:migrate` (cria `btree_gist` e aplica 0000–0009).
+2. `DATABASE_URL=<direta> pnpm db:migrate` (cria `btree_gist` e aplica 0000–0010).
 3. `vercel login` → `vercel link` (projeto novo, ligado ao GitHub `voidFrance/agendaPIX`, branch `master`).
 4. `vercel env add ... production` para cada variável acima.
 5. `vercel deploy --prod` (pelo CLI, para ver erros de validação do `vercel.json`).

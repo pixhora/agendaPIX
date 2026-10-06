@@ -1,8 +1,10 @@
 import { z } from "zod";
 import { HttpError } from "../http";
 import { FakePaymentProvider } from "./fake";
+import { getDb } from "../../db";
 import { MERCADOPAGO_BASE_URL, MercadoPagoPaymentProvider } from "./mercadopago";
 import type { PaymentProvider } from "./provider";
+import { DatabaseChargeReferenceStore } from "./reference-store";
 
 const unavailable = () => new HttpError(503, "payment_unavailable", "Cobrança indisponível. Tente novamente mais tarde.");
 const secret = z.string().min(32).refine((value) => !value.startsWith("replace-this-"));
@@ -29,6 +31,8 @@ export function getPaymentProvider(env: Readonly<Record<string, string | undefin
       webhookSecret: parsed.data.MERCADOPAGO_WEBHOOK_SECRET,
       env: parsed.data.MERCADOPAGO_ENV,
       baseUrl: parsed.data.MERCADOPAGO_BASE_URL ?? MERCADOPAGO_BASE_URL,
+      // Durável e compartilhado entre instâncias serverless; a conexão só abre no primeiro uso.
+      referenceStore: new DatabaseChargeReferenceStore("mercadopago", getDb),
     });
   }
   if (requested === "fake" && !production) {

@@ -156,6 +156,20 @@ export const payments = pgTable("payments", {
 ]);
 
 
+// Mapeamento durável reference (id do pagamento local) → id da cobrança no gateway.
+// Gravado logo após o gateway criar a cobrança, antes de anexar o QR ao pagamento; permite que
+// findChargeByReference funcione entre instâncias serverless (o Orders API do MP não busca por external_reference).
+export const providerChargeReferences = pgTable("provider_charge_references", {
+  provider: text("provider").notNull(),
+  reference: text("reference").notNull(),
+  externalId: text("external_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  primaryKey({ name: "provider_charge_references_pk", columns: [table.provider, table.reference] }),
+  unique("provider_charge_references_external_unique").on(table.provider, table.externalId),
+  check("provider_charge_references_not_empty", sql`length(trim(${table.reference})) > 0 AND length(trim(${table.externalId})) > 0`),
+]);
+
 // Metadados de auditoria não guardam corpo bruto, telefone, assinatura ou segredo.
 export const paymentEvents = pgTable("payment_events", {
   id: uuid("id").defaultRandom().primaryKey(),

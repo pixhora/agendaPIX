@@ -12,6 +12,7 @@ import {
   type ProviderCallOptions,
   type ProviderCharge,
 } from "./provider";
+import { InMemoryChargeReferenceStore, type ChargeReferenceStore } from "./reference-store";
 
 /** Mesma URL para sandbox e produção; o access token (teste vs prod) define o ambiente. */
 export const MERCADOPAGO_BASE_URL = "https://api.mercadopago.com";
@@ -33,6 +34,11 @@ export type MercadoPagoPaymentProviderOptions = {
   baseUrl?: string;
   fetchImpl?: MercadoPagoFetch;
   now?: () => Date;
+  /**
+   * Onde persistir reference → orderId (Orders API não busca por external_reference).
+   * Produção usa DatabaseChargeReferenceStore (ver getPaymentProvider); o padrão em memória serve só para testes.
+   */
+  referenceStore?: ChargeReferenceStore;
 };
 
 /**
@@ -149,12 +155,8 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
   private readonly baseUrl: string;
   private readonly fetchImpl: MercadoPagoFetch;
   private readonly now: () => Date;
-  /**
-   * Cache em memória reference → orderId para idempotência.
-   * Orders API não possui endpoint /search por external_reference.
-   * Em produção com múltiplas instâncias, mover para Redis ou tabela payments com index em reference.
-   */
-  private readonly referenceCache = new Map<string, string>();
+  /** reference → orderId durável (Orders API não possui /search por external_reference). */
+  private readonly referenceStore: ChargeReferenceStore;
 
   constructor(options: MercadoPagoPaymentProviderOptions) {
     this.accessToken = z.string().min(1).refine((value) => !value.startsWith("replace-this-")).parse(options.accessToken);
@@ -162,6 +164,7 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
     this.baseUrl = z.url().parse(options.baseUrl ?? MERCADOPAGO_BASE_URL).replace(/\/+$/, "");
     this.fetchImpl = options.fetchImpl ?? ((input, init) => fetch(input, init));
     this.now = options.now ?? (() => new Date());
+    this.referenceStore = options.referenceStore ?? new InMemoryChargeReferenceStore();
   }
 
   private async request(path: string, init: { method: string; body?: unknown; headers?: Record<string, string>; signal?: AbortSignal }) {
@@ -270,8 +273,9 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
           // Orders API pode suportar date_of_expiration no futuro; por ora não documentado
         },
       }));
-      // Cache reference → orderId para idempotência futura (normalizado para lowercase)
-      this.referenceCache.set(data.reference, created.id.toLowerCase());
+      // Persiste reference → orderId (lowercase) antes de devolver: outra instância (reconciliador, retry)
+      // encontra a cobrança mesmo que o anexo do QR ao pagamento local falhe.
+      await this.referenceStore.save(data.reference, created.id.toLowerCase());
       return this.toPix(await this.view(created));
     } catch (error) {
       if (error instanceof MercadoPagoHttpError && error.status < 500) {
@@ -293,12 +297,10 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
   }
 
   async findChargeByReference(reference: string, options: ProviderCallOptions = {}) {
-    // Orders API não tem /search por external_reference; usamos cache local
-    const orderId = this.referenceCache.get(reference);
-    if (!orderId) {
-      // TODO: em produção, consultar DB local que mapeia reference → orderId
-      return null;
-    }
+    // Orders API não tem /search por external_reference; consultamos o mapeamento persistido.
+    if (options.signal?.aborted) throw options.signal.reason ?? new Error("Aborted");
+    const orderId = await this.referenceStore.get(reference);
+    if (!orderId) return null;
     return this.getCharge(orderId, options);
   }
 

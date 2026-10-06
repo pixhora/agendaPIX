@@ -71,6 +71,13 @@
       "when": 1791178844677,
       "tag": "0009_pix_charge_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791252253206,
+      "tag": "0010_provider_charge_references",
+      "breakpoints": true
     }
   ]
 }
