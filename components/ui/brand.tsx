@@ -20,7 +20,7 @@ export function BrandMark({ className, size = 32, priority = false }: { classNam
 export function BrandLink({
   href = "/",
   className,
-  label = "Agenda",
+  label = "agendaPIX",
   markSize = 32,
   priority = false,
 }: {
