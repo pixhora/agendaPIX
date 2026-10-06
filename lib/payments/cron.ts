@@ -1,0 +1,52 @@
+import { createHash, timingSafeEqual } from "node:crypto";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
+import { z } from "zod";
+import * as schema from "../../db/schema";
+import { HttpError } from "../http";
+import { paymentsConfig } from "./config";
+import { getPaymentProvider } from "./index";
+import { reconcileOnce } from "./reconcile";
+
+const cronSecret = z.string().min(32).refine((value) => !value.startsWith("replace-this-"));
+const postgresUrl = z.url().refine((value) => ["postgres:", "postgresql:"].includes(new URL(value).protocol));
+
+const digest = (value: string) => createHash("sha256").update(value).digest();
+
+/**
+ * Autoriza o disparo do reconciliador sem servidor (Vercel Cron ou agendador externo).
+ * A Vercel envia `Authorization: Bearer <CRON_SECRET>`; sem CRON_SECRET válido a rota fica indisponível (503).
+ */
+export function authorizeCron(authorization: string | null, env: Readonly<Record<string, string | undefined>> = process.env) {
+  const secret = cronSecret.safeParse(env.CRON_SECRET);
+  if (!secret.success) throw new HttpError(503, "cron_unavailable", "Reconciliação indisponível.");
+  const token = /^Bearer (\S+)$/.exec(authorization ?? "")?.[1] ?? "";
+  if (!timingSafeEqual(digest(token), digest(secret.data))) throw new HttpError(401, "unauthorized", "Não autorizado.");
+}
+
+/**
+ * URL da passagem de reconciliação. O reconciliador segura advisory lock de SESSÃO, que não funciona atrás de
+ * pooler em modo transação (PgBouncer/Neon "-pooler"): por isso prefere a conexão direta DATABASE_URL_UNPOOLED
+ * (criada pela integração Neon ↔ Vercel) e só cai para DATABASE_URL quando ela não existe.
+ */
+export function reconcileDatabaseUrl(env: Readonly<Record<string, string | undefined>> = process.env) {
+  const candidate = env.DATABASE_URL_UNPOOLED?.trim() || env.DATABASE_URL;
+  const parsed = postgresUrl.safeParse(candidate);
+  if (!parsed.success) throw new HttpError(503, "cron_unavailable", "Reconciliação indisponível.");
+  return parsed.data;
+}
+
+/** Uma passagem com pool dedicado de uma conexão, encerrado ao final (nada fica aberto entre execuções). */
+export async function runReconcilePass() {
+  const config = paymentsConfig();
+  let provider = null;
+  try { provider = getPaymentProvider(); }
+  catch { provider = null; } // sem gateway: só expira holds locais (mesmo comportamento do script)
+  const pool = new Pool({ connectionString: reconcileDatabaseUrl(), max: 1, connectionTimeoutMillis: 10000 });
+  try {
+    const database = Object.assign(drizzle(pool, { schema }), { $client: pool });
+    return await reconcileOnce(database, provider, config);
+  } finally {
+    await pool.end();
+  }
+}
