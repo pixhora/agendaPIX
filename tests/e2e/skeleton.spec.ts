@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test("landing abre no celular e responde à verificação de saúde", async ({ page, request }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1, name: /Seu cliente agenda sozinho/ })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: /Sua vaga vale ouro/ })).toBeVisible();
   const response = await request.get("/api/health");
   expect(response.ok()).toBe(true);
   expect(await response.json()).toEqual({ status: "ok" });

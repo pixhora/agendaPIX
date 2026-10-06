@@ -7,7 +7,7 @@ test.describe("acessibilidade (axe) e reflow — páginas públicas", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
   for (const [path, heading] of [
-    ["/", /Seu cliente agenda sozinho/],
+    ["/", /Sua vaga vale ouro/],
     ["/login", /Entrar na sua conta/],
     ["/login?error=link", /Entrar na sua conta/],
     ["/onboarding", /Como se chama o seu negócio/],

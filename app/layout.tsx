@@ -18,7 +18,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "vagatta · Agendamento online com sinal por Pix",
-  description: "Seu cliente agenda sozinho, paga o sinal por Pix e você para de perder horário.",
+  description: "Sua vaga vale ouro. Cobre por ela com um link e um sinal no Pix — e o cliente não te deixa na mão.",
 };
 
 export const viewport: Viewport = {

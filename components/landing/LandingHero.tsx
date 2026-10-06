@@ -15,11 +15,13 @@ export function LandingHero() {
             <span aria-hidden="true" className="size-1.5 rounded-full bg-pix" />
             Agenda online com sinal no Pix
           </p>
-          <h1 className="mt-5 font-display text-[2.5rem] font-extrabold leading-[1.05] tracking-tight sm:text-6xl lg:text-7xl">
-            Seu cliente agenda sozinho e paga o sinal no <span className="text-pix">Pix</span>.
+          <h1 className="mt-5 font-display text-[2.5rem] font-extrabold leading-[1.05] tracking-tight text-balance sm:text-6xl lg:text-7xl">
+            Sua vaga vale <span className="text-pix">ouro</span>.
+            <br />
+            Cobre por ela.
           </h1>
-          <p className="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-muted">
-            Mande seu link no WhatsApp ou no Instagram. O cliente escolhe o horário, paga o sinal e a vaga fica confirmada. Sem furo e sem cobrar comprovante.
+          <p className="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-muted text-pretty">
+            Um link e um sinal no Pix, e o cliente não te deixa na mão.
           </p>
           <div className="mt-8 flex flex-col items-center gap-3">
             <Link href="/onboarding" className={buttonVariants({ size: "lg", className: "w-full px-8 sm:w-auto" })}>
