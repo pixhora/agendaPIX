@@ -71,6 +71,13 @@
       "when": 1791178844677,
       "tag": "0009_pix_charge_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791251275758,
+      "tag": "0010_glamorous_lilandra",
+      "breakpoints": true
     }
   ]
 }

@@ -157,6 +157,20 @@ export const payments = pgTable("payments", {
 
 
 // Metadados de auditoria não guardam corpo bruto, telefone, assinatura ou segredo.
+export const paymentProviderReferences = pgTable("payment_provider_references", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  provider: text("provider").notNull(),
+  reference: text("reference").notNull(),
+  externalId: text("external_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  unique("payment_provider_references_unique").on(table.provider, table.reference),
+  index("payment_provider_references_reference_idx").on(table.reference),
+  check("payment_provider_references_provider_not_empty", sql`length(trim(${table.provider})) > 0`),
+  check("payment_provider_references_reference_not_empty", sql`length(trim(${table.reference})) > 0`),
+  check("payment_provider_references_external_id_not_empty", sql`length(trim(${table.externalId})) > 0`),
+]);
+
 export const paymentEvents = pgTable("payment_events", {
   id: uuid("id").defaultRandom().primaryKey(),
   provider: text("provider").notNull(),

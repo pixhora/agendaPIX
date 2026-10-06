@@ -15,8 +15,8 @@ type Database = NodePgDatabase<typeof schema>;
  * Autentica a entrega sem tocar no banco: provedor, tamanho do corpo, assinatura e formato do evento.
  * Falhas viram 401/400/404/413 sem nenhuma escrita.
  */
-export async function verifyWebhookDelivery(request: Request, providerName: string, provider?: PaymentProvider, now = new Date()) {
-  const paymentProvider = provider ?? getPaymentProvider();
+export async function verifyWebhookDelivery(request: Request, providerName: string, provider?: PaymentProvider, database?: Database, now = new Date()) {
+  const paymentProvider = provider ?? getPaymentProvider(process.env, database);
   if (paymentProvider.name !== providerName) throw new HttpError(404, "provider_not_found", "Provedor não encontrado.");
   const declared = Number(request.headers.get("content-length") ?? "0");
   if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) throw new HttpError(413, "body_too_large", "Os dados enviados ultrapassam o limite permitido.");
@@ -35,7 +35,7 @@ export async function verifyWebhookDelivery(request: Request, providerName: stri
 export async function processWebhook(request: Request, providerName: string, database: Database = getDb(), provider?: PaymentProvider, now = new Date()) {
   let verified: Awaited<ReturnType<typeof verifyWebhookDelivery>>;
   try {
-    verified = await verifyWebhookDelivery(request, providerName, provider, now);
+    verified = await verifyWebhookDelivery(request, providerName, provider, database, now);
   } catch (error) {
     // Autenticado, mas não é evento de pagamento: 200 sem escrita (evita o gateway pausar a fila).
     if (error instanceof IgnoredWebhookEvent) return { outcome: "ignored", reason: "unsupported_event" };

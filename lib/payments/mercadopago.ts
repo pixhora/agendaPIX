@@ -1,6 +1,9 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { and, eq } from "drizzle-orm";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import QRCode from "qrcode";
 import { z } from "zod";
+import * as schema from "../../db/schema";
 import { HttpError } from "../http";
 import {
   chargeInputSchema,
@@ -33,6 +36,7 @@ export type MercadoPagoPaymentProviderOptions = {
   baseUrl?: string;
   fetchImpl?: MercadoPagoFetch;
   now?: () => Date;
+  database?: NodePgDatabase<typeof schema>;
 };
 
 /**
@@ -149,10 +153,10 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
   private readonly baseUrl: string;
   private readonly fetchImpl: MercadoPagoFetch;
   private readonly now: () => Date;
+  private readonly database: NodePgDatabase<typeof schema> | null;
   /**
-   * Cache em memória reference → orderId para idempotência.
-   * Orders API não possui endpoint /search por external_reference.
-   * Em produção com múltiplas instâncias, mover para Redis ou tabela payments com index em reference.
+   * Cache em memória reference → orderId (opcional, usado quando database é null).
+   * Database é a fonte de verdade; o cache serve apenas para compatibilidade sem banco.
    */
   private readonly referenceCache = new Map<string, string>();
 
@@ -162,6 +166,7 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
     this.baseUrl = z.url().parse(options.baseUrl ?? MERCADOPAGO_BASE_URL).replace(/\/+$/, "");
     this.fetchImpl = options.fetchImpl ?? ((input, init) => fetch(input, init));
     this.now = options.now ?? (() => new Date());
+    this.database = options.database ?? null;
   }
 
   private async request(path: string, init: { method: string; body?: unknown; headers?: Record<string, string>; signal?: AbortSignal }) {
@@ -270,8 +275,8 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
           // Orders API pode suportar date_of_expiration no futuro; por ora não documentado
         },
       }));
-      // Cache reference → orderId para idempotência futura (normalizado para lowercase)
-      this.referenceCache.set(data.reference, created.id.toLowerCase());
+      // Persiste reference → orderId no banco (normalizado para lowercase)
+      await this.persistReference(data.reference, created.id.toLowerCase());
       return this.toPix(await this.view(created));
     } catch (error) {
       if (error instanceof MercadoPagoHttpError && error.status < 500) {
@@ -292,13 +297,48 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
     }
   }
 
-  async findChargeByReference(reference: string, options: ProviderCallOptions = {}) {
-    // Orders API não tem /search por external_reference; usamos cache local
-    const orderId = this.referenceCache.get(reference);
-    if (!orderId) {
-      // TODO: em produção, consultar DB local que mapeia reference → orderId
-      return null;
+  private async persistReference(reference: string, externalId: string) {
+    // Persiste no banco se disponível; senão, usa cache em memória (fallback para testes/desenvolvimento)
+    if (this.database) {
+      try {
+        await this.database.insert(schema.paymentProviderReferences).values({
+          provider: this.name,
+          reference,
+          externalId,
+        }).onConflictDoNothing();
+      } catch {
+        // Silencia duplicatas e conflitos — idempotência já garantida pela unique constraint
+      }
+    } else {
+      this.referenceCache.set(reference, externalId);
     }
+  }
+
+  private async lookupReference(reference: string): Promise<string | null> {
+    // Consulta banco primeiro; fallback para cache em memória se banco não disponível
+    if (this.database) {
+      try {
+        const [row] = await this.database
+          .select({ externalId: schema.paymentProviderReferences.externalId })
+          .from(schema.paymentProviderReferences)
+          .where(and(
+            eq(schema.paymentProviderReferences.provider, this.name),
+            eq(schema.paymentProviderReferences.reference, reference)
+          ))
+          .limit(1);
+        return row?.externalId ?? null;
+      } catch {
+        return null;
+      }
+    }
+    // Fallback: cache em memória (usado em testes sem banco)
+    return this.referenceCache.get(reference) ?? null;
+  }
+
+  async findChargeByReference(reference: string, options: ProviderCallOptions = {}) {
+    // Orders API não tem /search por external_reference; consultamos DB local
+    const orderId = await this.lookupReference(reference);
+    if (!orderId) return null;
     return this.getCharge(orderId, options);
   }
 

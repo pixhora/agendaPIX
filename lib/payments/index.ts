@@ -1,4 +1,6 @@
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { z } from "zod";
+import * as schema from "../../db/schema";
 import { HttpError } from "../http";
 import { FakePaymentProvider } from "./fake";
 import { MERCADOPAGO_BASE_URL, MercadoPagoPaymentProvider } from "./mercadopago";
@@ -17,8 +19,13 @@ const mercadoPagoEnvSchema = z.object({
 /**
  * PAYMENT_PROVIDER=fake|mercadopago. Fora de produção o padrão é fake.
  * Em produção o fake é recusado e o Mercado Pago exige ACCESS_TOKEN + WEBHOOK_SECRET.
+ * @param env Variáveis de ambiente (process.env por padrão)
+ * @param database Banco de dados para persistir referências (opcional; usa getDb() internamente se não fornecido)
  */
-export function getPaymentProvider(env: Readonly<Record<string, string | undefined>> = process.env): PaymentProvider {
+export function getPaymentProvider(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+  database?: NodePgDatabase<typeof schema>
+): PaymentProvider {
   const production = env.NODE_ENV === "production";
   const requested = env.PAYMENT_PROVIDER?.trim() || (production ? "" : "fake");
   if (requested === "mercadopago") {
@@ -29,6 +36,7 @@ export function getPaymentProvider(env: Readonly<Record<string, string | undefin
       webhookSecret: parsed.data.MERCADOPAGO_WEBHOOK_SECRET,
       env: parsed.data.MERCADOPAGO_ENV,
       baseUrl: parsed.data.MERCADOPAGO_BASE_URL ?? MERCADOPAGO_BASE_URL,
+      database,
     });
   }
   if (requested === "fake" && !production) {

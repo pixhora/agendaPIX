@@ -198,18 +198,18 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
     await transaction.update(schema.bookings).set({ accessTokenHash: hash(token) }).where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.id, booking.id)));
     let payment: typeof schema.payments.$inferSelect | undefined;
     if (expiresAt) {
-      const activeProvider = paymentProvider ?? getPaymentProvider();
+      const activeProvider = paymentProvider ?? getPaymentProvider(process.env, database);
       [payment] = await transaction.insert(schema.payments).values({
         businessId: business.id, bookingId: booking.id, provider: activeProvider.name, idempotencyKey: chargeIdempotencyKey(business.id, requestKey),
         amountCents: service.depositCents, expiresAt, status: "creating",
       }).returning();
     }
-    return { kind: "created" as const, booking, payment, token, now, providerName: expiresAt ? (paymentProvider ?? getPaymentProvider()).name : null };
+    return { kind: "created" as const, booking, payment, token, now, providerName: expiresAt ? (paymentProvider ?? getPaymentProvider(process.env, database)).name : null };
   });
 
   // Fora de qualquer transação: cobra o gateway. O horário já está preso pela exclusão gist.
   if (reserved.payment?.status === "creating") {
-    const activeProvider = paymentProvider ?? getPaymentProvider();
+    const activeProvider = paymentProvider ?? getPaymentProvider(process.env, database);
     await finalizeCreatingPayment(database, reserved.payment, activeProvider, chargeCustomer);
   }
 

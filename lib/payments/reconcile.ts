@@ -61,7 +61,7 @@ export async function reconcileOnce(
   config ??= paymentsConfig();
   let activeProvider: PaymentProvider | null = provider === undefined ? null : provider;
   if (provider === undefined) {
-    try { activeProvider = getPaymentProvider(); }
+    try { activeProvider = getPaymentProvider(process.env, database); }
     catch {
       // Sem provedor configurado: segue só com passos locais (expirar holds / creating).
       activeProvider = null;

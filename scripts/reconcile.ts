@@ -19,13 +19,14 @@ const once = args.has("--once");
 const asJson = args.has("--json");
 
 async function pass() {
+  const database = getDb();
   let provider = null;
-  try { provider = getPaymentProvider(); }
+  try { provider = getPaymentProvider(process.env, database); }
   catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     process.stderr.write(`reconcile: provedor indisponível (${message}); seguindo só com expiração local\n`);
   }
-  const report = await reconcileOnce(getDb(), provider, paymentsConfig());
+  const report = await reconcileOnce(database, provider, paymentsConfig());
   if (asJson) process.stdout.write(`${JSON.stringify({ at: new Date().toISOString(), ...report })}\n`);
   else {
     if (report.skippedLock) process.stdout.write("reconcile: outro processo segura o lock; saindo\n");

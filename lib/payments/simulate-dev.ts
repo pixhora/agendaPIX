@@ -51,7 +51,7 @@ export async function simulateDevFakePayment(input: {
     throw new HttpError(409, "payment_unavailable", "Nenhum pagamento pendente para simular.");
   }
 
-  const provider = getPaymentProvider();
+  const provider = getPaymentProvider(process.env, database);
   if (!(provider instanceof FakePaymentProvider) || provider.name !== "fake") {
     throw new HttpError(404, "not_found", "Não encontrado.");
   }

@@ -40,7 +40,7 @@ describe("webhook valida antes de persistir", () => {
   });
   it("entrega válida devolve evento e hashes, sem guardar assinatura ou corpo bruto", async () => {
     const body = JSON.stringify(event());
-    const verified = await verifyWebhookDelivery(signed(body), "fake", provider, now);
+    const verified = await verifyWebhookDelivery(signed(body), "fake", provider, undefined, now);
     expect(verified.provider).toBe("fake");
     expect(verified.bodyHash).toMatch(/^[a-f0-9]{64}$/);
     expect(verified.payloadHash).toMatch(/^[a-f0-9]{64}$/);
