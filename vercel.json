@@ -1,0 +1,15 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "installCommand": "COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm install --frozen-lockfile",
+  "buildCommand": "COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm run build",
+  "regions": [
+    "gru1"
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/reconcile",
+      "schedule": "0 6 * * *"
+    }
+  ]
+}
