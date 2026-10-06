@@ -76,10 +76,10 @@ describe("reserva e cobrança do sinal", () => {
     const second = await createBooking(slugs[0], input(), key, database, provider);
     expect(second.replayed).toBe(true);
     expect(second.data).toEqual(first.data);
-    const status = await getBookingPayment(slugs[0], first.data.bookingId, `Bearer ${first.data.accessToken}`, database);
+    const status = await getBookingPayment(slugs[0], first.data.bookingId, first.token, database);
     expect(status.payment?.id).toBe(first.data.payment?.id);
     await expect(getBookingPayment(slugs[0], first.data.bookingId, null, database)).rejects.toMatchObject({ status: 404 });
-    await expect(getBookingPayment(slugs[1], first.data.bookingId, `Bearer ${first.data.accessToken}`, database)).rejects.toMatchObject({ status: 404 });
+    await expect(getBookingPayment(slugs[1], first.data.bookingId, first.token, database)).rejects.toMatchObject({ status: 404 });
     await expect(createBooking(slugs[0], { ...input(), customer: { ...input().customer, name: "Outro nome" } }, key, database, provider)).rejects.toMatchObject({ status: 409 });
   });
   it("duas requisições concorrentes não ocupam o mesmo horário", async () => {
@@ -88,7 +88,7 @@ describe("reserva e cobrança do sinal", () => {
     expect(result.filter((item) => item.status === "rejected")).toHaveLength(1);
     const bookings = await database.select().from(schema.bookings).where(eq(schema.bookings.businessId, businessIds[0]));
     expect(bookings).toHaveLength(1);
-    const available = await getAvailability(slugs[0], { serviceId: serviceIds[0], date: "2030-01-01" }, database);
+    const available = await getAvailability(slugs[0], { serviceId: serviceIds[0], date: "2030-01-01" }, null, database);
     expect(available.slots.some((slot) => slot.startsAt.toISOString() === "2030-01-01T12:00:00.000Z")).toBe(false);
   });
   it("restrição do Postgres impede sobreposição mesmo sem passar pela aplicação", async () => {
@@ -129,7 +129,7 @@ describe("reserva e cobrança do sinal", () => {
 
 describe("webhook transacional e auditável", () => {
   it("falha depois da confirmação reverte efeitos e permite repetir o mesmo evento", async () => {
-    const { data } = await createBooking(slugs[0], input(), randomUUID(), database, provider);
+    const { data, token } = await createBooking(slugs[0], input(), randomUUID(), database, provider);
     const request = webhook(data.payment!.externalId!);
     const failingDatabase = new Proxy(database, {
       get(target, property, receiver) {
@@ -141,7 +141,7 @@ describe("webhook transacional e auditável", () => {
       },
     });
     await expect(processWebhook(request.clone(), "fake", failingDatabase, provider)).rejects.toMatchObject({ status: 503 });
-    expect((await getBookingPayment(slugs[0], data.bookingId, `Bearer ${data.accessToken}`, database)).status).toBe("pending_payment");
+    expect((await getBookingPayment(slugs[0], data.bookingId, token, database)).status).toBe("pending_payment");
     // Falha reverte também a entrega: nada fica gravado e o reenvio do provedor processa normalmente.
     expect(await database.select().from(schema.webhookDeliveries).where(eq(schema.webhookDeliveries.bodyHash, bodyHashes[0]))).toHaveLength(0);
     expect(await processWebhook(request.clone(), "fake", database, provider)).toMatchObject({ outcome: "processed" });
@@ -149,18 +149,18 @@ describe("webhook transacional e auditável", () => {
     expect(deliveries.map((delivery) => delivery.outcome)).toEqual(["processed"]);
   });
   it("processa entregas simultâneas uma vez e grava uma única entrega", async () => {
-    const { data } = await createBooking(slugs[0], input(), randomUUID(), database, provider);
+    const { data, token } = await createBooking(slugs[0], input(), randomUUID(), database, provider);
     const eventId = randomUUID();
     const request = webhook(data.payment!.externalId!, { eventId });
     const result = await Promise.all([processWebhook(request.clone(), "fake", database, provider), processWebhook(request.clone(), "fake", database, provider)]);
     expect(result.map((item) => item.outcome).sort()).toEqual(["duplicate", "processed"]);
     expect(await database.select().from(schema.paymentEvents).where(eq(schema.paymentEvents.eventId, eventId))).toHaveLength(1);
     expect(await database.select().from(schema.webhookDeliveries).where(eq(schema.webhookDeliveries.eventId, eventId))).toHaveLength(1);
-    const status = await getBookingPayment(slugs[0], data.bookingId, `Bearer ${data.accessToken}`, database);
+    const status = await getBookingPayment(slugs[0], data.bookingId, token, database);
     expect(status.status).toBe("confirmed"); expect(status.payment?.status).toBe("paid"); expect(status.payment?.copyPaste).toBeNull();
   });
   it("assinatura inválida ou evento malformado não gravam nada nem alteram pagamento", async () => {
-    const { data } = await createBooking(slugs[0], input(), randomUUID(), database, provider);
+    const { data, token } = await createBooking(slugs[0], input(), randomUUID(), database, provider);
     const before = await webhookRowCounts();
     for (let attempt = 0; attempt < 25; attempt++) {
       await expect(processWebhook(webhook(data.payment!.externalId!, {}, false), "fake", database, provider)).rejects.toMatchObject({ status: 401 });
@@ -168,7 +168,7 @@ describe("webhook transacional e auditável", () => {
     await expect(processWebhook(webhook(data.payment!.externalId!, { amountCents: "1000" }), "fake", database, provider)).rejects.toMatchObject({ status: 400 });
     await expect(processWebhook(webhook(data.payment!.externalId!), "other", database, provider)).rejects.toMatchObject({ status: 404 });
     expect(await webhookRowCounts()).toEqual(before);
-    expect((await getBookingPayment(slugs[0], data.bookingId, `Bearer ${data.accessToken}`, database)).payment?.status).toBe("pending");
+    expect((await getBookingPayment(slugs[0], data.bookingId, token, database)).payment?.status).toBe("pending");
   });
   it("replay sequencial do mesmo evento é no-op: uma entrega, um evento, resposta duplicate", async () => {
     const { data } = await createBooking(slugs[0], input(), randomUUID(), database, provider);
@@ -182,9 +182,9 @@ describe("webhook transacional e auditável", () => {
     expect(delivery.outcome).toBe("processed");
   });
   it("valor incorreto não confirma, e evento posterior correto confirma", async () => {
-    const { data } = await createBooking(slugs[0], input(), randomUUID(), database, provider);
+    const { data, token } = await createBooking(slugs[0], input(), randomUUID(), database, provider);
     expect(await processWebhook(webhook(data.payment!.externalId!, { amountCents: 999 }), "fake", database, provider)).toMatchObject({ outcome: "rejected", reason: "amount_mismatch" });
-    expect((await getBookingPayment(slugs[0], data.bookingId, `Bearer ${data.accessToken}`, database)).status).toBe("pending_payment");
+    expect((await getBookingPayment(slugs[0], data.bookingId, token, database)).status).toBe("pending_payment");
     expect(await processWebhook(webhook(data.payment!.externalId!), "fake", database, provider)).toMatchObject({ outcome: "processed" });
   });
   it("não aceita outro conteúdo para identificador já processado", async () => {
@@ -201,9 +201,9 @@ describe("webhook transacional e auditável", () => {
     await database.update(schema.payments).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(schema.payments.id, first.data.payment!.id));
     const second = await createBooking(slugs[0], input(), randomUUID(), database, provider);
     expect(await processWebhook(webhook(first.data.payment!.externalId!), "fake", database, provider)).toMatchObject({ outcome: "ignored", reason: "late_payment_refund_pending" });
-    const old = await getBookingPayment(slugs[0], first.data.bookingId, `Bearer ${first.data.accessToken}`, database);
+    const old = await getBookingPayment(slugs[0], first.data.bookingId, first.token, database);
     expect(old.status).toBe("expired"); expect(old.payment?.status).toBe("refund_pending");
-    expect((await getBookingPayment(slugs[0], second.data.bookingId, `Bearer ${second.data.accessToken}`, database)).status).toBe("pending_payment");
+    expect((await getBookingPayment(slugs[0], second.data.bookingId, second.token, database)).status).toBe("pending_payment");
   });
   it("evento de um negócio não altera a reserva do outro", async () => {
     const first = await createBooking(slugs[0], input(), randomUUID(), database, provider);
@@ -221,15 +221,15 @@ describe("simulação de Pix fake em desenvolvimento", () => {
     process.env.PAYMENT_PROVIDER = "fake";
     process.env.FAKE_WEBHOOK_SECRET = secret;
     try {
-      const { data } = await createBooking(slugs[0], input(), randomUUID(), database, provider);
+      const { data, token } = await createBooking(slugs[0], input(), randomUUID(), database, provider);
       const result = await simulateDevFakePayment({
         slug: slugs[0],
         bookingId: data.bookingId,
-        authorization: `Bearer ${data.accessToken}`,
+        authorization: `Bearer ${token}`,
         database,
       });
       expect(result.outcome).toBe("processed");
-      const status = await getBookingPayment(slugs[0], data.bookingId, `Bearer ${data.accessToken}`, database);
+      const status = await getBookingPayment(slugs[0], data.bookingId, token, database);
       expect(status.status).toBe("confirmed");
       expect(status.payment?.status).toBe("paid");
     } finally {
