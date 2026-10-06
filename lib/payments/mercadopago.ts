@@ -195,10 +195,15 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
     const amountCents = Math.round(Number(order.total_amount) * 100);
     
     let status: ProviderCharge["status"];
-    // Status do order: "action_required" enquanto aguarda; order.status !== payment.status
-    // Checamos payment.status para saber se foi pago
-    if (payment.status === "approved") status = "paid";
-    else if (payment.status === "cancelled" || payment.status === "rejected" || order.status === "closed") status = "cancelled";
+    // Orders API: order.status "processed" + status_detail "accredited" = pago
+    // Payment.status também pode ser "approved" ou "accredited"
+    const isPaid = 
+      order.status === "processed" || 
+      payment.status === "approved" || 
+      payment.status === "accredited";
+    
+    if (isPaid) status = "paid";
+    else if (payment.status === "canceled" || payment.status === "rejected" || order.status === "canceled") status = "cancelled";
     else if (expiresAt <= now) status = "expired";
     else status = "pending";
     
@@ -265,8 +270,8 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
           // Orders API pode suportar date_of_expiration no futuro; por ora não documentado
         },
       }));
-      // Cache reference → orderId para idempotência futura
-      this.referenceCache.set(data.reference, created.id);
+      // Cache reference → orderId para idempotência futura (normalizado para lowercase)
+      this.referenceCache.set(data.reference, created.id.toLowerCase());
       return this.toPix(await this.view(created));
     } catch (error) {
       if (error instanceof MercadoPagoHttpError && error.status < 500) {
@@ -302,11 +307,11 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
     if (!current) return null;
     if (current.status === "paid") return current;
     try {
-      // Orders API: cancelamento via PUT /v1/orders/{id} com status: "closed" ou "cancelled"
-      const updated = orderSchema.parse(await this.request(`/v1/orders/${encodeURIComponent(externalId)}`, {
-        method: "PUT",
+      // Orders API: cancelamento via POST /v1/orders/{id}/cancel (sem body)
+      // Status final: "canceled" (um L)
+      const updated = orderSchema.parse(await this.request(`/v1/orders/${encodeURIComponent(externalId)}/cancel`, {
+        method: "POST",
         signal: options.signal,
-        body: { status: "closed" }, // ou "cancelled" - confirmar docs MP
       }));
       return this.view(updated);
     } catch (error) {
@@ -345,12 +350,27 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
     if (payload.type && payload.type !== "payment" && payload.type !== "order") throw new IgnoredWebhookEvent(payload.type);
     if (!dataId) throw new z.ZodError([]);
 
-    // Tentamos como orderId primeiro
-    const order = await this.getCharge(dataId);
+    // Normaliza order ID para lowercase antes de lookup (case-insensitive)
+    const normalizedId = dataId.toLowerCase();
+    const order = await this.getCharge(normalizedId);
     if (!order) {
-      // Se não achou, dataId pode ser paymentId; Orders API não tem lookup por paymentId
-      // TODO: webhook payload pode trazer order_id em outro campo; verificar docs
-      throw new HttpError(404, "order_not_found", "Pedido não encontrado.");
+      // Se não achou com lowercase, tenta original
+      const orderOriginal = await this.getCharge(dataId);
+      if (!orderOriginal) {
+        // Se não achou, dataId pode ser paymentId; Orders API não tem lookup por paymentId
+        throw new HttpError(404, "order_not_found", "Pedido não encontrado.");
+      }
+      if (orderOriginal.status !== "paid") {
+        throw new IgnoredWebhookEvent(payload.action ?? orderOriginal.status);
+      }
+      const notificationId = payload.id != null ? String(payload.id) : `order:${orderOriginal.externalId}`;
+      return paidEventSchema.parse({
+        eventId: `mp:${notificationId}`,
+        type: "payment.paid",
+        externalId: orderOriginal.externalId,
+        amountCents: orderOriginal.amountCents,
+        paidAt: (orderOriginal.paidAt ?? now).toISOString(),
+      });
     }
     if (order.status !== "paid") {
       throw new IgnoredWebhookEvent(payload.action ?? order.status);
