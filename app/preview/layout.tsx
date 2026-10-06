@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { PreviewBadge } from "@/components/preview/PreviewBadge";
 
 export const metadata: Metadata = {
-  title: "Modo Preview · agendaPIX Micro-SaaS",
+  title: "Modo Preview · vagatta Micro-SaaS",
   description: "Ambiente de visualização de desenvolvimento sem dependências externas.",
 };
 

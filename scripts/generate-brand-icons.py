@@ -39,10 +39,10 @@ def main():
     pub = ROOT / "public" / "brand"
     app = ROOT / "app"
     pub.mkdir(parents=True, exist_ok=True)
-    fit(sq, 512).save(pub / "agendapix-icon.png")
-    fit(sq, 128).save(pub / "agendapix-icon-128.png")
-    fit(sq, 128).save(pub / "agendapix-icon.webp", "WEBP", quality=92)
-    fit(sq, 32).save(pub / "agendapix-icon-32.png")
+    fit(sq, 512).save(pub / "vagatta-icon.png")
+    fit(sq, 128).save(pub / "vagatta-icon-128.png")
+    fit(sq, 128).save(pub / "vagatta-icon.webp", "WEBP", quality=92)
+    fit(sq, 32).save(pub / "vagatta-icon-32.png")
     fit(sq, 192).save(app / "icon.png")
     imgs = [fit(sq, 16), fit(sq, 32)]
     imgs[0].save(app / "favicon.ico", format="ICO", sizes=[(16, 16), (32, 32)], append_images=[imgs[1]])

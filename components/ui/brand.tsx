@@ -2,11 +2,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-/** Marca oficial agendaPIX: calendário cream + check mint no squircle charcoal. */
+/** Marca oficial vagatta: calendário cream + check mint no squircle charcoal. */
 export function BrandMark({ className, size = 32, priority = false }: { className?: string; size?: number; priority?: boolean }) {
   return (
     <Image
-      src="/brand/agendapix-icon.png"
+      src="/brand/vagatta-icon.png"
       alt=""
       width={size}
       height={size}
@@ -20,7 +20,7 @@ export function BrandMark({ className, size = 32, priority = false }: { classNam
 export function BrandLink({
   href = "/",
   className,
-  label = "agendaPIX",
+  label = "vagatta",
   markSize = 32,
   priority = false,
 }: {

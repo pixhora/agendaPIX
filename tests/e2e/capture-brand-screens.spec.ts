@@ -18,13 +18,13 @@ const meta = readMeta();
 
 test("landing header", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("link", { name: /agendaPIX/i }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: /vagatta/i }).first()).toBeVisible();
   await shot(page, "01-landing-header");
 });
 
 test("login", async ({ page }) => {
   await page.goto("/login");
-  await expect(page.getByRole("link", { name: /agendaPIX/i }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: /vagatta/i }).first()).toBeVisible();
   await shot(page, "02-login");
 });
 
@@ -40,7 +40,7 @@ test.describe("painel", () => {
 test("landing mockup", async ({ page }) => {
   test.skip(test.info().project.name !== "desktop", "mockup crop só no desktop");
   await page.goto("/");
-  const mockup = page.getByRole("img", { name: /Painel do agendaPIX/i });
+  const mockup = page.getByRole("img", { name: /Painel do vagatta/i });
   await expect(mockup).toBeVisible();
   await mockup.scrollIntoViewIfNeeded();
   await page.waitForTimeout(300);

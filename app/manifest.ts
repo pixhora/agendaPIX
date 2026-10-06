@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "agendaPIX",
-    short_name: "agendaPIX",
+    name: "vagatta",
+    short_name: "vagatta",
     description: "Agendamento online com sinal por Pix.",
     start_url: "/",
     display: "standalone",

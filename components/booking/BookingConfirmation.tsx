@@ -30,13 +30,13 @@ function buildIcs({
 }) {
   const stamp = (iso: string) =>
     new Date(iso).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
-  const uid = `agendapix-${stamp(slot.startsAt)}@agendapix`;
+  const uid = `vagatta-${stamp(slot.startsAt)}@vagatta`;
   const summary = `${service.name} · ${businessName}`;
   const description = `Agendamento de ${customerName} em ${businessName}. Sinal pago via Pix.`;
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//agendaPIX//PT",
+    "PRODID:-//vagatta//PT",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
     "BEGIN:VEVENT",

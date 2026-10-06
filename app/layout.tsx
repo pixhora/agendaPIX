@@ -17,7 +17,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "agendaPIX · Agendamento online com sinal por Pix",
+  title: "vagatta · Agendamento online com sinal por Pix",
   description: "Seu cliente agenda sozinho, paga o sinal por Pix e você para de perder horário.",
 };
 

@@ -11,7 +11,7 @@ import { getOwnerSession } from "@/lib/dashboard/auth-session";
 import { safeNextPath } from "@/lib/safe-redirect";
 
 export const metadata: Metadata = {
-  title: "Entrar · agendaPIX",
+  title: "Entrar · vagatta",
   robots: { index: false },
 };
 

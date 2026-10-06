@@ -38,7 +38,7 @@ export function LandingHero() {
             <div aria-hidden="true" className="flex items-center gap-1.5 border-b border-line bg-subtle/70 px-4 py-2.5">
               <span className="size-2.5 rounded-full bg-line-strong/70" /><span className="size-2.5 rounded-full bg-line-strong/70" /><span className="size-2.5 rounded-full bg-line-strong/70" />
             </div>
-            <Image src="/landing/painel-agenda.webp" width={1280} height={800} priority sizes="(min-width: 1024px) 1024px, 100vw" alt="Painel do agendaPIX: receita via Pix do dia, agendamentos confirmados e a lista de atendimentos com status do sinal." className="h-auto w-full" />
+            <Image src="/landing/painel-agenda.webp" width={1280} height={800} priority sizes="(min-width: 1024px) 1024px, 100vw" alt="Painel do vagatta: receita via Pix do dia, agendamentos confirmados e a lista de atendimentos com status do sinal." className="h-auto w-full" />
             <figcaption className="sr-only">Print real do painel do dono do negócio.</figcaption>
           </figure>
           <figure className="absolute -bottom-8 right-2 w-[34%] max-w-[220px] overflow-hidden rounded-[28px] border-[6px] border-ink bg-surface shadow-[var(--shadow-raised)] sm:-bottom-10 sm:right-6 lg:-right-8">
