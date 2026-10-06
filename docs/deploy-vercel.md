@@ -19,7 +19,8 @@ Holds vencidos já expiram sozinhos em cada leitura/criação de reserva.
 
 - **Hobby:** a Vercel só aceita cron diário (`vercel.json` usa `0 6 * * *` UTC). Expressões mais
   frequentes fazem o deploy falhar em silêncio. Para rodar a cada 1–5 min, use um agendador externo
-  (cron-job.org, GitHub Actions) chamando `POST /api/cron/reconcile` com o bearer.
+  (cron-job.org, GitHub Actions) chamando `POST /api/cron/reconcile` com o bearer — passo a passo em
+  [`reconcile-scheduler.md`](./reconcile-scheduler.md) (workflow `.github/workflows/reconcile-cron.yml`).
 - **Pro:** pode trocar para `*/2 * * * *` no `vercel.json`.
 
 ## Variáveis (Production)
