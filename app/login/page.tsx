@@ -47,7 +47,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
     <div className="grid min-h-dvh bg-paper lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <div className="flex min-w-0 flex-col">
         <header className="flex min-h-16 items-center justify-between gap-3 px-4 sm:px-8">
-          <BrandLink />
+          <BrandLink priority />
           <Link href="/onboarding" className="inline-flex min-h-11 items-center rounded-full px-3 text-sm font-semibold text-ink hover:bg-subtle">
             Criar conta
           </Link>
