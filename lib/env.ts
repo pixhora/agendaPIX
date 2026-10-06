@@ -7,6 +7,12 @@ export const authEnvSchema = z.object({
   BETTER_AUTH_URL: z.url().refine((value) => ["http:", "https:"].includes(new URL(value).protocol), "Use uma URL HTTP ou HTTPS."),
   BETTER_AUTH_SECRET: z.string().min(32).refine((value) => !value.startsWith("replace-this-"), "Substitua o segredo de exemplo."),
 });
+
+export const bookingSecretsSchema = z.object({
+  BOOKING_ACCESS_SECRET: z.string().min(32).optional(),
+  RATE_LIMIT_SECRET: z.string().min(32).optional(),
+  BETTER_AUTH_SECRET: z.string().min(32),
+});
 export const smtpEnvSchema = z.object({
   SMTP_HOST: z.string().min(1),
   SMTP_PORT: z.coerce.number().int().min(1).max(65535),

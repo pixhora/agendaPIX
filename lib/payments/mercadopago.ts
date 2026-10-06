@@ -150,9 +150,8 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
   private readonly fetchImpl: MercadoPagoFetch;
   private readonly now: () => Date;
   /**
-   * Cache em memória reference → orderId para idempotência.
-   * Orders API não possui endpoint /search por external_reference.
-   * Em produção com múltiplas instâncias, mover para Redis ou tabela payments com index em reference.
+   * Cache em memória reference → orderId para consultas dentro da mesma requisição.
+   * A persistência real agora usa payments.externalId no banco (cross-instance).
    */
   private readonly referenceCache = new Map<string, string>();
 
@@ -293,13 +292,39 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
   }
 
   async findChargeByReference(reference: string, options: ProviderCallOptions = {}) {
-    // Orders API não tem /search por external_reference; usamos cache local
-    const orderId = this.referenceCache.get(reference);
-    if (!orderId) {
-      // TODO: em produção, consultar DB local que mapeia reference → orderId
+    // Tenta cache em memória primeiro (mesmo request/instância)
+    const cached = this.referenceCache.get(reference);
+    if (cached) {
+      return this.getCharge(cached, options);
+    }
+
+    // Consulta DB persistente: payments.id = reference, provider = 'mercadopago'
+    // O externalId só existe após createPixCharge anexar a cobrança (status != creating)
+    try {
+      const { getDb } = await import("../../db");
+      const database = getDb();
+      const { eq, and } = await import("drizzle-orm");
+      const schema = await import("../../db/schema");
+      
+      const [payment] = await database.select({ externalId: schema.payments.externalId })
+        .from(schema.payments)
+        .where(and(
+          eq(schema.payments.id, reference),
+          eq(schema.payments.provider, this.name)
+        ))
+        .limit(1);
+
+      if (!payment?.externalId) {
+        return null;
+      }
+
+      // Atualiza cache local para próximas consultas nesta instância
+      this.referenceCache.set(reference, payment.externalId.toLowerCase());
+      return this.getCharge(payment.externalId, options);
+    } catch {
+      // Se DB indisponível, retorna null (reconcile tentará novamente)
       return null;
     }
-    return this.getCharge(orderId, options);
   }
 
   async cancelCharge(externalId: string, options: ProviderCallOptions = {}) {
@@ -326,6 +351,14 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
     const invalid = () => new HttpError(401, "invalid_signature", "Assinatura inválida ou vencida.");
     const parsedSig = parseXSignature(headers.get("x-signature") ?? "");
     if (!parsedSig) throw invalid();
+
+    // Valida timestamp: rejeita se fora de ±5 minutos (300s), alinhado com fake provider
+    const timestampMs = Number(parsedSig.ts) * 1000;
+    const skewMs = Math.abs(now.getTime() - timestampMs);
+    const MAX_TIMESTAMP_SKEW_MS = 300_000; // 5 minutos = 300 segundos
+    if (!Number.isFinite(timestampMs) || skewMs > MAX_TIMESTAMP_SKEW_MS) {
+      throw invalid();
+    }
 
     let dataId: string | undefined;
     if (requestUrl) {

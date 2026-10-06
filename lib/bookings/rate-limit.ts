@@ -3,7 +3,7 @@ import { isIP } from "node:net";
 import { sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "../../db/schema";
-import { authEnvSchema } from "../env";
+import { bookingSecretsSchema } from "../env";
 import { HttpError } from "../http";
 import { bookingConfig, type BookingConfig } from "./config";
 
@@ -59,9 +59,11 @@ export function bookingClientIdentity(request: Request, config: BookingConfig = 
 
 /** HMAC por negócio: o endereço nunca é armazenado e não correlaciona clientes entre negócios. */
 export function tenantScopedHash(purpose: string, businessId: string, identity: string) {
-  const env = authEnvSchema.safeParse(process.env);
+  const env = bookingSecretsSchema.safeParse(process.env);
   if (!env.success) throw new HttpError(503, "booking_unavailable", "Agendamento indisponível. Tente novamente mais tarde.");
-  return createHmac("sha256", env.data.BETTER_AUTH_SECRET).update(`${purpose}:${businessId}:${identity}`).digest("hex");
+  // Usa RATE_LIMIT_SECRET dedicado, fallback para BETTER_AUTH_SECRET se ausente (compatibilidade)
+  const secret = env.data.RATE_LIMIT_SECRET || env.data.BETTER_AUTH_SECRET;
+  return createHmac("sha256", secret).update(`${purpose}:${businessId}:${identity}`).digest("hex");
 }
 
 const BUSINESS_BUCKET = "*business*";

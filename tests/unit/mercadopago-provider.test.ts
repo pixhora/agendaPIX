@@ -134,7 +134,7 @@ function provider(mock = mpMock()) {
 }
 
 function signedHeaders(dataId: string, requestId = "req-1") {
-  const ts = String(now.getTime());
+  const ts = String(Math.floor(now.getTime() / 1000)); // timestamp em segundos (Unix epoch)
   const manifest = buildMercadoPagoManifest({ dataId, requestId, ts });
   const v1 = signMercadoPagoWebhook(manifest, webhookSecret);
   return new Headers({
@@ -371,7 +371,7 @@ describe("MercadoPagoPaymentProvider: webhook", () => {
   it.each([
     ["sem assinatura", () => new Headers()],
     ["assinatura de outro segredo", (dataId: string) => {
-      const ts = String(now.getTime());
+      const ts = String(Math.floor(now.getTime() / 1000)); // timestamp em segundos
       const v1 = signMercadoPagoWebhook(buildMercadoPagoManifest({ dataId, requestId: "r", ts }), "another-secret-another-secret-32xx");
       return new Headers({ "x-signature": `ts=${ts},v1=${v1}`, "x-request-id": "r" });
     }],

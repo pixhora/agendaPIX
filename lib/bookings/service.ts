@@ -4,7 +4,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { getDb } from "../../db";
 import * as schema from "../../db/schema";
-import { authEnvSchema } from "../env";
+import { bookingSecretsSchema } from "../env";
 import { HttpError } from "../http";
 import { paymentsConfig } from "../payments/config";
 import { getPaymentProvider } from "../payments";
@@ -25,9 +25,11 @@ export function chargeIdempotencyKey(businessId: string, requestKey: string) {
   return `${value.slice(0, 8)}-${value.slice(8, 12)}-${value.slice(12, 16)}-${value.slice(16, 20)}-${value.slice(20)}`;
 }
 function accessToken(businessId: string, bookingId: string) {
-  const env = authEnvSchema.safeParse(process.env);
+  const env = bookingSecretsSchema.safeParse(process.env);
   if (!env.success) throw new HttpError(503, "booking_unavailable", "Agendamento indisponível. Tente novamente mais tarde.");
-  return createHmac("sha256", env.data.BETTER_AUTH_SECRET).update(`booking-access:v1:${businessId}:${bookingId}`).digest("base64url");
+  // Usa BOOKING_ACCESS_SECRET dedicado, fallback para BETTER_AUTH_SECRET se ausente (compatibilidade)
+  const secret = env.data.BOOKING_ACCESS_SECRET || env.data.BETTER_AUTH_SECRET;
+  return createHmac("sha256", secret).update(`booking-access:v1:${businessId}:${bookingId}`).digest("base64url");
 }
 export async function lockBusiness(database: Database, businessId: string) {
   await database.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${businessId}, 0))`);
