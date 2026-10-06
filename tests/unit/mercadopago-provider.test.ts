@@ -89,22 +89,30 @@ function mpMock() {
         },
       };
       orders.set(reference, order);
+      // Armazena tanto com o ID original quanto lowercase para simular case-insensitive API
       byId.set(orderId, order);
+      byId.set(orderId.toLowerCase(), order);
       return json(order, 201);
     }
 
     const getMatch = /^\/v1\/orders\/(.+)$/.exec(url.pathname);
     if (getMatch && method === "GET") {
-      const order = byId.get(decodeURIComponent(getMatch[1]));
+      const requestedId = decodeURIComponent(getMatch[1]);
+      const order = byId.get(requestedId);
       if (!order) return json({ message: "not found" }, 404);
       return json(order);
     }
-    if (getMatch && method === "PUT") {
-      const order = byId.get(decodeURIComponent(getMatch[1]));
+    
+    const cancelMatch = /^\/v1\/orders\/(.+)\/cancel$/.exec(url.pathname);
+    if (cancelMatch && method === "POST") {
+      const requestedId = decodeURIComponent(cancelMatch[1]);
+      const order = byId.get(requestedId);
       if (!order) return json({ message: "not found" }, 404);
-      if (order.transactions.payments[0]?.status === "approved") return json({ message: "invalid status" }, 400);
-      order.status = "closed";
-      order.transactions.payments[0]!.status = "cancelled";
+      if (order.transactions.payments[0]?.status === "approved" || order.transactions.payments[0]?.status === "accredited" || order.status === "processed") {
+        return json({ message: "cannot cancel paid order" }, 409);
+      }
+      order.status = "canceled";
+      order.transactions.payments[0]!.status = "canceled";
       return json(order);
     }
     return json({ message: "unexpected" }, 500);
@@ -213,7 +221,7 @@ describe("MercadoPagoPaymentProvider: cobrança", () => {
     })).rejects.toThrow("idempotência");
   });
 
-  it("consulta order por id, localiza por cache local, mapeia status e cancela pendente", async () => {
+  it("consulta order por id, localiza por cache local, mapeia status e cancela pendente via POST /cancel", async () => {
     const { mock, mp } = provider();
     const reference = randomUUID();
     const created = await mp.createPixCharge({
@@ -225,7 +233,13 @@ describe("MercadoPagoPaymentProvider: cobrança", () => {
     });
     expect(await mp.findChargeByReference(reference)).toMatchObject({ status: "pending" });
     expect(await mp.findChargeByReference(randomUUID())).toBeNull();
-    expect(await mp.cancelCharge(created.externalId)).toMatchObject({ status: "cancelled" });
+    
+    const canceled = await mp.cancelCharge(created.externalId);
+    expect(canceled).toMatchObject({ status: "cancelled" });
+    // Verifica que usou POST /v1/orders/{id}/cancel
+    const cancelCall = mock.calls.find((c) => c.method === "POST" && c.url.includes("/cancel"));
+    expect(cancelCall).toBeTruthy();
+    expect(cancelCall?.url).toContain(`/v1/orders/${created.externalId}/cancel`);
 
     const paidRef = randomUUID();
     const paid = await mp.createPixCharge({
@@ -236,7 +250,9 @@ describe("MercadoPagoPaymentProvider: cobrança", () => {
     paidOrder.transactions.payments[0]!.status = "approved";
     paidOrder.transactions.payments[0]!.date_approved = "2030-01-01T12:01:00.000Z";
     expect(await mp.cancelCharge(paid.externalId)).toMatchObject({ status: "paid" });
-    expect(mock.calls.some((c) => c.method === "PUT" && c.url.includes(paid.externalId))).toBe(false);
+    // Não deve tentar cancelar pagamento já pago
+    const cancelAttempts = mock.calls.filter((c) => c.method === "POST" && c.url.includes(paid.externalId) && c.url.includes("/cancel"));
+    expect(cancelAttempts).toHaveLength(0);
   });
 
   it("propaga AbortSignal e erros 5xx", async () => {
@@ -249,6 +265,74 @@ describe("MercadoPagoPaymentProvider: cobrança", () => {
       fetchImpl: async () => json({ message: "boom" }, 503),
     });
     await expect(failing.getCharge("1")).rejects.toThrow("503");
+  });
+
+  it("detecta order.status=processed e payment.status=accredited como pago (Orders API)", async () => {
+    const { mock, mp } = provider();
+    const reference = randomUUID();
+    const created = await mp.createPixCharge({
+      idempotencyKey: randomUUID(), reference, amountCents: 1500,
+      expiresAt: new Date(now.getTime() + 40 * 60_000), customer,
+    });
+    
+    const order = mock.byId.get(created.externalId)!;
+    // Simula status do Orders API: order.status = "processed", payment.status = "accredited"
+    order.status = "processed";
+    order.transactions.payments[0]!.status = "accredited";
+    order.transactions.payments[0]!.date_approved = "2030-01-01T12:03:00.000Z";
+    
+    const charge = await mp.getCharge(created.externalId);
+    expect(charge).toMatchObject({
+      externalId: created.externalId,
+      status: "paid",
+      paidAt: new Date("2030-01-01T12:03:00.000Z"),
+    });
+    
+    // Tenta cancelar order pago → deve retornar o order pago sem chamar cancel
+    const cancelAttempt = await mp.cancelCharge(created.externalId);
+    expect(cancelAttempt).toMatchObject({ status: "paid" });
+    expect(mock.calls.some((c) => c.url.includes("/cancel"))).toBe(false);
+  });
+
+  it("normaliza order ID para lowercase no cache e lookup (case-insensitive)", async () => {
+    const { mp } = provider();
+    const reference = randomUUID();
+    const created = await mp.createPixCharge({
+      idempotencyKey: randomUUID(), reference, amountCents: 1000,
+      expiresAt: new Date(now.getTime() + 40 * 60_000), customer,
+    });
+    
+    // Verifica que findChargeByReference recupera com ID em lowercase
+    const found = await mp.findChargeByReference(reference);
+    expect(found).toMatchObject({
+      externalId: created.externalId,
+      status: "pending",
+    });
+    
+    // Mock deve aceitar lookup case-insensitive
+    const upperCaseId = created.externalId.toUpperCase();
+    const charge = await mp.getCharge(upperCaseId);
+    expect(charge).toMatchObject({
+      externalId: created.externalId,
+      status: "pending",
+    });
+  });
+
+  it("mapeia status canceled (um L) corretamente após POST /cancel", async () => {
+    const { mock, mp } = provider();
+    const reference = randomUUID();
+    const created = await mp.createPixCharge({
+      idempotencyKey: randomUUID(), reference, amountCents: 800,
+      expiresAt: new Date(now.getTime() + 40 * 60_000), customer,
+    });
+    
+    const canceled = await mp.cancelCharge(created.externalId);
+    expect(canceled?.status).toBe("cancelled");
+    
+    // Verifica que o mock retornou status "canceled" (um L)
+    const order = mock.byId.get(created.externalId)!;
+    expect(order.status).toBe("canceled");
+    expect(order.transactions.payments[0]?.status).toBe("canceled");
   });
 });
 
@@ -331,6 +415,67 @@ describe("MercadoPagoPaymentProvider: webhook", () => {
     );
     await expect(processWebhook(request, "mercadopago", untouchable, mp, now)).resolves.toEqual({
       outcome: "ignored", reason: "unsupported_event",
+    });
+  });
+
+  it("webhook detecta order.status=processed + payment.status=accredited como pago", async () => {
+    const { mock, mp } = provider();
+    const reference = randomUUID();
+    const created = await mp.createPixCharge({
+      idempotencyKey: randomUUID(), reference, amountCents: 2000,
+      expiresAt: new Date(now.getTime() + 40 * 60_000), customer,
+    });
+    
+    const order = mock.byId.get(created.externalId)!;
+    order.status = "processed";
+    order.transactions.payments[0]!.status = "accredited";
+    order.transactions.payments[0]!.date_approved = "2030-01-01T12:07:00.000Z";
+    
+    const body = JSON.stringify({
+      id: 888,
+      type: "order",
+      action: "order.processed",
+      data: { id: created.externalId },
+    });
+    const url = `http://localhost/api/webhooks/payments/mercadopago?data.id=${created.externalId}&type=order`;
+    const event = await mp.verifyWebhook(body, signedHeaders(created.externalId), now, url);
+    
+    expect(event).toEqual({
+      eventId: "mp:888",
+      type: "payment.paid",
+      externalId: created.externalId,
+      amountCents: 2000,
+      paidAt: "2030-01-01T12:07:00.000Z",
+    });
+  });
+
+  it("webhook com order ID em uppercase faz lookup case-insensitive", async () => {
+    const { mock, mp } = provider();
+    const reference = randomUUID();
+    const created = await mp.createPixCharge({
+      idempotencyKey: randomUUID(), reference, amountCents: 1200,
+      expiresAt: new Date(now.getTime() + 40 * 60_000), customer,
+    });
+    
+    const order = mock.byId.get(created.externalId)!;
+    order.transactions.payments[0]!.status = "approved";
+    order.transactions.payments[0]!.date_approved = "2030-01-01T12:10:00.000Z";
+    
+    // Webhook envia ID em uppercase
+    const upperCaseId = created.externalId.toUpperCase();
+    const body = JSON.stringify({
+      id: 999,
+      type: "order",
+      action: "order.updated",
+      data: { id: upperCaseId },
+    });
+    const url = `http://localhost/api/webhooks/payments/mercadopago?data.id=${upperCaseId}&type=order`;
+    const event = await mp.verifyWebhook(body, signedHeaders(upperCaseId), now, url);
+    
+    expect(event).toMatchObject({
+      type: "payment.paid",
+      externalId: created.externalId,
+      amountCents: 1200,
     });
   });
 });
