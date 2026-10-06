@@ -16,6 +16,13 @@ async function shot(page: import("@playwright/test").Page, name: string) {
 
 const meta = readMeta();
 
+test.beforeEach(async ({ context }) => {
+  await context.route("**/*", async (route) => {
+    const headers = { ...route.request().headers(), "cache-control": "no-cache", pragma: "no-cache" };
+    await route.continue({ headers });
+  });
+});
+
 test("landing header", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("link", { name: /vagatta/i }).first()).toBeVisible();
