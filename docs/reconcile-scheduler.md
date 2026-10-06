@@ -19,13 +19,20 @@ Authorization: Bearer <CRON_SECRET>
 
 Arquivo: `.github/workflows/reconcile-cron.yml` (a cada 30 min, minutos `7,37`, e `workflow_dispatch`).
 
-1. Copie o `CRON_SECRET` da Vercel para um secret do repositório **sem exibi-lo**:
-   ```bash
-   vercel env pull /tmp/.env.prod --environment=production --yes \
-     && grep '^CRON_SECRET=' /tmp/.env.prod | cut -d= -f2- | tr -d '"' | gh secret set CRON_SECRET -R voidFrance/agendaPIX \
-     && rm -f /tmp/.env.prod
-   ```
-   (ou cole manualmente em Settings → Secrets and variables → Actions → New repository secret).
+1. Ponha o **mesmo** `CRON_SECRET` da Vercel num secret do repositório. As variáveis do projeto na Vercel
+   são do tipo *sensitive* (não dá para ler o valor depois de criado), então:
+   - se você ainda tem o valor guardado: Settings → Secrets and variables → Actions → New repository
+     secret `CRON_SECRET` (ou `gh secret set CRON_SECRET -R voidFrance/agendaPIX` e cole no prompt);
+   - senão, **rotacione** nos dois lugares sem exibir o valor e faça redeploy:
+     ```bash
+     NEW=$(openssl rand -hex 32)
+     printf %s "$NEW" | gh secret set CRON_SECRET -R voidFrance/agendaPIX
+     vercel env rm CRON_SECRET production --yes
+     printf %s "$NEW" | vercel env add CRON_SECRET production --sensitive
+     unset NEW
+     vercel deploy --prod   # env nova só vale após novo deploy
+     ```
+     (atualize também o header do cron-job.org, se usar a opção B).
 2. Opcional: variável `RECONCILE_URL` (outro domínio) e `RECONCILE_CRON_ENABLED=false` para pausar.
 3. Depois do merge em `master`: Actions → *Reconcile (external scheduler)* → **Run workflow** e confira
    `HTTP 200` no log.
