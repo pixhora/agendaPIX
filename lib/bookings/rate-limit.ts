@@ -89,3 +89,15 @@ export async function consumeBookingRateLimit(database: NodePgDatabase<typeof sc
     throw new HttpError(429, "rate_limited", "Muitas tentativas neste negócio. Aguarde um minuto e tente novamente.", 60);
   }
 }
+
+/** Rate-limit para consultas públicas (availability, services). Limites mais altos que createBooking. */
+export async function consumeBookingReadRateLimit(database: NodePgDatabase<typeof schema>, businessId: string, identity: string | null, config: BookingConfig = bookingConfig()) {
+  await database.execute(sql`DELETE FROM booking_rate_limits WHERE window_started_at < now() - interval '24 hours' AND (business_id, client_hash) IN
+    (SELECT business_id, client_hash FROM booking_rate_limits WHERE window_started_at < now() - interval '24 hours' LIMIT 100)`);
+  if (identity && !await consumeBucket(database, businessId, tenantScopedHash("booking-read-rate:v1", businessId, identity), config.BOOKING_RATE_LIMIT_READ_PER_CLIENT)) {
+    throw new HttpError(429, "rate_limited", "Muitas consultas. Aguarde um minuto e tente novamente.", 60);
+  }
+  if (!await consumeBucket(database, businessId, tenantScopedHash("booking-read-rate:v1", businessId, BUSINESS_BUCKET), config.BOOKING_RATE_LIMIT_READ_PER_BUSINESS)) {
+    throw new HttpError(429, "rate_limited", "Muitas consultas neste negócio. Aguarde um minuto e tente novamente.", 60);
+  }
+}

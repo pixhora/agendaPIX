@@ -18,7 +18,12 @@ function emailTransport() {
 }
 
 export async function verifyEmailTransport() {
-  if (process.env.MAGIC_LINK_CAPTURE_FILE) return;
+  if (process.env.MAGIC_LINK_CAPTURE_FILE) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("MAGIC_LINK_CAPTURE_FILE não pode estar definida em produção.");
+    }
+    return;
+  }
   const { transporter } = emailTransport();
   try { await transporter.verify(); }
   finally { transporter.close(); }
@@ -27,6 +32,9 @@ export async function verifyEmailTransport() {
 export async function sendMagicLinkEmail(email: string, url: string) {
   const capture = process.env.MAGIC_LINK_CAPTURE_FILE;
   if (capture) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("MAGIC_LINK_CAPTURE_FILE não pode estar definida em produção.");
+    }
     await mkdir(path.dirname(capture), { recursive: true });
     await writeFile(capture, `${email}\n${url}\n`, "utf8");
     return;

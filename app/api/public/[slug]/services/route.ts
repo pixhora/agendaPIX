@@ -1,9 +1,10 @@
 import { appPreflight, withAppCors } from "@/lib/origins";
 import { listPublicServices } from "@/lib/bookings/service";
 import { json } from "@/lib/http";
+import { bookingClientIdentity } from "@/lib/bookings/rate-limit";
 
 export async function GET(request: Request, context: RouteContext<"/api/public/[slug]/services">) {
-  return withAppCors(request, async () => json(await listPublicServices((await context.params).slug)));
+  return withAppCors(request, async () => json(await listPublicServices((await context.params).slug, bookingClientIdentity(request))));
 }
 
 export function OPTIONS(request: Request) { return appPreflight(request, ["GET"]); }

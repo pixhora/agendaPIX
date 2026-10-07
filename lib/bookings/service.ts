@@ -13,7 +13,7 @@ import { callProvider, ProviderTimeoutError } from "../payments/timeout";
 import { availableSlots, localDate } from "./availability";
 import { availabilitySchema, bookingInputSchema, requestKeySchema, slugSchema } from "./validation";
 import { bookingConfig, type BookingConfig } from "./config";
-import { consumeBookingRateLimit, tenantScopedHash } from "./rate-limit";
+import { consumeBookingRateLimit, consumeBookingReadRateLimit, tenantScopedHash } from "./rate-limit";
 
 type Database = NodePgDatabase<typeof schema>;
 export function hash(value: string) { return createHash("sha256").update(value).digest("hex"); }
@@ -50,8 +50,9 @@ async function serviceById(businessId: string, serviceId: string, database: Data
   if (!service) throw new HttpError(404, "service_not_found", "Serviço não encontrado.");
   return service;
 }
-export async function listPublicServices(slug: string, database: Database = getDb()) {
+export async function listPublicServices(slug: string, clientIdentity: string | null = null, database: Database = getDb()) {
   const business = await businessBySlug(slug, database);
+  await consumeBookingReadRateLimit(database, business.id, clientIdentity);
   const services = await database.select({ id: schema.services.id, name: schema.services.name, durationMinutes: schema.services.durationMinutes, priceCents: schema.services.priceCents, depositCents: schema.services.depositCents }).from(schema.services).where(and(eq(schema.services.businessId, business.id), eq(schema.services.active, true)));
   return { name: business.name, timezone: business.timezone, services };
 }
@@ -65,9 +66,10 @@ async function slotsFor(business: typeof schema.businesses.$inferSelect, service
   ));
   return availableSlots({ date, timezone: business.timezone, durationMinutes: service.durationMinutes, hours: hours ?? null, busy, now });
 }
-export async function getAvailability(slug: string, query: unknown, database: Database = getDb()) {
+export async function getAvailability(slug: string, query: unknown, clientIdentity: string | null = null, database: Database = getDb()) {
   const input = availabilitySchema.parse(query);
   const business = await businessBySlug(slug, database);
+  await consumeBookingReadRateLimit(database, business.id, clientIdentity);
   const service = await serviceById(business.id, input.serviceId, database);
   return { timezone: business.timezone, slots: await slotsFor(business, service, input.date, new Date(), database) };
 }
@@ -215,12 +217,11 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
 
   const now = new Date();
   const [booking] = await database.select().from(schema.bookings).where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.id, reserved.booking.id))).limit(1);
-  return { replayed: reserved.kind === "existing", data: { ...await bookingView(booking, database, now), accessToken: reserved.token } };
+  return { replayed: reserved.kind === "existing", data: await bookingView(booking, database, now), token: reserved.token };
 }
 
-export async function getBookingPayment(slug: string, id: string, authorization: string | null, database: Database = getDb()) {
+export async function getBookingPayment(slug: string, id: string, token: string | null, database: Database = getDb()) {
   const bookingId = z.uuid().parse(id);
-  const token = /^Bearer ([A-Za-z0-9_-]{43})$/.exec(authorization ?? "")?.[1];
   const business = await businessBySlug(slug, database);
   return database.transaction(async (transaction) => {
     await lockBusiness(transaction, business.id);
