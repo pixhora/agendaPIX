@@ -225,7 +225,7 @@ describe("simulação de Pix fake em desenvolvimento", () => {
       const result = await simulateDevFakePayment({
         slug: slugs[0],
         bookingId: data.bookingId,
-        authorization: `Bearer ${token}`,
+        token,
         database,
       });
       expect(result.outcome).toBe("processed");

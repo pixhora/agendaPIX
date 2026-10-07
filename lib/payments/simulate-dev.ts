@@ -27,7 +27,7 @@ export function assertDevFakeSimulationAllowed() {
 export async function simulateDevFakePayment(input: {
   slug: string;
   bookingId: string;
-  authorization: string | null;
+  token: string | null;
   database?: Database;
   now?: Date;
 }) {
@@ -36,7 +36,7 @@ export async function simulateDevFakePayment(input: {
   const now = input.now ?? new Date();
 
   // Autoriza com o mesmo token do checkout público e obtém o estado atual.
-  const view = await getBookingPayment(input.slug, input.bookingId, input.authorization, database);
+  const view = await getBookingPayment(input.slug, input.bookingId, input.token, database);
   if (view.status === "confirmed" && view.payment?.status === "paid") {
     return { outcome: "duplicate" as const, reason: null as string | null, bookingId: view.bookingId };
   }
