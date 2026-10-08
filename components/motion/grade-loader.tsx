@@ -1,18 +1,40 @@
+import type { CSSProperties } from "react";
 import { cn } from "@/lib/utils";
-import { BrandMark } from "@/components/ui/brand";
-import { InView } from "@/components/motion/in-view";
 
 export type GradeLoaderProps = {
+  /** Nome acessível. O glifo não é lido de novo. */
   label?: string;
+  /** Loop contínuo do brilho. Sem loop, a marca entra uma vez (1,1 s). */
+  loop?: boolean;
+  /** Lado do azulejo, em px. 24, 32, 64 e 96 acompanham o raio do BrandMark. */
+  size?: number;
   className?: string;
 };
 
-/** A Grade A acende em sequência. A geometria vem da marca, sem cópia do desenho. */
-export function GradeLoader({ label = "Carregando…", className }: GradeLoaderProps) {
+/**
+ * Marca Aro carregando: anel em verde-água e haste à direita.
+ * Desenho original do AgendaPix. A troca da marca estática fica fora daqui.
+ */
+export function GradeLoader({
+  label = "Carregando",
+  loop = true,
+  size = 32,
+  className,
+}: GradeLoaderProps) {
+  const style = { "--grade-size": `${size}px` } as CSSProperties;
+
   return (
-    <InView role="status" data-testid="grade-loader" className={cn("grade-loader inline-flex flex-col items-center gap-3", className)}>
-      <BrandMark className="size-20" />
-      <span className="text-sm text-muted">{label}</span>
-    </InView>
+    <span
+      role="status"
+      aria-label={label}
+      data-testid="grade-loader"
+      className={cn("grade-loader", loop && "is-loop", className)}
+      style={style}
+    >
+      <span className="grade-glyph" aria-hidden="true">
+        <span className="grade-ring" />
+        <span className="grade-stem" />
+      </span>
+    </span>
   );
 }

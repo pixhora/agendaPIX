@@ -14,9 +14,12 @@ test.describe("preview de movimento", () => {
 
     await expect(page.locator("#preview-hold")).toHaveText(/\d+ minutos/);
     await expect(page.locator("#preview-deposit")).toHaveText(/R\$\s*15,00/);
-    await expect(page.getByRole("status").first()).toContainText("Carregando…");
+    const loader = page.getByTestId("grade-loader").first();
+    await expect(loader).toHaveAttribute("aria-label", "Carregando");
+    await expect(loader.locator(".grade-glyph")).toHaveAttribute("aria-hidden", "true");
+    await expect(loader.locator(".grade-ring")).toHaveCSS("animation-name", "none");
+    await expect(loader.locator(".grade-stem")).toHaveCSS("opacity", "1");
     await expect(page.getByTestId("booking-island")).not.toHaveAttribute("data-inview", "");
-    await expect(page.getByTestId("grade-loader").first()).not.toHaveAttribute("data-inview", "");
 
     const duration = page.getByRole("radiogroup", { name: "Duração do serviço" });
     await duration.getByRole("radio", { name: "15 min" }).focus();
@@ -43,7 +46,14 @@ test.describe("preview de movimento", () => {
     await expectNoAxeViolations(page, "preview movimento escuro");
     await page.getByTestId("booking-island").scrollIntoViewIfNeeded();
     await expect(page.getByTestId("booking-island")).toHaveAttribute("data-inview", "");
-    await page.getByTestId("grade-loader").first().scrollIntoViewIfNeeded();
-    await expect(page.getByTestId("grade-loader").first()).toHaveAttribute("data-inview", "");
+    const loader = page.getByTestId("grade-loader").first();
+    await loader.scrollIntoViewIfNeeded();
+    await expect(loader).toHaveClass(/is-loop/);
+    await expect(loader.locator(".grade-ring")).toHaveCSS("animation-name", "none");
+    const sweep = await loader.locator(".grade-ring").evaluate((el) => {
+      const style = getComputedStyle(el, "::before");
+      return { name: style.animationName, count: style.animationIterationCount };
+    });
+    expect(sweep).toEqual({ name: "grade-aro-sweep", count: "infinite" });
   });
 });

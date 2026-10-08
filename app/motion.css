@@ -123,30 +123,91 @@
   .booking-island[data-inview] .island-detail {
     animation: island-fade-in var(--dur-3) var(--ease-out-quint) both;
   }
-
-  .grade-loader[data-inview] svg g > rect,
-  .grade-loader[data-inview] svg > rect {
-    animation-name: grade-cell;
-    animation-duration: calc(var(--dur-3) * 3);
-    animation-timing-function: var(--ease-out-quint);
-    animation-iteration-count: infinite;
-  }
-
-  .grade-loader[data-inview] svg g > rect:nth-child(1) { animation-delay: 0ms; }
-  .grade-loader[data-inview] svg g > rect:nth-child(2) { animation-delay: 70ms; }
-  .grade-loader[data-inview] svg g > rect:nth-child(3) { animation-delay: 140ms; }
-  .grade-loader[data-inview] svg g > rect:nth-child(4) { animation-delay: 210ms; }
-  .grade-loader[data-inview] svg g > rect:nth-child(5) { animation-delay: 280ms; }
-  .grade-loader[data-inview] svg g > rect:nth-child(6) { animation-delay: 350ms; }
-  .grade-loader[data-inview] svg g > rect:nth-child(7) { animation-delay: 420ms; }
-  .grade-loader[data-inview] svg g > rect:nth-child(8) { animation-delay: 490ms; }
-  .grade-loader[data-inview] svg g > rect:nth-child(9) { animation-delay: 560ms; }
-  .grade-loader[data-inview] svg > rect { animation-delay: 280ms; }
 }
 
-@keyframes grade-cell {
-  0%, 100% { opacity: 0.28; }
-  45% { opacity: 1; }
+/* GradeLoader: marca Aro. Uma volta em 1,1 s; no loop só o brilho gira. */
+.grade-loader {
+  --grade-size: 32px;
+  --grade-tile: var(--brand-tile, #0b0b0c);
+  --grade-fg: var(--brand-tile-foreground, #f6f5f2);
+  --grade-edge: var(--brand-tile-edge, transparent);
+  --grade-acc: var(--pix-bright, #3fd0be);
+  --grade-pix: #0a6e63;
+  --grade-mint: #8ff2e3;
+  position: relative;
+  display: inline-block;
+  flex: none;
+  width: var(--grade-size);
+  height: var(--grade-size);
+  border-radius: 31.25%;
+  background: var(--grade-tile);
+  box-shadow: inset 0 0 0 1px var(--grade-edge);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.grade-loader .grade-glyph {
+  position: absolute;
+  inset: 17.1875%;
+}
+
+.grade-loader .grade-glyph > * {
+  position: absolute;
+}
+
+.grade-loader .grade-ring {
+  inset: 0;
+  border-radius: 50%;
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(60% - 0.5px), #000 60%);
+  mask: radial-gradient(farthest-side, transparent calc(60% - 0.5px), #000 60%);
+  animation: grade-aro-in 0.28s ease-out both;
+}
+
+.grade-loader .grade-ring::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: conic-gradient(from 120deg, #e6fffa 0deg, var(--grade-mint) 48deg, var(--grade-acc) 165deg, var(--grade-pix) 300deg, var(--grade-pix) 360deg);
+  animation: grade-aro-sweep 1.1s cubic-bezier(0.65, 0, 0.35, 1) both;
+}
+
+.grade-loader .grade-stem {
+  top: 0;
+  left: 80%;
+  width: 20%;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--grade-fg);
+  transform-origin: 50% 100%;
+  animation: grade-aro-stem 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 0.12s;
+}
+
+@keyframes grade-aro-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes grade-aro-sweep {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+
+@keyframes grade-aro-stem {
+  from { transform: scaleY(0); opacity: 0; }
+  to { transform: scaleY(1); opacity: 1; }
+}
+
+.grade-loader.is-loop .grade-ring {
+  animation: none;
+}
+
+.grade-loader.is-loop .grade-ring::before {
+  animation: grade-aro-sweep 1.1s linear infinite;
+}
+
+.grade-loader.is-loop .grade-stem {
+  animation: none;
 }
 
 /* Copiar: os dois ícones ocupam a mesma célula. Só opacity e scale. */
@@ -254,8 +315,7 @@
   .copy-glyphs > svg,
   .island-body,
   .island-compact,
-  .island-detail,
-  .grade-loader svg rect {
+  .island-detail {
     animation: none;
     transition: none;
   }
@@ -263,5 +323,17 @@
   .island-body { transform: none; }
   .island-compact { opacity: 0; }
   .island-detail { opacity: 1; }
-  .grade-loader svg rect { opacity: 1; }
+
+  .grade-loader,
+  .grade-loader *,
+  .grade-loader *::before,
+  .grade-loader *::after {
+    animation: none !important;
+  }
+
+  .grade-loader .grade-ring,
+  .grade-loader .grade-stem {
+    opacity: 1;
+    transform: none;
+  }
 }

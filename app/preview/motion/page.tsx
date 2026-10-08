@@ -27,6 +27,38 @@ const durations = [
   { value: "60", label: "60 min" },
 ];
 
+const loaderSizes = [24, 32, 64] as const;
+
+function GradeLoaderStage({ tone, title }: { tone: "light" | "dark"; title: string }) {
+  const stageClass = tone === "light"
+    ? "bg-[#f6f5f2] text-[#0b0b0c] [--brand-tile-edge:transparent]"
+    : "bg-[#0f0f10] text-[#f6f5f2] [--brand-tile-edge:rgb(255_255_255_/_0.14)]";
+
+  return (
+    <div className={`space-y-5 rounded-card p-4 ${stageClass}`}>
+      <h3 className="text-sm font-semibold">{title}</h3>
+      <div className="flex flex-wrap items-end gap-6">
+        <figure className="space-y-2">
+          <GradeLoader />
+          <figcaption className="text-sm">Loop</figcaption>
+        </figure>
+        <figure className="space-y-2">
+          <GradeLoader loop={false} label="Marca entrando" />
+          <figcaption className="text-sm">Uma vez</figcaption>
+        </figure>
+      </div>
+      <div className="flex flex-wrap items-end gap-4">
+        {loaderSizes.map((size) => (
+          <figure key={size} className="space-y-2">
+            <GradeLoader size={size} label={`Carregando, ${size} pixels`} />
+            <figcaption className="text-sm tabular-nums">{size}</figcaption>
+          </figure>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function MotionPreviewPage() {
   if (!isMotionPreviewOpen(process.env.NODE_ENV)) notFound();
   const holdMinutes = bookingConfig().BOOKING_HOLD_MINUTES;
@@ -41,7 +73,7 @@ export default function MotionPreviewPage() {
             </p>
             <h1 className="font-display text-[28px] font-bold tracking-tight">Movimento</h1>
             <p className="text-base text-muted">
-              Números, aviso de reserva, copiar código, escolha única, tempo do Pix e a marca carregando. Estes blocos ainda não entram nas telas do produto.
+              Números, aviso de reserva, copiar código, escolha única, tempo do Pix e a marca Aro carregando. Estes blocos ainda não entram nas telas do produto.
             </p>
           </div>
           <ThemeToggle />
@@ -103,9 +135,12 @@ export default function MotionPreviewPage() {
 
         <section aria-labelledby="carregando-heading" className="space-y-4">
           <h2 id="carregando-heading" className="font-display text-xl font-bold">Carregando</h2>
-          <div className="flex flex-wrap gap-10">
-            <GradeLoader />
-            <GradeLoader label="Verificando pagamento…" />
+          <p className="max-w-[62ch] text-sm text-muted">
+            Marca Aro. No loop o brilho dá voltas e a haste fica parada. Na entrada, o anel acende e a haste sobe uma vez.
+          </p>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <GradeLoaderStage tone="light" title="Fundo claro" />
+            <GradeLoaderStage tone="dark" title="Fundo escuro" />
           </div>
         </section>
       </main>

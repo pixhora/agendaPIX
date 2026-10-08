@@ -68,7 +68,15 @@ describe("movimento: acessibilidade e movimento reduzido", () => {
     expect(css).toContain("--dur-3:");
     expect(css).toContain("@media (prefers-reduced-motion: reduce)");
     expect(css).toContain(".island-detail { opacity: 1; }");
-    expect(css).toContain(".grade-loader svg rect { opacity: 1; }");
+    expect(css).toContain(".grade-loader.is-loop .grade-ring::before");
+    expect(css).toContain("animation: grade-aro-sweep 1.1s linear infinite");
+    expect(css).toContain("var(--pix-bright, #3fd0be)");
+    expect(css).toContain("var(--brand-tile, #0b0b0c)");
+    expect(css).toContain("var(--brand-tile-foreground, #f6f5f2)");
+    expect(css).toContain("var(--brand-tile-edge, transparent)");
+    expect(css).not.toContain("--ap-offset");
+    expect(css).not.toContain("grade-cell");
+    expect(css).toContain(".grade-loader .grade-ring,\n  .grade-loader .grade-stem {\n    opacity: 1;");
     expect(css).toContain("box-shadow: var(--shadow-focus)");
     expect(css).toContain("transform: translateX");
     const globals = readFileSync("app/globals.css", "utf8");
@@ -115,15 +123,30 @@ describe("movimento: acessibilidade e movimento reduzido", () => {
     expect(expired).toContain("text-danger");
   });
 
-  it("a marca carregando anuncia o texto e usa o símbolo importado", () => {
+  it("a marca Aro anuncia o rótulo e esconde o glifo", () => {
     const html = renderToStaticMarkup(GradeLoader({}));
     expect(html).toContain('role="status"');
-    expect(html).toContain("Carregando…");
-    expect(html).toContain("<svg");
-    expect(html).toContain("text-pix-bright");
+    expect(html).toContain('aria-label="Carregando"');
+    expect(html).toContain('class="grade-glyph" aria-hidden="true"');
+    expect(html).toContain("grade-ring");
+    expect(html).toContain("grade-stem");
+    expect(html).toContain("is-loop");
+    expect(html).toContain("--grade-size:32px");
+    expect(html).not.toContain("<svg");
     expect(html).not.toContain("data-inview");
+    expect(html).not.toContain("Jordan-Gilliam");
+
+    const once = renderToStaticMarkup(GradeLoader({ loop: false, size: 64, label: "Marca entrando" }));
+    expect(once).not.toContain("is-loop");
+    expect(once).toContain("--grade-size:64px");
+    expect(once).toContain('aria-label="Marca entrando"');
+
+    for (const size of [24, 32, 96]) {
+      expect(renderToStaticMarkup(GradeLoader({ size }))).toContain(`--grade-size:${size}px`);
+    }
+
     const custom = renderToStaticMarkup(GradeLoader({ label: "Verificando pagamento…" }));
-    expect(custom).toContain("Verificando pagamento…");
+    expect(custom).toContain('aria-label="Verificando pagamento…"');
   });
 
   it("o botão de copiar tem rótulo, região ao vivo e campo de fallback", () => {
