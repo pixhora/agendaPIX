@@ -1,4 +1,6 @@
 import { CalendarCheckIcon, CircleCheckIcon, LayoutPanelIcon, SmartphoneIcon } from "./icons";
+import { cn } from "@/lib/utils";
+import { belowFold } from "./section";
 
 const items = [
   { Icon: CalendarCheckIcon, title: "Menos horário furado", text: "Quem paga para reservar assume o compromisso com o horário." },
@@ -9,7 +11,7 @@ const items = [
 
 export function LandingBenefits() {
   return (
-    <section aria-labelledby="beneficios-titulo" className="bg-slab py-16 text-slab-foreground lg:py-28">
+    <section aria-labelledby="beneficios-titulo" className={cn("bg-slab py-16 text-slab-foreground lg:py-28", belowFold)}>
       <div className="mx-auto w-full max-w-[1120px] px-5">
         <h2 id="beneficios-titulo" className="max-w-[20rem] font-display text-[1.75rem] font-bold leading-[1.08] tracking-[-0.025em] sm:max-w-[28rem] lg:text-[2.75rem]">
           O sinal no Pix protege a sua agenda.

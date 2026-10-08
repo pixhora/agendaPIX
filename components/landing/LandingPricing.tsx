@@ -5,7 +5,7 @@ import { Eyebrow, Section, SectionTitle } from "./section";
 
 export function LandingPricing() {
   return (
-    <Section id="precos" labelledBy="precos-titulo">
+    <Section id="precos" labelledBy="precos-titulo" paint="always">
       <div className="max-w-[40rem]">
         <Eyebrow>Preço</Eyebrow>
         <SectionTitle id="precos-titulo">Menos que um atendimento por mês.</SectionTitle>
