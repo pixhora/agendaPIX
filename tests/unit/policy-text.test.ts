@@ -46,7 +46,7 @@ describe("texto da política do sinal", () => {
     expect(policySummary(creditPolicy(), { depositCents: 2000, businessName: "Barbearia do Zé" })).toBe(
       "Com 24 h de antecedência, Barbearia do Zé pode devolver o sinal. Mais perto da hora, o sinal vira crédito para outro horário, válido por 60 dias.",
     );
-    expect(policySummary({ ...creditPolicy(), creditValidityDays: 45 } as DepositPolicy, { depositCents: 2000, businessName: "Barbearia do Zé" })).toContain(
+    expect(policySummary({ ...creditPolicy(), creditValidityDays: 45 } as unknown as DepositPolicy, { depositCents: 2000, businessName: "Barbearia do Zé" })).toContain(
       "válido por 45 dias.",
     );
     expect(policySummary(PADRAO_DEPOSIT_POLICY, { depositCents: 0, businessName: "Barbearia do Zé" })).toBe("Sem sinal.");
@@ -86,7 +86,7 @@ describe("texto da política do sinal", () => {
     });
     expect(noShowRefund.find((line) => line.title === "Se faltar")?.body).toBe("Barbearia do Zé pode devolver o sinal.");
 
-    const twice = policyDetails({ ...PADRAO_DEPOSIT_POLICY, maxReschedules: 2 } as DepositPolicy, { ...context, contactWhatsapp: null });
+    const twice = policyDetails({ ...PADRAO_DEPOSIT_POLICY, maxReschedules: 2 } as unknown as DepositPolicy, { ...context, contactWhatsapp: null });
     expect(twice[0]?.body).toContain("(2 vezes)");
 
     expect(policyIcsText(PADRAO_DEPOSIT_POLICY, { businessName: "Barbearia do Zé", depositCents: 2000, startsAt })).toBe(
