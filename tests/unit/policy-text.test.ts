@@ -40,22 +40,70 @@ describe("texto da política do sinal", () => {
   });
 
   it("resume a política padrão e o caso dentro do prazo", () => {
-    expect(policySummary(PADRAO_DEPOSIT_POLICY, { depositCents: 2000 })).toBe("Se cancelar até 24 h antes, o negócio faz a devolução conforme a política.");
-    expect(policySummary(PADRAO_DEPOSIT_POLICY, { depositCents: 0 })).toBe("Sem sinal.");
+    expect(policySummary(PADRAO_DEPOSIT_POLICY, { depositCents: 2000, businessName: "Barbearia do Zé" })).toBe(
+      "Com 24 h de antecedência, Barbearia do Zé pode devolver o sinal. Mais perto da hora, o sinal fica com Barbearia do Zé.",
+    );
+    expect(policySummary(creditPolicy(), { depositCents: 2000, businessName: "Barbearia do Zé" })).toBe(
+      "Com 24 h de antecedência, Barbearia do Zé pode devolver o sinal. Mais perto da hora, o sinal vira crédito para outro horário, válido por 60 dias.",
+    );
+    expect(policySummary({ ...creditPolicy(), creditValidityDays: 45 } as DepositPolicy, { depositCents: 2000, businessName: "Barbearia do Zé" })).toContain(
+      "válido por 45 dias.",
+    );
+    expect(policySummary(PADRAO_DEPOSIT_POLICY, { depositCents: 0, businessName: "Barbearia do Zé" })).toBe("Sem sinal.");
     const startsAt = new Date("2030-01-02T15:00:00.000Z");
-    expect(policySummary(PADRAO_DEPOSIT_POLICY, { depositCents: 2000, startsAt, now: new Date("2030-01-02T12:00:00.000Z") }))
+    expect(policySummary(PADRAO_DEPOSIT_POLICY, { depositCents: 2000, businessName: "Barbearia do Zé", startsAt, now: new Date("2030-01-02T12:00:00.000Z") }))
       .toBe("Faltam menos de 24 h para o horário: se cancelar, o sinal não é devolvido.");
     expect(policyListLabel(PADRAO_DEPOSIT_POLICY, 2000)).toBe("Até 24 h, conforme a política");
     expect(policyListLabel(PADRAO_DEPOSIT_POLICY, 0)).toBe("Sem sinal");
   });
 
-  it("diz que o negócio devolve pelo AgendaPix, sem prometer devolução automática", () => {
-    const lines = policyDetails(PADRAO_DEPOSIT_POLICY, { businessName: "Studio Bella", contactWhatsapp: "+5511999999999" });
-    const body = lines.map((line) => line.body).join(" ");
-    expect(body).toContain("Studio Bella devolve pelo AgendaPix, conforme a política, se confirmar no painel");
-    expect(body).toContain("A devolução não é automática: Studio Bella confirma no painel, em Devolver pelo AgendaPix, e o valor sai da conta Mercado Pago dele.");
-    expect(body.toLowerCase()).not.toContain("repass");
-    expect(body).not.toMatch(/receba o sinal|sinal devolvido/i);
-    expect(policyIcsText(PADRAO_DEPOSIT_POLICY, { businessName: "Studio Bella", depositCents: 2000 })).toContain("pelo AgendaPix");
+  it("fala com o cliente pelo nome cadastrado, sem painel e sem artigo", () => {
+    const startsAt = new Date("2026-10-08T14:30:00.000Z");
+    const now = new Date("2026-10-01T15:00:00.000Z");
+    const context = { businessName: "Barbearia do Zé", startsAt, now, timezone: "America/Sao_Paulo" as const };
+
+    const withWhatsapp = policyDetails(PADRAO_DEPOSIT_POLICY, { ...context, contactWhatsapp: "+5511999999999" });
+    expect(withWhatsapp.map((line) => line.title)).toEqual(["Até qua, 07 out, 11:30", "Depois disso", "Se faltar", "Como cancelar ou remarcar"]);
+    expect(withWhatsapp.map((line) => line.body)).toEqual([
+      "Cancele e Barbearia do Zé pode devolver o sinal, ou remarque usando o sinal (1 vez).",
+      "Se cancelar, o sinal fica com Barbearia do Zé.",
+      "O sinal fica com Barbearia do Zé.",
+      "Fale com Barbearia do Zé pelo WhatsApp. A devolução não é automática: quem devolve é Barbearia do Zé, da conta Mercado Pago do negócio, depois de confirmar o cancelamento.",
+    ]);
+
+    const withoutWhatsapp = policyDetails(PADRAO_DEPOSIT_POLICY, { ...context, contactWhatsapp: null });
+    expect(withoutWhatsapp[3]?.body).toBe(
+      "Fale com Barbearia do Zé pelos canais de sempre. A devolução não é automática: quem devolve é Barbearia do Zé, da conta Mercado Pago do negócio, depois de confirmar o cancelamento.",
+    );
+
+    const creditLines = policyDetails(creditPolicy(), { ...context, contactWhatsapp: "+5511999999999" });
+    expect(creditLines[1]?.body).toBe("Se cancelar, o sinal vira crédito para outro horário em Barbearia do Zé, válido por 60 dias.");
+    expect(creditLines[2]?.body).toBe("O sinal vira crédito para outro horário em Barbearia do Zé, válido por 60 dias.");
+
+    const noShowRefund = policyDetails(policy({ refundUntilHours: null, rescheduleUntilHours: null, lateCancel: "retain", noShow: "refund" }), {
+      businessName: "Barbearia do Zé",
+      contactWhatsapp: null,
+    });
+    expect(noShowRefund.find((line) => line.title === "Se faltar")?.body).toBe("Barbearia do Zé pode devolver o sinal.");
+
+    const twice = policyDetails({ ...PADRAO_DEPOSIT_POLICY, maxReschedules: 2 } as DepositPolicy, { ...context, contactWhatsapp: null });
+    expect(twice[0]?.body).toContain("(2 vezes)");
+
+    expect(policyIcsText(PADRAO_DEPOSIT_POLICY, { businessName: "Barbearia do Zé", depositCents: 2000, startsAt })).toBe(
+      "Barbearia do Zé pode devolver o sinal até qua, 07 out, às 11:30.",
+    );
+
+    for (const lines of [withWhatsapp, withoutWhatsapp, creditLines]) {
+      const blob = lines.map((line) => `${line.title} ${line.body}`).join(" ");
+      expect(blob).not.toMatch(/painel|AgendaPix|Devolver pelo/i);
+      expect(blob.toLowerCase()).not.toContain("repass");
+      expect(blob).not.toMatch(/(?:^|\s)(?:o|a|do|da|no|na|pelo|pela)\s+Barbearia do Zé/);
+    }
+    const receipt = policyIcsText(PADRAO_DEPOSIT_POLICY, { businessName: "Barbearia do Zé", depositCents: 2000, startsAt });
+    expect(receipt).not.toMatch(/painel|AgendaPix/);
   });
 });
+
+function creditPolicy(): DepositPolicy {
+  return { ...PADRAO_DEPOSIT_POLICY, preset: "personalizada", lateCancel: "credit", noShow: "credit" };
+}

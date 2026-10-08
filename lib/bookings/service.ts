@@ -62,7 +62,7 @@ function publicPolicy(service: { depositCents: number; depositPolicy: unknown },
   const policy = depositPolicySchema.parse(service.depositPolicy);
   return {
     depositPolicy: policy,
-    policySummary: policySummary(policy, { depositCents: service.depositCents }),
+    policySummary: policySummary(policy, { depositCents: service.depositCents, businessName }),
     policyHash: policyHashFor(policy, { businessName, depositCents: service.depositCents }),
   };
 }
@@ -247,7 +247,7 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
     if (policy && currentHash && input.policyHash !== currentHash) {
       throw new HttpError(409, POLICY_CHANGED_CODE, POLICY_CHANGED_MESSAGE, undefined, {
         depositPolicy: policy,
-        policySummary: policySummary(policy, { depositCents: service.depositCents }),
+        policySummary: policySummary(policy, { depositCents: service.depositCents, businessName: business.name }),
         policyHash: currentHash,
       });
     }
