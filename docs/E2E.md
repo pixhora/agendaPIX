@@ -6,7 +6,7 @@ Suíte em `tests/e2e/`, dois projetos: **mobile** (390×844, perfil iPhone 13 no
 | --- | --- |
 | `booking.spec.ts` | Página pública: serviço → dia/horário → nome, WhatsApp e CPF → Pix (QR PNG + copia-e-cola do contrato `PixCharge`, provedor fake) → webhook assinado → "Horário confirmado!"; também cobre expiração do hold; axe em cada etapa |
 | `owner-journeys.spec.ts` | Login por link mágico (`/login` → `/dashboard`, link reutilizado volta com aviso) e onboarding completo → painel |
-| `painel.spec.ts` | Agenda do dia (KPIs, detalhe no painel lateral), semana/navegação/calendário, cadastro de serviço, clientes, configurações (horários e chave Pix), isolamento entre negócios (A não vê B, inclusive na API da chave Pix) |
+| `painel.spec.ts` | Agenda do dia (KPIs, detalhe no painel lateral), semana/navegação/calendário, cadastro de serviço, clientes, configurações (horários e link público; a chave Pix não aparece), isolamento entre negócios (A não vê B) |
 | `dashboard-owner.spec.ts`, `dashboard-login.spec.ts` | Redirecionamentos, cabeçalhos e acesso negado |
 | `a11y.spec.ts` | axe (`@axe-core/playwright`, tags `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa`) e reflow sem rolagem horizontal na landing, login, onboarding, página pública e painel; tema escuro; alternador de tema persistente |
 | `skeleton.spec.ts` | Landing e `/api/health` |

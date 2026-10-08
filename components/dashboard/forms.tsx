@@ -48,11 +48,11 @@ function PendingLine({ children }: { children: string }) {
 }
 
 function FormCta({ pending, idle }: { pending: boolean; idle: string }) {
-  return <div className="form-cta">
+  return (
     <Button type="submit" disabled={pending} aria-busy={pending} className="dash-disabled w-full md:w-auto">
       {pending ? <><Loader2 aria-hidden="true" className="animate-spin motion-reduce:animate-none" />Salvando…</> : idle}
     </Button>
-  </div>;
+  );
 }
 
 function FieldShell({ invalid, children }: { invalid?: boolean; children: React.ReactNode }) {
