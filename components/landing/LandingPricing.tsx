@@ -16,7 +16,7 @@ export function LandingPricing() {
         <article aria-labelledby="plano-base" className="flex flex-col rounded-frame border-2 border-ink bg-surface p-5 shadow-[var(--shadow-card)] sm:p-6">
           <p className="text-[13px] text-muted">{basePlan.audience}</p>
           <h3 id="plano-base" className="mt-1 font-display text-[1.375rem] font-bold text-ink">{basePlan.name}</h3>
-          <div className="mt-5 rounded-[22px] bg-slab p-5 text-slab-foreground">
+          <div className="mt-5 rounded-slab bg-slab p-5 text-slab-foreground ring-1 ring-white/10">
             <p className="flex flex-wrap items-baseline gap-x-2">
               <span className="font-display text-[2.75rem] font-bold leading-none tabular-nums">{basePlan.price}</span>
               <span className="text-sm font-semibold text-slab-muted">{basePlan.unit}</span>
