@@ -1,11 +1,16 @@
-import Link from "next/link";
-import { Check } from "lucide-react";
+import { CheckIcon } from "./icons";
 import { buttonVariants } from "@/components/ui/button";
 import { ValueSlab } from "@/components/ui/value-slab";
 
 const niches = ["Barbearias", "Salões", "Manicures", "Estética", "Clínicas", "Personal trainers"];
 const reassurances = ["7 dias grátis", "Sem cartão de crédito", "Cliente não baixa app"];
-const days = ["Qui", "Sex", "Sáb"];
+const days = [
+  { label: "Qua 14", selected: false },
+  { label: "Qui 15", selected: true },
+  { label: "Sex 16", selected: false },
+  { label: "Sáb 17", selected: false },
+  { label: "Dom 18", selected: false },
+];
 const times = ["14:00", "14:45", "15:30", "16:15"];
 
 export function LandingHero({ publicHost }: { publicHost: string }) {
@@ -25,17 +30,17 @@ export function LandingHero({ publicHost }: { publicHost: string }) {
             Você manda um link no WhatsApp ou no Instagram. O cliente escolhe o horário, paga o sinal por Pix e a reserva se confirma sozinha. Sem cobrar comprovante.
           </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <Link id="hero-primary-cta" href="/onboarding" className={buttonVariants({ size: "lg", className: "w-full sm:w-auto" })}>
+            <a id="hero-primary-cta" href="/onboarding" className={buttonVariants({ size: "lg", className: "w-full sm:w-auto" })}>
               Criar minha agenda grátis
-            </Link>
-            <Link href="/preview/booking" className={buttonVariants({ variant: "outline", size: "lg", className: "w-full sm:w-auto" })}>
+            </a>
+            <a href="/preview/booking" className={buttonVariants({ variant: "outline", size: "lg", className: "w-full sm:w-auto" })}>
               Ver uma página de exemplo
-            </Link>
+            </a>
           </div>
           <ul className="mt-4 flex flex-col gap-1.5 text-[13px] text-muted sm:flex-row sm:flex-wrap sm:gap-x-4">
             {reassurances.map((item) => (
               <li key={item} className="inline-flex items-center gap-1.5">
-                <Check aria-hidden="true" className="size-4 text-pix" />
+                <CheckIcon aria-hidden="true" className="size-4 text-pix" />
                 {item}
               </li>
             ))}
@@ -56,9 +61,9 @@ export function LandingHero({ publicHost }: { publicHost: string }) {
             <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-paper to-transparent lg:hidden" />
             <div aria-hidden="true" className="pointer-events-none absolute top-[71%] right-[calc(100%-1rem)] z-10 hidden w-[210px] -translate-y-1/2 rounded-card border border-line bg-surface p-3 shadow-[var(--shadow-raised)] xl:block">
               <p className="text-[13px] font-semibold text-ink">Nova reserva · Ana</p>
-              <p className="mt-1 text-[13px] text-muted">Design de sobrancelha · Qui 15:30</p>
+              <p className="mt-1 text-[13px] text-muted">Design de sobrancelha · Qui 15, 15:30</p>
               <p className="mt-2 inline-flex items-center gap-1 text-[13px] font-semibold text-success">
-                <Check className="size-3.5" /> Confirmado · sinal pago
+                <CheckIcon className="size-3.5" /> Confirmado · sinal pago
               </p>
             </div>
           </div>
@@ -93,10 +98,10 @@ function PhoneStage({ publicHost }: { publicHost: string }) {
           <p className="mt-1 text-[12px] text-muted">45 min · R$ 60,00</p>
           <p className="mt-1 text-[12px] font-semibold text-pix">Sinal R$ 20,00</p>
         </div>
-        <div className="mt-3 flex gap-1.5">
-          {days.map((day, index) => (
-            <span key={day} className={index === 0 ? "rounded-full bg-ink px-2.5 py-1 text-[11px] font-semibold text-paper" : "rounded-full bg-subtle px-2.5 py-1 text-[11px] font-semibold text-muted"}>
-              {day}
+        <div className="mt-3 flex flex-wrap gap-1">
+          {days.map((day) => (
+            <span key={day.label} className={day.selected ? "rounded-full bg-ink px-2 py-1 text-[10px] font-semibold leading-none text-paper" : "rounded-full bg-subtle px-2 py-1 text-[10px] font-semibold leading-none text-muted"}>
+              {day.label}
             </span>
           ))}
         </div>

@@ -33,11 +33,11 @@ describe("getPublicBookingFacts", () => {
     else process.env.MP_REQUIRES_PAYER_CPF = previousCpf;
   });
 
-  it("defaults to a 30 minute hold, no CPF, and a null recipient", async () => {
+  it("follows bookingConfig when the env is unset: hold 10, no CPF, null recipient", async () => {
     delete process.env.BOOKING_HOLD_MINUTES;
     delete process.env.MP_REQUIRES_PAYER_CPF;
     await expect(getPublicBookingFacts()).resolves.toEqual({
-      holdMinutes: 30,
+      holdMinutes: 10,
       pixRecipientDisplayName: null,
       requiresPayerCpf: false,
     });
@@ -53,16 +53,16 @@ describe("getPublicBookingFacts", () => {
     });
   });
 
-  it("keeps the minimum hold at 28 minutes", async () => {
-    process.env.BOOKING_HOLD_MINUTES = "10";
+  it("accepts a hold inside the configured range", async () => {
+    process.env.BOOKING_HOLD_MINUTES = "30";
     await expect(getPublicBookingFacts()).resolves.toMatchObject({ holdMinutes: 30 });
   });
 
-  it("keeps a null recipient when a business id is passed", async () => {
+  it("keeps a null recipient for a non-uuid business id and does not query the database", async () => {
     delete process.env.BOOKING_HOLD_MINUTES;
     const facts = await getPublicBookingFacts("studio-bella");
     expect(facts.pixRecipientDisplayName).toBeNull();
-    expect(facts.holdMinutes).toBe(30);
+    expect(facts.holdMinutes).toBe(10);
   });
 });
 
@@ -110,6 +110,13 @@ describe("landing copy", () => {
       return feminineBrand.test(source) ? [file] : [];
     });
     expect(offenders).toEqual([]);
+  });
+
+  it("uses the October 2026 day strip on the hero", () => {
+    const hero = readFileSync("components/landing/LandingHero.tsx", "utf8");
+    for (const label of ["Qua 14", "Qui 15", "Sex 16", "Sáb 17", "Dom 18"]) {
+      expect(hero).toContain(label);
+    }
   });
 
   it("does not hardcode a payment deadline in the landing components", () => {

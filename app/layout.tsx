@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans, Inter } from "next/font/google";
-import { Toaster } from "@/components/ui/toaster";
 import { siteDescription, siteName, siteOpenGraph, siteOrigin, siteTitle } from "@/lib/site";
 import { themeInitScript } from "@/lib/theme";
 import "./globals.css";
@@ -12,10 +11,12 @@ const plusJakartaSans = Plus_Jakarta_Sans({
   display: "swap",
 });
 
+// A landing pinta com Plus Jakarta. Inter não entra no preload.
 const inter = Inter({
   subsets: ["latin", "latin-ext"],
   variable: "--font-sans-family",
   display: "swap",
+  preload: false,
 });
 
 export const metadata: Metadata = {
@@ -47,7 +48,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       </head>
       <body className="min-h-dvh bg-paper font-sans text-ink antialiased">
         {children}
-        <Toaster />
       </body>
     </html>
   );

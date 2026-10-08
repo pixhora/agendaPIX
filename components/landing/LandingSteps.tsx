@@ -1,4 +1,4 @@
-import { Check } from "lucide-react";
+import { CheckIcon } from "./icons";
 import { Eyebrow, Section, SectionTitle } from "./section";
 
 const steps = [
@@ -62,7 +62,7 @@ function LinkPreview({ host }: { host: string }) {
         <span className="shrink-0 text-sm font-semibold text-pix">Copiar</span>
       </div>
       <p className="mt-2 inline-flex items-center gap-1.5 text-[13px] font-medium text-pix">
-        <Check className="size-3.5" /> Link curto, fácil de lembrar
+        <CheckIcon className="size-3.5" /> Link curto, fácil de lembrar
       </p>
     </div>
   );
@@ -72,13 +72,13 @@ function PaidPreview() {
   return (
     <ul className="grid gap-2 text-sm">
       {[
-        ["Qui 15:30", "Ana"],
-        ["Qui 16:15", "Bruna"],
+        ["Qui 15, 15:30", "Ana"],
+        ["Qui 15, 16:15", "Bruna"],
       ].map(([when, name]) => (
         <li key={name} className="flex items-center justify-between gap-2 rounded-card border border-line px-3 py-2">
           <span className="text-ink">{when} · {name}</span>
           <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2 py-1 text-[12px] font-semibold text-success">
-            <Check className="size-3" /> Sinal pago
+            <CheckIcon className="size-3" /> Sinal pago
           </span>
         </li>
       ))}

@@ -11,6 +11,7 @@ import { LandingSteps } from "@/components/landing/LandingSteps";
 import { MoneyFlow } from "@/components/landing/MoneyFlow";
 import { Roadmap } from "@/components/landing/Roadmap";
 import { StickyCta } from "@/components/landing/StickyCta";
+import { landingBootScript } from "@/components/landing/landing-boot-script";
 import { getPublicBookingFacts } from "@/lib/marketing/facts";
 import { siteOpenGraph, siteOrigin } from "@/lib/site";
 
@@ -24,7 +25,7 @@ export default async function Home() {
   const publicHost = siteOrigin().host;
 
   return (
-    <div className="relative flex min-h-dvh w-full max-w-full flex-col overflow-x-clip bg-paper">
+    <div className="relative flex min-h-dvh w-full max-w-full flex-col overflow-x-clip bg-paper font-display">
       <a
         href="#content"
         className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[70] focus:inline-flex focus:min-h-11 focus:items-center focus:rounded-full focus:bg-ink focus:px-4 focus:text-sm focus:font-semibold focus:text-paper"
@@ -45,6 +46,7 @@ export default async function Home() {
       </main>
       <LandingFooter />
       <StickyCta />
+      <script type="module" dangerouslySetInnerHTML={{ __html: landingBootScript }} />
     </div>
   );
 }

@@ -1,15 +1,17 @@
-import { CalendarCheck, CircleCheck, LayoutPanelLeft, Smartphone } from "lucide-react";
+import { CalendarCheckIcon, CircleCheckIcon, LayoutPanelIcon, SmartphoneIcon } from "./icons";
+import { cn } from "@/lib/utils";
+import { belowFold } from "./section";
 
 const items = [
-  { Icon: CalendarCheck, title: "Menos horário furado", text: "Quem paga para reservar assume o compromisso com o horário." },
-  { Icon: Smartphone, title: "Feito para o celular", text: "Seu cliente agenda pelo navegador, sem baixar aplicativo e sem criar conta." },
-  { Icon: CircleCheck, title: "Confirmação automática", text: "O Pix cai, a reserva confirma. Você não confere comprovante." },
-  { Icon: LayoutPanelLeft, title: "Seu dia num olhar", text: "Atendimentos, sinais pagos e pendentes no mesmo painel, no celular ou no computador." },
+  { Icon: CalendarCheckIcon, title: "Menos horário furado", text: "Quem paga para reservar assume o compromisso com o horário." },
+  { Icon: SmartphoneIcon, title: "Feito para o celular", text: "Seu cliente agenda pelo navegador, sem baixar aplicativo e sem criar conta." },
+  { Icon: CircleCheckIcon, title: "Confirmação automática", text: "O Pix cai, a reserva confirma. Você não confere comprovante." },
+  { Icon: LayoutPanelIcon, title: "Seu dia num olhar", text: "Atendimentos, sinais pagos e pendentes no mesmo painel, no celular ou no computador." },
 ];
 
 export function LandingBenefits() {
   return (
-    <section aria-labelledby="beneficios-titulo" className="bg-slab py-16 text-slab-foreground lg:py-28">
+    <section aria-labelledby="beneficios-titulo" className={cn("bg-slab py-16 text-slab-foreground lg:py-28", belowFold)}>
       <div className="mx-auto w-full max-w-[1120px] px-5">
         <h2 id="beneficios-titulo" className="max-w-[20rem] font-display text-[1.75rem] font-bold leading-[1.08] tracking-[-0.025em] sm:max-w-[28rem] lg:text-[2.75rem]">
           O sinal no Pix protege a sua agenda.

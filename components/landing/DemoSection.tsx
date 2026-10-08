@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import type { PublicBookingFacts } from "@/lib/marketing/facts";
 import { demoSteps, minutesUnit } from "@/lib/marketing/landing-copy";
@@ -25,9 +24,9 @@ export function DemoSection({ facts }: { facts: PublicBookingFacts }) {
               </li>
             ))}
           </ol>
-          <Link href="/preview/booking" className={buttonVariants({ size: "lg", className: "mt-6 w-full sm:w-auto" })}>
+          <a href="/preview/booking" className={buttonVariants({ size: "lg", className: "mt-6 w-full sm:w-auto" })}>
             Abrir a página de exemplo
-          </Link>
+          </a>
           <p className="mt-3 text-[13px] text-muted">Exemplo com dados fictícios. Nenhum Pix de verdade é gerado.</p>
         </div>
         <ExamplePhone holdMinutes={facts.holdMinutes} />

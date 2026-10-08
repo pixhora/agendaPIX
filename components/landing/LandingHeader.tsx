@@ -1,183 +1,71 @@
-"use client";
-
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
-import { createPortal } from "react-dom";
-import Link from "next/link";
-import { Menu, X } from "lucide-react";
-import { BrandLink } from "@/components/ui/brand";
+import { BrandMark } from "@/components/ui/brand-mark";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { setLandingNavOpen } from "./nav-state";
+import { landingNavLinks } from "./nav-links";
 
-const links = [
-  { href: "#como-funciona", label: "Como funciona" },
-  { href: "#exemplo", label: "Exemplo", menuLabel: "Página de exemplo" },
-  { href: "#precos", label: "Preço" },
-  { href: "#perguntas-frequentes", label: "Dúvidas" },
-] as const;
-
-/** Anel do token, sem o outline nativo (o :focus-visible global é um retângulo). */
 const focusRing = "outline-none [outline:none!important] focus-visible:shadow-[var(--shadow-focus)]";
 
 export function LandingHeader() {
-  const [open, setOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const menuButtonRef = useRef<HTMLButtonElement>(null);
-  const titleId = useId();
-
-  function close(restoreFocus: boolean) {
-    setOpen(false);
-    if (restoreFocus) menuButtonRef.current?.focus();
-  }
-
-  useEffect(() => {
-    setLandingNavOpen(open);
-    return () => setLandingNavOpen(false);
-  }, [open]);
-
-  useEffect(() => {
-    const onScroll = () => {
-      const next = window.scrollY > 8;
-      setScrolled((current) => (current === next ? current : next));
-    };
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  useEffect(() => {
-    if (!open) return;
-    const media = window.matchMedia("(min-width: 768px)");
-    const closeIfWide = () => {
-      if (media.matches) setOpen(false);
-    };
-    media.addEventListener("change", closeIfWide);
-    return () => media.removeEventListener("change", closeIfWide);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const html = document.documentElement;
-    const body = document.body;
-    const previousHtml = html.style.overflow;
-    const previousBody = body.style.overflow;
-    html.style.overflow = "hidden";
-    body.style.overflow = "hidden";
-    const first = dialogRef.current?.querySelector<HTMLElement>("a[href]");
-    first?.focus();
-
-    const blockScroll = (event: Event) => {
-      const panel = dialogRef.current;
-      if (panel && event.target instanceof Node && panel.contains(event.target)) return;
-      event.preventDefault();
-    };
-    document.addEventListener("wheel", blockScroll, { passive: false });
-    document.addEventListener("touchmove", blockScroll, { passive: false });
-
-    return () => {
-      html.style.overflow = previousHtml;
-      body.style.overflow = previousBody;
-      document.removeEventListener("wheel", blockScroll);
-      document.removeEventListener("touchmove", blockScroll);
-    };
-  }, [open]);
-
-  function onDialogKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      close(true);
-      return;
-    }
-    if (event.key !== "Tab") return;
-    const root = dialogRef.current;
-    if (!root) return;
-    const focusable = [...root.querySelectorAll<HTMLElement>("a[href], button:not([disabled])")];
-    if (focusable.length === 0) return;
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    const active = document.activeElement;
-    if (event.shiftKey && (active === first || !root.contains(active))) {
-      event.preventDefault();
-      last?.focus();
-    } else if (!event.shiftKey && active === last) {
-      event.preventDefault();
-      first?.focus();
-    }
-  }
-
   return (
-    <header className={cn("sticky top-0 z-50 bg-paper/85 backdrop-blur-[10px]", scrolled && "border-b border-line")}>
+    <header className="sticky top-0 z-50 bg-paper/85 backdrop-blur-[10px]">
       <div className="mx-auto flex h-[60px] max-w-[1120px] items-center justify-between gap-2 px-5 lg:h-[72px]">
-        <BrandLink />
+        <a href="/" aria-label="AgendaPix, página inicial" className="inline-flex min-h-11 shrink-0 items-center gap-2.5 rounded-field text-ink">
+          <BrandMark />
+          <span className="relative -top-0.5 font-display text-lg leading-none tracking-[-0.02em]">
+            <span className="font-bold">Agenda</span>
+            <span className="font-extrabold text-pix">Pix</span>
+          </span>
+        </a>
         <nav aria-label="Principal" className="hidden items-center gap-1 lg:flex">
-          {links.map((link) => (
+          {landingNavLinks.map((link) => (
             <a key={link.href} href={link.href} className="inline-flex min-h-11 items-center rounded-full px-3 text-sm font-semibold text-muted transition-feedback hover:text-ink">
               {link.label}
             </a>
           ))}
         </nav>
         <div className="flex items-center gap-1.5 sm:gap-2">
-          <Link href="/login" className="hidden min-h-11 items-center rounded-full px-3 text-sm font-semibold text-ink hover:bg-subtle md:inline-flex">
+          <a href="/login" className="hidden min-h-11 items-center rounded-full px-3 text-sm font-semibold text-ink hover:bg-subtle md:inline-flex">
             Entrar
-          </Link>
-          <Link href="/onboarding" className={cn(buttonVariants({ size: "sm", className: "hidden min-h-11 md:inline-flex" }))}>
+          </a>
+          <a href="/onboarding" className={cn(buttonVariants({ size: "sm", className: "hidden min-h-11 md:inline-flex" }))}>
             Criar agenda grátis
-          </Link>
-          <Link href="/onboarding" className={cn(buttonVariants({ size: "sm", className: "min-h-11 whitespace-nowrap px-3.5 md:hidden" }))}>
+          </a>
+          <a href="/onboarding" className={cn(buttonVariants({ size: "sm", className: "min-h-11 whitespace-nowrap px-3.5 md:hidden" }))}>
             Criar grátis
-          </Link>
+          </a>
           <button
-            ref={menuButtonRef}
+            id="landing-menu-button"
             type="button"
             className={cn("inline-flex size-11 items-center justify-center rounded-full text-ink hover:bg-subtle md:hidden", focusRing)}
-            aria-expanded={open}
+            aria-expanded="false"
             aria-controls="landing-menu"
-            aria-label={open ? "Fechar menu" : "Abrir menu"}
-            onClick={() => (open ? close(false) : setOpen(true))}
+            aria-label="Abrir menu"
           >
-            {open ? <X aria-hidden="true" className="size-5" /> : <Menu aria-hidden="true" className="size-5" />}
+            <span data-icon="open" className="inline-flex">
+              <svg aria-hidden="true" viewBox="0 0 20 20" className="size-5">
+                <path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            </span>
+            <span data-icon="close" hidden className="inline-flex">
+              <svg aria-hidden="true" viewBox="0 0 20 20" className="size-5">
+                <path d="M5 5 15 15M15 5 5 15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            </span>
           </button>
         </div>
       </div>
-      {open
-        ? createPortal(
-            <div className="md:hidden">
-              <button type="button" tabIndex={-1} aria-hidden="true" className="fixed inset-0 z-40 bg-black/40" onClick={() => close(true)} />
-              <div
-                ref={dialogRef}
-                id="landing-menu"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby={titleId}
-                onKeyDown={onDialogKeyDown}
-                className="fixed inset-x-0 top-[60px] z-50 border-b border-line bg-paper px-5 pt-2 pb-5 shadow-[var(--shadow-raised)]"
-              >
-                <p id={titleId} className="sr-only">Menu</p>
-                <nav aria-label="Seções" className="flex flex-col">
-                  {links.map((link) => (
-                    <a
-                      key={link.href}
-                      href={link.href}
-                      className={cn("inline-flex min-h-12 items-center rounded-lg px-2 text-base font-semibold text-ink", focusRing)}
-                      onClick={() => close(false)}
-                    >
-                      {"menuLabel" in link ? link.menuLabel : link.label}
-                    </a>
-                  ))}
-                </nav>
-                <div className="my-3 h-px bg-line" />
-                <Link href="/login" className={cn("inline-flex min-h-12 items-center rounded-lg px-2 text-base font-semibold text-ink", focusRing)} onClick={() => close(false)}>
-                  Entrar
-                </Link>
-                <Link href="/onboarding" className={cn(buttonVariants({ size: "lg", className: "mt-2 w-full" }))} onClick={() => close(false)}>
-                  Criar minha agenda grátis
-                </Link>
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
+      <script
+        type="text/plain"
+        id="landing-menu-source"
+        dangerouslySetInnerHTML={{
+          __html: `<div id="landing-menu-layer" class="md:hidden"><button id="landing-menu-overlay" type="button" tabindex="-1" aria-hidden="true" class="fixed inset-0 z-40 bg-black/40"></button><div id="landing-menu" role="dialog" aria-modal="true" aria-labelledby="landing-menu-title" class="fixed inset-x-0 top-[60px] z-50 border-b border-line bg-paper px-5 pt-2 pb-5 font-display shadow-[var(--shadow-raised)]"><p id="landing-menu-title" class="sr-only">Menu</p><nav aria-label="Seções" class="flex flex-col">${landingNavLinks
+            .map((link) => {
+              const label = "menuLabel" in link ? link.menuLabel : link.label;
+              return `<a href="${link.href}" class="${cn("inline-flex min-h-12 items-center rounded-lg px-2 text-base font-semibold text-ink", focusRing)}">${label}</a>`;
+            })
+            .join("")}</nav><div class="my-3 h-px bg-line"></div><a href="/login" class="${cn("inline-flex min-h-12 items-center rounded-lg px-2 text-base font-semibold text-ink", focusRing)}">Entrar</a><a href="/onboarding" class="${cn(buttonVariants({ size: "lg", className: "mt-2 w-full" }))}">Criar minha agenda grátis</a></div></div>`,
+        }}
+      />
     </header>
   );
 }

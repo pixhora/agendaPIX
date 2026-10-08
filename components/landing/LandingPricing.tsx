@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { Check } from "lucide-react";
+import { CheckIcon } from "./icons";
 import { basePlan, upcomingPlan } from "@/lib/marketing/plans";
 import { buttonVariants } from "@/components/ui/button";
 import { Eyebrow, Section, SectionTitle } from "./section";
@@ -26,14 +25,14 @@ export function LandingPricing() {
           <ul className="mt-5 grid gap-3 text-sm">
             {basePlan.features.map((feature) => (
               <li key={feature} className="flex gap-2.5">
-                <Check aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-pix" />
+                <CheckIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-pix" />
                 <span>{feature}</span>
               </li>
             ))}
           </ul>
-          <Link href={basePlan.href} className={buttonVariants({ size: "lg", className: "mt-6 w-full" })}>
+          <a href={basePlan.href} className={buttonVariants({ size: "lg", className: "mt-6 w-full" })}>
             {basePlan.cta}
-          </Link>
+          </a>
           <p className="mt-3 text-[12px] leading-relaxed text-muted">{basePlan.guarantee}</p>
         </article>
 

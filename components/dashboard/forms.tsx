@@ -6,7 +6,7 @@ import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { saveHours, saveService } from "@/app/dashboard/(owner)/actions";
+import { saveHours, saveService } from "@/app/(product)/dashboard/(owner)/actions";
 import type { FormState } from "@/lib/dashboard/validation";
 import { cn } from "@/lib/utils";
 

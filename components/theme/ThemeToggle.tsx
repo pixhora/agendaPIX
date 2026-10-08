@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useId, useState, useSyncExternalStore } from "react";
-import { Monitor, Moon, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { THEME_STORAGE_KEY, applyTheme, readThemePreference, resolveTheme, type ThemePreference } from "@/lib/theme";
 
-const options: { value: ThemePreference; label: string; short: string; Icon: typeof Sun }[] = [
-  { value: "light", label: "Tema claro", short: "Claro", Icon: Sun },
-  { value: "dark", label: "Tema escuro", short: "Escuro", Icon: Moon },
-  { value: "system", label: "Seguir o sistema", short: "Sistema", Icon: Monitor },
+const options: { value: ThemePreference; label: string; short: string; icon: "sun" | "moon" | "monitor" }[] = [
+  { value: "light", label: "Tema claro", short: "Claro", icon: "sun" },
+  { value: "dark", label: "Tema escuro", short: "Escuro", icon: "moon" },
+  { value: "system", label: "Seguir o sistema", short: "Sistema", icon: "monitor" },
 ];
 
 const subscribeNoop = () => () => {};
@@ -50,7 +49,7 @@ export function ThemeToggle({ className, variant = "icons" }: { className?: stri
           variant === "icons" && className,
         )}
       >
-        {options.map(({ value, label, short, Icon }) => {
+        {options.map(({ value, label, short, icon }) => {
           const checked = hydrated && preference === value;
           return (
             <button
@@ -67,11 +66,45 @@ export function ThemeToggle({ className, variant = "icons" }: { className?: stri
                 checked && "bg-ink text-paper hover:text-paper",
               )}
             >
-              {variant === "text" ? short : <Icon aria-hidden="true" className="size-4" />}
+              {variant === "text" ? short : <ThemeIcon name={icon} />}
             </button>
           );
         })}
       </div>
     </div>
+  );
+}
+
+function ThemeIcon({ name }: { name: "sun" | "moon" | "monitor" }) {
+  const props = {
+    "aria-hidden": true as const,
+    viewBox: "0 0 24 24",
+    className: "size-4",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 2,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+  };
+  if (name === "sun") {
+    return (
+      <svg {...props}>
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+      </svg>
+    );
+  }
+  if (name === "moon") {
+    return (
+      <svg {...props}>
+        <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+      </svg>
+    );
+  }
+  return (
+    <svg {...props}>
+      <rect x="2" y="3" width="20" height="14" rx="2" />
+      <path d="M8 21h8M12 17v4" />
+    </svg>
   );
 }
