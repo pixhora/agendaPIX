@@ -8,7 +8,7 @@ import { HttpError } from "../http";
 import { ONBOARDING_SEGMENTS, suggestFreeSlugs } from "../slug-availability";
 import { normalizeSlug } from "../slug";
 import { onboardingInputSchema } from "./validation";
-import { maskEmail } from "./draft-cookie";
+import { maskEmail } from "../privacy/mask-email";
 import { oneBusinessPerOwner } from "./owner-policy";
 
 const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
