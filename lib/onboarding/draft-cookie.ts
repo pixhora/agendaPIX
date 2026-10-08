@@ -16,10 +16,3 @@ export function readOnboardingDraftCookie(header: string | null) {
   }
   return null;
 }
-
-/** Mostra a primeira letra do nome e o domínio. O restante do e-mail não volta na API. */
-export function maskEmail(email: string) {
-  const [local = "", domain] = email.split("@");
-  if (!domain) return "***";
-  return `${local.slice(0, 1)}***@${domain}`;
-}

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { expect, it } from "vitest";
 import { requestKeySchema } from "../../lib/bookings/validation";
-import { maskEmail, onboardingDraftCookie } from "../../lib/onboarding/draft-cookie";
+import { onboardingDraftCookie } from "../../lib/onboarding/draft-cookie";
 import { oneBusinessPerOwner } from "../../lib/onboarding/owner-policy";
 
 it("aceita o UUID v4 gerado para o rascunho como chave de cadastro", () => {
@@ -17,11 +17,6 @@ it("grava o cookie do rascunho com os atributos do contrato", () => {
   expect(cookie).toContain("SameSite=Lax");
   expect(cookie).toContain("Path=/");
   expect(cookie).toContain("Max-Age=604800");
-});
-
-it("mascara o e-mail deixando a primeira letra e o domínio", () => {
-  expect(maskEmail("ana@studiobella.com.br")).toBe("a***@studiobella.com.br");
-  expect(maskEmail("a@exemplo.com")).toBe("a***@exemplo.com");
 });
 
 it("só liga um negócio por dono com a string true", () => {

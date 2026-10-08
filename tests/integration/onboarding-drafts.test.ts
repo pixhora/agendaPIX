@@ -91,8 +91,8 @@ describe.sequential("rascunho de cadastro", () => {
     expect(hidden.status).toBe(404);
     const visible = await readDraft(new Request(`http://localhost:3000/api/onboarding/drafts/${draftId}`, { headers: { cookie } }), { params: Promise.resolve({ id: draftId }) });
     expect(visible.status).toBe(200);
-    const body = await visible.json() as { email: string };
-    expect(body.email).toBe(`${email.slice(0, 1)}***@example.com`);
+    const body = await visible.json() as { email: string | null };
+    expect(body.email).toBe(`${ownerId.slice(0, 2)}••@example.com`);
     const denied = await commitDraft(originRequest(`http://localhost:3000/api/onboarding/drafts/${draftId}/commit`, { method: "POST" }), { params: Promise.resolve({ id: draftId }) });
     expect(denied.status).toBe(401);
     await db.delete(onboardingDrafts).where(eq(onboardingDrafts.id, draftId));
@@ -116,7 +116,7 @@ describe.sequential("rascunho de cadastro", () => {
       body: JSON.stringify({ email: nextEmail }),
     }), { params: Promise.resolve({ id: created.draftId }) });
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ email: `n***@example.com`, draftId: created.draftId });
+    expect(await response.json()).toMatchObject({ email: "no••@example.com", draftId: created.draftId });
     expect(await db.select().from(verification).where(eq(verification.identifier, signInOtpIdentifier(email)))).toHaveLength(0);
     await db.delete(onboardingDrafts).where(eq(onboardingDrafts.id, created.draftId));
   });
