@@ -13,7 +13,7 @@ import { callProvider, ProviderTimeoutError } from "../payments/timeout";
 import { loadBookingAccess } from "../billing/load";
 import { depositPolicySchema, POLICY_CHANGED_CODE, POLICY_CHANGED_MESSAGE } from "../policy/schema";
 import { policyHashFor } from "../policy/hash";
-import { clientPolicyText, policySummary } from "../policy/text";
+import { clientPolicyText, policySummary, refundWindowClosedAtBooking } from "../policy/text";
 import { availableSlots, localDate } from "./availability";
 import { assertDepositBookable } from "./deposit-bookability";
 import { availabilitySchema, bookingInputSchema, requestKeySchema, slugSchema } from "./validation";
@@ -175,7 +175,13 @@ async function finalizeCreatingPayment(
 async function bookingView(booking: typeof schema.bookings.$inferSelect, database: Database, now: Date) {
   const [payment] = await database.select().from(schema.payments).where(and(eq(schema.payments.businessId, booking.businessId), eq(schema.payments.bookingId, booking.id))).limit(1);
   const policy = booking.policyText
-    ? { text: booking.policyText, snapshot: booking.policySnapshot, refundDeadlineAt: booking.refundDeadlineAt, rescheduleDeadlineAt: booking.rescheduleDeadlineAt }
+    ? {
+        text: booking.policyText,
+        snapshot: booking.policySnapshot,
+        refundDeadlineAt: booking.refundDeadlineAt,
+        rescheduleDeadlineAt: booking.rescheduleDeadlineAt,
+        refundWindowClosedAtBooking: Boolean(booking.policySnapshot && refundWindowClosedAtBooking(booking.policySnapshot, booking.startsAt, booking.createdAt)),
+      }
     : null;
   return { bookingId: booking.id, status: booking.status, startsAt: booking.startsAt, endsAt: booking.endsAt, expiresAt: booking.expiresAt, payment: paymentView(payment, now), policy };
 }
@@ -264,7 +270,7 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
     const expiresAt = service.depositCents > 0 ? new Date(Math.min(now.getTime() + config.BOOKING_HOLD_MINUTES * 60000, slot.startsAt.getTime())) : null;
     const [booking] = await transaction.insert(schema.bookings).values({ businessId: business.id, serviceId: service.id, customerId, requestKey, requestHash, clientHash, ...slot,
       priceCents: service.priceCents, depositCents: service.depositCents, status: expiresAt ? "pending_payment" : "confirmed", expiresAt, createdAt: now,
-      policySnapshot: policy, policyText: policy ? clientPolicyText(policy, { businessName: business.name, depositCents: service.depositCents, contactWhatsapp: business.contactWhatsapp, startsAt: slot.startsAt, now, timezone: business.timezone }) : null, policyHash: currentHash,
+      policySnapshot: policy, policyText: policy ? clientPolicyText(policy, { businessName: business.name, depositCents: service.depositCents, contactWhatsapp: business.contactWhatsapp, startsAt: slot.startsAt, bookedAt: now, timezone: business.timezone }) : null, policyHash: currentHash,
       refundDeadlineAt: policy ? deadlineAt(slot.startsAt, policy.refundUntilHours) : null,
       rescheduleDeadlineAt: policy ? deadlineAt(slot.startsAt, policy.rescheduleUntilHours) : null,
     }).returning();

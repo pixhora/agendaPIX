@@ -468,6 +468,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
             customerName={customerName}
             customerPhone={customerPhone}
             policyText={bookingResponse?.policy?.text}
+            refundWindowClosedAtBooking={bookingResponse?.policy?.refundWindowClosedAtBooking}
             contactWhatsapp={business.contactWhatsapp}
             onNewBooking={handleRestart}
           />
