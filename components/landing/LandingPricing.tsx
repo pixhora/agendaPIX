@@ -1,53 +1,59 @@
 import Link from "next/link";
 import { Check } from "lucide-react";
-import { ValueSlab } from "@/components/ui/value-slab";
+import { basePlan, upcomingPlan } from "@/lib/marketing/plans";
 import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-
-const PLANS = [
-  {
-    id: "base",
-    name: "Plano Base",
-    audience: "Para quem atende sozinho",
-    price: "R$ 49",
-    features: ["1 profissional, 1 agenda", "Agendamentos ilimitados", "Sinal no Pix com confirmação automática", "Página de agendamento para celular", "Lembrete pelo WhatsApp do cliente"],
-    featured: false,
-  },
-  {
-    id: "completo",
-    name: "Plano Completo",
-    audience: "Para quem quer crescer",
-    price: "R$ 79",
-    features: ["Tudo do Plano Base", "Vários serviços com sinais diferentes", "Relatório de sinais recebidos", "Histórico e lista de clientes", "Suporte prioritário no WhatsApp"],
-    featured: true,
-  },
-] as const;
+import { Eyebrow, Section, SectionTitle } from "./section";
 
 export function LandingPricing() {
   return (
-    <section id="precos" className="scroll-mt-20 py-16 sm:py-24">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <div className="mx-auto max-w-2xl text-center">
-          <p className="text-sm font-bold uppercase tracking-wide text-pix">Preços</p>
-          <h2 className="mt-2 font-display text-3xl font-extrabold tracking-tight sm:text-5xl">Menos que um atendimento por mês.</h2>
-          <p className="mt-4 text-lg text-muted">7 dias grátis em qualquer plano, sem cartão de crédito. Sem taxa por agendamento.</p>
-        </div>
-        <div className="mx-auto mt-12 grid max-w-4xl gap-5 md:grid-cols-2">
-          {PLANS.map((plan) => (
-            <article key={plan.id} aria-labelledby={`plano-${plan.id}`} className={cn("flex flex-col rounded-frame bg-surface p-6 sm:p-8", plan.featured ? "border-2 border-ink shadow-[var(--shadow-raised)]" : "border border-line")}>
-              <p className="text-sm font-semibold text-muted">{plan.audience}</p>
-              <h3 id={`plano-${plan.id}`} className="mt-1 font-display text-2xl font-extrabold">{plan.name}</h3>
-              <ValueSlab size="compact" className="mt-5" label="Mensalidade" value={plan.price} unit="/ mês" badge={plan.featured ? "Mais escolhido" : undefined} sublabel="Cancele quando quiser" />
-              <ul className="mt-6 grid gap-3 text-sm">
-                {plan.features.map((feature) => <li key={feature} className="flex gap-2.5"><Check aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-success" />{feature}</li>)}
-              </ul>
-              <Link href={`/onboarding?plano=${plan.id}`} className={buttonVariants({ variant: plan.featured ? "default" : "outline", size: "lg", className: "mt-8 w-full" })}>
-                Testar 7 dias grátis<span className="sr-only"> no {plan.name}</span>
-              </Link>
-            </article>
-          ))}
-        </div>
+    <Section id="precos" labelledBy="precos-titulo">
+      <div className="max-w-[40rem]">
+        <Eyebrow>Preço</Eyebrow>
+        <SectionTitle id="precos-titulo">Menos que um atendimento por mês.</SectionTitle>
+        <p className="mt-4 text-base leading-relaxed text-pretty text-muted lg:text-lg">7 dias grátis, sem cartão. Nada é cobrado automaticamente.</p>
       </div>
-    </section>
+      <div className="mt-8 grid gap-4 lg:grid-cols-2">
+        <article aria-labelledby="plano-base" className="flex flex-col rounded-frame border-2 border-ink bg-surface p-5 shadow-[var(--shadow-card)] sm:p-6">
+          <p className="text-[13px] text-muted">{basePlan.audience}</p>
+          <h3 id="plano-base" className="mt-1 font-display text-[1.375rem] font-bold text-ink">{basePlan.name}</h3>
+          <div className="mt-5 rounded-[22px] bg-slab p-5 text-slab-foreground">
+            <p className="flex flex-wrap items-baseline gap-x-2">
+              <span className="font-display text-[2.75rem] font-bold leading-none tabular-nums">{basePlan.price}</span>
+              <span className="text-sm font-semibold text-slab-muted">{basePlan.unit}</span>
+            </p>
+            <p className="mt-2 text-sm text-slab-muted">{basePlan.note}</p>
+          </div>
+          <ul className="mt-5 grid gap-3 text-sm">
+            {basePlan.features.map((feature) => (
+              <li key={feature} className="flex gap-2.5">
+                <Check aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-pix" />
+                <span>{feature}</span>
+              </li>
+            ))}
+          </ul>
+          <Link href={basePlan.href} className={buttonVariants({ size: "lg", className: "mt-6 w-full" })}>
+            {basePlan.cta}
+          </Link>
+          <p className="mt-3 text-[12px] leading-relaxed text-muted">{basePlan.guarantee}</p>
+        </article>
+
+        <article aria-labelledby="plano-completo" className="flex flex-col rounded-frame border border-dashed border-line-strong p-5 sm:p-6">
+          <p className="w-fit rounded-full bg-subtle px-2.5 py-1 text-[12px] font-semibold text-muted">{upcomingPlan.badge}</p>
+          <h3 id="plano-completo" className="mt-1 font-display text-[1.375rem] font-bold text-muted">{upcomingPlan.name}</h3>
+          <p className="mt-5 flex flex-wrap items-baseline gap-x-2">
+            <span className="font-display text-[2.75rem] font-bold leading-none text-ink tabular-nums">{upcomingPlan.price}</span>
+            <span className="text-sm font-semibold text-muted">{upcomingPlan.unit}</span>
+          </p>
+          <ul className="mt-5 grid gap-3 text-sm text-muted">
+            {upcomingPlan.features.map((feature) => (
+              <li key={feature} className="flex gap-2.5">
+                <span aria-hidden="true" className="mt-0.5 size-4 shrink-0 rounded-full border border-dashed border-line-strong" />
+                <span>{feature}</span>
+              </li>
+            ))}
+          </ul>
+        </article>
+      </div>
+    </Section>
   );
 }

@@ -7,6 +7,8 @@ export function Toaster() {
   return (
     <Sonner
       position="bottom-center"
+      offset="calc(16px + var(--sticky-cta-height, 0px))"
+      mobileOffset="calc(16px + var(--sticky-cta-height, 0px))"
       closeButton
       toastOptions={{
         classNames: {

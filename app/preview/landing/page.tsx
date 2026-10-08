@@ -1,70 +1,49 @@
-import React from "react";
 import Link from "next/link";
-import { LandingHero } from "@/components/landing/LandingHero";
-import { LandingFacts } from "@/components/landing/LandingFacts";
-import { LandingSteps } from "@/components/landing/LandingSteps";
+import { DemoSection } from "@/components/landing/DemoSection";
 import { LandingBenefits } from "@/components/landing/LandingBenefits";
-import { LandingFinalCta } from "@/components/landing/LandingFinalCta";
-import { LandingPricing } from "@/components/landing/LandingPricing";
 import { LandingFaq } from "@/components/landing/LandingFaq";
+import { LandingFinalCta } from "@/components/landing/LandingFinalCta";
 import { LandingFooter } from "@/components/landing/LandingFooter";
+import { LandingHero } from "@/components/landing/LandingHero";
+import { LandingPricing } from "@/components/landing/LandingPricing";
+import { LandingSteps } from "@/components/landing/LandingSteps";
+import { MoneyFlow } from "@/components/landing/MoneyFlow";
+import { Roadmap } from "@/components/landing/Roadmap";
+import { getPublicBookingFacts } from "@/lib/marketing/facts";
+import { siteOrigin } from "@/lib/site";
 
-export default function PreviewLandingPage() {
+export default async function PreviewLandingPage() {
+  const facts = await getPublicBookingFacts();
+  const publicHost = siteOrigin().host;
+
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground w-full max-w-full overflow-x-hidden">
-      {/* Header com Navegação do Preview */}
-      <header className="sticky top-0 z-40 w-full border-b border-border bg-background/90 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-3.5 sm:px-6 lg:px-8">
-          <Link href="/preview" className="flex items-center gap-2 font-display text-lg sm:text-xl font-bold tracking-tight text-foreground shrink-0">
-            <span className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-xl bg-ink text-xs sm:text-sm font-black text-primary">
-              A
-            </span>
-            <span>AgendaPix</span>
-            <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-extrabold uppercase text-primary-foreground">
-              Preview
-            </span>
+    <div className="flex min-h-dvh w-full max-w-full flex-col overflow-x-clip bg-paper text-ink">
+      <header className="sticky top-0 z-40 w-full border-b border-line bg-paper/90 backdrop-blur-md">
+        <div className="mx-auto flex h-16 max-w-[1120px] items-center justify-between gap-2 px-4 sm:px-6">
+          <Link href="/preview" className="font-display text-lg font-bold tracking-tight">
+            AgendaPix <span className="rounded-full bg-ink px-2 py-0.5 text-[10px] font-bold text-paper">Preview</span>
           </Link>
-
-          <nav className="hidden md:flex items-center gap-6 text-sm font-semibold text-muted-foreground" aria-label="Navegação da landing">
-            <a href="#como-funciona" className="hover:text-foreground transition-colors">
-              Como funciona
-            </a>
-            <a href="#precos" className="hover:text-foreground transition-colors">
-              Preços
-            </a>
-            <a href="#perguntas-frequentes" className="hover:text-foreground transition-colors">
-              Dúvidas
-            </a>
-          </nav>
-
           <div className="flex items-center gap-2">
-            <Link
-              href="/preview/dashboard"
-              className="hidden sm:inline-flex items-center justify-center rounded-full border border-border bg-surface hover:bg-subtle min-h-9 sm:min-h-10 text-xs font-bold text-foreground px-3.5 transition-colors"
-            >
-              Ver Painel
+            <Link href="/preview/dashboard" className="hidden min-h-11 items-center rounded-full border border-line px-3 text-xs font-semibold sm:inline-flex">
+              Ver painel
             </Link>
-            <Link
-              href="/preview/booking"
-              className="inline-flex items-center justify-center rounded-full bg-primary hover:bg-ink-hover h-11 min-h-[44px] text-xs font-extrabold text-primary-foreground px-4 shadow-xs transition-all active:scale-95 focus:outline-2 focus:outline-ring focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
-            >
-              Testar Booking
+            <Link href="/preview/booking" className="inline-flex min-h-11 items-center rounded-full bg-ink px-4 text-xs font-semibold text-paper">
+              Testar agendamento
             </Link>
           </div>
         </div>
       </header>
-
-      {/* Seções Reais da Landing */}
       <main className="flex-1">
-        <LandingHero />
-        <LandingFacts />
-        <LandingSteps />
+        <LandingHero publicHost={publicHost} />
+        <LandingSteps publicHost={publicHost} />
+        <DemoSection facts={facts} />
+        <MoneyFlow facts={facts} />
         <LandingBenefits />
+        <Roadmap />
         <LandingPricing />
-        <LandingFaq />
+        <LandingFaq facts={facts} />
         <LandingFinalCta />
       </main>
-
       <LandingFooter />
     </div>
   );
