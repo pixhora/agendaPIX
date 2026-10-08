@@ -10,11 +10,11 @@
  * Allowed exceptions:
  * - img-src `data:` and `blob:` — Pix QR codes are `data:image/png;base64`
  *   (generated server-side). `blob:` covers Next image previews.
+ * - style-src `'unsafe-inline'` — Sonner injects a `<style>` tag at runtime and
+ *   has no nonce hook. A nonce in style-src would make browsers ignore
+ *   `'unsafe-inline'` and block that tag (style-src-elem). Next's own CSS is a
+ *   same-origin file (`'self'`). Script nonces stay strict.
  * - style-src-attr `'unsafe-inline'` — Sonner and Radix set style attributes.
- *   A nonce or hash in style-src makes browsers ignore `'unsafe-inline'` there,
- *   so attribute styles are allowed only through style-src-attr.
- * - style-src `'unsafe-inline'` in development — the dev server injects style
- *   tags that are not all nonced. Production style tags use the nonce.
  * - script-src `'unsafe-eval'` in development — React uses eval for debug stacks.
  * - `upgrade-insecure-requests` only off localhost, so `next dev` / `next start`
  *   on http://127.0.0.1 keep working. Production hostnames always send it.
@@ -62,7 +62,8 @@ export function buildContentSecurityPolicy({ nonce, isDev, upgradeInsecureReques
   const scriptSrc = ["'self'", `'nonce-${nonce}'`, "'strict-dynamic'"];
   if (isDev) scriptSrc.push("'unsafe-eval'");
 
-  const styleSrc = isDev ? "'self' 'unsafe-inline'" : `'self' 'nonce-${nonce}'`;
+  // No nonce here: it would disable 'unsafe-inline' and block Sonner's runtime <style>.
+  const styleSrc = "'self' 'unsafe-inline'";
 
   const directives = [
     "default-src 'self'",

@@ -33,7 +33,12 @@ describe("document security headers", () => {
     expect(csp).toContain("upgrade-insecure-requests");
     expect(csp).not.toMatch(/script-src [^;]*'unsafe-inline'/);
     expect(csp).not.toContain("'unsafe-eval'");
+    expect(csp).toContain("style-src 'self' 'unsafe-inline'");
+    expect(csp).not.toMatch(/style-src [^;]*'nonce-/);
     expect(csp).toContain("style-src-attr 'unsafe-inline'");
+    const parsedScriptSrc = csp.split(";").map((part) => part.trim()).find((part) => part.startsWith("script-src"));
+    expect(parsedScriptSrc?.startsWith("script-src ")).toBe(true);
+    expect(parsedScriptSrc).toContain(`'nonce-${NONCE}'`);
     expect(csp).not.toMatch(/google|analytics|umami|plausible|fonts\.gstatic|fonts\.googleapis/i);
     expect(headers.get("x-frame-options")).toBe("DENY");
     expect(headers.get("referrer-policy")).toBe(REFERRER_POLICY);
@@ -49,16 +54,15 @@ describe("document security headers", () => {
     expect(csp).toContain("font-src 'self'");
     expect(csp).toContain("connect-src 'self'");
     expect(csp).toContain("img-src 'self' blob: data:");
-    expect(csp).toContain(`style-src 'self' 'nonce-${NONCE}'`);
+    expect(csp).toContain("style-src 'self' 'unsafe-inline'");
     expect(csp).toContain("style-src-attr 'unsafe-inline'");
     expect(csp).not.toContain("upgrade-insecure-requests");
   });
 
-  it("relaxes eval and style tags only in development", () => {
+  it("allows eval only in development", () => {
     const csp = buildContentSecurityPolicy({ nonce: NONCE, isDev: true, upgradeInsecureRequests: false });
     expect(csp).toContain("'unsafe-eval'");
     expect(csp).toContain("style-src 'self' 'unsafe-inline'");
-    expect(csp).not.toContain(`style-src 'self' 'nonce-${NONCE}'`);
     expect(csp).not.toContain("upgrade-insecure-requests");
   });
 
