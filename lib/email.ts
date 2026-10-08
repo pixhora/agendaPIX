@@ -37,7 +37,7 @@ export async function sendMagicLinkEmail(email: string, url: string) {
   await transporter.sendMail({
     from: env.SMTP_FROM,
     to: email,
-    subject: "Seu link para acessar a AgendaPix",
+    subject: "Seu link para acessar o AgendaPix",
     text: `Acesse sua conta pelo link abaixo. O link vale por 30 minutos e pode ser usado uma vez.\n\n${url}\n\nSe você não pediu este acesso, ignore esta mensagem.`,
   });
 }
@@ -69,10 +69,10 @@ export function buildSignInCodeEmail(input: { otp: string; appOrigin: string; dr
   const continuation = business
     ? `Ou toque no botão para continuar o cadastro da ${business}:`
     : "Ou toque no botão para continuar o cadastro:";
-  const subject = `Seu código da AgendaPix: ${grouped}`;
+  const subject = `Seu código do AgendaPix: ${grouped}`;
   const text = `Oi! Seu código é ${grouped}. Ele vale por 30 minutos.\n\n${continuation}\n${buttonUrl}\n\nSe você não pediu este código, pode ignorar este e-mail.`;
   const htmlBusiness = business ? ` da <strong>${escapeHtml(business)}</strong>` : "";
-  const html = `<p>Oi! Seu código é <strong>${escapeHtml(grouped)}</strong>. Ele vale por 30 minutos.</p><p>Ou toque no botão para continuar o cadastro${htmlBusiness}:</p><p><a href="${escapeHtml(buttonUrl)}">Entrar na AgendaPix</a></p><p>Se você não pediu este código, pode ignorar este e-mail.</p>`;
+  const html = `<p>Oi! Seu código é <strong>${escapeHtml(grouped)}</strong>. Ele vale por 30 minutos.</p><p>Ou toque no botão para continuar o cadastro${htmlBusiness}:</p><p><a href="${escapeHtml(buttonUrl)}">Entrar no AgendaPix</a></p><p>Se você não pediu este código, pode ignorar este e-mail.</p>`;
   return { subject, text, html, buttonUrl };
 }
 

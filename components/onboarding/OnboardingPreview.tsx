@@ -40,7 +40,7 @@ export function OnboardingPreview({ data }: { data: OnboardingData }) {
                 <p className="truncate font-semibold">{data.serviceName.trim() || "Seu serviço"}</p>
                 <p className="mt-0.5 flex items-center gap-1 text-xs text-muted"><Clock3 aria-hidden="true" className="size-3" />{formatDuration(data.durationMinutes)}</p>
               </div>
-              <p className="font-display font-bold tabular-nums">{formatCurrency(data.priceCents)}</p>
+              <p className="font-display font-bold tabular-nums">{data.priceCents > 0 ? formatCurrency(data.priceCents) : "R$ —"}</p>
             </div>
             {data.depositCents > 0 && <p className="mt-3 inline-flex min-h-6 items-center rounded-full bg-pix-soft px-2.5 text-xs font-semibold text-pix">Sinal Pix {formatCurrency(data.depositCents)}</p>}
           </div>

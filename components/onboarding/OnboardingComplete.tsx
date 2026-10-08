@@ -12,6 +12,7 @@ import {
   ONBOARDING_COMPLETE_PATH,
   clearCompletedSetup,
   ensureOnboardingIdempotencyKey,
+  readCommitResult,
   readCompletedSetup,
 } from "./storage";
 
@@ -30,6 +31,11 @@ export function OnboardingComplete() {
   const started = useRef(false);
 
   const run = useCallback(async () => {
+    const committed = readCommitResult();
+    if (committed) {
+      setState({ kind: "done", publicPath: committed.publicPath, slug: committed.slug });
+      return;
+    }
     const setup = readCompletedSetup();
     if (!setup) {
       setState({ kind: "missing" });
@@ -85,7 +91,7 @@ export function OnboardingComplete() {
               <span aria-hidden="true" className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-subtle text-muted"><FileQuestion className="size-7" /></span>
               <h1 className="font-display text-2xl font-extrabold tracking-tight">Nenhum cadastro pendente</h1>
               <p className="text-muted">
-                Não encontramos os dados do cadastro neste navegador. Abra o link no mesmo navegador em que você preencheu o cadastro, ou comece de novo.
+                Não encontramos um cadastro para continuar. Comece de novo, leva poucos minutos.
               </p>
               <Link href="/onboarding" className={primary}>Fazer cadastro</Link>
             </div>

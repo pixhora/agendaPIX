@@ -17,7 +17,7 @@ export default function OnboardingPage() {
         </div>
       }
     >
-      <OnboardingFlow />
+      <OnboardingFlow legalPagesPublished={process.env.LEGAL_PAGES_PUBLISHED === "true"} />
     </Suspense>
   );
 }

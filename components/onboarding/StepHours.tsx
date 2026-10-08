@@ -45,7 +45,8 @@ export function StepHours({ openDays, opensAt, closesAt, onChangeOpenDays, onCha
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="flex flex-1 flex-col">
+      <div className="flex-1 space-y-6 px-5 pt-6 pb-4">
       <StepHeader title="Quando você atende?" description="Seus clientes só veem horários livres dentro do seu expediente." />
 
       <fieldset className="grid gap-2">
@@ -86,8 +87,17 @@ export function StepHours({ openDays, opensAt, closesAt, onChangeOpenDays, onCha
         </div>
       </div>
       <FieldError id="hours-error">{!isTimeOrderValid ? "O fechamento deve ser depois da abertura." : null}</FieldError>
+      </div>
 
-      <StepActions onBack={onBack} submitLabel="Continuar" disabled={!isValid} />
+      <StepActions
+        onBack={onBack}
+        submitLabel="Continuar"
+        disabled={!isValid}
+        onInvalid={() => {
+          if (!isDaysValid) document.querySelector<HTMLElement>("[aria-label='Segunda-feira']")?.focus();
+          else document.getElementById("hours-opens")?.focus();
+        }}
+      />
     </form>
   );
 }
