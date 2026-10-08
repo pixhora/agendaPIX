@@ -232,11 +232,15 @@ export function policyDetails(policy: DepositPolicy, context: PolicyDetailsConte
   ];
 }
 
+function splitDeadlines(policy: DepositPolicy) {
+  return policy.refundUntilHours !== null && policy.rescheduleUntilHours !== null && policy.refundUntilHours !== policy.rescheduleUntilHours;
+}
+
 function ownerWindow(policy: DepositPolicy) {
   const refund = policy.refundUntilHours;
   const reschedule = policy.rescheduleUntilHours;
   if (refund !== null && reschedule !== null && refund === reschedule) return `Pode cancelar ou remarcar até ${refund} h antes.`;
-  if (refund !== null && reschedule !== null) return `Pode cancelar até ${refund} h antes ou remarcar até ${reschedule} h antes.`;
+  if (refund !== null && reschedule !== null) return `Pode cancelar até ${refund} h antes ou remarcar até ${reschedule} h antes, usando o sinal (1 vez).`;
   if (refund !== null) return `Pode cancelar até ${refund} h antes.`;
   if (reschedule !== null) return `Pode remarcar até ${reschedule} h antes, usando o sinal (1 vez).`;
   return "";
@@ -245,14 +249,15 @@ function ownerWindow(policy: DepositPolicy) {
 function ownerOutcome(policy: DepositPolicy) {
   const late = policy.lateCancel;
   const missed = policy.noShow;
+  const after = splitDeadlines(policy) ? "Depois do prazo para cancelar" : "Depois disso";
   if (late === missed) {
     return late === "credit"
-      ? `Depois disso, ou se faltar, o sinal vira ${CREDIT_PHRASE}.`
-      : "Depois disso, ou se faltar, o sinal fica com você.";
+      ? `${after}, ou se faltar, o sinal vira ${CREDIT_PHRASE}.`
+      : `${after}, ou se faltar, o sinal fica com você.`;
   }
   const lateLine = late === "credit"
-    ? `Depois disso, o sinal vira ${CREDIT_PHRASE}.`
-    : "Depois disso, o sinal fica com você.";
+    ? `${after}, o sinal vira ${CREDIT_PHRASE}.`
+    : `${after}, o sinal fica com você.`;
   const missedLine = missed === "credit"
     ? `Se faltar, o sinal vira ${CREDIT_PHRASE}.`
     : missed === "refund"
