@@ -12,7 +12,7 @@ const steps = [
   },
   {
     title: "Receba com sinal pago",
-    text: "O cliente paga o Pix e a reserva aparece confirmada no seu painel. Sem print.",
+    text: "O cliente paga o Pix, o sinal cai direto na sua conta Mercado Pago e a reserva aparece confirmada no seu painel.",
   },
 ] as const;
 

@@ -27,7 +27,7 @@ export function LandingHero({ publicHost }: { publicHost: string }) {
             Seu cliente agenda sozinho e já chega com o sinal pago.
           </h1>
           <p className="mt-4 max-w-[40rem] text-base leading-[1.55] text-pretty text-muted lg:text-lg">
-            Você manda um link no WhatsApp ou no Instagram. O cliente escolhe o horário, paga o sinal por Pix e a reserva se confirma sozinha. Sem cobrar comprovante.
+            Você manda um link no WhatsApp ou no Instagram. O cliente escolhe o horário, paga o sinal por Pix e o valor cai direto na sua conta Mercado Pago. A reserva se confirma sozinha.
           </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
             <a id="hero-primary-cta" href="/onboarding" className={buttonVariants({ size: "lg", className: "w-full sm:w-auto" })}>
@@ -59,13 +59,13 @@ export function LandingHero({ publicHost }: { publicHost: string }) {
           <div className="relative mx-auto h-[440px] w-[270px] overflow-hidden lg:h-auto lg:w-[280px] lg:overflow-visible">
             <PhoneStage publicHost={publicHost} />
             <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-paper to-transparent lg:hidden" />
-            <div aria-hidden="true" className="pointer-events-none absolute top-[71%] right-[calc(100%-1rem)] z-10 hidden w-[210px] -translate-y-1/2 rounded-card border border-line bg-surface p-3 shadow-[var(--shadow-raised)] xl:block">
-              <p className="text-[13px] font-semibold text-ink">Nova reserva · Ana</p>
-              <p className="mt-1 text-[13px] text-muted">Design de sobrancelha · Qui 15, 15:30</p>
-              <p className="mt-2 inline-flex items-center gap-1 text-[13px] font-semibold text-success">
-                <CheckIcon className="size-3.5" /> Confirmado · sinal pago
-              </p>
-            </div>
+          </div>
+          <div aria-hidden="true" className="pointer-events-none absolute top-[68%] left-0 z-10 hidden w-[210px] max-w-[calc(100%-1.5rem)] -translate-y-1/2 rounded-card border border-line bg-surface p-3 shadow-[var(--shadow-raised)] xl:block">
+            <p className="text-[13px] font-semibold text-ink">Nova reserva · Ana</p>
+            <p className="mt-1 text-[13px] text-muted">Design de sobrancelha · Qui 15, 15:30</p>
+            <p className="mt-2 inline-flex items-center gap-1 text-[13px] font-semibold text-success">
+              <CheckIcon className="size-3.5" /> Confirmado · sinal pago
+            </p>
           </div>
           <ValueSlab
             aria-hidden="true"
@@ -110,7 +110,7 @@ function PhoneStage({ publicHost }: { publicHost: string }) {
             time === "15:30" ? (
               <span key={time} className="flex items-center justify-between rounded-full bg-pix-bright px-3 py-1.5 text-[12px] font-semibold text-pix-bright-foreground">
                 <span>{time}</span>
-                <span>Reservado · sinal pago</span>
+                <span>Selecionado</span>
               </span>
             ) : (
               <span key={time} className="rounded-full border border-line px-3 py-1.5 text-[12px] font-medium text-ink">

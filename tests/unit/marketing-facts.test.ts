@@ -119,6 +119,33 @@ describe("landing copy", () => {
     }
   });
 
+  it("shows the 15:30 slot as selected while the phone still asks to pay", () => {
+    const hero = readFileSync("components/landing/LandingHero.tsx", "utf8");
+    expect(hero).toContain("Selecionado");
+    expect(hero).toContain("Pagar sinal de R$ 20,00 no Pix");
+    expect(hero).not.toContain("Reservado · sinal pago");
+  });
+
+  it("says the deposit lands in the owner's Mercado Pago account", () => {
+    const files = [...sourceFiles("components/landing"), ...sourceFiles("lib/marketing")];
+    const rendered = files.map((file) => readFileSync(file, "utf8")).join("\n");
+    expect(rendered).toContain("O sinal cai direto na sua conta Mercado Pago");
+    expect(rendered).not.toMatch(/processados pelo Mercado Pago/);
+    for (const file of [
+      "components/landing/LandingFooter.tsx",
+      "components/landing/LandingHero.tsx",
+      "components/landing/LandingSteps.tsx",
+      "components/landing/DemoSection.tsx",
+      "components/landing/LandingPricing.tsx",
+      "components/landing/LandingFinalCta.tsx",
+      "components/landing/LandingBenefits.tsx",
+      "components/landing/Roadmap.tsx",
+    ]) {
+      expect(readFileSync(file, "utf8"), file).toMatch(/conta Mercado Pago/);
+    }
+    expect(readFileSync("components/landing/LandingFooter.tsx", "utf8")).toContain("O AgendaPix");
+  });
+
   it("does not hardcode a payment deadline in the landing components", () => {
     const files = [...sourceFiles("components/landing"), "app/page.tsx"];
     const offenders = files.flatMap((file) => {

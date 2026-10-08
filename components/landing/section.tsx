@@ -1,9 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-/** Fora da primeira tela: o navegador não calcula o layout antes do título. */
-export const belowFold = "[content-visibility:auto] [contain-intrinsic-size:auto_720px]";
-
 export function Section({
   id,
   className,
@@ -16,7 +13,7 @@ export function Section({
   children: ReactNode;
 }) {
   return (
-    <section id={id} aria-labelledby={labelledBy} className={cn("scroll-mt-24 py-16 lg:py-28", belowFold, className)}>
+    <section id={id} aria-labelledby={labelledBy} className={cn("scroll-mt-24 py-16 lg:py-28", className)}>
       <div className="mx-auto w-full max-w-[1120px] px-5">{children}</div>
     </section>
   );

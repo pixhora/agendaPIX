@@ -8,7 +8,7 @@ export function Roadmap() {
       <Eyebrow>Sem letra miúda</Eyebrow>
       <SectionTitle id="roadmap-titulo">O que já funciona e o que vem aí.</SectionTitle>
       <p className="mt-4 max-w-[40rem] text-base leading-relaxed text-pretty text-muted lg:text-lg">
-        O AgendaPix é novo. Preferimos mostrar exatamente o que você recebe hoje.
+        O AgendaPix é novo. O sinal cai direto na sua conta Mercado Pago. Preferimos mostrar exatamente o que você recebe hoje.
       </p>
       <div className="mt-8 grid gap-4 lg:grid-cols-2">
         <article className="rounded-frame border border-line bg-surface p-5 sm:p-6">

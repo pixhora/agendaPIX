@@ -1,12 +1,11 @@
 import { faqItems } from "@/lib/marketing/landing-copy";
 import type { PublicBookingFacts } from "@/lib/marketing/facts";
-import { cn } from "@/lib/utils";
-import { belowFold, Eyebrow, SectionTitle } from "./section";
+import { Eyebrow, SectionTitle } from "./section";
 import { FaqAccordion } from "./FaqAccordion";
 
 export function LandingFaq({ facts }: { facts: PublicBookingFacts }) {
   return (
-    <section id="perguntas-frequentes" aria-labelledby="faq-titulo" className={cn("scroll-mt-24 border-t border-line py-16 lg:py-28", belowFold)}>
+    <section id="perguntas-frequentes" aria-labelledby="faq-titulo" className="scroll-mt-24 border-t border-line py-16 lg:py-28">
       <div className="mx-auto grid w-full max-w-[1120px] gap-8 px-5 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-12">
         <div className="lg:sticky lg:top-24 lg:self-start">
           <Eyebrow>Dúvidas</Eyebrow>

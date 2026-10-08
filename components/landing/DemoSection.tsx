@@ -50,7 +50,7 @@ function ExamplePhone({ holdMinutes }: { holdMinutes: number }) {
         <div className="mt-4 rounded-card border border-dashed border-line-strong/70 bg-paper px-3 py-6 text-center text-[13px] text-muted">
           Código de exemplo
         </div>
-        <p className="mt-4 text-[13px] leading-relaxed text-muted">No banco, o Pix cai na conta Mercado Pago do Studio Bella.</p>
+        <p className="mt-4 text-[13px] leading-relaxed text-muted">O sinal cai direto na conta Mercado Pago do Studio Bella.</p>
         <span className="mt-4 flex min-h-11 items-center justify-center rounded-full bg-ink text-sm font-semibold text-paper">Copiar código Pix</span>
       </div>
     </div>
