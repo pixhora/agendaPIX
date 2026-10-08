@@ -1,25 +1,22 @@
 import Link from "next/link";
+import { markRects, uiMarkMetrics } from "@/lib/brand/mark";
 import { cn } from "@/lib/utils";
 
+const uiMark = markRects(uiMarkMetrics);
+
 /**
- * Símbolo Grade A numa grade de 24 px (célula 4, vão 1), a mesma proporção do mark.svg.
+ * Símbolo Grade A. A geometria vem de lib/brand/mark.ts.
  * crispEdges mantém o traço inteiro em 1x. A faixa usa o verde-água; as células seguem a cor do texto.
  */
 function GradeAMark({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" shapeRendering="crispEdges" className={className}>
+    <svg viewBox={`0 0 ${uiMarkMetrics.viewBox} ${uiMarkMetrics.viewBox}`} aria-hidden="true" shapeRendering="crispEdges" className={className}>
       <g fill="currentColor">
-        <rect x="5" y="0" width="4" height="4" rx="1" />
-        <rect x="10" y="0" width="4" height="4" rx="1" />
-        <rect x="15" y="0" width="4" height="4" rx="1" />
-        <rect x="0" y="5" width="4" height="4" rx="1" />
-        <rect x="20" y="5" width="4" height="4" rx="1" />
-        <rect x="0" y="15" width="4" height="4" rx="1" />
-        <rect x="20" y="15" width="4" height="4" rx="1" />
-        <rect x="0" y="20" width="4" height="4" rx="1" />
-        <rect x="20" y="20" width="4" height="4" rx="1" />
+        {uiMark.cells.map((cell) => (
+          <rect key={`${cell.x}-${cell.y}`} x={cell.x} y={cell.y} width={cell.width} height={cell.height} rx={cell.rx} />
+        ))}
       </g>
-      <rect x="0" y="10" width="24" height="4" rx="2" fill="currentColor" className="text-pix-bright" />
+      <rect x={uiMark.bar.x} y={uiMark.bar.y} width={uiMark.bar.width} height={uiMark.bar.height} rx={uiMark.bar.rx} fill="currentColor" className="text-pix-bright" />
     </svg>
   );
 }
