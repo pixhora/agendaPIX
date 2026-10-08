@@ -114,6 +114,11 @@ export interface BookingPolicyView {
   snapshot?: DepositPolicy | null;
   refundDeadlineAt?: string | null;
   rescheduleDeadlineAt?: string | null;
+  /**
+   * A reserva nasceu dentro da janela (`bookings.created_at`).
+   * Com `true`, o comprovante usa o tom de aviso e `text` não traz data.
+   */
+  refundWindowClosedAtBooking?: boolean;
   /** Linhas da folha, se o servidor enviar junto do snapshot. */
   details?: PolicyDetailLine[] | null;
 }

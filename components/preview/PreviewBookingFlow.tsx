@@ -29,10 +29,12 @@ import { Button } from "@/components/ui/button";
 import { BusinessAvatar } from "@/components/ui/business-avatar";
 import { PREVIEW_PIX_COPY_PASTE, PREVIEW_PIX_QR } from "@/lib/preview/sample-pix-qr";
 import { PIX_HOLD_MS, previewLateSlot, previewOpeningSlot, previewPayDeadline } from "@/lib/preview/preview-schedule";
-import { mirrorCustomerPolicy } from "@/components/booking/policy-copy";
+import { closedWindowReceipt, mirrorCustomerPolicy } from "@/components/booking/policy-copy";
 
-/** Frase de comprovante da reserva em cima da hora. A variante de crédito ainda não está na spec 06. */
-const LATE_BOOKING_POLICY_TEXT = "Este sinal não é devolvido se cancelar.";
+const CLOSED_WINDOW_VARIANTS = [
+  { id: "padrao", label: "Política padrão", lateCancel: "retain" },
+  { id: "credito", label: "Política com crédito", lateCancel: "credit" },
+] as const;
 
 function previewStep(scene: PreviewScene): 1 | 2 | 3 | 4 {
   if (scene === "dados" || scene === "politica" || scene === "politica-mudou") return 3;
@@ -63,12 +65,18 @@ function previewBooking(scene: PreviewScene, service: PublicService, slot: Avail
   };
 }
 
-function previewPolicy(slot: AvailabilitySlot, lateBooking: boolean): BookingPolicyView {
-  if (lateBooking) return { text: LATE_BOOKING_POLICY_TEXT };
+function previewPolicy(slot: AvailabilitySlot): BookingPolicyView {
   const deadline = new Date(new Date(slot.startsAt).getTime() - 24 * 60 * 60 * 1000).toISOString();
   return {
     refundDeadlineAt: deadline,
     rescheduleDeadlineAt: deadline,
+  };
+}
+
+function closedPreviewPolicy(lateCancel: "retain" | "credit"): BookingPolicyView {
+  return {
+    text: closedWindowReceipt({ lateCancel }),
+    refundWindowClosedAtBooking: true,
   };
 }
 
@@ -97,8 +105,8 @@ export function PreviewBookingFlow({ scene = "fluxo" }: { scene?: PreviewScene }
   const contactWhatsapp = scene === "indisponivel" || scene === "pausada" ? "5511987654321" : null;
   const openingService = services.find((service) => service.bookable !== false) ?? services[0];
   const [step, setStep] = useState<1 | 2 | 3 | 4>(() => previewStep(scene));
-  const lateBooking = scene === "cima-da-hora";
-  const [isCompleted, setIsCompleted] = useState(scene === "comprovante" || lateBooking);
+  const lateScene = scene === "cima-da-hora";
+  const [isCompleted, setIsCompleted] = useState(scene === "comprovante" || lateScene);
 
   const [selectedService, setSelectedService] = useState<PublicService | null>(openingService);
   const [selectedSlot, setSelectedSlot] = useState<AvailabilitySlot | null>(openingSlot);
@@ -213,6 +221,28 @@ export function PreviewBookingFlow({ scene = "fluxo" }: { scene?: PreviewScene }
         {businessHeader}
 
         {isCompleted && selectedService && selectedSlot ? (
+          lateScene ? (
+            <div className="space-y-8">
+              {CLOSED_WINDOW_VARIANTS.map((variant) => (
+                <section key={variant.id} data-variant={variant.id} className="space-y-3">
+                  <p className="text-xs font-semibold text-muted-foreground">{variant.label}</p>
+                  <div className="rounded-3xl border border-border bg-surface p-6 sm:p-7 shadow-sm">
+                    <BookingConfirmation
+                      businessName={MOCK_PUBLIC_BUSINESS.name}
+                      service={selectedService}
+                      slot={selectedSlot}
+                      timezone={MOCK_PUBLIC_BUSINESS.timezone}
+                      customerName={customerName}
+                      customerPhone={customerPhone}
+                      policy={closedPreviewPolicy(variant.lateCancel)}
+                      refundWindowClosedAtBooking
+                      onNewBooking={handleRestart}
+                    />
+                  </div>
+                </section>
+              ))}
+            </div>
+          ) : (
           <div className="rounded-3xl border border-border bg-surface p-6 sm:p-7 shadow-sm">
             <BookingConfirmation
               businessName={MOCK_PUBLIC_BUSINESS.name}
@@ -221,11 +251,11 @@ export function PreviewBookingFlow({ scene = "fluxo" }: { scene?: PreviewScene }
               timezone={MOCK_PUBLIC_BUSINESS.timezone}
               customerName={customerName}
               customerPhone={customerPhone}
-              policy={previewPolicy(selectedSlot, lateBooking)}
-              lateBooking={lateBooking}
+              policy={previewPolicy(selectedSlot)}
               onNewBooking={handleRestart}
             />
           </div>
+          )
         ) : (
           <>
             <StepProgress currentStep={step} />

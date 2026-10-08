@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import {
   formatPolicyWindowTitle,
   mirrorCustomerPolicy,
+  closedWindowLine,
+  closedWindowReceipt,
   confirmationCardTone,
   confirmationPolicyText,
   policyHowToChange,
@@ -14,6 +16,7 @@ import {
   policyReceiptRefund,
   policyWindowBody,
   receiptRefundCopy,
+  refundWindowClosedAtBooking,
 } from "../../components/booking/policy-copy";
 import { policyLineTone, readPolicyChangedUpdate } from "../../components/booking/policy-gate";
 import { serviceCardAside, serviceCardMeta } from "../../components/booking/service-card";
@@ -91,7 +94,7 @@ describe("telas do cliente", () => {
     for (const file of CUSTOMER_SCREEN_FILES) {
       const source = readFileSync(file, "utf8");
       expect(source, file).not.toMatch(/\bpainel\b|Devolver pelo AgendaPix/);
-      if (file !== "components/booking/BookingConfirmation.tsx") {
+      if (file !== "components/booking/BookingConfirmation.tsx" && file !== "components/booking/BookingFlow.tsx") {
         expect(source, file).not.toMatch(/policy\.text|\bpolicyText\b/);
       }
     }
@@ -171,7 +174,8 @@ describe("policy.text do comprovante", () => {
     expect(confirmationCardTone(false)).toBe("ok");
     expect(confirmationCardTone(true)).toBe("warn");
     const confirmation = readFileSync("components/booking/BookingConfirmation.tsx", "utf8");
-    expect(confirmation).toContain("lateBooking = false");
+    expect(confirmation).toContain("refundWindowClosedAtBooking");
+    expect(confirmation).not.toContain("lateBooking");
     expect(confirmation).not.toContain("Este sinal não é devolvido se cancelar.");
     expect(confirmation).not.toContain("vira crédito");
   });
@@ -252,9 +256,14 @@ describe("reserva dentro e fora do prazo de devolução", () => {
     const view = mirrorCustomerPolicy({ businessName: name, hours: 24, startsAt, now });
     expect(view.tone).toBe("warn");
     expect(view.summary).toBe("Faltam menos de 24 h para o horário: se cancelar, o sinal não é devolvido.");
-    expect(view.details[0]?.tone).toBe("warn");
-    expect(`${view.details[0]?.title}: ${view.details[0]?.body.charAt(0).toLowerCase()}${view.details[0]?.body.slice(1)}`).toBe(view.summary);
-    expect(view.details.map((line) => line.title).join(" ")).not.toMatch(/^Até | Até /);
+    expect(view.details[0]).toEqual({
+      title: "Perto do horário",
+      body: "Faltam menos de 24 h para o horário: se cancelar, o sinal não é devolvido.",
+      tone: "warn",
+    });
+    expect(view.summary).not.toMatch(/pode devolver o sinal até/);
+    expect(closedWindowReceipt({ lateCancel: "retain" })).toBe("Este sinal não é devolvido se cancelar.");
+    expect(refundWindowClosedAtBooking({ refundUntilHours: 24 }, startsAt, now)).toBe(true);
 
     const receipt = receiptRefundCopy({
       businessName: name,
@@ -268,11 +277,34 @@ describe("reserva dentro e fora do prazo de devolução", () => {
 
     const preview = readFileSync("components/preview/PreviewBookingFlow.tsx", "utf8");
     const flow = readFileSync("components/booking/BookingFlow.tsx", "utf8");
-    expect(preview).toContain('lines={selectedService.policyDetails}');
+    expect(preview).toContain("lines={selectedService.policyDetails}");
     expect(flow).toContain("lines={selectedService.policyDetails}");
     expect(preview).not.toContain("policyLinesForCustomer");
-    expect(preview).toContain("Este sinal não é devolvido se cancelar.");
-    expect(preview).not.toContain("Se cancelar, o sinal vira crédito para outro horário, válido por 60 dias.");
-    expect(preview).toContain("lateBooking={lateBooking}");
+    expect(preview).toContain("refundWindowClosedAtBooking: true");
+    expect(preview).toContain("closedWindowReceipt({ lateCancel })");
+    expect(preview).toContain('lateCancel: "credit"');
+    expect(preview).toContain('id: "credito"');
+    expect(preview).not.toContain("lateBooking");
+    expect(flow).toContain("refundWindowClosedAtBooking={bookingResponse?.policy?.refundWindowClosedAtBooking}");
+  });
+
+  it("espelha as duas frases de crédito da janela fechada e usa bookedAt como referência", () => {
+    const now = new Date("2026-10-08T15:00:00.000Z");
+    const startsAt = new Date("2026-10-11T14:30:00.000Z");
+    const bookedAt = new Date("2026-10-10T20:00:00.000Z");
+    expect(refundWindowClosedAtBooking({ refundUntilHours: 24 }, startsAt, now)).toBe(false);
+    expect(refundWindowClosedAtBooking({ refundUntilHours: 24 }, startsAt, bookedAt)).toBe(true);
+
+    const open = mirrorCustomerPolicy({ businessName: name, hours: 24, startsAt, now });
+    expect(open.tone).toBe("ok");
+    expect(open.details[0]?.title).toBe("Até sáb, 10 out, 11:30");
+
+    const closed = mirrorCustomerPolicy({ businessName: name, hours: 24, startsAt, now, bookedAt, late: "credit" });
+    expect(closed.summary).toBe(closedWindowLine({ refundUntilHours: 24, lateCancel: "credit" }));
+    expect(closed.summary).toBe("Faltam menos de 24 h para o horário: se cancelar, o sinal vira crédito para outro horário, válido por 60 dias.");
+    expect(closed.details[0]).toEqual({ title: "Perto do horário", body: closed.summary, tone: "warn" });
+    expect(closedWindowReceipt({ lateCancel: "credit" })).toBe("Se cancelar, o sinal vira crédito para outro horário, válido por 60 dias.");
+    expect(closed.summary).not.toMatch(/pode devolver o sinal até/);
+    expect(closedWindowReceipt({ lateCancel: "credit" })).not.toMatch(/pode devolver o sinal até/);
   });
 });

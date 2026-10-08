@@ -19,11 +19,11 @@ interface BookingConfirmationProps {
   customerPhone: string;
   /** Snapshot gravado na reserva. `policy.text` entra como o servidor mandou. */
   policy?: BookingPolicyView | null;
-  /**
-   * Pinta o cartão da política em âmbar. Desligado até o #29 nomear o booleano
-   * ao lado de `policy.text`. Aguardando nome do campo do #29.
-   */
-  lateBooking?: boolean;
+  /** Mesmo valor de `policy.text`. O #29 passa os dois no comprovante. */
+  policyText?: string | null;
+  /** `policy.refundWindowClosedAtBooking`. Liga o tom de aviso. */
+  refundWindowClosedAtBooking?: boolean;
+  contactWhatsapp?: string | null;
   onNewBooking: () => void;
 }
 
@@ -76,26 +76,30 @@ export function BookingConfirmation({
   customerName,
   customerPhone,
   policy,
-  lateBooking = false,
+  policyText: policyTextProp,
+  refundWindowClosedAtBooking,
+  contactWhatsapp,
   onNewBooking,
 }: BookingConfirmationProps) {
   const remainingCents = Math.max(0, service.priceCents - service.depositCents);
+  const windowClosed = Boolean(refundWindowClosedAtBooking ?? policy?.refundWindowClosedAtBooking);
   const refundDeadlineAt = policy?.refundDeadlineAt;
-  const datedRefund = refundDeadlineAt && isFutureInstant(refundDeadlineAt)
+  const datedRefund = !windowClosed && refundDeadlineAt && isFutureInstant(refundDeadlineAt)
     ? policyReceiptRefund(
         businessName,
         formatDateFull(refundDeadlineAt, timezone).replace(/^./, (letter) => letter.toLowerCase()),
         formatTimeSlot(refundDeadlineAt, timezone),
       )
     : null;
-  const policyText = confirmationPolicyText(policy?.text, datedRefund);
-  const policyTone = confirmationCardTone(lateBooking);
-  const rescheduleOpen = isFutureInstant(policy?.rescheduleDeadlineAt);
+  const policyText = confirmationPolicyText(policyTextProp ?? policy?.text, datedRefund);
+  const policyTone = confirmationCardTone(windowClosed);
+  const rescheduleOpen = !windowClosed && isFutureInstant(policy?.rescheduleDeadlineAt);
   const icsHref = useMemo(
     () => buildIcs({ businessName, service, slot, customerName, policyLine: policyText }),
     [businessName, service, slot, customerName, policyText],
   );
 
+  const whatsappNumber = contactWhatsapp?.replace(/^\+/, "") ?? "";
   const whatsappMessage = encodeURIComponent(
     `Olá ${businessName}! Acabei de agendar ${service.name} para ${formatDateFull(
       slot.startsAt,
@@ -169,7 +173,7 @@ export function BookingConfirmation({
 
       <div className="grid gap-3 sm:grid-cols-2">
         <Button asChild size="lg">
-          <a href={`https://wa.me/?text=${whatsappMessage}`} target="_blank" rel="noopener noreferrer">
+          <a href={`https://wa.me/${whatsappNumber}?text=${whatsappMessage}`} target="_blank" rel="noopener noreferrer">
             <Icon icon={CONFIRMATION_ICONS.whatsapp} size="md" /> Enviar no WhatsApp
           </a>
         </Button>
