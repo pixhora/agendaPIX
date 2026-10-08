@@ -6,6 +6,8 @@ import {
   policyHowToChange,
   policyLateCancelDetail,
   policyLinesForCustomer,
+  confirmationPolicyCopy,
+  policyNoShowCredit,
   policyNoShowRefund,
   policyOneLiner,
   policyLateBookingNotice,
@@ -88,9 +90,10 @@ describe("telas do cliente", () => {
 
     for (const file of CUSTOMER_SCREEN_FILES) {
       const source = readFileSync(file, "utf8");
-      expect(source, file).not.toMatch(/policy\.text/);
-      expect(source, file).not.toMatch(/\bpolicyText\b/);
       expect(source, file).not.toMatch(/\bpainel\b|Devolver pelo AgendaPix/);
+      if (file !== "components/booking/BookingConfirmation.tsx") {
+        expect(source, file).not.toMatch(/policy\.text|\bpolicyText\b/);
+      }
     }
   });
 
@@ -104,6 +107,77 @@ describe("telas do cliente", () => {
     expect(update?.policySummary).toBeNull();
     expect(update?.policyHash).toBe("hash-novo");
     expect(`${update?.policySummary ?? ""}`).not.toMatch(/\bpainel\b|Devolver pelo AgendaPix/);
+  });
+});
+
+describe("frases de crédito", () => {
+  it("espelha as três frases da spec 06", () => {
+    expect(policyOneLiner(business, 24, "credit")).toBe(
+      "Com 24 h de antecedência, Barbearia do Zé pode devolver o sinal. Mais perto da hora, o sinal vira crédito para outro horário, válido por 60 dias.",
+    );
+    expect(policyLateCancelDetail(business, "credit")).toBe(
+      "Se cancelar, o sinal vira crédito para outro horário em Barbearia do Zé, válido por 60 dias.",
+    );
+    expect(policyNoShowCredit()).toBe("O sinal vira crédito para outro horário, válido por 60 dias.");
+    const credit = mirrorCustomerPolicy({
+      businessName: business,
+      hours: 24,
+      startsAt: new Date("2026-10-11T14:30:00.000Z"),
+      now: new Date("2026-10-08T15:00:00.000Z"),
+      late: "credit",
+      noShow: "credit",
+    });
+    expect(credit.details.find((line) => line.title === "Se faltar")?.body).toBe(policyNoShowCredit());
+  });
+});
+
+describe("policy.text do cliente", () => {
+  const now = new Date("2026-10-08T21:54:00.000Z");
+  const pastDeadline = "2026-10-08T14:30:00.000Z";
+  const futureDeadline = "2026-10-10T14:30:00.000Z";
+
+  it("mostra o texto do cliente quando o prazo ainda está aberto", () => {
+    const copy = confirmationPolicyCopy({
+      policyText: "Studio Bella pode devolver o sinal até sáb, 10 out, às 11:30. Cancele e Studio Bella pode devolver o sinal, ou remarque usando o sinal (1 vez).",
+      businessName: "Studio Bella",
+      hours: 24,
+      refundDeadlineAt: futureDeadline,
+      dateLabel: "sábado, 10 de outubro",
+      timeLabel: "11:30",
+      now,
+    });
+    expect(copy.tone).toBe("ok");
+    expect(copy.text).toMatch(/^Studio Bella pode devolver o sinal até sáb, 10 out/);
+  });
+
+  it("troca a data vencida que ainda vem em policy.text pelo aviso âmbar", () => {
+    const copy = confirmationPolicyCopy({
+      policyText: "Studio Bella pode devolver o sinal até qui, 08 out, às 11:30. Cancele e Studio Bella pode devolver o sinal.",
+      businessName: "Studio Bella",
+      hours: 24,
+      refundDeadlineAt: pastDeadline,
+      dateLabel: "quinta-feira, 08 de outubro",
+      timeLabel: "11:30",
+      now,
+    });
+    expect(copy).toEqual({
+      tone: "warn",
+      text: "Faltam menos de 24 h para o horário: se cancelar, o sinal não é devolvido.",
+    });
+  });
+
+  it("não exibe a prévia do dono se ela ainda vier no campo", () => {
+    const copy = confirmationPolicyCopy({
+      policyText: OWNER_POLICY_TEXT,
+      businessName: "Studio Bella",
+      hours: 24,
+      refundDeadlineAt: futureDeadline,
+      dateLabel: "sábado, 10 de outubro",
+      timeLabel: "11:30",
+      now,
+    });
+    expect(copy.text).toBe("Studio Bella pode devolver o sinal até sábado, 10 de outubro, às 11:30.");
+    expect(copy.text).not.toMatch(/\bpainel\b|Devolver pelo AgendaPix/);
   });
 });
 

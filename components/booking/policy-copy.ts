@@ -44,6 +44,11 @@ export function policyNoShowRefund(businessName: string): string {
   return `${businessName} pode devolver o sinal.`;
 }
 
+/** "Se faltar" quando o sinal vira crédito. Sem o nome do negócio, como na spec 06. */
+export function policyNoShowCredit(): string {
+  return "O sinal vira crédito para outro horário, válido por 60 dias.";
+}
+
 export function policyHowToChange(businessName: string, hasContact: boolean): string {
   const start = hasContact
     ? `Fale com ${businessName} pelo WhatsApp.`
@@ -71,7 +76,7 @@ export interface CustomerPolicyLine {
   tone: "ok" | "warn";
 }
 
-/** Espelho local de `policySummary` + `policyDetails` para o preview. Não lê `policy.text`. */
+/** Espelho local de `policySummary` + `policyDetails` para o preview. */
 export function mirrorCustomerPolicy(input: {
   businessName: string;
   hours: number;
@@ -79,6 +84,7 @@ export function mirrorCustomerPolicy(input: {
   now?: Date;
   hasContact?: boolean;
   late?: "keep" | "credit";
+  noShow?: "refund" | "credit" | "retain";
 }): {
   tone: "ok" | "warn";
   summary: string;
@@ -89,6 +95,12 @@ export function mirrorCustomerPolicy(input: {
   const open = isBeforeRefundDeadline(input.startsAt, input.hours, now);
   const deadline = new Date(input.startsAt.getTime() - input.hours * 3_600_000);
   const late = input.late ?? "keep";
+  const noShow = input.noShow ?? "refund";
+  const noShowBody = noShow === "credit"
+    ? policyNoShowCredit()
+    : noShow === "retain"
+      ? `O sinal fica com ${input.businessName}.`
+      : policyNoShowRefund(input.businessName);
   const first: CustomerPolicyLine = open
     ? { title: formatPolicyWindowTitle(deadline), body: policyWindowBody(input.businessName), tone: "ok" }
     : {
@@ -102,7 +114,7 @@ export function mirrorCustomerPolicy(input: {
     details: [
       first,
       { title: "Depois disso", body: policyLateCancelDetail(input.businessName, late), tone: late === "keep" ? "warn" : "ok" },
-      { title: "Se faltar", body: policyNoShowRefund(input.businessName), tone: "ok" },
+      { title: "Se faltar", body: noShowBody, tone: noShow === "retain" ? "warn" : "ok" },
       { title: "Como cancelar ou remarcar", body: policyHowToChange(input.businessName, input.hasContact !== false), tone: "ok" },
     ],
     refundDeadlineAt: deadline.toISOString(),
@@ -151,6 +163,45 @@ export function receiptRefundCopy(input: {
     return { tone: "warn", text: policyLateBookingNotice(input.hours) };
   }
   return { tone: "ok", text: null };
+}
+
+const OWNER_POLICY_MARK = /\bpainel\b|Devolver pelo AgendaPix/;
+const DATED_REFUND_MARK = /pode devolver o sinal até/;
+
+/**
+ * Texto do comprovante e do calendário.
+ * `policy.text` do #29 em 7e74a59 é o texto do cliente, mas ainda inclui
+ * "pode devolver o sinal até {data}" quando a reserva já está dentro do prazo.
+ * Nesse caso o front mostra o aviso e esconde a data.
+ */
+export function confirmationPolicyCopy(input: {
+  policyText?: string | null;
+  businessName: string;
+  hours: number | null;
+  refundDeadlineAt?: string | null;
+  dateLabel: string;
+  timeLabel: string;
+  now?: Date;
+}): { tone: "ok" | "warn"; text: string | null } {
+  const now = input.now ?? new Date();
+  const local = receiptRefundCopy({
+    businessName: input.businessName,
+    hours: input.hours,
+    refundDeadlineAt: input.refundDeadlineAt,
+    dateLabel: input.dateLabel,
+    timeLabel: input.timeLabel,
+    now,
+  });
+  const incoming = input.policyText?.trim() ?? "";
+  const safeIncoming = incoming && !OWNER_POLICY_MARK.test(incoming) ? incoming : "";
+  const deadline = input.refundDeadlineAt ? new Date(input.refundDeadlineAt).getTime() : Number.NaN;
+  const closed = !Number.isNaN(deadline) && now.getTime() >= deadline;
+  if (closed) {
+    if (safeIncoming && !DATED_REFUND_MARK.test(safeIncoming)) return { tone: "warn", text: safeIncoming };
+    return local.tone === "warn" ? local : { tone: "warn", text: null };
+  }
+  if (safeIncoming) return { tone: "ok", text: safeIncoming };
+  return local;
 }
 
 export function isFutureInstant(iso: string | null | undefined, now = new Date()): boolean {

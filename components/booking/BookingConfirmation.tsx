@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { CONFIRMATION_ICONS } from "@/lib/icons/registry";
 import { ReservedTimeBand } from "./ReservedTimeBand";
-import { isFutureInstant, receiptRefundCopy } from "./policy-copy";
+import { confirmationPolicyCopy, isFutureInstant } from "./policy-copy";
 import { REMAINDER_LABEL } from "@/lib/copy/booking-summary";
 
 interface BookingConfirmationProps {
@@ -20,6 +20,10 @@ interface BookingConfirmationProps {
   /** Snapshot gravado na reserva. A tela só mostra o que o servidor mandou. */
   policy?: BookingPolicyView | null;
   onNewBooking: () => void;
+}
+
+function icsText(value: string) {
+  return value.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
 }
 
 function buildIcs({
@@ -52,7 +56,7 @@ function buildIcs({
     `DTSTART:${stamp(slot.startsAt)}`,
     `DTEND:${stamp(slot.endsAt)}`,
     `SUMMARY:${summary}`,
-    `DESCRIPTION:${description}`,
+    `DESCRIPTION:${icsText(description)}`,
     "END:VEVENT",
     "END:VCALENDAR",
   ];
@@ -72,15 +76,14 @@ export function BookingConfirmation({
   const remainingCents = Math.max(0, service.priceCents - service.depositCents);
   const hours = service.depositPolicy?.refundUntilHours ?? policy?.snapshot?.refundUntilHours ?? null;
   const refundDeadlineAt = policy?.refundDeadlineAt;
-  const refundCopy = refundDeadlineAt
-    ? receiptRefundCopy({
-        businessName,
-        hours,
-        refundDeadlineAt,
-        dateLabel: formatDateFull(refundDeadlineAt, timezone).replace(/^./, (letter) => letter.toLowerCase()),
-        timeLabel: formatTimeSlot(refundDeadlineAt, timezone),
-      })
-    : { tone: "ok" as const, text: null };
+  const refundCopy = confirmationPolicyCopy({
+    policyText: policy?.text,
+    businessName,
+    hours,
+    refundDeadlineAt,
+    dateLabel: refundDeadlineAt ? formatDateFull(refundDeadlineAt, timezone).replace(/^./, (letter) => letter.toLowerCase()) : "",
+    timeLabel: refundDeadlineAt ? formatTimeSlot(refundDeadlineAt, timezone) : "",
+  });
   const rescheduleOpen = isFutureInstant(policy?.rescheduleDeadlineAt);
   const icsHref = useMemo(
     () => buildIcs({ businessName, service, slot, customerName, policyLine: refundCopy.text }),
