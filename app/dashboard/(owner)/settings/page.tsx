@@ -1,6 +1,5 @@
 import { DashboardShell, Empty, SectionCard } from "@/components/dashboard/shell";
 import { HoursForm } from "@/components/dashboard/forms";
-import { PixKeyForm } from "@/components/dashboard/pix-key-form";
 import { PublicLink } from "@/components/dashboard/public-link";
 import { MpStatusPanel } from "@/components/payments/mp-status-panel";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
@@ -24,7 +23,6 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         <SectionCard title="Horários de funcionamento" headingId="hours-title" icon={<Icon icon={ACTION_ICONS.hours} size="md" />} description={`Fuso horário: ${friendlyTimezoneLabel(business.timezone)}.`}>
           <HoursForm key={business.id} businessId={business.id} hours={hours} />
         </SectionCard>
-        <PixKeyForm key={`pix-${business.id}`} businessId={business.id} />
       </div>
       <div className="grid min-w-0 gap-6 lg:sticky lg:top-8">
         <SectionCard title="Sua página pública" headingId="public-link-title" icon={<Icon icon={ACTION_ICONS.link} size="md" />} description="Compartilhe este link para receber reservas com sinal via Pix.">

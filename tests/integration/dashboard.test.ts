@@ -1,10 +1,12 @@
 import { randomUUID } from "node:crypto";
+import { eq } from "drizzle-orm";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool, type PoolClient } from "pg";
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as schema from "../../db/schema";
 import { databaseEnvSchema } from "../../lib/env";
 import { dashboardBookings, dashboardCustomers, dashboardHours, dashboardServices, ownedBusinesses, saveDashboardHours, saveDashboardService } from "../../lib/dashboard/data";
+import { insertConnectedMercadoPago } from "../helpers/connected-mp";
 
 const pool = new Pool({ connectionString: databaseEnvSchema.parse(process.env).DATABASE_URL });
 let client: PoolClient;
@@ -16,6 +18,8 @@ beforeEach(async () => {
   await database.insert(schema.user).values([ownerA, ownerB].map((id) => ({ id, name: "Dono", email: `${id}@example.com` })));
   await database.insert(schema.businesses).values([{ id: businessA, ownerId: ownerA, name: "Negócio A", slug: `a-${businessA}` }, { id: businessB, ownerId: ownerB, name: "Negócio B", slug: `b-${businessB}` }]);
   await database.insert(schema.services).values([{ id: serviceA, businessId: businessA, name: "Corte A", durationMinutes: 30, priceCents: 5000, depositCents: 1000 }, { id: serviceB, businessId: businessB, name: "Corte B", durationMinutes: 30, priceCents: 6000, depositCents: 1000 }]);
+  await insertConnectedMercadoPago(database, businessA);
+  await insertConnectedMercadoPago(database, businessB);
   for (const [businessId, serviceId, name] of [[businessA, serviceA, "Cliente A"], [businessB, serviceB, "Cliente B"]]) {
     const [customer] = await database.insert(schema.customers).values({ businessId, name, phone: "+5511999999999" }).returning();
     await database.insert(schema.businessHours).values({ businessId, weekday: 1, opensAt: "09:00", closesAt: "18:00" });
@@ -28,6 +32,7 @@ describe("painel isolado por negócio com PostgreSQL", () => {
   it("filtra negócios, serviços, clientes, horários e agenda pelo dono", async () => {
     expect((await ownedBusinesses(ownerA, database)).map((row) => row.id)).toEqual([businessA]);
     expect((await dashboardServices(ownerA, businessA, database)).map((row) => row.name)).toEqual(["Corte A"]);
+    expect((await dashboardServices(ownerA, businessA, database))[0]).toMatchObject({ bookable: true, blockedReason: null });
     expect((await dashboardCustomers(ownerA, businessA, database)).map((row) => row.name)).toEqual(["Cliente A"]);
     expect((await dashboardHours(ownerA, businessA, database)).map((row) => row.businessId)).toEqual([businessA]);
     const rows = await dashboardBookings(ownerA, businessA, ["2030-01-01"], database);
@@ -44,6 +49,13 @@ describe("painel isolado por negócio com PostgreSQL", () => {
     await saveDashboardService(ownerA, { ...input, id: serviceA }, database);
     expect((await dashboardServices(ownerB, businessB, database))[0].name).toBe("Corte B");
     expect((await dashboardBookings(ownerA, businessA, ["2030-01-01"], database))[0].priceCents).toBe(5000);
+  });
+  it("recusa gravar serviço com sinal sem Mercado Pago conectado", async () => {
+    await database.delete(schema.mercadopagoConnections).where(eq(schema.mercadopagoConnections.businessId, businessA));
+    const [service] = await dashboardServices(ownerA, businessA, database);
+    expect(service).toMatchObject({ bookable: false, blockedReason: "mp_account_not_connected" });
+    await expect(saveDashboardService(ownerA, { businessId: businessA, id: serviceA, name: "Corte A", durationMinutes: 30, priceCents: 5000, depositCents: 1000, active: true }, database)).rejects.toMatchObject({ status: 409, code: "mp_account_not_connected" });
+    await saveDashboardService(ownerA, { businessId: businessA, name: "Sem sinal", durationMinutes: 20, priceCents: 2000, depositCents: 0, active: true }, database);
   });
   it("salva dias atomicamente somente no próprio negócio", async () => {
     await saveDashboardHours(ownerA, businessA, [{ weekday: 2, opensAt: "10:00", closesAt: "17:00" }], database);

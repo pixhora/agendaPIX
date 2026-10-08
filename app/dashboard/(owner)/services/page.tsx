@@ -47,6 +47,7 @@ export default async function ServicesPage({ searchParams }: { searchParams: Pro
               <div className="text-right tabular-nums">
                 <p className="font-display text-xl font-extrabold">{money.format(service.priceCents / 100)}</p>
                 <p className="text-sm font-semibold text-pix">{service.depositCents > 0 ? `Sinal Pix ${money.format(service.depositCents / 100)}` : "Sem sinal"}</p>
+                {service.blockedReason === "mp_account_not_connected" ? <p className="mt-1 max-w-prose text-sm text-ink">Conecte a conta Mercado Pago no AgendaPix para o cliente pagar o sinal deste serviço.</p> : null}
               </div>
             </div>
             <details className="group mt-3 border-t border-line pt-1">

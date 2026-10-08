@@ -3,6 +3,8 @@ import { z } from "zod";
 import { getDb } from "../../db";
 import { businesses, bookings, businessHours, customers, services } from "../../db/schema";
 import { HttpError } from "../http";
+import { assertMpConnectedForDeposit, getServiceBlockedReason, isMpConnected } from "../mercadopago-oauth/bookability";
+import { createDrizzleMpStore } from "../mercadopago-oauth/repository";
 import { findOwnedBusiness } from "../tenancy";
 import { hoursSchema, serviceFormSchema, shiftDate, dateSchema } from "./validation";
 import { localDate } from "../bookings/availability";
@@ -18,7 +20,12 @@ async function authorize(ownerId: string, businessId: string, database: Database
 }
 export async function dashboardServices(ownerId: string, businessId: string, database: Database = getDb()) {
   await authorize(ownerId, businessId, database);
-  return database.select().from(services).where(eq(services.businessId, businessId)).orderBy(asc(services.name), asc(services.id));
+  const rows = await database.select().from(services).where(eq(services.businessId, businessId)).orderBy(asc(services.name), asc(services.id));
+  const mpConnected = await isMpConnected(businessId, { store: createDrizzleMpStore(database) });
+  return rows.map((service) => {
+    const blockedReason = getServiceBlockedReason(service, { mpConnected });
+    return { ...service, bookable: blockedReason === null, blockedReason };
+  });
 }
 export async function dashboardCustomers(ownerId: string, businessId: string, database: Database = getDb()) {
   await authorize(ownerId, businessId, database);
@@ -45,6 +52,7 @@ export type DashboardBooking = Awaited<ReturnType<typeof dashboardBookings>>[num
 export async function saveDashboardService(ownerId: string, input: unknown, database: Database = getDb()) {
   const { businessId, id, ...values } = serviceFormSchema.parse(input);
   await authorize(ownerId, businessId, database);
+  if (values.depositCents > 0 && values.active) await assertMpConnectedForDeposit(businessId, { store: createDrizzleMpStore(database) });
   if (id) {
     const [result] = await database.update(services).set(values).where(and(eq(services.businessId, businessId), eq(services.id, id))).returning({ id: services.id });
     if (!result) throw new HttpError(404, "service_unavailable", "Este serviço não está disponível para seu negócio.");
