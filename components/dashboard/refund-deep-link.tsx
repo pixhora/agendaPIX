@@ -112,8 +112,6 @@ export function RefundDeepLink({
         bookingId={bookingId}
         serviceLine={serviceLine}
         timeZone={timeZone}
-        dueTomorrow={dueTomorrow}
-        dueLabel={dueLabel}
       />
     </div>
   );

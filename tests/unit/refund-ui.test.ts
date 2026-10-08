@@ -5,8 +5,11 @@ import {
   customerLine,
   deepLinkGate,
   deepLinkOpensDialog,
+  dialogDeadline,
   eveDeadlineLine,
   formatRefundAmount,
+  isDueTomorrow,
+  refundDueDay,
   mapRefundFailure,
   paidOnLabel,
   asRefundStatus,
@@ -62,6 +65,49 @@ describe("devolução no painel", () => {
     expect(paidOnLabel("2026-10-08T17:02:00.000Z", "America/Sao_Paulo")).toBe("qui, 8 out, 14:02");
     expect(refundWindowLine("2026-10-08T17:02:00.000Z", "America/Sao_Paulo")).toBe("Dá para devolver até ter, 6 abr (180 dias).");
     expect(refundWindowLine(null, "America/Sao_Paulo")).toBeNull();
+  });
+
+  it("compara o prazo em dias de calendário, inclusive na virada do mês", () => {
+    expect(isDueTomorrow("2026-10-09", "2026-10-08")).toBe(true);
+    expect(isDueTomorrow("2026-10-15", "2026-10-08")).toBe(false);
+    expect(isDueTomorrow("2026-02-01", "2026-01-31")).toBe(true);
+    expect(isDueTomorrow("2027-01-01", "2026-12-31")).toBe(true);
+    expect(isDueTomorrow("2026-03-01", "2026-02-27")).toBe(false);
+    expect(refundDueDay("2026-10-09", "America/Sao_Paulo")).toBe("2026-10-09");
+    expect(refundDueDay("2026-10-10T02:59:59.999Z", "America/Sao_Paulo")).toBe("2026-10-09");
+    expect(refundDueDay("2026-10-10T02:59:59.999Z", "UTC")).toBe("2026-10-10");
+    expect(refundDueDay(null, "America/Sao_Paulo")).toBeNull();
+  });
+
+  it("não mostra dois prazos diferentes no mesmo diálogo", () => {
+    const eve = dialogDeadline({
+      requestedOn: "2026-10-02",
+      pickedOn: "2026-10-08",
+      todayLocal: "2026-10-08",
+      manualRefundDueAt: "2026-10-09",
+      timeZone: "America/Sao_Paulo",
+    });
+    expect(eve).toEqual({ kind: "eve", text: "O prazo para devolver vence amanhã (sex, 9 out)." });
+    expect(eve?.text).not.toContain("Devolva até");
+
+    const stored = dialogDeadline({
+      requestedOn: "2026-10-02",
+      pickedOn: "2026-10-08",
+      todayLocal: "2026-10-08",
+      manualRefundDueAt: "2026-10-20",
+      timeZone: "America/Sao_Paulo",
+    });
+    expect(stored).toEqual({ kind: "returnBy", text: "Devolva até ter, 20 out." });
+
+    const picking = dialogDeadline({
+      requestedOn: null,
+      pickedOn: "2026-10-08",
+      todayLocal: "2026-10-08",
+      manualRefundDueAt: null,
+      timeZone: "America/Sao_Paulo",
+    });
+    expect(picking).toEqual({ kind: "returnBy", text: "Devolva até qui, 15 out." });
+    expect(picking?.text).not.toContain("amanhã");
   });
 
   it("trava a data gravada e limita o picker entre o pagamento e hoje", () => {

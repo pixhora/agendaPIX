@@ -118,14 +118,75 @@ export function policyLine(policy: RefundPreview["policy"]): string | null {
   return text ? text : null;
 }
 
+const CALENDAR_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
 export function returnByLine(requestedOn: string, timeZone: string): string | null {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(requestedOn)) return null;
+  if (!CALENDAR_DAY.test(requestedOn)) return null;
   try {
     const due = formatBusinessDate(addCalendarDays(requestedOn, MANUAL_REFUND_DEADLINE_DAYS), timeZone);
     return `Devolva até ${due}.`;
   } catch {
     return null;
   }
+}
+
+/**
+ * Dia YYYY-MM-DD do prazo. String de calendário entra como está.
+ * O GET também manda o instante ISO (`toISOString` do fim do dia local); aí o dia sai no fuso do negócio, uma vez só.
+ */
+export function refundDueDay(manualRefundDueAt: string | null, timeZone: string): string | null {
+  if (!manualRefundDueAt) return null;
+  if (CALENDAR_DAY.test(manualRefundDueAt)) return manualRefundDueAt;
+  const instant = new Date(manualRefundDueAt);
+  if (Number.isNaN(instant.getTime())) return null;
+  try {
+    return localDate(instant, timeZone);
+  } catch {
+    return null;
+  }
+}
+
+/** Compara dias YYYY-MM-DD. Amanhã é o dia seguinte no calendário, sem relógio. */
+export function isDueTomorrow(dueDay: string, todayLocal: string) {
+  if (!CALENDAR_DAY.test(dueDay) || !CALENDAR_DAY.test(todayLocal)) return false;
+  return dueDay === addCalendarDays(todayLocal, 1);
+}
+
+export type DialogDeadline = { kind: "eve" | "returnBy"; text: string };
+
+/**
+ * Uma linha só. Data gravada usa o prazo da API. Enquanto o dono escolhe, a prévia é o dia marcado + 7.
+ * Se o prazo da API é amanhã, essa frase substitui "Devolva até" — as duas não aparecem com datas diferentes.
+ */
+export function dialogDeadline(input: {
+  requestedOn: string | null;
+  pickedOn: string;
+  todayLocal: string;
+  manualRefundDueAt: string | null;
+  timeZone: string;
+}): DialogDeadline | null {
+  const dueDay = refundDueDay(input.manualRefundDueAt, input.timeZone);
+  if (dueDay && isDueTomorrow(dueDay, input.todayLocal)) {
+    try {
+      return { kind: "eve", text: eveDeadlineLine(formatBusinessDate(dueDay, input.timeZone)) };
+    } catch {
+      return null;
+    }
+  }
+  if (input.requestedOn) {
+    if (!dueDay) return null;
+    try {
+      return { kind: "returnBy", text: `Devolva até ${formatBusinessDate(dueDay, input.timeZone)}.` };
+    } catch {
+      return null;
+    }
+  }
+  return input.pickedOn ? returnByDeadline(input.pickedOn, input.timeZone) : null;
+}
+
+function returnByDeadline(pickedOn: string, timeZone: string): DialogDeadline | null {
+  const text = returnByLine(pickedOn, timeZone);
+  return text ? { kind: "returnBy", text } : null;
 }
 
 export function eveDeadlineLine(dueLabel: string) {
@@ -139,7 +200,7 @@ export function paidOnLabel(paidAt: string | null, timeZone: string): string | n
   return formatBusinessDateTime(date, timeZone);
 }
 
-/** Linha dos 180 dias do Mercado Pago, contados de `paidAt`. Sem data, não inventa prazo. */
+/** Janela do Mercado Pago: `paidAt` + 180 dias (`REFUND_WINDOW_MS`), a mesma conta de `refund_window_expired`. Sem `paidAt`, não inventa prazo. */
 export function refundWindowLine(paidAt: string | null, timeZone: string): string | null {
   if (!paidAt) return null;
   const date = new Date(paidAt);

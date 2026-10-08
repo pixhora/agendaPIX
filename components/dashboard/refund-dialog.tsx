@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { RefundEveLine } from "@/components/dashboard/refund-deadline";
 import { fetchRefundPreview, postRefund } from "@/lib/dashboard/refund-client";
 import {
   BALANCE_WARNING,
@@ -15,6 +14,7 @@ import {
   customerLine,
   DATE_HINT,
   DATE_LABEL,
+  dialogDeadline,
   DISCONNECTED_COPY,
   formatRefundAmount,
   IN_PROCESS_BODY,
@@ -28,7 +28,6 @@ import {
   refundWindowLine,
   requestedDateField,
   RETRY_LABEL,
-  returnByLine,
   type RefundPreview,
   type RefundResult,
 } from "@/lib/dashboard/refund-ui";
@@ -42,8 +41,6 @@ export function RefundDialog({
   bookingId,
   serviceLine,
   timeZone,
-  dueTomorrow,
-  dueLabel,
 }: {
   open: boolean;
   onClose: () => void;
@@ -51,8 +48,6 @@ export function RefundDialog({
   bookingId: string;
   serviceLine: string;
   timeZone: string;
-  dueTomorrow: boolean;
-  dueLabel: string | null;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
 
@@ -86,8 +81,6 @@ export function RefundDialog({
           bookingId={bookingId}
           serviceLine={serviceLine}
           timeZone={timeZone}
-          dueTomorrow={dueTomorrow}
-          dueLabel={dueLabel}
         />
       )}
     </dialog>
@@ -100,16 +93,12 @@ function RefundDialogBody({
   bookingId,
   serviceLine,
   timeZone,
-  dueTomorrow,
-  dueLabel,
 }: {
   onClose: () => void;
   businessId: string;
   bookingId: string;
   serviceLine: string;
   timeZone: string;
-  dueTomorrow: boolean;
-  dueLabel: string | null;
 }) {
   const lock = useRef(false);
   const alive = useRef(true);
@@ -155,7 +144,13 @@ function RefundDialogBody({
   const rule = preview ? policyLine(preview.policy) : null;
   const paidLabel = preview ? paidOnLabel(preview.paidAt, timeZone) : null;
   const windowLine = preview ? refundWindowLine(preview.paidAt, timeZone) : null;
-  const dueLine = dateValue ? returnByLine(dateValue, timeZone) : null;
+  const deadline = preview ? dialogDeadline({
+    requestedOn: preview.requestedOn,
+    pickedOn: dateValue,
+    todayLocal: preview.todayLocal,
+    manualRefundDueAt: preview.manualRefundDueAt,
+    timeZone,
+  }) : null;
   const storedDateLabel = field?.readOnly ? safeBusinessDate(field.value, timeZone) : null;
   const disconnected = preview?.reason === "mp_account_not_connected";
   const showForm = Boolean(preview?.eligible && !success);
@@ -215,12 +210,13 @@ function RefundDialogBody({
 
   return (
     <div className="flex max-h-[88dvh] min-h-0 flex-col lg:max-h-[min(40rem,calc(100dvh-2rem))]" aria-busy={busy}>
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4 pt-5 sm:px-6">
+      <div className="shrink-0 px-5 pb-1 pt-8 sm:px-6">
         <div className="flex items-start justify-end">
           <Button variant="ghost" size="icon" onClick={onClose} aria-label="Fechar"><X aria-hidden="true" /></Button>
         </div>
         <h2 id="refund-dialog-title" className="font-display text-xl font-extrabold tracking-tight sm:text-2xl">{title}</h2>
-
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4 sm:px-6">
         {loading && !preview && (
           <div className="mt-4 grid gap-3" aria-live="polite">
             <p className="text-sm text-muted">Carregando a devolução…</p>
@@ -230,7 +226,6 @@ function RefundDialogBody({
         )}
 
         {alertMessage && <p role="alert" className="mt-4 rounded-field border border-danger/30 bg-danger-soft px-3 py-3 text-sm text-danger">{alertMessage}</p>}
-        {dueTomorrow && dueLabel && (alertMessage || showForm) && <div className="mt-3"><RefundEveLine dueLabel={dueLabel} /></div>}
 
         {success && (
           <p className="mt-4 text-sm text-muted">
@@ -281,7 +276,7 @@ function RefundDialogBody({
                     </>
                   )}
                   <p id="refund-date-hint" className="text-xs text-muted">{DATE_HINT}</p>
-                  {dueLine && <p id="refund-return-by" aria-live="polite" className="font-semibold">{dueLine}</p>}
+                  {deadline && <p id="refund-return-by" aria-live="polite" className={deadline.kind === "eve" ? "font-semibold text-warning" : "font-semibold"}>{deadline.text}</p>}
                   {fieldError && <p id="refund-date-error" role="alert" className="text-sm text-danger">{fieldError}</p>}
                 </div>
                 {amountLabel && (

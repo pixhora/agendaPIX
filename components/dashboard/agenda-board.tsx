@@ -229,8 +229,6 @@ export function AgendaBoard({ days, bookings, weekly, businessName, businessId, 
         bookingId={refundBooking?.id ?? ""}
         serviceLine={refundBooking ? `${refundBooking.serviceName} · ${refundBooking.whenLabel}` : ""}
         timeZone={timeZone}
-        dueTomorrow={Boolean(refundBooking?.manualRefundDueTomorrow)}
-        dueLabel={refundBooking?.manualRefundDueLabel ?? null}
       />
     </>
   );
