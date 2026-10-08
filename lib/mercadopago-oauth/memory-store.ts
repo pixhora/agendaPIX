@@ -1,4 +1,4 @@
-import type { MpConnection, MpConnectionStore } from "./types";
+import type { MpConnection, MpConnectionStore, MpConsentEvent, MpOAuthState } from "./types";
 
 function clone(row: MpConnection): MpConnection {
   return {
@@ -7,14 +7,17 @@ function clone(row: MpConnection): MpConnection {
     connectedAt: new Date(row.connectedAt),
     refreshedAt: row.refreshedAt ? new Date(row.refreshedAt) : null,
     disconnectedAt: row.disconnectedAt ? new Date(row.disconnectedAt) : null,
+    autoRefundAckAt: row.autoRefundAckAt ? new Date(row.autoRefundAckAt) : null,
   };
 }
 
 /** Store em memória com o mesmo contrato do Postgres, inclusive o lock por negócio. Só para testes. */
-export function createMemoryMpStore(seed: MpConnection[] = []): MpConnectionStore & { pendingExpiresAt: Map<string, Date | null> } {
+export function createMemoryMpStore(seed: MpConnection[] = []): MpConnectionStore & { pendingExpiresAt: Map<string, Date | null>; consentEvents: MpConsentEvent[] } {
   const rows = new Map<string, MpConnection>();
   for (const row of seed) rows.set(row.businessId, clone(row));
   const pendingExpiresAt = new Map<string, Date | null>();
+  const oauthStates = new Map<string, MpOAuthState>();
+  const consentEvents: MpConsentEvent[] = [];
   const locks = new Map<string, Promise<void>>();
 
   async function withKeyLock<T>(key: string, run: () => Promise<T>): Promise<T> {
@@ -29,6 +32,7 @@ export function createMemoryMpStore(seed: MpConnection[] = []): MpConnectionStor
 
   return {
     pendingExpiresAt,
+    consentEvents,
     async findByBusinessId(businessId) {
       const row = rows.get(businessId);
       return row ? clone(row) : null;
@@ -86,6 +90,19 @@ export function createMemoryMpStore(seed: MpConnection[] = []): MpConnectionStor
       return [...rows.values()]
         .filter((row) => row.status === "connected" && row.expiresAt !== null && row.expiresAt.getTime() < expiresBefore.getTime())
         .map((row) => row.businessId);
+    },
+    async saveOAuthState(row) {
+      oauthStates.set(row.state, { ...row, autoRefundAckAt: new Date(row.autoRefundAckAt), expiresAt: new Date(row.expiresAt) });
+    },
+    async findOAuthState(state) {
+      const row = oauthStates.get(state);
+      return row ? { ...row, autoRefundAckAt: new Date(row.autoRefundAckAt), expiresAt: new Date(row.expiresAt) } : null;
+    },
+    async consumeOAuthState(state) {
+      oauthStates.delete(state);
+    },
+    async recordConsentEvent(event) {
+      consentEvents.push({ ...event, createdAt: new Date(event.createdAt) });
     },
     async withBusinessLock(businessId, run) {
       return withKeyLock(`biz:${businessId}`, () => run({

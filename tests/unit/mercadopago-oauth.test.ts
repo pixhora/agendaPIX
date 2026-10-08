@@ -4,7 +4,9 @@ import { assertMpConnectedForDeposit, getServiceBlockedReason } from "../../lib/
 import { mercadoPagoManifest, handleMpConnectWebhook } from "../../lib/mercadopago-oauth/connect-webhook";
 import { encryptMpToken } from "../../lib/mercadopago-oauth/crypto";
 import { disconnectMercadoPago, findBusinessIdByMpUserId, getMercadoPagoOwnerStatus, getSellerAccessToken, getSellerAccessTokenForSettlement, isMpConnected } from "../../lib/mercadopago-oauth/credentials";
-import { assertPlaintextAbsent, beginMercadoPagoConnect, completeMercadoPagoConnect } from "../../lib/mercadopago-oauth/flow";
+import { MP_CONNECT_CONSENT_VERSION } from "../../lib/mercadopago/consent";
+import { assertPlaintextAbsent, beginMercadoPagoConnect, completeMercadoPagoConnect, submitMercadoPagoConnect } from "../../lib/mercadopago-oauth/flow";
+import { GET as connectGet } from "../../app/api/businesses/[businessId]/mercadopago/connect/route";
 import { createMemoryMpStore } from "../../lib/mercadopago-oauth/memory-store";
 import { sanitizeMpReturnTo } from "../../lib/mercadopago-oauth/return-to";
 import { disconnectedTokensReadyToPurge, purgeDisconnectedMercadoPagoTokens, refreshMercadoPagoConnection } from "../../lib/mercadopago-oauth/refresh";
@@ -38,6 +40,20 @@ function tokenResponse(access = "seller-access", refresh = "seller-refresh") {
   });
 }
 
+async function pinConsent(store: ReturnType<typeof createMemoryMpStore>, authorizationUrl: string) {
+  const state = new URL(authorizationUrl).searchParams.get("state");
+  if (!state) throw new Error("state ausente");
+  await store.saveOAuthState({
+    state,
+    businessId,
+    returnTo: "/dashboard",
+    consentVersion: MP_CONNECT_CONSENT_VERSION,
+    autoRefundAckAt: now,
+    consentUserId: "owner",
+    expiresAt: new Date(now.getTime() + 10 * 60 * 1000),
+  });
+}
+
 function connection(overrides: Partial<MpConnection> = {}): MpConnection {
   return {
     businessId,
@@ -53,6 +69,9 @@ function connection(overrides: Partial<MpConnection> = {}): MpConnection {
     status: "connected",
     lastError: null,
     disconnectedAt: null,
+    consentVersion: null,
+    autoRefundAckAt: null,
+    consentUserId: null,
     ...overrides,
   };
 }
@@ -80,6 +99,7 @@ describe("OAuth Mercado Pago por negócio", () => {
     const store = createMemoryMpStore();
     const started = beginMercadoPagoConnect({ businessId, returnTo: "/dashboard/settings", now, env });
     const state = new URL(started.authorizationUrl).searchParams.get("state");
+    await pinConsent(store, started.authorizationUrl);
     const expired = openMpOAuthState(started.cookie, secret, now.getTime() + 11 * 60 * 1000);
     expect(expired.ok).toBe(false);
     const mismatch = await completeMercadoPagoConnect({
@@ -111,6 +131,7 @@ describe("OAuth Mercado Pago por negócio", () => {
       env,
       store,
       ownsBusiness: async () => true,
+      clientIp: "203.0.113.10",
       fetchImpl: async (_url, init) => {
         calls += 1;
         const body = JSON.parse(String(init?.body));
@@ -121,8 +142,13 @@ describe("OAuth Mercado Pago por negócio", () => {
       },
     });
     expect(finished.path).toContain("mp=connected");
-    expect(calls).toBe(1);
     const saved = await store.findByBusinessId(businessId);
+    expect(saved?.consentVersion).toBe(MP_CONNECT_CONSENT_VERSION);
+    expect(saved?.consentUserId).toBe("owner");
+    expect(JSON.stringify(saved)).not.toContain("203.0.113.10");
+    expect(store.consentEvents).toEqual([{ businessId, kind: "consent_recorded", ip: "203.0.113.10", createdAt: now }]);
+    expect(await store.findOAuthState(state ?? "")).toBeNull();
+    expect(calls).toBe(1);
     expect(saved?.accessTokenEnc).not.toContain("seller-access");
     expect(await findBusinessIdByMpUserId("4242", { store })).toBe(businessId);
     expect(await isMpConnected(businessId, { store, now })).toBe(true);
@@ -132,6 +158,7 @@ describe("OAuth Mercado Pago por negócio", () => {
     const store = createMemoryMpStore([connection({ businessId: otherBusinessId, mpUserId: "4242" })]);
     const started = beginMercadoPagoConnect({ businessId, returnTo: "/dashboard", now, env });
     const state = new URL(started.authorizationUrl).searchParams.get("state");
+    await pinConsent(store, started.authorizationUrl);
     const expiredCode = await completeMercadoPagoConnect({
       requestUrl: `https://app.example.com/callback?code=old&state=${state}`,
       cookie: started.cookie,
@@ -209,6 +236,7 @@ describe("OAuth Mercado Pago por negócio", () => {
       expiresAt: null,
       liveMode: null,
       canReceiveDeposits: false,
+      consentVersion: null,
     });
     expect(await getSellerAccessToken(businessId, { store, env, now })).toBeNull();
     expect(await isMpConnected(businessId, { store, now })).toBe(false);
@@ -267,6 +295,92 @@ describe("OAuth Mercado Pago por negócio", () => {
       env,
       store,
     })).rejects.toMatchObject({ status: 401, code: "invalid_signature" });
+  });
+
+  it("só inicia o OAuth por POST com consentimento da versão atual", async () => {
+    expect((await connectGet()).status).toBe(405);
+    expect((await connectGet()).headers.get("allow")).toBe("POST");
+    const store = createMemoryMpStore();
+    const headers = { origin: "https://app.example.com", "content-type": "application/x-www-form-urlencoded" };
+    const denied = await submitMercadoPagoConnect({
+      request: new Request("https://app.example.com/api/businesses/x/mercadopago/connect", {
+        method: "POST",
+        headers,
+        body: new URLSearchParams({ returnTo: "/onboarding/pagamento", autoRefundAck: "on", consentVersion: "antiga" }),
+      }),
+      businessId,
+      ownerId: "owner",
+      now,
+      env,
+      store,
+    });
+    expect(denied).toMatchObject({ kind: "redirect", cookie: null });
+    if (denied.kind === "redirect") expect(new URL(denied.location).searchParams.get("reason")).toBe("auto_refund_ack_required");
+    const jsonDenied = await submitMercadoPagoConnect({
+      request: new Request("https://app.example.com/api/businesses/x/mercadopago/connect", {
+        method: "POST",
+        headers: { ...headers, accept: "application/json", "content-type": "application/json" },
+        body: JSON.stringify({ returnTo: "/dashboard", autoRefundAck: false, consentVersion: MP_CONNECT_CONSENT_VERSION }),
+      }),
+      businessId,
+      ownerId: "owner",
+      now,
+      env,
+      store,
+    });
+    expect(jsonDenied).toEqual({ kind: "json", status: 400, body: { error: { code: "auto_refund_ack_required" } } });
+    const foreign = await submitMercadoPagoConnect({
+      request: new Request("https://app.example.com/api/businesses/x/mercadopago/connect", {
+        method: "POST",
+        headers: { origin: "https://evil.example", "content-type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ autoRefundAck: "1", consentVersion: MP_CONNECT_CONSENT_VERSION }),
+      }),
+      businessId,
+      ownerId: "owner",
+      now,
+      env,
+      store,
+    });
+    expect(foreign).toEqual({ kind: "json", status: 403, body: { error: { code: "forbidden_origin" } } });
+    const referer = await submitMercadoPagoConnect({
+      request: new Request("https://app.example.com/api/businesses/x/mercadopago/connect", {
+        method: "POST",
+        headers: { referer: "https://app.example.com/dashboard/settings", "content-type": "application/json" },
+        body: JSON.stringify({ returnTo: "https://evil.example", autoRefundAck: true, consentVersion: MP_CONNECT_CONSENT_VERSION }),
+      }),
+      businessId,
+      ownerId: "owner",
+      now,
+      env,
+      store,
+    });
+    expect(referer.kind).toBe("redirect");
+    if (referer.kind !== "redirect" || !referer.cookie) throw new Error("redirect sem cookie");
+    expect(referer.location).toContain("https://auth.mercadopago.com.br/authorization");
+    expect(new URL(referer.location).searchParams.has("scope")).toBe(false);
+    const state = new URL(referer.location).searchParams.get("state");
+    const pending = await store.findOAuthState(state ?? "");
+    expect(pending?.consentVersion).toBe(MP_CONNECT_CONSENT_VERSION);
+    expect(pending?.consentUserId).toBe("owner");
+    expect(pending?.returnTo).toBe("/dashboard");
+    const again = createMemoryMpStore([connection({ consentVersion: MP_CONNECT_CONSENT_VERSION, autoRefundAckAt: now, consentUserId: "owner-original" })]);
+    const reused = await submitMercadoPagoConnect({
+      request: new Request("https://app.example.com/api/businesses/x/mercadopago/connect", {
+        method: "POST",
+        headers: { origin: "https://app.example.com", "content-type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ returnTo: "/dashboard/settings" }),
+      }),
+      businessId,
+      ownerId: "owner",
+      now,
+      env,
+      store: again,
+    });
+    expect(reused.kind).toBe("redirect");
+    if (reused.kind !== "redirect") throw new Error("reconexão sem redirect");
+    const reusedState = await again.findOAuthState(new URL(reused.location).searchParams.get("state") ?? "");
+    expect(reusedState?.consentUserId).toBe("owner-original");
+    expect(reusedState?.autoRefundAckAt).toEqual(now);
   });
 
   it("serviço sem sinal continua agendável por este critério", () => {

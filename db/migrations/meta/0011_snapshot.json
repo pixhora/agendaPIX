@@ -1,5 +1,5 @@
 {
-  "id": "be0a8e34-1543-4104-b245-c64ac58cc519",
+  "id": "9c84234b-bf74-4f48-8675-465ee71273f9",
   "prevId": "fb71f4eb-a4bc-4452-9356-84cd7ff1623e",
   "version": "7",
   "dialect": "postgresql",
@@ -830,6 +830,24 @@
           "primaryKey": false,
           "notNull": false
         },
+        "consent_version": {
+          "name": "consent_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "auto_refund_ack_at": {
+          "name": "auto_refund_ack_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "consent_user_id": {
+          "name": "consent_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -909,6 +927,189 @@
         "mercadopago_connections_tokens_match_status": {
           "name": "mercadopago_connections_tokens_match_status",
           "value": "(\n    (\"mercadopago_connections\".\"status\" = 'connected' AND \"mercadopago_connections\".\"disconnected_at\" IS NULL AND \"mercadopago_connections\".\"access_token_enc\" IS NOT NULL AND \"mercadopago_connections\".\"refresh_token_enc\" IS NOT NULL AND length(\"mercadopago_connections\".\"access_token_enc\") > 0 AND length(\"mercadopago_connections\".\"refresh_token_enc\") > 0 AND \"mercadopago_connections\".\"expires_at\" IS NOT NULL)\n    OR (\"mercadopago_connections\".\"status\" = 'needs_reconnect' AND \"mercadopago_connections\".\"access_token_enc\" IS NULL AND \"mercadopago_connections\".\"refresh_token_enc\" IS NULL)\n    OR (\"mercadopago_connections\".\"status\" = 'disconnected' AND \"mercadopago_connections\".\"disconnected_at\" IS NOT NULL AND (\n      (\"mercadopago_connections\".\"access_token_enc\" IS NULL AND \"mercadopago_connections\".\"refresh_token_enc\" IS NULL)\n      OR (\"mercadopago_connections\".\"access_token_enc\" IS NOT NULL AND \"mercadopago_connections\".\"refresh_token_enc\" IS NOT NULL AND length(\"mercadopago_connections\".\"access_token_enc\") > 0 AND length(\"mercadopago_connections\".\"refresh_token_enc\") > 0)\n    ))\n  )"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.mercadopago_oauth_states": {
+      "name": "mercadopago_oauth_states",
+      "schema": "",
+      "columns": {
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "business_id": {
+          "name": "business_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "return_to": {
+          "name": "return_to",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "consent_version": {
+          "name": "consent_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "auto_refund_ack_at": {
+          "name": "auto_refund_ack_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "consent_user_id": {
+          "name": "consent_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "mercadopago_oauth_states_business_idx": {
+          "name": "mercadopago_oauth_states_business_idx",
+          "columns": [
+            {
+              "expression": "business_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "mercadopago_oauth_states_business_id_businesses_id_fk": {
+          "name": "mercadopago_oauth_states_business_id_businesses_id_fk",
+          "tableFrom": "mercadopago_oauth_states",
+          "tableTo": "businesses",
+          "columnsFrom": [
+            "business_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "mercadopago_oauth_states_not_empty": {
+          "name": "mercadopago_oauth_states_not_empty",
+          "value": "length(trim(\"mercadopago_oauth_states\".\"state\")) > 0 AND length(trim(\"mercadopago_oauth_states\".\"consent_version\")) > 0 AND length(trim(\"mercadopago_oauth_states\".\"consent_user_id\")) > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.mp_connection_events": {
+      "name": "mp_connection_events",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "business_id": {
+          "name": "business_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ip": {
+          "name": "ip",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "mp_connection_events_business_idx": {
+          "name": "mp_connection_events_business_idx",
+          "columns": [
+            {
+              "expression": "business_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "mp_connection_events_business_id_businesses_id_fk": {
+          "name": "mp_connection_events_business_id_businesses_id_fk",
+          "tableFrom": "mp_connection_events",
+          "tableTo": "businesses",
+          "columnsFrom": [
+            "business_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "mp_connection_events_kind_not_empty": {
+          "name": "mp_connection_events_kind_not_empty",
+          "value": "length(trim(\"mp_connection_events\".\"kind\")) > 0"
         }
       },
       "isRLSEnabled": false

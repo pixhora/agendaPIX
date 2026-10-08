@@ -44,14 +44,16 @@ export type MpOwnerStatus = {
   expiresAt: string | null;
   liveMode: boolean | null;
   canReceiveDeposits: boolean;
+  consentVersion: string | null;
 };
 
 /** Status visto pelo dono. `disconnected` (desconexão nossa) aparece como `not_connected` e não revela token nem mp_user_id. */
 export async function getMercadoPagoOwnerStatus(businessId: string, deps?: RefreshDeps): Promise<MpOwnerStatus> {
   const now = deps?.now ?? new Date();
   const row = await storeOf(deps).findByBusinessId(businessId);
+  const consentVersion = row?.consentVersion ?? null;
   if (!row || row.status === "disconnected") {
-    return { status: "not_connected", connectedAt: null, expiresAt: null, liveMode: null, canReceiveDeposits: false };
+    return { status: "not_connected", connectedAt: null, expiresAt: null, liveMode: null, canReceiveDeposits: false, consentVersion };
   }
   if (row.status === "needs_reconnect") {
     return {
@@ -60,6 +62,7 @@ export async function getMercadoPagoOwnerStatus(businessId: string, deps?: Refre
       expiresAt: row.expiresAt?.toISOString() ?? null,
       liveMode: row.liveMode,
       canReceiveDeposits: false,
+      consentVersion,
     };
   }
   return {
@@ -68,6 +71,7 @@ export async function getMercadoPagoOwnerStatus(businessId: string, deps?: Refre
     expiresAt: row.expiresAt?.toISOString() ?? null,
     liveMode: row.liveMode,
     canReceiveDeposits: connectionCanCharge(row, now),
+    consentVersion,
   };
 }
 

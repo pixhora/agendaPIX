@@ -244,6 +244,9 @@ export const mercadopagoConnections = pgTable("mercadopago_connections", {
   status: text("status", { enum: mpConnectionStatuses }).notNull(),
   lastError: text("last_error"),
   disconnectedAt: timestamp("disconnected_at", { withTimezone: true }),
+  consentVersion: text("consent_version"),
+  autoRefundAckAt: timestamp("auto_refund_ack_at", { withTimezone: true }),
+  consentUserId: text("consent_user_id"),
   ...timestamps(),
 }, (table) => [
   uniqueIndex("mercadopago_connections_mp_user_connected_uq").on(table.mpUserId).where(sql`${table.status} = 'connected'`),
@@ -258,6 +261,33 @@ export const mercadopagoConnections = pgTable("mercadopago_connections", {
       OR (${table.accessTokenEnc} IS NOT NULL AND ${table.refreshTokenEnc} IS NOT NULL AND length(${table.accessTokenEnc}) > 0 AND length(${table.refreshTokenEnc}) > 0)
     ))
   )`),
+]);
+
+/** State do OAuth enquanto o dono está no Mercado Pago. O verifier PKCE continua só no cookie. */
+export const mercadopagoOauthStates = pgTable("mercadopago_oauth_states", {
+  state: text("state").primaryKey(),
+  businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "restrict" }),
+  returnTo: text("return_to").notNull(),
+  consentVersion: text("consent_version").notNull(),
+  autoRefundAckAt: timestamp("auto_refund_ack_at", { withTimezone: true }).notNull(),
+  consentUserId: text("consent_user_id").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index("mercadopago_oauth_states_business_idx").on(table.businessId),
+  check("mercadopago_oauth_states_not_empty", sql`length(trim(${table.state})) > 0 AND length(trim(${table.consentVersion})) > 0 AND length(trim(${table.consentUserId})) > 0`),
+]);
+
+/** Eventos da conexão. O IP do consentimento fica só aqui. */
+export const mpConnectionEvents = pgTable("mp_connection_events", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "restrict" }),
+  kind: text("kind").notNull(),
+  ip: text("ip"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index("mp_connection_events_business_idx").on(table.businessId, table.createdAt),
+  check("mp_connection_events_kind_not_empty", sql`length(trim(${table.kind})) > 0`),
 ]);
 
 /** Aviso dispensado pelo dono. Uma linha por negócio e tipo. Não guarda a chave Pix. */

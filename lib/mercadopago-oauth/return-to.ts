@@ -2,7 +2,7 @@
 export const MP_RETURN_PREFIXES = ["/dashboard", "/onboarding"] as const;
 export const MP_RETURN_FALLBACK = "/dashboard";
 
-export type MpCallbackReason = "access_denied" | "state_mismatch" | "expired_code" | "exchange_failed" | "already_linked_elsewhere";
+export type MpCallbackReason = "access_denied" | "state_mismatch" | "expired_code" | "exchange_failed" | "already_linked_elsewhere" | "auto_refund_ack_required";
 
 function allowedPath(pathname: string) {
   return MP_RETURN_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));

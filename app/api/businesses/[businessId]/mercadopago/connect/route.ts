@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { handleHttp } from "@/lib/http";
-import { beginMercadoPagoConnect } from "@/lib/mercadopago-oauth/flow";
+import { handleHttp, json } from "@/lib/http";
+import { submitMercadoPagoConnect } from "@/lib/mercadopago-oauth/flow";
 import { requireBusinessOwner } from "@/lib/mercadopago-oauth/owner";
 import { MP_OAUTH_COOKIE, MP_OAUTH_COOKIE_MAX_AGE_SECONDS } from "@/lib/mercadopago-oauth/state";
 
@@ -15,14 +15,19 @@ const cookie = {
   maxAge: MP_OAUTH_COOKIE_MAX_AGE_SECONDS,
 };
 
-export async function GET(request: Request, context: RouteContext<"/api/businesses/[businessId]/mercadopago/connect">) {
+export function GET() {
+  return new Response(null, { status: 405, headers: { allow: "POST", "cache-control": "no-store" } });
+}
+
+export async function POST(request: Request, context: RouteContext<"/api/businesses/[businessId]/mercadopago/connect">) {
   return handleHttp(async () => {
     const { businessId } = await context.params;
-    await requireBusinessOwner(request, businessId);
-    const started = beginMercadoPagoConnect({ businessId, returnTo: new URL(request.url).searchParams.get("returnTo") });
-    const response = NextResponse.redirect(started.authorizationUrl, 302);
+    const ownerId = await requireBusinessOwner(request, businessId);
+    const result = await submitMercadoPagoConnect({ request, businessId, ownerId });
+    if (result.kind === "json") return json(result.body, result.status);
+    const response = NextResponse.redirect(result.location, 303);
     response.headers.set("cache-control", "no-store");
-    response.cookies.set(MP_OAUTH_COOKIE, started.cookie, cookie);
+    if (result.cookie) response.cookies.set(MP_OAUTH_COOKIE, result.cookie, cookie);
     return response;
   });
 }

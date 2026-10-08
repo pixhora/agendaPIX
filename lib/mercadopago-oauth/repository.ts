@@ -1,6 +1,6 @@
 import { and, desc, eq, inArray, isNotNull, lt, ne, sql } from "drizzle-orm";
 import { getDb } from "../../db";
-import { mercadopagoConnections, payments } from "../../db/schema";
+import { mercadopagoConnections, mercadopagoOauthStates, mpConnectionEvents, payments } from "../../db/schema";
 import type { MpConnection, MpConnectionStore } from "./types";
 
 type Database = Pick<ReturnType<typeof getDb>, "select" | "insert" | "update" | "delete" | "transaction" | "execute">;
@@ -28,6 +28,9 @@ function fromRow(row: Row): MpConnection {
     status: row.status,
     lastError: row.lastError,
     disconnectedAt: row.disconnectedAt,
+    consentVersion: row.consentVersion,
+    autoRefundAckAt: row.autoRefundAckAt,
+    consentUserId: row.consentUserId,
   };
 }
 
@@ -46,6 +49,9 @@ function toValues(connection: MpConnection) {
     status: connection.status,
     lastError: connection.lastError,
     disconnectedAt: connection.disconnectedAt,
+    consentVersion: connection.consentVersion,
+    autoRefundAckAt: connection.autoRefundAckAt,
+    consentUserId: connection.consentUserId,
     updatedAt: new Date(),
   };
 }
@@ -89,6 +95,9 @@ export function createDrizzleMpStore(database: Database = getDb()): MpConnection
               status: values.status,
               lastError: values.lastError,
               disconnectedAt: values.disconnectedAt,
+              consentVersion: values.consentVersion,
+              autoRefundAckAt: values.autoRefundAckAt,
+              consentUserId: values.consentUserId,
               updatedAt: values.updatedAt,
             },
           });
@@ -140,6 +149,28 @@ export function createDrizzleMpStore(database: Database = getDb()): MpConnection
         inArray(payments.status, ["creating", "pending"]),
       )).orderBy(desc(payments.expiresAt)).limit(1);
       return row?.expiresAt ?? null;
+    },
+    async saveOAuthState(row) {
+      await database.insert(mercadopagoOauthStates).values(row);
+    },
+    async findOAuthState(state) {
+      const [row] = await database.select().from(mercadopagoOauthStates).where(eq(mercadopagoOauthStates.state, state)).limit(1);
+      if (!row) return null;
+      return {
+        state: row.state,
+        businessId: row.businessId,
+        returnTo: row.returnTo,
+        consentVersion: row.consentVersion,
+        autoRefundAckAt: row.autoRefundAckAt,
+        consentUserId: row.consentUserId,
+        expiresAt: row.expiresAt,
+      };
+    },
+    async consumeOAuthState(state) {
+      await database.delete(mercadopagoOauthStates).where(eq(mercadopagoOauthStates.state, state));
+    },
+    async recordConsentEvent(event) {
+      await database.insert(mpConnectionEvents).values({ businessId: event.businessId, kind: event.kind, ip: event.ip, createdAt: event.createdAt });
     },
     async listRefreshCandidates(expiresBefore) {
       const rows = await database.select({ businessId: mercadopagoConnections.businessId }).from(mercadopagoConnections).where(and(

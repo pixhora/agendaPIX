@@ -14,6 +14,26 @@ export type MpConnection = {
   status: MpConnectionStatus;
   lastError: string | null;
   disconnectedAt: Date | null;
+  consentVersion: string | null;
+  autoRefundAckAt: Date | null;
+  consentUserId: string | null;
+};
+
+export type MpOAuthState = {
+  state: string;
+  businessId: string;
+  returnTo: string;
+  consentVersion: string;
+  autoRefundAckAt: Date;
+  consentUserId: string;
+  expiresAt: Date;
+};
+
+export type MpConsentEvent = {
+  businessId: string;
+  kind: "consent_recorded";
+  ip: string | null;
+  createdAt: Date;
 };
 
 export type MpLock = {
@@ -33,4 +53,8 @@ export type MpConnectionStore = {
   latestPendingDepositExpiresAt(businessId: string): Promise<Date | null>;
   listRefreshCandidates(expiresBefore: Date): Promise<string[]>;
   withBusinessLock<T>(businessId: string, run: (lock: MpLock) => Promise<T>): Promise<T>;
+  saveOAuthState(row: MpOAuthState): Promise<void>;
+  findOAuthState(state: string): Promise<MpOAuthState | null>;
+  consumeOAuthState(state: string): Promise<void>;
+  recordConsentEvent(event: MpConsentEvent): Promise<void>;
 };
