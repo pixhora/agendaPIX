@@ -1,5 +1,6 @@
 import { faqItems } from "@/lib/marketing/landing-copy";
 import type { PublicBookingFacts } from "@/lib/marketing/facts";
+import { supportWhatsappUrl } from "@/lib/support-contact";
 import { Eyebrow, SectionTitle } from "./section";
 import { FaqAccordion } from "./FaqAccordion";
 
@@ -10,7 +11,14 @@ export function LandingFaq({ facts }: { facts: PublicBookingFacts }) {
         <div className="lg:sticky lg:top-24 lg:self-start">
           <Eyebrow>Dúvidas</Eyebrow>
           <SectionTitle id="faq-titulo">Perguntas frequentes</SectionTitle>
-          <p className="mt-4 text-sm leading-relaxed text-muted">Não achou? Fale com a gente.</p>
+          <p className="mt-4 text-sm leading-relaxed text-muted">
+            Não achou?{" "}
+            <a href={supportWhatsappUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-pix underline underline-offset-4">
+              Fale com a gente
+              <span className="sr-only"> (abre em nova aba)</span>
+            </a>
+            .
+          </p>
         </div>
         <FaqAccordion items={faqItems(facts)} />
       </div>

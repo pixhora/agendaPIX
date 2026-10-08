@@ -79,6 +79,86 @@ test.describe("cartão do hero", () => {
       expect(floating.x - (textColumn.x + textColumn.width), `vão da coluna de texto em ${width}`).toBeGreaterThanOrEqual(16);
       expect(floating.x, `borda esquerda em ${width}`).toBeGreaterThanOrEqual(column!.x - 1);
       expect(floating.x + floating.width, `borda direita em ${width}`).toBeLessThanOrEqual(column!.x + column!.width + 1);
+      const date = card.locator("span.whitespace-nowrap");
+      const dateBox = await box(date);
+      expect(dateBox.height, `data em uma linha em ${width}`).toBeLessThanOrEqual(22);
     }
+  });
+});
+
+test.describe("dias do celular no hero", () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  test("Qua a Sáb ficam na mesma linha", async ({ page }) => {
+    await page.goto("/");
+    const tops = await page.evaluate(() => {
+      const labels = ["Qua 14", "Qui 15", "Sex 16", "Sáb 17"];
+      return labels.map((label) => {
+        const node = [...document.querySelectorAll("span")].find((element) => element.textContent === label);
+        return node ? Math.round(node.getBoundingClientRect().top) : null;
+      });
+    });
+    expect(tops.every((top) => top != null)).toBe(true);
+    expect(new Set(tops).size).toBe(1);
+    await expect(page.getByText("Dom 18")).toHaveCount(0);
+  });
+});
+
+test.describe("barra fixa da landing", () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  test("reserva a altura da barra mais 16 px e some no CTA final ou no rodapé", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "mobile", "a barra só existe até 767 px");
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/");
+    const bar = page.locator("#sticky-cta");
+
+    await page.evaluate(() => {
+      const hero = document.getElementById("hero-primary-cta");
+      if (!hero) return;
+      window.scrollTo(0, hero.getBoundingClientRect().bottom + window.scrollY + 24);
+    });
+    await expect(bar).toHaveAttribute("data-visible", "true");
+
+    const measured = await page.evaluate(() => {
+      const main = document.querySelector("main");
+      const node = document.getElementById("sticky-cta");
+      if (!main || !node) return null;
+      return { pad: Number.parseFloat(getComputedStyle(main).paddingBottom), height: node.offsetHeight };
+    });
+    expect(measured).not.toBeNull();
+    expect(measured!.pad).toBe(measured!.height + 16);
+
+    await page.locator("#cta-final").evaluate((element) => element.scrollIntoView({ block: "center", inline: "nearest" }));
+    await expect(bar).toHaveAttribute("data-visible", "false");
+
+    await page.evaluate(() => {
+      const hero = document.getElementById("hero-primary-cta");
+      if (!hero) return;
+      window.scrollTo(0, hero.getBoundingClientRect().bottom + window.scrollY + 24);
+    });
+    await expect(bar).toHaveAttribute("data-visible", "true");
+
+    await page.locator("#rodape").evaluate((element) => element.scrollIntoView({ block: "end", inline: "nearest" }));
+    await expect(bar).toHaveAttribute("data-visible", "false");
+
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await expect(bar).toHaveAttribute("data-visible", "false");
+    const covered = await page.evaluate(() => {
+      const node = document.getElementById("sticky-cta");
+      const footer = document.getElementById("rodape");
+      const questions = document.querySelectorAll("#perguntas-frequentes details");
+      const last = questions[questions.length - 1];
+      if (!node || !footer || !last) return null;
+      const barBox = node.getBoundingClientRect();
+      const onScreen = node.dataset.visible === "true" && barBox.top < window.innerHeight && barBox.bottom > 0;
+      const hits = (target: Element) => {
+        if (!onScreen) return false;
+        const rect = target.getBoundingClientRect();
+        return rect.top < barBox.bottom && rect.bottom > barBox.top && rect.left < barBox.right && rect.right > barBox.left;
+      };
+      return { faq: hits(last), footer: hits(footer) };
+    });
+    expect(covered).toEqual({ faq: false, footer: false });
   });
 });

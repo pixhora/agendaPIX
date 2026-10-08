@@ -33,7 +33,7 @@ export default async function Home() {
         Pular para o conteúdo
       </a>
       <LandingHeader />
-      <main id="content" tabIndex={-1} className="flex-1 pb-[var(--sticky-cta-height)] outline-none">
+      <main id="content" tabIndex={-1} className="flex-1 pb-[var(--sticky-cta-pad)] outline-none">
         <LandingHero publicHost={publicHost} />
         <LandingSteps publicHost={publicHost} />
         <DemoSection facts={facts} />

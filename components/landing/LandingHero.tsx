@@ -1,3 +1,4 @@
+import { formatAppointmentMeta } from "@/components/booking/formatters";
 import { CheckIcon } from "./icons";
 import { buttonVariants } from "@/components/ui/button";
 import { ValueSlab } from "@/components/ui/value-slab";
@@ -9,8 +10,9 @@ const days = [
   { label: "Qui 15", selected: true },
   { label: "Sex 16", selected: false },
   { label: "Sáb 17", selected: false },
-  { label: "Dom 18", selected: false },
 ];
+const anaReservationAt = "2026-10-15T18:30:00.000Z";
+const anaWhen = formatAppointmentMeta(anaReservationAt, "America/Sao_Paulo");
 const times = ["14:00", "14:45", "15:30", "16:15"];
 
 export function LandingHero({ publicHost }: { publicHost: string }) {
@@ -62,7 +64,9 @@ export function LandingHero({ publicHost }: { publicHost: string }) {
           </div>
           <div aria-hidden="true" className="pointer-events-none absolute top-full left-0 z-10 mt-3 hidden w-[210px] max-w-[calc(100%-14.5rem)] rounded-card border border-line bg-surface p-3 shadow-[var(--shadow-raised)] xl:block">
             <p className="text-[13px] font-semibold text-ink">Nova reserva · Ana</p>
-            <p className="mt-1 text-[13px] text-muted">Design de sobrancelha · Qui 15, 15:30</p>
+            <p className="mt-1 text-[13px] text-muted">
+              Design de sobrancelha <span className="whitespace-nowrap">· {anaWhen}</span>
+            </p>
             <p className="mt-2 inline-flex items-center gap-1 text-[13px] font-semibold text-success">
               <CheckIcon className="size-3.5" /> Confirmado · sinal pago
             </p>
@@ -98,9 +102,9 @@ function PhoneStage({ publicHost }: { publicHost: string }) {
           <p className="mt-1 text-[12px] text-muted">45 min · R$ 60,00</p>
           <p className="mt-1 text-[12px] font-semibold text-pix">Sinal R$ 20,00</p>
         </div>
-        <div className="mt-3 flex flex-wrap gap-1">
+        <div className="mt-3 flex flex-nowrap gap-1">
           {days.map((day) => (
-            <span key={day.label} className={day.selected ? "rounded-full bg-ink px-2 py-1 text-[10px] font-semibold leading-none text-paper" : "rounded-full bg-subtle px-2 py-1 text-[10px] font-semibold leading-none text-muted"}>
+            <span key={day.label} className={day.selected ? "whitespace-nowrap rounded-full bg-ink px-2 py-1 text-[10px] font-semibold leading-none text-paper" : "whitespace-nowrap rounded-full bg-subtle px-2 py-1 text-[10px] font-semibold leading-none text-muted"}>
               {day.label}
             </span>
           ))}

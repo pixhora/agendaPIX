@@ -108,9 +108,18 @@ export const landingBootScript = `(function(){
     var tag = document.activeElement && document.activeElement.tagName;
     return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
   }
+  function inView(id){
+    var el = document.getElementById(id);
+    if(!el) return false;
+    var rect = el.getBoundingClientRect();
+    return rect.bottom > 0 && rect.top < window.innerHeight;
+  }
   function updateBar(){
     var node = bar();
     if(!node) return;
+    heroGone = !inView("hero-primary-cta");
+    finalVisible = inView("cta-final");
+    footerVisible = inView("rodape");
     var visible = heroGone && !finalVisible && !footerVisible && !menuOpen && narrowMedia.matches && !keyboardOpen() && !fieldFocused();
     node.dataset.visible = visible ? "true" : "false";
     node.setAttribute("aria-hidden", visible ? "false" : "true");
@@ -119,6 +128,7 @@ export const landingBootScript = `(function(){
     node.classList.toggle("translate-y-full", !visible);
     node.classList.toggle("pointer-events-none", !visible);
     document.documentElement.style.setProperty("--sticky-cta-height", visible ? node.offsetHeight + "px" : "0px");
+    document.documentElement.style.setProperty("--sticky-cta-pad", visible ? node.offsetHeight + 16 + "px" : "0px");
   }
   var armed = false;
   function arm(){
@@ -143,6 +153,7 @@ export const landingBootScript = `(function(){
       observer.observe(finalCta);
       observer.observe(footer);
     }
+    window.addEventListener("scroll", updateBar, { passive: true });
     window.addEventListener("resize", updateBar);
     window.addEventListener("focusin", updateBar);
     window.addEventListener("focusout", updateBar);

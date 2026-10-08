@@ -9,6 +9,7 @@ import {
   normalizePhoneToE164,
   formatTimeSlot,
   formatDateFull,
+  formatAppointmentMeta,
 } from "../../components/booking/formatters";
 
 describe("Booking UI formatters and helpers", () => {
@@ -71,6 +72,10 @@ describe("Booking UI formatters and helpers", () => {
 
     const dateFormatted = formatDateFull(iso, timezone);
     expect(dateFormatted).toContain("outubro");
+  });
+
+  it("formats the short appointment metadata", () => {
+    expect(formatAppointmentMeta("2026-10-15T18:30:00.000Z", "America/Sao_Paulo")).toBe("qui, 15 out · 15:30");
   });
 });
 

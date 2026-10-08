@@ -115,9 +115,10 @@ describe("landing copy", () => {
 
   it("uses the October 2026 day strip on the hero", () => {
     const hero = readFileSync("components/landing/LandingHero.tsx", "utf8");
-    for (const label of ["Qua 14", "Qui 15", "Sex 16", "Sáb 17", "Dom 18"]) {
+    for (const label of ["Qua 14", "Qui 15", "Sex 16", "Sáb 17"]) {
       expect(hero).toContain(label);
     }
+    expect(hero).not.toContain("Dom 18");
   });
 
   it("shows the 15:30 slot as selected while the phone still asks to pay", () => {
