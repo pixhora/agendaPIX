@@ -11,6 +11,11 @@ function field(formData: FormData, name: string) {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
+function decodeCookieValue(value: string) {
+  try { return decodeURIComponent(value); }
+  catch { return value; }
+}
+
 function applySetCookies(response: Response, jar: Awaited<ReturnType<typeof cookies>>) {
   const list = typeof response.headers.getSetCookie === "function" ? response.headers.getSetCookie() : [];
   for (const header of list) {
@@ -32,7 +37,8 @@ function applySetCookies(response: Response, jar: Awaited<ReturnType<typeof cook
         if (site === "lax" || site === "strict" || site === "none") options.sameSite = site;
       }
     }
-    jar.set(pair.slice(0, separator), pair.slice(separator + 1), options);
+    // O header já vem codificado. cookies().set codifica de novo; sem o decode a sessão não gruda.
+    jar.set(pair.slice(0, separator), decodeCookieValue(pair.slice(separator + 1)), options);
   }
 }
 
