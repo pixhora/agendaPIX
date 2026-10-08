@@ -46,10 +46,11 @@ function summarize(violations: Awaited<ReturnType<AxeBuilder["analyze"]>>["viola
  * Axe com as regras WCAG 2.0/2.1/2.2 A e AA. Falha listando regra, impacto, alvos e motivo.
  * `target-size` (2.5.8) roda à parte com as barras fixas do painel (`data-sticky-chrome`) no fluxo:
  * elas são sticky e o conteúdo rola por baixo delas (com scroll-padding), então não contam como obstrução.
- * Toasts transitórios também ficam de fora dessa checagem.
+ * O toaster do Sonner fica de fora das duas: a opacidade da entrada/saída faz o contraste oscilar,
+ * e o aviso que permanece na tela é o status inline.
  */
 export async function expectNoAxeViolations(page: Page, context: string) {
-  const main = await new AxeBuilder({ page }).withTags(WCAG_TAGS).disableRules(["target-size"]).exclude("nextjs-portal").analyze();
+  const main = await new AxeBuilder({ page }).withTags(WCAG_TAGS).disableRules(["target-size"]).exclude("nextjs-portal").exclude("[data-sonner-toaster]").analyze();
   const style = await page.addStyleTag({ content: "[data-sticky-chrome]{position:static!important}[data-sonner-toaster]{display:none!important}" });
   const targets = await new AxeBuilder({ page }).withRules(["target-size"]).exclude("nextjs-portal").analyze();
   await style.evaluate((element) => (element as Element).remove());

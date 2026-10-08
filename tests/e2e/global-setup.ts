@@ -63,6 +63,18 @@ async function ensureBusiness(ownerId: string, name: string, slug: string, seedB
   return created;
 }
 
+function magicLinkVerifyRequest(link: string, baseURL: string) {
+  const source = new URL(link);
+  if (source.pathname.endsWith("/magic-link/verify")) return new Request(source);
+  const verify = new URL("/api/auth/magic-link/verify", baseURL);
+  for (const key of ["token", "callbackURL", "errorCallbackURL", "newUserCallbackURL"]) {
+    const value = source.searchParams.get(key);
+    if (value) verify.searchParams.set(key, value);
+  }
+  if (!verify.searchParams.get("token")) throw new Error("Link de acesso sem código");
+  return new Request(verify);
+}
+
 async function mintCookie(email: string) {
   process.env.MAGIC_LINK_CAPTURE_FILE = capturePath;
   try { await unlink(capturePath); } catch { /* ok */ }
@@ -77,7 +89,8 @@ async function mintCookie(email: string) {
   const content = await readFile(capturePath, "utf8");
   const link = content.trim().split("\n").at(-1);
   if (!link?.startsWith("http")) throw new Error("Link mágico não capturado");
-  const verified = await auth.handler(new Request(link));
+  // O e-mail abre /entrar/confirmar. O handler do Better Auth só verifica em GET /magic-link/verify.
+  const verified = await auth.handler(magicLinkVerifyRequest(link, baseURL));
   if (verified.status !== 302) throw new Error(`Verificação falhou: ${verified.status}`);
   const setCookie = verified.headers.getSetCookie?.() ?? [];
   const legacy = verified.headers.get("set-cookie");

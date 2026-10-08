@@ -19,6 +19,13 @@ async function capturedLink(email: string) {
   return link;
 }
 
+/** O e-mail abre a página de confirmação. O botão é que cria a sessão. */
+async function openAccessLink(page: Page, link: string) {
+  await page.goto(link);
+  if (new URL(page.url()).pathname !== "/entrar/confirmar") return;
+  await page.getByRole("button", { name: "Entrar", exact: true }).click();
+}
+
 async function requestLink(page: Page, email: string) {
   await page.getByLabel("E-mail profissional").fill(email);
   await page.getByRole("button", { name: "Receber link de acesso" }).click();
@@ -34,7 +41,7 @@ test("login único: /login → link mágico → /dashboard; link reutilizado vol
   await page.goto("/dashboard");
   await expect(page).toHaveURL(/\/login$/);
   const link = await requestLink(page, meta.ownerEmail);
-  await page.goto(link);
+  await openAccessLink(page, link);
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByRole("heading", { name: "Agenda de Negócio E2E A" })).toBeVisible();
 
@@ -44,9 +51,9 @@ test("login único: /login → link mágico → /dashboard; link reutilizado vol
 
   const other = await browser.newContext({ storageState: { cookies: [], origins: [] } });
   const reused = await other.newPage();
-  await reused.goto(link);
+  await openAccessLink(reused, link);
   await expect(reused).toHaveURL(/\/login\?error=/);
-  await expect(reused.getByRole("alert")).toContainText("expirou ou já foi usado");
+  await expect(reused.locator("#login-error")).toContainText("expirou ou já foi usado");
   await other.close();
 });
 
@@ -67,7 +74,7 @@ test("cadastro concluído → \"Ir para o painel\" abre /dashboard com o negóci
   await page.locator('button[type="submit"]').click();
   await expect(page.getByText("Verifique seu e-mail")).toBeVisible();
 
-  await page.goto(await capturedLink(email));
+  await openAccessLink(page, await capturedLink(email));
   await expect(page).toHaveURL(/\/onboarding\/concluir$/);
   await expect(page.getByRole("heading", { name: "Sua agenda está no ar" })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText(`/${slug}`)).toBeVisible();

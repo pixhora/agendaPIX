@@ -263,3 +263,25 @@ Migration aditiva cria apenas contadores, preservando schema/dados existentes. A
 ## Readiness
 
 `GET /api/health` permanece liveness200. `GET /api/ready` (novo):200 `{status:"ready"}` se SELECT1 PostgreSQL e autenticação/conexão SMTP passam;503 `{status:"unavailable"}` em qualquer falha. Sem autenticação, no-store, sem nomes de servidores, credenciais, erros brutos ou PII. Não envia e-mail, não cria cobrança, não testa domínio/remetente ou entrega do destinatário; pagamento bancário continua gate separado.
+
+## Onboarding v2 — rascunho, link e código (draft)
+
+`POST /api/onboarding` (F01) não muda e não limita quantos negócios um dono cria. A flag `ONE_BUSINESS_PER_OWNER` só vale no commit do rascunho. Ausente ou diferente de `true` mantém vários negócios. `true` faz o commit responder `409 already_has_business` com `{ publicPath }` do negócio mais antigo, salvo replay do mesmo rascunho (200).
+
+Migration 0011 adiciona `onboarding_drafts` e `abuse_rate_limits`. Reversão: voltar o código e manter as tabelas. Não apagar rascunhos no rollback.
+
+`POST /api/onboarding/drafts` exige Origin, corpo `{ email, segment, plan, data }` e devolve `201 { draftId, expiresAt }` com `Set-Cookie: onb_draft=<uuidv4>; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800`. `data` passa por `onboardingInputSchema` depois de `normalizeSlug(slug, { final: true })`. Slug com menos de 3 caracteres: `400 invalid_input`. Reservado continua `400`. Tomado: `409 slug_unavailable` com `suggestions`. 10 criações por IP por hora: `429 rate_limited` e `Retry-After`. Sem IP confiável, a criação não entra num balde compartilhado.
+
+`GET /api/onboarding/drafts/:id` → `200 { draftId, email mascarado, segment, plan, data, expiresAt }` se o cookie `onb_draft` é o id ou a sessão tem o mesmo e-mail. Senão `404`, mesmo vencido. Vencido e autorizado: `410 draft_expired`.
+
+`PATCH` aceita `{ email? , data? }` com ao menos um campo. `200` no mesmo formato do GET. Trocar o e-mail apaga códigos `sign-in-otp-<email>` anteriores. Rascunho já consumido: `409 draft_consumed`.
+
+`POST /api/onboarding/drafts/:id/commit` exige sessão e o mesmo e-mail. Chama `provisionBusiness(userId, draftId, data)`. Primeira vez `201`; repetição `200` com o mesmo `{ businessId, slug, publicPath, serviceId }`, inclusive se o rascunho já venceu depois do sucesso. `401` sem sessão. Id que não é UUID v4: `400`. E-mail diferente: `404`.
+
+`GET /api/public/slugs/availability?slug=` → `200 { input, normalized, valid, available, reason, suggestions }` com `Cache-Control: no-store`. `reason`: `null | too_short | invalid | reserved | taken`. Sugestões só quando reservado ou tomado, no máximo 3, numa query `IN` (equivalente ao `ANY` da spec). `segment` e `uf` são opcionais; segmento fora da lista e UF que não tem 2 letras são ignorados. 30 consultas por IP por minuto.
+
+Código: plugin `emailOTP` (`otpLength: 6`, `expiresIn: 1800`, `allowedAttempts: 3`, `storeOTP: "hashed"`, `resendStrategy: "rotate"`). `POST /api/auth/email-otp/send-verification-otp` com `{ email, type: "sign-in" }` e `POST /api/auth/sign-in/email-otp` com `{ email, otp }`. O e-mail traz o código agrupado e o botão `https://{app}/onboarding/confirmar?d={draftId}#c={código}` (sem `d` se não houver rascunho ativo). 5 envios por e-mail por hora e 20 por IP por hora na tabela `abuse_rate_limits`. O `rateLimit` do plugin fica em 30 por 60 s porque o mesmo número vale também para conferir o código. Reenvio gera código novo e invalida o anterior. Três códigos errados bloqueiam o quarto, mesmo correto.
+
+Link mágico: `expiresIn: 1800`. O e-mail abre `GET /entrar/confirmar?token=…`, que não consome o acesso. O botão faz POST na página; o servidor chama o verify oficial (GET no plugin 1.7.7) e copia o cookie de sessão. Copy: vale por 30 minutos.
+
+`lib/slug.ts` neste branch é provisório. A lista `RESERVED_BUSINESS_SLUGS` não foi ampliada aqui. `contactWhatsapp`, `depositPolicy` e faixas múltiplas de horário ficam para outro PR; o schema `.strict()` atual recusa esses campos com `400`.
