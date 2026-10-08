@@ -8,7 +8,7 @@ import type {
   AvailabilitySlot,
   BookingResponse,
 } from "./types";
-import { cpfDigitsOnly, normalizePhoneToE164 } from "./formatters";
+import { cpfDigitsOnly, formatCurrency, normalizePhoneToE164 } from "./formatters";
 import { publicBookingPagePath, publicBookingPaymentUrl, publicBookingsUrl, publicServicesUrl } from "@/lib/public-api";
 import { StepProgress } from "./StepProgress";
 import { StepService } from "./StepService";
@@ -26,7 +26,9 @@ import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { BrandMark } from "@/components/ui/brand";
 import { BookingSummary } from "./BookingSummary";
 import { POLICY_CHANGED_MESSAGE, publicBookingErrorView, whatsappHref } from "./booking-error";
+import { buildPublicBookingBody } from "./booking-payload";
 import { PausedState } from "./PausedState";
+import { PolicySheet } from "@/components/policy/PolicySheet";
 
 interface BookingFlowProps {
   slug: string;
@@ -53,6 +55,11 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
   // Submissão da Reserva
   const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
   const [bookingError, setBookingError] = useState<{ message: string; contactHref: string | null; tone: "danger" | "calm" } | null>(null);
+  const [policySheet, setPolicySheet] = useState<{ open: boolean; notice: string | null; trigger: HTMLElement | null }>({
+    open: false,
+    notice: null,
+    trigger: null,
+  });
   const [bookingResponse, setBookingResponse] = useState<BookingResponse | null>(null);
 
   // Chave de Idempotência fixa por tentativa de reserva
@@ -258,15 +265,14 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
     setIsSubmittingBooking(true);
     setBookingError(null);
 
-    const payload = {
-      serviceId: selectedService.id,
+    const payload = buildPublicBookingBody({
+      service: selectedService,
       startsAt: selectedSlot.startsAt,
-      customer: {
-        name: customerName.trim(),
-        phone: normalizePhoneToE164(customerPhone),
-        cpfCnpj: cpfDigitsOnly(customerCpf),
-      },
-    };
+      name: customerName.trim(),
+      phone: normalizePhoneToE164(customerPhone),
+      cpfDigits: cpfDigitsOnly(customerCpf),
+      requiresPayerCpf: business?.requiresPayerCpf,
+    });
 
     try {
       const res = await fetch(publicBookingsUrl(slug), {
@@ -305,7 +311,8 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
             depositPolicy: failure.update.depositPolicy ?? current.depositPolicy,
             policyDetails: failure.update.policyDetails ?? current.policyDetails,
           } : current));
-          setBookingError({ message: POLICY_CHANGED_MESSAGE, contactHref: null, tone: "calm" });
+          setBookingError(null);
+          setPolicySheet({ open: true, notice: POLICY_CHANGED_MESSAGE, trigger: null });
           if (typeof crypto !== "undefined" && crypto.randomUUID) setIdempotencyKey(crypto.randomUUID());
           return;
         }
@@ -424,7 +431,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
       <div className="flex items-center gap-3">
         <ThemeToggle className="sm:hidden" />
         <Link href="/" className="inline-flex min-h-11 items-center gap-2 font-semibold text-ink">
-          <BrandMark className="size-6 rounded-md text-[10px]" /> Feito com Agenda
+          <BrandMark className="size-6 rounded-md text-[10px]" /> Feito com o AgendaPix
         </Link>
       </div>
     </footer>
@@ -494,7 +501,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
             timezone={business.timezone}
             customerName={customerName}
             customerPhone={customerPhone}
-            cancellationPolicy={bookingResponse?.policy?.text}
+            policy={bookingResponse?.policy}
             onNewBooking={handleRestart}
           />
         </main>
@@ -555,6 +562,8 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
                 onBack={() => setStep(2)}
                 onSubmit={handleCreateBooking}
                 summaryClassName="lg:hidden"
+                requiresPayerCpf={business.requiresPayerCpf}
+                onOpenPolicy={(trigger) => setPolicySheet({ open: true, notice: null, trigger })}
               />
             )}
 
@@ -563,6 +572,8 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
                 slug={slug}
                 booking={bookingResponse}
                 summary={selectedService && selectedSlot ? { service: selectedService, slot: selectedSlot, timezone: business.timezone } : undefined}
+                pixRecipientDisplayName={business.pixRecipientDisplayName}
+                onOpenPolicy={(trigger) => setPolicySheet({ open: true, notice: null, trigger })}
                 onPaymentConfirmed={() => {
                   if (typeof window !== "undefined") {
                     try {
@@ -589,6 +600,19 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
         </aside>
       </main>
       {pageFooter}
+      {selectedService ? (
+        <PolicySheet
+          open={policySheet.open}
+          businessName={business.name}
+          serviceName={selectedService.name}
+          depositLabel={formatCurrency(selectedService.depositCents)}
+          lines={selectedService.policyDetails}
+          text={selectedService.policySummary}
+          notice={policySheet.notice}
+          returnFocus={policySheet.trigger}
+          onClose={() => setPolicySheet((current) => ({ ...current, open: false, trigger: null }))}
+        />
+      ) : null}
     </div>
   );
 }

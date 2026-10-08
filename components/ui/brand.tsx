@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-/** Marca: monograma + "Agenda". O ponto verde-água remete ao Pix. */
+/** Marca: monograma + "AgendaPix". O ponto verde-água remete ao Pix. */
 export function BrandMark({ className }: { className?: string }) {
   return (
     <span aria-hidden="true" className={cn("relative flex size-8 items-center justify-center rounded-[10px] bg-ink font-display text-sm font-extrabold text-paper", className)}>
@@ -11,7 +11,7 @@ export function BrandMark({ className }: { className?: string }) {
   );
 }
 
-export function BrandLink({ href = "/", className, label = "Agenda" }: { href?: string; className?: string; label?: string }) {
+export function BrandLink({ href = "/", className, label = "AgendaPix" }: { href?: string; className?: string; label?: string }) {
   return (
     <Link href={href} aria-label={`${label}, página inicial`} className={cn("inline-flex min-h-11 items-center gap-2.5 rounded-field font-display text-lg font-bold tracking-tight text-ink", className)}>
       <BrandMark />

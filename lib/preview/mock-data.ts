@@ -35,8 +35,13 @@ export const MOCK_SERVICES: PublicService[] = [
     durationMinutes: 60,
     priceCents: 8000,   // R$ 80,00
     depositCents: 2500, // R$ 25,00
-    policySummary: "Cancelou com 24h de antecedência, o sinal volta. Mais perto da hora, o sinal fica com o Studio Bella.",
+    policySummary: "Com 24 horas de antecedência, o Studio Bella pode devolver o sinal. Mais perto da hora, o sinal fica com o estúdio.",
     policyHash: "preview-policy-corte",
+    depositPolicy: { refundUntilHours: 24, rescheduleUntilHours: 24 },
+    policyDetails: [
+      { title: "Devolução do sinal", body: "Até 24 horas antes, a devolução fica a cargo do Studio Bella.", tone: "ok" },
+      { title: "Perto do horário", body: "Com menos de 24 horas, o sinal fica com o Studio Bella.", tone: "warn" },
+    ],
   },
   {
     id: "srv-corte-escova",

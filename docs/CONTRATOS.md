@@ -133,8 +133,8 @@ Concorrência é protegida por lock transacional do negócio e restrição de ex
 ## Rotas públicas
 
 - `GET /api/public/[slug]/services`: nome e fuso do negócio e serviços ativos com `id`, `name`, `durationMinutes`, `priceCents`, `depositCents`.
-- `GET /api/public/[slug]/availability?serviceId=<uuid>&date=YYYY-MM-DD`: responde `{ timezone, slots: [{ startsAt, endsAt }] }`. Datas de horários são ISO 8601 UTC. Lista vazia significa fechado, passado ou sem vagas. Serviço com sinal de um negócio sem conta Mercado Pago conectada pode vir com `bookable: false` e `reason: "mp_account_not_connected"`. A tela mostra um texto neutro e, se houver, `contactWhatsapp`. Não exibe `reason`. Serviço sem sinal ignora esse par.
-- `POST /api/public/[slug]/bookings`: exige header `Idempotency-Key` UUID v4 e JSON `{ serviceId, startsAt, customer: { name, phone } }`. Telefone em E.164. Responde `201` com `{ bookingId, status, startsAt, endsAt, expiresAt, accessToken, payment }`; repetição idêntica responde `200`. Mesma chave com outro corpo responde `409`. Serviço com sinal sem conta conectada responde `409 { error: { code: "mp_account_not_connected" } }`. A tela não mostra o código.
+- `GET /api/public/[slug]/availability?serviceId=<uuid>&date=YYYY-MM-DD`: responde `{ timezone, slots: [{ startsAt, endsAt }] }`. Datas de horários são ISO 8601 UTC. Lista vazia significa fechado, passado ou sem vagas.
+- `POST /api/public/[slug]/bookings`: exige header `Idempotency-Key` UUID v4 e JSON `{ serviceId, startsAt, customer: { name, phone } }`. Telefone em E.164. Responde `201` com `{ bookingId, status, startsAt, endsAt, expiresAt, accessToken, payment }`; repetição idêntica responde `200`. Mesma chave com outro corpo responde `409`.
 - `GET /api/public/[slug]/bookings/[id]/payment`: exige `Authorization: Bearer <accessToken>`. Responde `{ bookingId, status, expiresAt, payment }`. Não retorna nome, telefone nem dados do dono.
 
 `payment` é `null` com sinal zero; caso contrário contém `{ id, provider, externalId, amountCents, status, expiresAt, qrCodeDataUrl, copyPaste }`.

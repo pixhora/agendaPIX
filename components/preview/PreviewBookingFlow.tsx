@@ -18,10 +18,57 @@ import { StepCustomer } from "@/components/booking/StepCustomer";
 import { BookingConfirmation } from "@/components/booking/BookingConfirmation";
 import { StepSlot } from "@/components/booking/StepSlot";
 import { StepPayment } from "@/components/booking/StepPayment";
+import { PausedState } from "@/components/booking/PausedState";
+import { POLICY_CHANGED_MESSAGE } from "@/components/booking/booking-error";
+import { formatCurrency } from "@/components/booking/formatters";
+import type { BookingPolicyView } from "@/components/booking/types";
+import { PolicySheet } from "@/components/policy/PolicySheet";
 import type { PreviewScene } from "@/components/preview/scene";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { BusinessAvatar } from "@/components/ui/business-avatar";
+import { cn } from "@/lib/utils";
+
+const PREVIEW_QR = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+
+function previewStep(scene: PreviewScene): 1 | 2 | 3 | 4 {
+  if (scene === "dados" || scene === "politica" || scene === "politica-mudou") return 3;
+  if (scene === "pix" || scene === "pix-perto" || scene === "pix-expirado") return 4;
+  return 1;
+}
+
+function previewBooking(scene: PreviewScene, service: PublicService, slot: AvailabilitySlot): BookingResponse {
+  const offset = scene === "pix-perto" ? 4 * 60 * 1000 : scene === "pix-expirado" ? -60 * 1000 : 12 * 60 * 1000;
+  const expiresAt = new Date(Date.now() + offset).toISOString();
+  const expired = scene === "pix-expirado";
+  return {
+    bookingId: "bk-preview-pix",
+    status: expired ? "expired" : "pending_payment",
+    startsAt: slot.startsAt,
+    endsAt: slot.endsAt,
+    expiresAt,
+    accessToken: "mock-preview-token-12345",
+    payment: {
+      id: "pay-preview",
+      provider: "fake",
+      externalId: "fake_charge_preview",
+      amountCents: service.depositCents,
+      status: expired ? "expired" : "pending",
+      expiresAt,
+      qrCodeDataUrl: expired ? null : PREVIEW_QR,
+      copyPaste: expired ? null : "00020126580014br.gov.bcb.pix0136studio-bella-preview52040000530398654025.005802BR5912Studio Bella6009Sao Paulo62070503***6304PREV",
+    },
+  };
+}
+
+function previewPolicy(slot: AvailabilitySlot): BookingPolicyView {
+  const deadline = new Date(new Date(slot.startsAt).getTime() - 24 * 60 * 60 * 1000).toISOString();
+  return {
+    text: MOCK_SERVICES[0]?.policySummary ?? null,
+    refundDeadlineAt: deadline,
+    rescheduleDeadlineAt: deadline,
+  };
+}
 
 export function PreviewBookingFlow({ scene = "fluxo" }: { scene?: PreviewScene }) {
   const services = scene === "indisponivel"
@@ -30,24 +77,27 @@ export function PreviewBookingFlow({ scene = "fluxo" }: { scene?: PreviewScene }
         { id: "srv-sem-sinal", name: "Ajuste de franja", durationMinutes: 20, priceCents: 0, depositCents: 0, bookable: false },
       ]
     : MOCK_SERVICES;
-  const contactWhatsapp = scene === "indisponivel" ? "5511987654321" : null;
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
-  const [isCompleted, setIsCompleted] = useState(false);
-
-  const [selectedService, setSelectedService] = useState<PublicService | null>(
-    services.find((service) => service.bookable !== false) ?? services[0]
-  );
-  const [selectedSlot, setSelectedSlot] = useState<AvailabilitySlot | null>(() => {
+  const contactWhatsapp = scene === "indisponivel" || scene === "pausada" ? "5511987654321" : null;
+  const openingService = services.find((service) => service.bookable !== false) ?? services[0];
+  const openingSlot = (() => {
     const today = new Date().toISOString().slice(0, 10);
-    const slots = getMockAvailabilitySlots(today);
-    return slots[0] || null;
-  });
+    return getMockAvailabilitySlots(today)[0] ?? null;
+  })();
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(() => previewStep(scene));
+  const [isCompleted, setIsCompleted] = useState(scene === "comprovante");
+
+  const [selectedService, setSelectedService] = useState<PublicService | null>(openingService);
+  const [selectedSlot, setSelectedSlot] = useState<AvailabilitySlot | null>(openingSlot);
   const [customerName, setCustomerName] = useState("Juliana Mendes");
   const [customerPhone, setCustomerPhone] = useState("(11) 98234-5678");
   const [customerCpf, setCustomerCpf] = useState("529.982.247-25");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [bookingResponse, setBookingResponse] = useState<BookingResponse | null>(null);
+  const [policyOpen, setPolicyOpen] = useState(scene === "politica" || scene === "politica-mudou");
+  const [bookingResponse, setBookingResponse] = useState<BookingResponse | null>(() => {
+    if (!openingSlot || (scene !== "pix" && scene !== "pix-perto" && scene !== "pix-expirado")) return null;
+    return previewBooking(scene, openingService, openingSlot);
+  });
 
   const handleGetSlots = React.useCallback(
     async (dateStr: string) => {
@@ -113,9 +163,21 @@ export function PreviewBookingFlow({ scene = "fluxo" }: { scene?: PreviewScene }
     setStep(1);
   };
 
+  if (scene === "pausada") {
+    return (
+      <div data-scene={scene} className="min-h-screen bg-paper px-4 py-8">
+        <div className="mx-auto w-full max-w-md">
+          <PausedState businessName={MOCK_PUBLIC_BUSINESS.name} contactWhatsapp={contactWhatsapp} services={MOCK_SERVICES} />
+        </div>
+      </div>
+    );
+  }
+
+  const widePix = scene === "pix" || scene === "pix-perto" || scene === "pix-expirado";
+
   return (
     <div data-scene={scene} className="min-h-screen bg-background text-foreground pt-6 pb-24 sm:py-8 px-4 sm:px-6">
-      <div className="w-full max-w-md mx-auto space-y-6">
+      <div className={cn("mx-auto w-full space-y-6", widePix ? "max-w-3xl" : "max-w-md")}>
         {/* Barra Superior do Preview */}
         <div className="flex items-center justify-between text-xs text-muted-foreground pb-2 border-b border-border">
           <Link href="/preview" className="font-bold text-pix dark:text-primary hover:underline">
@@ -149,6 +211,7 @@ export function PreviewBookingFlow({ scene = "fluxo" }: { scene?: PreviewScene }
               timezone={MOCK_PUBLIC_BUSINESS.timezone}
               customerName={customerName}
               customerPhone={customerPhone}
+              policy={selectedSlot ? previewPolicy(selectedSlot) : null}
               onNewBooking={handleRestart}
             />
           </div>
@@ -200,6 +263,8 @@ export function PreviewBookingFlow({ scene = "fluxo" }: { scene?: PreviewScene }
                   onChangeCpf={setCustomerCpf}
                   onBack={() => setStep(2)}
                   onSubmit={handleCreateMockBooking}
+                  requiresPayerCpf={scene === "fluxo" ? undefined : false}
+                  onOpenPolicy={() => setPolicyOpen(true)}
                 />
               )}
 
@@ -208,6 +273,9 @@ export function PreviewBookingFlow({ scene = "fluxo" }: { scene?: PreviewScene }
                   <StepPayment
                     slug="studio-bella"
                     booking={bookingResponse}
+                    summary={selectedService && selectedSlot ? { service: selectedService, slot: selectedSlot, timezone: MOCK_PUBLIC_BUSINESS.timezone } : undefined}
+                    pixRecipientDisplayName="Studio Bella"
+                    onOpenPolicy={() => setPolicyOpen(true)}
                     checkStatusFn={async () => {
                       if (bookingResponse.status === "confirmed") {
                         return {
@@ -228,8 +296,7 @@ export function PreviewBookingFlow({ scene = "fluxo" }: { scene?: PreviewScene }
                     onRestart={handleRestart}
                   />
 
-                  {/* Atalho de Demonstração para Confirmar o Pix Imediatamente */}
-                  <div className="rounded-xl border border-success/30 bg-success-soft p-3 text-center space-y-2">
+                  {scene === "fluxo" ? <div className="rounded-xl border border-success/30 bg-success-soft p-3 text-center space-y-2">
                     <p className="text-xs font-semibold text-success ">
                       Simulador de Pagamento Instantâneo (Preview)
                     </p>
@@ -260,7 +327,7 @@ export function PreviewBookingFlow({ scene = "fluxo" }: { scene?: PreviewScene }
                     >
                       ⚡ Simular Pix Pago no Banco
                     </Button>
-                  </div>
+                  </div> : null}
                 </div>
               )}
             </div>
@@ -271,6 +338,18 @@ export function PreviewBookingFlow({ scene = "fluxo" }: { scene?: PreviewScene }
           </>
         )}
       </div>
+      {selectedService ? (
+        <PolicySheet
+          open={policyOpen}
+          businessName={MOCK_PUBLIC_BUSINESS.name}
+          serviceName={selectedService.name}
+          depositLabel={formatCurrency(selectedService.depositCents)}
+          lines={selectedService.policyDetails}
+          text={selectedService.policySummary}
+          notice={scene === "politica-mudou" ? POLICY_CHANGED_MESSAGE : null}
+          onClose={() => setPolicyOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }

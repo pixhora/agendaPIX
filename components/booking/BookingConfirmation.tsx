@@ -1,12 +1,11 @@
 "use client";
 
 import React, { useMemo } from "react";
-import type { PublicService, AvailabilitySlot } from "./types";
+import type { AvailabilitySlot, BookingPolicyView, PublicService } from "./types";
 import { formatCurrency, formatDateFull, formatTimeSlot, formatDuration } from "./formatters";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { CONFIRMATION_ICONS } from "@/lib/icons/registry";
-import { CancellationNotice } from "./CancellationNotice";
 import { ReservedTimeBand } from "./ReservedTimeBand";
 
 interface BookingConfirmationProps {
@@ -16,8 +15,8 @@ interface BookingConfirmationProps {
   timezone: string;
   customerName: string;
   customerPhone: string;
-  /** Snapshot gravado na reserva. Não usa a política atual do serviço. */
-  cancellationPolicy?: string | null;
+  /** Snapshot gravado na reserva. A tela só mostra o que o servidor mandou. */
+  policy?: BookingPolicyView | null;
   onNewBooking: () => void;
 }
 
@@ -63,7 +62,7 @@ export function BookingConfirmation({
   timezone,
   customerName,
   customerPhone,
-  cancellationPolicy,
+  policy,
   onNewBooking,
 }: BookingConfirmationProps) {
   const remainingCents = Math.max(0, service.priceCents - service.depositCents);
@@ -126,9 +125,18 @@ export function BookingConfirmation({
             <div className="flex justify-between border-t border-line pt-2 font-bold text-ink"><dt>Restante no local</dt><dd className="tabular-nums">{formatCurrency(remainingCents)}</dd></div>
           </dl>
         </div>
-        <div className="border-t border-line p-5">
-          <CancellationNotice policy={cancellationPolicy} businessName={businessName} />
-        </div>
+        {policy?.text || policy?.refundDeadlineAt || policy?.rescheduleDeadlineAt ? (
+          <div className="border-t border-line p-5" data-testid="policy-snapshot">
+            <p className="text-sm font-semibold text-ink">Política do sinal</p>
+            {policy.text?.trim() ? <p className="mt-1 text-sm leading-relaxed text-ink">{policy.text.trim()}</p> : null}
+            {policy.refundDeadlineAt ? (
+              <p className="mt-2 text-sm text-muted">O estabelecimento pode devolver o sinal até {formatDateFull(policy.refundDeadlineAt, timezone)} às {formatTimeSlot(policy.refundDeadlineAt, timezone)}.</p>
+            ) : null}
+            {policy.rescheduleDeadlineAt ? (
+              <p className="mt-1 text-sm text-muted">Remarcação até {formatDateFull(policy.rescheduleDeadlineAt, timezone)} às {formatTimeSlot(policy.rescheduleDeadlineAt, timezone)}.</p>
+            ) : null}
+          </div>
+        ) : null}
       </article>
 
       <p className="rounded-card border border-line bg-surface p-4 text-sm text-muted">
