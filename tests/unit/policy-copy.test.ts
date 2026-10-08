@@ -6,6 +6,7 @@ import {
   closedWindowLine,
   closedWindowReceipt,
   paymentLateWindowNotice,
+  pixPaymentPolicy,
   confirmationCardTone,
   confirmationPolicyText,
   policyHowToChange,
@@ -151,6 +152,49 @@ describe("linha acima do Pix dentro do prazo", () => {
       startsAt,
       now: inside,
     })).toBeNull();
+  });
+});
+
+describe("resumo do Pix", () => {
+  const businessName = "Studio Bella";
+  const startsAt = "2026-10-11T14:30:00.000Z";
+  const now = new Date("2026-10-08T15:00:00.000Z");
+
+  it("monta o resumo de crédito a partir de lateCancel", () => {
+    const view = pixPaymentPolicy({ businessName, refundUntilHours: 24, lateCancel: "credit", startsAt, now });
+    expect(view.warn).toBeNull();
+    expect(view.summary).toBe("Com 24 h de antecedência, Studio Bella pode devolver o sinal. Mais perto da hora, o sinal vira crédito para outro horário, válido por 60 dias.");
+    expect(view.summary).not.toContain("fica com");
+  });
+
+  it("monta o resumo de retenção a partir de lateCancel", () => {
+    const view = pixPaymentPolicy({ businessName, refundUntilHours: 24, lateCancel: "retain", startsAt, now });
+    expect(view.warn).toBeNull();
+    expect(view.summary).toBe("Com 24 h de antecedência, Studio Bella pode devolver o sinal. Mais perto da hora, o sinal fica com Studio Bella.");
+    expect(view.summary).not.toContain("crédito");
+  });
+
+  it("esconde o resumo quando a reserva já está dentro da janela", () => {
+    const inside = pixPaymentPolicy({
+      businessName,
+      refundUntilHours: 24,
+      lateCancel: "credit",
+      startsAt: "2026-10-09T14:30:00.000Z",
+      now: new Date("2026-10-08T21:54:00.000Z"),
+    });
+    expect(inside.summary).toBeNull();
+    expect(inside.warn).toBe("Faltam menos de 24 h para o horário: se cancelar, o sinal vira crédito para outro horário, válido por 60 dias.");
+
+    const flagged = pixPaymentPolicy({
+      businessName,
+      refundUntilHours: 24,
+      lateCancel: "retain",
+      startsAt,
+      now,
+      refundWindowClosedAtBooking: true,
+    });
+    expect(flagged.summary).toBeNull();
+    expect(flagged.warn).toBe("Faltam menos de 24 h para o horário: se cancelar, o sinal não é devolvido.");
   });
 });
 

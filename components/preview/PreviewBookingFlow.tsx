@@ -346,6 +346,7 @@ export function PreviewBookingFlow({
                     booking={bookingResponse}
                     summary={selectedService && selectedSlot ? { service: selectedService, slot: selectedSlot, timezone: MOCK_PUBLIC_BUSINESS.timezone } : undefined}
                     pixRecipientDisplayName="Studio Bella"
+                    businessName={MOCK_PUBLIC_BUSINESS.name}
                     onOpenPolicy={() => setPolicyOpen(true)}
                     checkStatusFn={async () => {
                       if (bookingResponse.status === "confirmed") {

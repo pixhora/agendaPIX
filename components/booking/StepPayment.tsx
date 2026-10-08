@@ -30,8 +30,7 @@ import {
 import { ReservedTimeBand } from "./ReservedTimeBand";
 import { PixQr } from "./PixQr";
 import { PolicySummaryLine } from "@/components/policy/PolicySummaryLine";
-import { policyLineTone } from "./policy-gate";
-import { paymentLateWindowNotice } from "./policy-copy";
+import { pixPaymentPolicy } from "./policy-copy";
 import { usePrefersReducedMotion } from "./use-prefers-reduced-motion";
 import { cn } from "@/lib/utils";
 
@@ -45,6 +44,8 @@ interface StepPaymentProps {
   summary?: { service: PublicService; slot: AvailabilitySlot; timezone: string };
   /** Nome de quem recebe o Pix, vindo do servidor. */
   pixRecipientDisplayName?: string | null;
+  /** Nome do negócio na frase da política. */
+  businessName?: string | null;
   onOpenPolicy?: (trigger: HTMLElement) => void;
 }
 
@@ -56,6 +57,7 @@ export function StepPayment({
   checkStatusFn,
   summary,
   pixRecipientDisplayName,
+  businessName,
   onOpenPolicy,
 }: StepPaymentProps) {
   const payment = booking.payment;
@@ -74,13 +76,16 @@ export function StepPayment({
   const [checkError, setCheckError] = useState<string | null>(null);
   const [isSimulating, setIsSimulating] = useState(false);
   const reducedMotion = usePrefersReducedMotion();
-  const lateNotice = summary
-    ? paymentLateWindowNotice({
+  const pixPolicy = summary
+    ? pixPaymentPolicy({
+        businessName: businessName ?? "",
         refundUntilHours: summary.service.depositPolicy?.refundUntilHours,
         lateCancel: summary.service.depositPolicy?.lateCancel,
         startsAt: summary.slot.startsAt,
+        refundWindowClosedAtBooking: booking.policy?.refundWindowClosedAtBooking,
       })
-    : null;
+    : { warn: null, summary: null };
+  const lateNotice = pixPolicy.warn;
 
   const isCheckingRef = useRef(false);
   const hasCheckedOnExpireRef = useRef(false);
@@ -373,10 +378,10 @@ export function StepPayment({
             : summary.service.name
           : "O horário é confirmado assim que o Pix cair."}
       />
-      {summary?.service.policySummary && onOpenPolicy ? (
+      {pixPolicy.summary && onOpenPolicy ? (
         <PolicySummaryLine
-          summary={summary.service.policySummary}
-          tone={policyLineTone(summary.service.depositPolicy, summary.slot.startsAt)}
+          summary={pixPolicy.summary}
+          tone="ok"
           compact
           onDetails={onOpenPolicy}
         />
@@ -385,7 +390,22 @@ export function StepPayment({
       {lateNotice ? (
         <div role="note" data-testid="late-window-notice" className="flex items-start gap-2 rounded-card border border-warning/30 bg-warning-soft p-4 text-sm font-medium text-warning">
           <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-          <p>{lateNotice}</p>
+          <p>
+            {lateNotice}
+            {onOpenPolicy ? (
+              <>
+                {" "}
+                <button
+                  type="button"
+                  data-testid="policy-details"
+                  className="relative inline bg-transparent p-0 font-semibold text-ink underline decoration-line-strong underline-offset-4 before:absolute before:-inset-x-2 before:-inset-y-3 before:content-[''] focus-visible:outline-none focus-visible:shadow-focus"
+                  onClick={(event) => onOpenPolicy(event.currentTarget)}
+                >
+                  Ver detalhes
+                </button>
+              </>
+            ) : null}
+          </p>
         </div>
       ) : null}
 

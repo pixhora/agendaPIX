@@ -579,6 +579,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
                 booking={bookingResponse}
                 summary={selectedService && selectedSlot ? { service: selectedService, slot: selectedSlot, timezone: business.timezone } : undefined}
                 pixRecipientDisplayName={business.pixRecipientDisplayName}
+                businessName={business.name}
                 onOpenPolicy={(trigger) => setPolicySheet({ open: true, notice: null, trigger })}
                 onPaymentConfirmed={() => {
                   if (typeof window !== "undefined") {

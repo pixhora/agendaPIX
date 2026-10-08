@@ -92,9 +92,37 @@ export function closedWindowLine(policy: { refundUntilHours?: number | null; lat
 }
 
 /**
- * Linha acima do Pix quando `now` já está dentro do prazo de cancelamento.
- * `{h}` e retain/crédito vêm de `depositPolicy`, que o serviço público já manda.
+ * Resumo do Pix fora da janela, e a linha de aviso dentro dela.
+ * O texto segue `depositPolicy.lateCancel`. Dentro da janela o resumo some.
  */
+export function pixPaymentPolicy(input: {
+  businessName: string;
+  refundUntilHours?: number | null;
+  lateCancel?: "retain" | "credit" | null;
+  startsAt?: string | Date | null;
+  now?: Date;
+  refundWindowClosedAtBooking?: boolean;
+}): { warn: string | null; summary: string | null } {
+  const lateCancel = input.lateCancel === "credit" ? "credit" : "retain";
+  const warn = input.refundUntilHours == null
+    ? null
+    : paymentLateWindowNotice({
+        refundUntilHours: input.refundUntilHours,
+        lateCancel,
+        startsAt: input.startsAt,
+        now: input.now,
+      }) ?? (input.refundWindowClosedAtBooking
+        ? closedWindowLine({ refundUntilHours: input.refundUntilHours, lateCancel })
+        : null);
+  const inside = input.refundWindowClosedAtBooking === true || warn != null;
+  if (inside) return { warn, summary: null };
+  if (input.refundUntilHours == null || !input.businessName.trim()) return { warn: null, summary: null };
+  return {
+    warn: null,
+    summary: policyOneLiner(input.businessName, input.refundUntilHours, lateCancel === "credit" ? "credit" : "keep"),
+  };
+}
+
 export function paymentLateWindowNotice(input: {
   refundUntilHours?: number | null;
   lateCancel?: "retain" | "credit" | null;
