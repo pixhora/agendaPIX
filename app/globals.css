@@ -260,7 +260,14 @@ h1, h2, h3, h4, h5, h6, .font-display {
   html:has([data-app-frame]) { scroll-padding-block: 5rem; }
 }
 
-/* O Sonner some o texto dos toasts de trás em 400ms. No meio do fade o axe lê um cinza abaixo de 4,5:1. */
+/* O Sonner anima a opacidade do toast (entrada) e do texto de trás (400ms).
+   No meio do fade o axe lê um cinza abaixo de 4,5:1. A opacidade troca na hora. */
+[data-sonner-toast] {
+  transition: transform 400ms, height 400ms, box-shadow 200ms !important;
+}
+[data-sonner-toast][data-mounted="true"] {
+  opacity: 1 !important;
+}
 [data-sonner-toast][data-expanded="false"][data-front="false"] > * {
   opacity: 0 !important;
   transition: none !important;
