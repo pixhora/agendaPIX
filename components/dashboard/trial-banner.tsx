@@ -101,7 +101,7 @@ export function TrialBanner({
             {cta.kind === "pending" && <p className="max-w-[62ch] text-sm leading-relaxed">{pendingActivationCopy(cta.activationHours)}</p>}
             {cta.kind === "pending" && cta.allowResend && action && (
               <CheckoutForm action={action}>
-                <Button type="submit" variant="outline" className="w-full border-white/20 bg-transparent text-slab-foreground hover:bg-white/10 sm:w-auto">{SUBSCRIPTION_WHATSAPP_LABEL}<span className="sr-only"> (abre em nova aba)</span></Button>
+                <Button type="submit" variant="outline" className="w-full sm:w-auto">{SUBSCRIPTION_WHATSAPP_LABEL}<span className="sr-only"> (abre em nova aba)</span></Button>
               </CheckoutForm>
             )}
             {cta.kind === "unavailable" && <p className="max-w-[62ch] text-sm leading-relaxed text-slab-muted">{SUBSCRIPTION_UNAVAILABLE_COPY}</p>}
