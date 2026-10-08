@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -8,8 +9,13 @@ import { getLandingNavOpen, subscribeLandingNav } from "./nav-state";
 
 const HEIGHT_VAR = "--sticky-cta-height";
 
+function subscribeNoop() {
+  return () => {};
+}
+
 export function StickyCta() {
   const menuOpen = useSyncExternalStore(subscribeLandingNav, getLandingNavOpen, () => false);
+  const canPortal = useSyncExternalStore(subscribeNoop, () => true, () => false);
   const [heroGone, setHeroGone] = useState(false);
   const [finalVisible, setFinalVisible] = useState(false);
   const [footerVisible, setFooterVisible] = useState(false);
@@ -84,9 +90,10 @@ export function StickyCta() {
     };
   }, [visible]);
 
-  return (
+  const bar = (
     <div
       id="sticky-cta"
+      data-visible={visible ? "true" : "false"}
       role="region"
       aria-label="Criar agenda"
       aria-hidden={!visible}
@@ -104,4 +111,7 @@ export function StickyCta() {
       <p className="mt-1.5 text-center text-[12px] text-muted">7 dias grátis · sem cartão</p>
     </div>
   );
+
+  if (!canPortal) return bar;
+  return createPortal(bar, document.body);
 }

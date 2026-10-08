@@ -54,13 +54,13 @@ export function LandingHero({ publicHost }: { publicHost: string }) {
           <div className="relative mx-auto h-[440px] w-[270px] overflow-hidden lg:h-auto lg:w-[280px] lg:overflow-visible">
             <PhoneStage publicHost={publicHost} />
             <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-paper to-transparent lg:hidden" />
-          </div>
-          <div aria-hidden="true" className="absolute top-16 -left-2 hidden w-[210px] rounded-card border border-line bg-surface p-3 shadow-[var(--shadow-raised)] xl:block">
-            <p className="text-[13px] font-semibold text-ink">Nova reserva · Ana</p>
-            <p className="mt-1 text-[13px] text-muted">Design de sobrancelha · Qui 15:30</p>
-            <p className="mt-2 inline-flex items-center gap-1 text-[13px] font-semibold text-success">
-              <Check className="size-3.5" /> Confirmado · sinal pago
-            </p>
+            <div aria-hidden="true" className="pointer-events-none absolute top-[71%] right-[calc(100%-1rem)] z-10 hidden w-[210px] -translate-y-1/2 rounded-card border border-line bg-surface p-3 shadow-[var(--shadow-raised)] xl:block">
+              <p className="text-[13px] font-semibold text-ink">Nova reserva · Ana</p>
+              <p className="mt-1 text-[13px] text-muted">Design de sobrancelha · Qui 15:30</p>
+              <p className="mt-2 inline-flex items-center gap-1 text-[13px] font-semibold text-success">
+                <Check className="size-3.5" /> Confirmado · sinal pago
+              </p>
+            </div>
           </div>
           <ValueSlab
             aria-hidden="true"

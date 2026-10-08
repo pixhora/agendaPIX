@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { BrandLink } from "@/components/ui/brand";
@@ -11,9 +12,12 @@ import { setLandingNavOpen } from "./nav-state";
 const links = [
   { href: "#como-funciona", label: "Como funciona" },
   { href: "#exemplo", label: "Exemplo", menuLabel: "Página de exemplo" },
-  { href: "#precos", label: "Preços" },
+  { href: "#precos", label: "Preço" },
   { href: "#perguntas-frequentes", label: "Dúvidas" },
 ] as const;
+
+/** Anel do token, sem o outline nativo (o :focus-visible global é um retângulo). */
+const focusRing = "outline-none [outline:none!important] focus-visible:shadow-[var(--shadow-focus)]";
 
 export function LandingHeader() {
   const [open, setOpen] = useState(false);
@@ -54,12 +58,28 @@ export function LandingHeader() {
 
   useEffect(() => {
     if (!open) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const html = document.documentElement;
+    const body = document.body;
+    const previousHtml = html.style.overflow;
+    const previousBody = body.style.overflow;
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
     const first = dialogRef.current?.querySelector<HTMLElement>("a[href]");
     first?.focus();
+
+    const blockScroll = (event: Event) => {
+      const panel = dialogRef.current;
+      if (panel && event.target instanceof Node && panel.contains(event.target)) return;
+      event.preventDefault();
+    };
+    document.addEventListener("wheel", blockScroll, { passive: false });
+    document.addEventListener("touchmove", blockScroll, { passive: false });
+
     return () => {
-      document.body.style.overflow = previous;
+      html.style.overflow = previousHtml;
+      body.style.overflow = previousBody;
+      document.removeEventListener("wheel", blockScroll);
+      document.removeEventListener("touchmove", blockScroll);
     };
   }, [open]);
 
@@ -87,7 +107,7 @@ export function LandingHeader() {
   }
 
   return (
-    <header className={cn("sticky top-0 z-40 bg-paper/85 backdrop-blur-[10px]", scrolled && "border-b border-line")}>
+    <header className={cn("sticky top-0 z-50 bg-paper/85 backdrop-blur-[10px]", scrolled && "border-b border-line")}>
       <div className="mx-auto flex h-[60px] max-w-[1120px] items-center justify-between gap-2 px-5 lg:h-[72px]">
         <BrandLink />
         <nav aria-label="Principal" className="hidden items-center gap-1 lg:flex">
@@ -110,7 +130,7 @@ export function LandingHeader() {
           <button
             ref={menuButtonRef}
             type="button"
-            className="inline-flex size-11 items-center justify-center rounded-full text-ink hover:bg-subtle md:hidden"
+            className={cn("inline-flex size-11 items-center justify-center rounded-full text-ink hover:bg-subtle md:hidden", focusRing)}
             aria-expanded={open}
             aria-controls="landing-menu"
             aria-label={open ? "Fechar menu" : "Abrir menu"}
@@ -120,41 +140,44 @@ export function LandingHeader() {
           </button>
         </div>
       </div>
-      {open ? (
-        <div className="fixed inset-0 z-50 md:hidden">
-          <button type="button" tabIndex={-1} className="absolute inset-0 bg-ink/40" aria-label="Fechar menu" onClick={() => close(true)} />
-          <div
-            ref={dialogRef}
-            id="landing-menu"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={titleId}
-            onKeyDown={onDialogKeyDown}
-            className="absolute inset-x-0 top-[60px] border-b border-line bg-paper px-5 pt-2 pb-5 shadow-[var(--shadow-raised)]"
-          >
-            <p id={titleId} className="sr-only">Menu</p>
-            <nav aria-label="Seções" className="flex flex-col">
-              {links.map((link) => (
-                <a
-                  key={link.href}
-                  href={link.href}
-                  className="inline-flex min-h-12 items-center text-base font-semibold text-ink"
-                  onClick={() => close(false)}
-                >
-                  {"menuLabel" in link ? link.menuLabel : link.label}
-                </a>
-              ))}
-            </nav>
-            <div className="my-3 h-px bg-line" />
-            <Link href="/login" className="inline-flex min-h-12 items-center text-base font-semibold text-ink" onClick={() => close(false)}>
-              Entrar
-            </Link>
-            <Link href="/onboarding" className={cn(buttonVariants({ size: "lg", className: "mt-2 w-full" }))} onClick={() => close(false)}>
-              Criar minha agenda grátis
-            </Link>
-          </div>
-        </div>
-      ) : null}
+      {open
+        ? createPortal(
+            <div className="md:hidden">
+              <button type="button" tabIndex={-1} aria-hidden="true" className="fixed inset-0 z-40 bg-black/40" onClick={() => close(true)} />
+              <div
+                ref={dialogRef}
+                id="landing-menu"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby={titleId}
+                onKeyDown={onDialogKeyDown}
+                className="fixed inset-x-0 top-[60px] z-50 border-b border-line bg-paper px-5 pt-2 pb-5 shadow-[var(--shadow-raised)]"
+              >
+                <p id={titleId} className="sr-only">Menu</p>
+                <nav aria-label="Seções" className="flex flex-col">
+                  {links.map((link) => (
+                    <a
+                      key={link.href}
+                      href={link.href}
+                      className={cn("inline-flex min-h-12 items-center rounded-lg px-2 text-base font-semibold text-ink", focusRing)}
+                      onClick={() => close(false)}
+                    >
+                      {"menuLabel" in link ? link.menuLabel : link.label}
+                    </a>
+                  ))}
+                </nav>
+                <div className="my-3 h-px bg-line" />
+                <Link href="/login" className={cn("inline-flex min-h-12 items-center rounded-lg px-2 text-base font-semibold text-ink", focusRing)} onClick={() => close(false)}>
+                  Entrar
+                </Link>
+                <Link href="/onboarding" className={cn(buttonVariants({ size: "lg", className: "mt-2 w-full" }))} onClick={() => close(false)}>
+                  Criar minha agenda grátis
+                </Link>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </header>
   );
 }

@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { faqItems, moneyLead } from "../../lib/marketing/landing-copy";
+import { demoSteps, faqItems, moneyLead } from "../../lib/marketing/landing-copy";
 import { formatMinutes, getPublicBookingFacts, type PublicBookingFacts } from "../../lib/marketing/facts";
 
 const feminineBrand = /(?:^|[^\p{L}])(?:a|da|pela|na)\s+AgendaPix/iu;
@@ -65,9 +65,23 @@ describe("landing copy", () => {
     expect(rendered).not.toMatch(/nada é devolvido sozinho|nada é automático|reembolsos nunca|repasse|chave Pix/i);
   });
 
-  it("hides the CPF question unless the server requires it", () => {
-    expect(faqItems(withName).some((item) => item.id === "cpf")).toBe(false);
-    expect(faqItems({ ...withName, requiresPayerCpf: true }).some((item) => item.id === "cpf")).toBe(true);
+  it("shows the CPF step and FAQ only when requiresPayerCpf is true", () => {
+    const withoutCpf = faqItems(withName);
+    const withCpf = faqItems({ ...withName, requiresPayerCpf: true });
+
+    expect(demoSteps(false)[2]).toBe("Informa nome e WhatsApp e lê a política do sinal antes de pagar.");
+    expect(demoSteps(true)[2]).toBe("Informa nome, WhatsApp e CPF e lê a política do sinal antes de pagar.");
+    expect(withoutCpf.some((item) => item.id === "cpf" || item.question.includes("CPF"))).toBe(false);
+    expect(withCpf.find((item) => item.id === "cpf")?.question).toBe("Por que o cliente informa o CPF?");
+  });
+
+  it("does not publish FAQ JSON-LD, so the CPF question cannot leak into structured data", () => {
+    const files = [...sourceFiles("components/landing"), ...sourceFiles("lib/marketing"), "app/page.tsx"];
+    const offenders = files.flatMap((file) => {
+      const source = readFileSync(file, "utf8");
+      return /FAQPage|ld\+json/.test(source) ? [file] : [];
+    });
+    expect(offenders).toEqual([]);
   });
 
   it("keeps the brand masculine in landing source", () => {

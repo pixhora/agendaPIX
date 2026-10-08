@@ -13,7 +13,7 @@ export function DemoSection({ facts }: { facts: PublicBookingFacts }) {
           <Eyebrow>Página de exemplo</Eyebrow>
           <SectionTitle id="exemplo-titulo">Veja como seu cliente agenda.</SectionTitle>
           <p className="mt-4 max-w-[46rem] text-base leading-relaxed text-pretty text-muted lg:text-lg">
-            Esta é a página que seu cliente abre pelo link. Toque e faça uma reserva de mentira, do serviço até o Pix.
+            Esta é a página que seu cliente abre pelo link. Toque e faça uma reserva de teste, do serviço até o Pix.
           </p>
           <ol className="mt-6 grid gap-3">
             {steps.map((step, index) => (
