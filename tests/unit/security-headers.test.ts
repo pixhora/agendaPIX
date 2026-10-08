@@ -1,12 +1,14 @@
 import { NextRequest } from "next/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  FORM_ACTION_SOURCES,
   HSTS_VALUE,
   PERMISSIONS_POLICY,
   REFERRER_POLICY,
   STATIC_ASSET_HEADER_SOURCES,
   buildContentSecurityPolicy,
   documentSecurityHeaders,
+  formActionDirective,
   staticAssetHeaderRules,
   staticAssetSecurityHeaders,
 } from "../../lib/security/headers";
@@ -77,6 +79,36 @@ describe("document security headers", () => {
 
   it("rejects a nonce that could break the policy", () => {
     expect(() => buildContentSecurityPolicy({ nonce: "bad nonce", isDev: false, upgradeInsecureRequests: false })).toThrow(/base64/);
+  });
+
+  it("allows form redirects only to Mercado Pago and WhatsApp, plus a configured OAuth origin", () => {
+    const base = `form-action ${FORM_ACTION_SOURCES.join(" ")}`;
+    expect(FORM_ACTION_SOURCES).toEqual([
+      "'self'",
+      "https://auth.mercadopago.com",
+      "https://auth.mercadopago.com.br",
+      "https://wa.me",
+      "https://api.whatsapp.com",
+    ]);
+    expect(formActionDirective("")).toBe(base);
+    expect(base).not.toMatch(/\*/);
+    expect(base.split(" ").filter((source) => source === "https:")).toEqual([]);
+    expect(formActionDirective("https://auth.mercadopago.com/authorization?client_id=1")).toBe(base);
+    expect(formActionDirective("https://auth.mercadopago.com.br/authorization")).toBe(base);
+    expect(formActionDirective("https://oauth.example.test/authorize")).toBe(`${base} https://oauth.example.test`);
+    expect(formActionDirective("https://oauth.example.test:8443/authorize")).toBe(`${base} https://oauth.example.test:8443`);
+    expect(formActionDirective("http://oauth.example.test/authorize")).toBe(base);
+    expect(formActionDirective("https://user:secret@oauth.example.test/authorize")).toBe(base);
+    expect(formActionDirective("not a url")).toBe(base);
+    expect(formActionDirective("https://*.example.test/authorize")).toBe(base);
+
+    vi.stubEnv("MP_OAUTH_AUTHORIZE_URL", "https://pagos.example/oauth/authorize");
+    try {
+      const csp = buildContentSecurityPolicy({ nonce: NONCE, isDev: false, upgradeInsecureRequests: false });
+      expect(csp.split(";").map((part) => part.trim()).find((part) => part.startsWith("form-action"))).toBe(`${base} https://pagos.example`);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });
 
