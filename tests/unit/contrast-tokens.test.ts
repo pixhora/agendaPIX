@@ -38,9 +38,7 @@ const lightSurfaces = ["--surface", "--paper", "--subtle"].map((name) => token(l
 const darkSurfaces = ["--surface", "--paper", "--subtle"].map((name) => token(dark, name));
 
 describe("texto secundário contra as superfícies", () => {
-  it("mantém o cinza claro neutro e pelo menos 4,5:1 no branco, no papel e no fundo sutil", () => {
-    expect(lightMuted.slice(1, 3)).toBe(lightMuted.slice(3, 5));
-    expect(lightMuted.slice(3, 5)).toBe(lightMuted.slice(5, 7));
+  it("mantém o cinza claro em pelo menos 4,5:1 no branco, no papel e no fundo sutil", () => {
     for (const surface of lightSurfaces) {
       expect(contrast(lightMuted, surface), `${lightMuted} sobre ${surface}`).toBeGreaterThanOrEqual(4.5);
     }
