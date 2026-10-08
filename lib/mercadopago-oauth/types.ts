@@ -15,6 +15,7 @@ export type MpConnection = {
   lastError: string | null;
   disconnectedAt: Date | null;
   consentVersion: string | null;
+  consentTextSha256: string | null;
   autoRefundAckAt: Date | null;
   consentUserId: string | null;
 };
@@ -24,6 +25,7 @@ export type MpOAuthState = {
   businessId: string;
   returnTo: string;
   consentVersion: string;
+  consentTextSha256: string;
   autoRefundAckAt: Date;
   consentUserId: string;
   expiresAt: Date;

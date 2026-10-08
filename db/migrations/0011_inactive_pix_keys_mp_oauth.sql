@@ -13,12 +13,14 @@ CREATE TABLE "mercadopago_connections" (
 	"last_error" text,
 	"disconnected_at" timestamp with time zone,
 	"consent_version" text,
+	"consent_text_sha256" text,
 	"auto_refund_ack_at" timestamp with time zone,
 	"consent_user_id" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "mercadopago_connections_status_valid" CHECK ("mercadopago_connections"."status" IN ('connected', 'needs_reconnect', 'disconnected')),
 	CONSTRAINT "mercadopago_connections_mp_user_not_empty" CHECK (length(trim("mercadopago_connections"."mp_user_id")) > 0),
+	CONSTRAINT "mercadopago_connections_consent_hash" CHECK ("mercadopago_connections"."consent_text_sha256" IS NULL OR "mercadopago_connections"."consent_text_sha256" ~ '^[0-9a-f]{64}$'),
 	CONSTRAINT "mercadopago_connections_tokens_match_status" CHECK ((
     ("mercadopago_connections"."status" = 'connected' AND "mercadopago_connections"."disconnected_at" IS NULL AND "mercadopago_connections"."access_token_enc" IS NOT NULL AND "mercadopago_connections"."refresh_token_enc" IS NOT NULL AND length("mercadopago_connections"."access_token_enc") > 0 AND length("mercadopago_connections"."refresh_token_enc") > 0 AND "mercadopago_connections"."expires_at" IS NOT NULL)
     OR ("mercadopago_connections"."status" = 'needs_reconnect' AND "mercadopago_connections"."access_token_enc" IS NULL AND "mercadopago_connections"."refresh_token_enc" IS NULL)
@@ -34,11 +36,12 @@ CREATE TABLE "mercadopago_oauth_states" (
 	"business_id" uuid NOT NULL,
 	"return_to" text NOT NULL,
 	"consent_version" text NOT NULL,
+	"consent_text_sha256" text NOT NULL,
 	"auto_refund_ack_at" timestamp with time zone NOT NULL,
 	"consent_user_id" text NOT NULL,
 	"expires_at" timestamp with time zone NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "mercadopago_oauth_states_not_empty" CHECK (length(trim("mercadopago_oauth_states"."state")) > 0 AND length(trim("mercadopago_oauth_states"."consent_version")) > 0 AND length(trim("mercadopago_oauth_states"."consent_user_id")) > 0)
+	CONSTRAINT "mercadopago_oauth_states_not_empty" CHECK (length(trim("mercadopago_oauth_states"."state")) > 0 AND length(trim("mercadopago_oauth_states"."consent_version")) > 0 AND length(trim("mercadopago_oauth_states"."consent_user_id")) > 0 AND "mercadopago_oauth_states"."consent_text_sha256" ~ '^[0-9a-f]{64}$')
 );
 --> statement-breakpoint
 CREATE TABLE "mp_connection_events" (
@@ -53,8 +56,8 @@ CREATE TABLE "mp_connection_events" (
 CREATE TABLE "owner_notices" (
 	"business_id" uuid NOT NULL,
 	"kind" text NOT NULL,
+	"booking_id" uuid,
 	"dismissed_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "owner_notices_business_id_kind_pk" PRIMARY KEY("business_id","kind"),
 	CONSTRAINT "owner_notices_kind_not_empty" CHECK (length(trim("owner_notices"."kind")) > 0)
 );
 --> statement-breakpoint
@@ -68,4 +71,6 @@ CREATE UNIQUE INDEX "mercadopago_connections_mp_user_connected_uq" ON "mercadopa
 CREATE INDEX "mercadopago_connections_refresh_idx" ON "mercadopago_connections" USING btree ("expires_at") WHERE "mercadopago_connections"."status" = 'connected';--> statement-breakpoint
 CREATE INDEX "mercadopago_oauth_states_business_idx" ON "mercadopago_oauth_states" USING btree ("business_id");--> statement-breakpoint
 CREATE INDEX "mp_connection_events_business_idx" ON "mp_connection_events" USING btree ("business_id","created_at");--> statement-breakpoint
+CREATE UNIQUE INDEX "owner_notices_business_kind_uq" ON "owner_notices" USING btree ("business_id","kind") WHERE "owner_notices"."booking_id" IS NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "owner_notices_booking_kind_uq" ON "owner_notices" USING btree ("booking_id","kind") WHERE "owner_notices"."booking_id" IS NOT NULL;--> statement-breakpoint
 ALTER TABLE "business_pix_keys" ADD CONSTRAINT "business_pix_keys_retired" CHECK ("business_pix_keys"."deactivated_at" IS NOT NULL AND length(trim("business_pix_keys"."deactivation_reason")) > 0);

@@ -1,10 +1,10 @@
-import { createHmac } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { assertMpConnectedForDeposit, getServiceBlockedReason } from "../../lib/mercadopago-oauth/bookability";
 import { mercadoPagoManifest, handleMpConnectWebhook } from "../../lib/mercadopago-oauth/connect-webhook";
 import { encryptMpToken } from "../../lib/mercadopago-oauth/crypto";
 import { disconnectMercadoPago, findBusinessIdByMpUserId, getMercadoPagoOwnerStatus, getSellerAccessToken, getSellerAccessTokenForSettlement, isMpConnected } from "../../lib/mercadopago-oauth/credentials";
-import { MP_CONNECT_CONSENT_VERSION } from "../../lib/mercadopago/consent";
+import { MP_CONNECT_CONSENT_TEXT, MP_CONNECT_CONSENT_VERSION } from "../../lib/mercadopago/consent";
 import { assertPlaintextAbsent, beginMercadoPagoConnect, completeMercadoPagoConnect, submitMercadoPagoConnect } from "../../lib/mercadopago-oauth/flow";
 import { GET as connectGet } from "../../app/api/businesses/[businessId]/mercadopago/connect/route";
 import { createMemoryMpStore } from "../../lib/mercadopago-oauth/memory-store";
@@ -48,6 +48,7 @@ async function pinConsent(store: ReturnType<typeof createMemoryMpStore>, authori
     businessId,
     returnTo: "/dashboard",
     consentVersion: MP_CONNECT_CONSENT_VERSION,
+    consentTextSha256: createHash("sha256").update(MP_CONNECT_CONSENT_TEXT).digest("hex"),
     autoRefundAckAt: now,
     consentUserId: "owner",
     expiresAt: new Date(now.getTime() + 10 * 60 * 1000),
@@ -70,6 +71,7 @@ function connection(overrides: Partial<MpConnection> = {}): MpConnection {
     lastError: null,
     disconnectedAt: null,
     consentVersion: null,
+    consentTextSha256: null,
     autoRefundAckAt: null,
     consentUserId: null,
     ...overrides,
@@ -144,6 +146,7 @@ describe("OAuth Mercado Pago por negócio", () => {
     expect(finished.path).toContain("mp=connected");
     const saved = await store.findByBusinessId(businessId);
     expect(saved?.consentVersion).toBe(MP_CONNECT_CONSENT_VERSION);
+    expect(saved?.consentTextSha256).toBe(createHash("sha256").update(MP_CONNECT_CONSENT_TEXT).digest("hex"));
     expect(saved?.consentUserId).toBe("owner");
     expect(JSON.stringify(saved)).not.toContain("203.0.113.10");
     expect(store.consentEvents).toEqual([{ businessId, kind: "consent_recorded", ip: "203.0.113.10", createdAt: now }]);
@@ -360,10 +363,18 @@ describe("OAuth Mercado Pago por negócio", () => {
     expect(new URL(referer.location).searchParams.has("scope")).toBe(false);
     const state = new URL(referer.location).searchParams.get("state");
     const pending = await store.findOAuthState(state ?? "");
+    expect(MP_CONNECT_CONSENT_TEXT).toBe("Entendi e autorizo: quando um Pix chegar depois do prazo e o horário já estiver ocupado, o AgendaPix devolve sozinho o valor inteiro, do saldo da minha conta Mercado Pago, e me avisa por e-mail. Se essa devolução falhar, eu devolvo manualmente em até 7 dias corridos, contados do aviso.");
     expect(pending?.consentVersion).toBe(MP_CONNECT_CONSENT_VERSION);
+    expect(pending?.consentTextSha256).toBe(createHash("sha256").update(MP_CONNECT_CONSENT_TEXT).digest("hex"));
     expect(pending?.consentUserId).toBe("owner");
     expect(pending?.returnTo).toBe("/dashboard");
-    const again = createMemoryMpStore([connection({ consentVersion: MP_CONNECT_CONSENT_VERSION, autoRefundAckAt: now, consentUserId: "owner-original" })]);
+    const storedHash = "ab".repeat(32);
+    const again = createMemoryMpStore([connection({
+      consentVersion: MP_CONNECT_CONSENT_VERSION,
+      consentTextSha256: storedHash,
+      autoRefundAckAt: now,
+      consentUserId: "owner-original",
+    })]);
     const reused = await submitMercadoPagoConnect({
       request: new Request("https://app.example.com/api/businesses/x/mercadopago/connect", {
         method: "POST",
@@ -380,6 +391,7 @@ describe("OAuth Mercado Pago por negócio", () => {
     if (reused.kind !== "redirect") throw new Error("reconexão sem redirect");
     const reusedState = await again.findOAuthState(new URL(reused.location).searchParams.get("state") ?? "");
     expect(reusedState?.consentUserId).toBe("owner-original");
+    expect(reusedState?.consentTextSha256).toBe(storedHash);
     expect(reusedState?.autoRefundAckAt).toEqual(now);
   });
 

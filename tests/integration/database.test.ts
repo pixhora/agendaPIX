@@ -82,13 +82,51 @@ describe("isolamento entre negócios", () => {
     const first = await client.query("SELECT dismissed_at FROM owner_notices WHERE business_id = $1 AND kind = 'pix_key_retired'", [businessA]);
     expect(first.rows).toEqual([]);
     await dismissLegacyPixKeyNotice(businessA, database);
-    const dismissed = await client.query("SELECT dismissed_at FROM owner_notices WHERE business_id = $1 AND kind = 'pix_key_retired'", [businessA]);
+    const dismissed = await client.query("SELECT dismissed_at, booking_id FROM owner_notices WHERE business_id = $1 AND kind = 'pix_key_retired'", [businessA]);
     await dismissLegacyPixKeyNotice(businessA, database);
-    const again = await client.query("SELECT dismissed_at FROM owner_notices WHERE business_id = $1 AND kind = 'pix_key_retired'", [businessA]);
+    const again = await client.query("SELECT dismissed_at, booking_id FROM owner_notices WHERE business_id = $1 AND kind = 'pix_key_retired'", [businessA]);
     expect(again.rows).toHaveLength(1);
     expect(again.rows[0].dismissed_at).toEqual(dismissed.rows[0].dismissed_at);
     expect(await hasUndismissedLegacyPixKey(businessA, database)).toBe(false);
     expect(await client.query("SELECT ciphertext FROM business_pix_keys WHERE business_id = $1", [businessA])).toMatchObject({ rows: [{ ciphertext: "cipher-text-not-a-key" }] });
+    expect(again.rows[0].booking_id).toBeNull();
+  });
+  it("aceita um aviso por reserva e recusa o segundo do mesmo par", async () => {
+    const columns = await client.query(
+      "SELECT table_name, is_nullable FROM information_schema.columns WHERE column_name = 'consent_text_sha256' AND table_schema = 'public' ORDER BY table_name",
+    );
+    expect(columns.rows).toEqual([
+      { table_name: "mercadopago_connections", is_nullable: "YES" },
+      { table_name: "mercadopago_oauth_states", is_nullable: "NO" },
+    ]);
+    await dismissLegacyPixKeyNotice(businessA, database);
+    await client.query("SAVEPOINT pix_notice_dup");
+    await expect(client.query(
+      "INSERT INTO owner_notices (business_id, kind) VALUES ($1, 'pix_key_retired')",
+      [businessA],
+    )).rejects.toMatchObject({ code: "23505" });
+    await client.query("ROLLBACK TO SAVEPOINT pix_notice_dup");
+    const bookingB = randomUUID();
+    await database.insert(schema.bookings).values({
+      id: bookingB, businessId: businessA, serviceId: serviceA, customerId: customerA,
+      startsAt: new Date("2030-01-02T12:00:00Z"), endsAt: new Date("2030-01-02T12:30:00Z"),
+      priceCents: 5000, depositCents: 1000, status: "confirmed",
+    });
+    await client.query(
+      "INSERT INTO owner_notices (business_id, kind, booking_id) VALUES ($1, 'refund_deadline_eve', $2), ($1, 'refund_deadline_eve', $3)",
+      [businessA, bookingA, bookingB],
+    );
+    await client.query("SAVEPOINT booking_notice_dup");
+    await expect(client.query(
+      "INSERT INTO owner_notices (business_id, kind, booking_id) VALUES ($1, 'refund_deadline_eve', $2)",
+      [businessA, bookingA],
+    )).rejects.toMatchObject({ code: "23505" });
+    await client.query("ROLLBACK TO SAVEPOINT booking_notice_dup");
+    const indexes = await client.query("SELECT indexdef FROM pg_indexes WHERE tablename = 'owner_notices' ORDER BY indexname");
+    const defs = indexes.rows.map((row: { indexdef: string }) => row.indexdef).join("\n");
+    expect(defs).toMatch(/UNIQUE INDEX owner_notices_business_kind_uq .* WHERE \(booking_id IS NULL\)/);
+    expect(defs).toMatch(/UNIQUE INDEX owner_notices_booking_kind_uq .* WHERE \(booking_id IS NOT NULL\)/);
+    expect(defs).not.toMatch(/PRIMARY KEY/);
   });
   it.each(["service", "customer"])("impede reserva com %s de outro negócio", async (field) => {
     await expect(client.query(

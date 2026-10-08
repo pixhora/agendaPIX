@@ -1,4 +1,4 @@
-import { and, eq, isNotNull } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { getDb } from "../../db";
 import { businessPixKeys, ownerNotices } from "../../db/schema";
 
@@ -20,6 +20,7 @@ export async function hasUndismissedLegacyPixKey(businessId: string, database: N
   const [notice] = await database.select({ businessId: ownerNotices.businessId }).from(ownerNotices).where(and(
     eq(ownerNotices.businessId, businessId),
     eq(ownerNotices.kind, PIX_KEY_RETIRED_NOTICE),
+    isNull(ownerNotices.bookingId),
   )).limit(1);
   return !notice;
 }
@@ -28,5 +29,6 @@ export async function hasUndismissedLegacyPixKey(businessId: string, database: N
 export async function dismissLegacyPixKeyNotice(businessId: string, database: NoticeDatabase = getDb()) {
   await database.insert(ownerNotices).values({ businessId, kind: PIX_KEY_RETIRED_NOTICE }).onConflictDoNothing({
     target: [ownerNotices.businessId, ownerNotices.kind],
+    where: sql`${ownerNotices.bookingId} IS NULL`,
   });
 }

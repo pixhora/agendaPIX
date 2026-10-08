@@ -1,4 +1,5 @@
-import { isAutoRefundAck, MP_CONNECT_CONSENT_VERSION } from "../mercadopago/consent";
+import { createHash } from "node:crypto";
+import { isAutoRefundAck, MP_CONNECT_CONSENT_TEXT, MP_CONNECT_CONSENT_VERSION } from "../mercadopago/consent";
 import { normalizeClientAddress } from "../bookings/rate-limit";
 import { findOwnedBusiness } from "../tenancy";
 import { readBody } from "../http";
@@ -109,6 +110,7 @@ export async function completeMercadoPagoConnect(input: {
     lastError: null,
     disconnectedAt: null,
     consentVersion: pending.consentVersion,
+    consentTextSha256: pending.consentTextSha256,
     autoRefundAckAt: pending.autoRefundAckAt,
     consentUserId: pending.consentUserId,
   });
@@ -179,15 +181,16 @@ export async function submitMercadoPagoConnect(input: {
   const returnTo = sanitizeMpReturnTo(fields.returnTo);
   const store = input.store ?? createDrizzleMpStore();
   const existing = await store.findByBusinessId(input.businessId);
+  const textSha256 = createHash("sha256").update(MP_CONNECT_CONSENT_TEXT).digest("hex");
   const reused = existing?.consentVersion === MP_CONNECT_CONSENT_VERSION && existing.autoRefundAckAt && existing.consentUserId
-    ? { version: existing.consentVersion, ackAt: existing.autoRefundAckAt, userId: existing.consentUserId }
+    ? { version: existing.consentVersion, ackAt: existing.autoRefundAckAt, userId: existing.consentUserId, textSha256: existing.consentTextSha256 ?? textSha256 }
     : null;
   const acknowledged = isAutoRefundAck(fields.autoRefundAck) && fields.consentVersion === MP_CONNECT_CONSENT_VERSION;
   if (!reused && !acknowledged) {
     if (wantsJson(input.request)) return { kind: "json", status: 400, body: { error: { code: "auto_refund_ack_required" } } };
     return { kind: "redirect", location: redirectUrl(mpResultPath(returnTo, { mp: "error", reason: "auto_refund_ack_required" }), config).toString(), cookie: null };
   }
-  const consent = reused ?? { version: MP_CONNECT_CONSENT_VERSION, ackAt: now, userId: input.ownerId };
+  const consent = reused ?? { version: MP_CONNECT_CONSENT_VERSION, ackAt: now, userId: input.ownerId, textSha256 };
   const started = beginMercadoPagoConnect({ businessId: input.businessId, returnTo, now, env: input.env });
   const state = new URL(started.authorizationUrl).searchParams.get("state");
   if (!state) throw new Error("state ausente");
@@ -196,6 +199,7 @@ export async function submitMercadoPagoConnect(input: {
     businessId: input.businessId,
     returnTo: started.returnTo,
     consentVersion: consent.version,
+    consentTextSha256: consent.textSha256,
     autoRefundAckAt: consent.ackAt,
     consentUserId: consent.userId,
     expiresAt: new Date(now.getTime() + MP_OAUTH_COOKIE_MAX_AGE_SECONDS * 1000),

@@ -1,5 +1,5 @@
 {
-  "id": "9c84234b-bf74-4f48-8675-465ee71273f9",
+  "id": "52b533ff-2b57-44f5-9306-a4f56067c661",
   "prevId": "fb71f4eb-a4bc-4452-9356-84cd7ff1623e",
   "version": "7",
   "dialect": "postgresql",
@@ -836,6 +836,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "consent_text_sha256": {
+          "name": "consent_text_sha256",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "auto_refund_ack_at": {
           "name": "auto_refund_ack_at",
           "type": "timestamp with time zone",
@@ -924,6 +930,10 @@
           "name": "mercadopago_connections_mp_user_not_empty",
           "value": "length(trim(\"mercadopago_connections\".\"mp_user_id\")) > 0"
         },
+        "mercadopago_connections_consent_hash": {
+          "name": "mercadopago_connections_consent_hash",
+          "value": "\"mercadopago_connections\".\"consent_text_sha256\" IS NULL OR \"mercadopago_connections\".\"consent_text_sha256\" ~ '^[0-9a-f]{64}$'"
+        },
         "mercadopago_connections_tokens_match_status": {
           "name": "mercadopago_connections_tokens_match_status",
           "value": "(\n    (\"mercadopago_connections\".\"status\" = 'connected' AND \"mercadopago_connections\".\"disconnected_at\" IS NULL AND \"mercadopago_connections\".\"access_token_enc\" IS NOT NULL AND \"mercadopago_connections\".\"refresh_token_enc\" IS NOT NULL AND length(\"mercadopago_connections\".\"access_token_enc\") > 0 AND length(\"mercadopago_connections\".\"refresh_token_enc\") > 0 AND \"mercadopago_connections\".\"expires_at\" IS NOT NULL)\n    OR (\"mercadopago_connections\".\"status\" = 'needs_reconnect' AND \"mercadopago_connections\".\"access_token_enc\" IS NULL AND \"mercadopago_connections\".\"refresh_token_enc\" IS NULL)\n    OR (\"mercadopago_connections\".\"status\" = 'disconnected' AND \"mercadopago_connections\".\"disconnected_at\" IS NOT NULL AND (\n      (\"mercadopago_connections\".\"access_token_enc\" IS NULL AND \"mercadopago_connections\".\"refresh_token_enc\" IS NULL)\n      OR (\"mercadopago_connections\".\"access_token_enc\" IS NOT NULL AND \"mercadopago_connections\".\"refresh_token_enc\" IS NOT NULL AND length(\"mercadopago_connections\".\"access_token_enc\") > 0 AND length(\"mercadopago_connections\".\"refresh_token_enc\") > 0)\n    ))\n  )"
@@ -955,6 +965,12 @@
         },
         "consent_version": {
           "name": "consent_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "consent_text_sha256": {
+          "name": "consent_text_sha256",
           "type": "text",
           "primaryKey": false,
           "notNull": true
@@ -1023,7 +1039,7 @@
       "checkConstraints": {
         "mercadopago_oauth_states_not_empty": {
           "name": "mercadopago_oauth_states_not_empty",
-          "value": "length(trim(\"mercadopago_oauth_states\".\"state\")) > 0 AND length(trim(\"mercadopago_oauth_states\".\"consent_version\")) > 0 AND length(trim(\"mercadopago_oauth_states\".\"consent_user_id\")) > 0"
+          "value": "length(trim(\"mercadopago_oauth_states\".\"state\")) > 0 AND length(trim(\"mercadopago_oauth_states\".\"consent_version\")) > 0 AND length(trim(\"mercadopago_oauth_states\".\"consent_user_id\")) > 0 AND \"mercadopago_oauth_states\".\"consent_text_sha256\" ~ '^[0-9a-f]{64}$'"
         }
       },
       "isRLSEnabled": false
@@ -1196,6 +1212,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "booking_id": {
+          "name": "booking_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "dismissed_at": {
           "name": "dismissed_at",
           "type": "timestamp with time zone",
@@ -1204,7 +1226,52 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "owner_notices_business_kind_uq": {
+          "name": "owner_notices_business_kind_uq",
+          "columns": [
+            {
+              "expression": "business_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "kind",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"owner_notices\".\"booking_id\" IS NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "owner_notices_booking_kind_uq": {
+          "name": "owner_notices_booking_kind_uq",
+          "columns": [
+            {
+              "expression": "booking_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "kind",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"owner_notices\".\"booking_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "owner_notices_business_id_businesses_id_fk": {
           "name": "owner_notices_business_id_businesses_id_fk",
@@ -1220,15 +1287,7 @@
           "onUpdate": "no action"
         }
       },
-      "compositePrimaryKeys": {
-        "owner_notices_business_id_kind_pk": {
-          "name": "owner_notices_business_id_kind_pk",
-          "columns": [
-            "business_id",
-            "kind"
-          ]
-        }
-      },
+      "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {

@@ -245,6 +245,7 @@ export const mercadopagoConnections = pgTable("mercadopago_connections", {
   lastError: text("last_error"),
   disconnectedAt: timestamp("disconnected_at", { withTimezone: true }),
   consentVersion: text("consent_version"),
+  consentTextSha256: text("consent_text_sha256"),
   autoRefundAckAt: timestamp("auto_refund_ack_at", { withTimezone: true }),
   consentUserId: text("consent_user_id"),
   ...timestamps(),
@@ -253,6 +254,7 @@ export const mercadopagoConnections = pgTable("mercadopago_connections", {
   index("mercadopago_connections_refresh_idx").on(table.expiresAt).where(sql`${table.status} = 'connected'`),
   check("mercadopago_connections_status_valid", sql`${table.status} IN ('connected', 'needs_reconnect', 'disconnected')`),
   check("mercadopago_connections_mp_user_not_empty", sql`length(trim(${table.mpUserId})) > 0`),
+  check("mercadopago_connections_consent_hash", sql`${table.consentTextSha256} IS NULL OR ${table.consentTextSha256} ~ '^[0-9a-f]{64}$'`),
   check("mercadopago_connections_tokens_match_status", sql`(
     (${table.status} = 'connected' AND ${table.disconnectedAt} IS NULL AND ${table.accessTokenEnc} IS NOT NULL AND ${table.refreshTokenEnc} IS NOT NULL AND length(${table.accessTokenEnc}) > 0 AND length(${table.refreshTokenEnc}) > 0 AND ${table.expiresAt} IS NOT NULL)
     OR (${table.status} = 'needs_reconnect' AND ${table.accessTokenEnc} IS NULL AND ${table.refreshTokenEnc} IS NULL)
@@ -269,13 +271,14 @@ export const mercadopagoOauthStates = pgTable("mercadopago_oauth_states", {
   businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "restrict" }),
   returnTo: text("return_to").notNull(),
   consentVersion: text("consent_version").notNull(),
+  consentTextSha256: text("consent_text_sha256").notNull(),
   autoRefundAckAt: timestamp("auto_refund_ack_at", { withTimezone: true }).notNull(),
   consentUserId: text("consent_user_id").notNull(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
   index("mercadopago_oauth_states_business_idx").on(table.businessId),
-  check("mercadopago_oauth_states_not_empty", sql`length(trim(${table.state})) > 0 AND length(trim(${table.consentVersion})) > 0 AND length(trim(${table.consentUserId})) > 0`),
+  check("mercadopago_oauth_states_not_empty", sql`length(trim(${table.state})) > 0 AND length(trim(${table.consentVersion})) > 0 AND length(trim(${table.consentUserId})) > 0 AND ${table.consentTextSha256} ~ '^[0-9a-f]{64}$'`),
 ]);
 
 /** Eventos da conexão. O IP do consentimento fica só aqui. */
@@ -290,13 +293,15 @@ export const mpConnectionEvents = pgTable("mp_connection_events", {
   check("mp_connection_events_kind_not_empty", sql`length(trim(${table.kind})) > 0`),
 ]);
 
-/** Aviso dispensado pelo dono. Uma linha por negócio e tipo. Não guarda a chave Pix. */
+/** Aviso do dono. Sem reserva, uma linha por negócio e tipo. Com reserva, uma linha por reserva e tipo. Não guarda a chave Pix. */
 export const ownerNotices = pgTable("owner_notices", {
   businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "restrict" }),
   kind: text("kind").notNull(),
+  bookingId: uuid("booking_id"),
   dismissedAt: timestamp("dismissed_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
-  primaryKey({ columns: [table.businessId, table.kind] }),
+  uniqueIndex("owner_notices_business_kind_uq").on(table.businessId, table.kind).where(sql`${table.bookingId} IS NULL`),
+  uniqueIndex("owner_notices_booking_kind_uq").on(table.bookingId, table.kind).where(sql`${table.bookingId} IS NOT NULL`),
   check("owner_notices_kind_not_empty", sql`length(trim(${table.kind})) > 0`),
 ]);
 
