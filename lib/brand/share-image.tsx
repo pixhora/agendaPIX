@@ -76,9 +76,10 @@ export async function renderShareImage() {
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          justifyContent: "space-between",
+          justifyContent: "center",
           background: brandColors.paper,
-          padding: 64,
+          padding: "40px 0",
+          gap: 28,
           fontFamily: "Plus Jakarta Sans",
         }}
       >
@@ -86,7 +87,8 @@ export async function renderShareImage() {
         <div
           style={{
             display: "flex",
-            maxWidth: 900,
+            width: 560,
+            maxWidth: 560,
             textAlign: "center",
             fontSize: 64,
             fontWeight: 700,
@@ -102,21 +104,22 @@ export async function renderShareImage() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            gap: 20,
-            width: "100%",
+            width: 560,
+            maxWidth: 560,
             background: brandColors.pixBright,
             color: brandColors.ink,
             borderRadius: 16,
             height: 84,
-            padding: "0 32px",
             fontSize: 32,
             fontWeight: 700,
           }}
         >
-          <span style={{ display: "flex" }}>15:30</span>
-          <span style={{ display: "flex" }}>·</span>
-          <CheckMark />
-          <span style={{ display: "flex" }}>Reservado · sinal pago</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+            <span style={{ display: "flex" }}>15:30</span>
+            <span style={{ display: "flex" }}>·</span>
+            <CheckMark />
+            <span style={{ display: "flex" }}>Reservado · sinal pago</span>
+          </div>
         </div>
       </div>
     ),
