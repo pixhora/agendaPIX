@@ -208,17 +208,19 @@ h1, h2, h3, h4, h5, h6, .font-display {
   box-shadow: none;
 }
 
-/* CTA grudado só no celular. A partir de 768px volta ao fluxo. */
+/* CTA grudado só no celular. Fundo opaco da superfície do card, cobrindo o preenchimento e a borda de baixo para não cortar o canto. A partir de 768px volta ao fluxo. */
 @media (max-width: 767.98px) {
   .form-cta {
     position: sticky;
     z-index: 20;
     bottom: 0;
-    margin-inline: -0.25rem;
+    margin-inline: calc(-1 * var(--form-cta-outset, 1rem) - 1px);
+    margin-bottom: calc(-1 * var(--form-cta-outset, 1rem) - 1px);
     border-top: 1px solid var(--line);
-    background: color-mix(in srgb, var(--paper) 92%, transparent);
-    padding: 0.75rem 0.25rem calc(0.75rem + env(safe-area-inset-bottom));
-    backdrop-filter: blur(8px);
+    border-bottom-left-radius: var(--form-cta-radius, var(--radius-card));
+    border-bottom-right-radius: var(--form-cta-radius, var(--radius-card));
+    background: var(--surface);
+    padding: 0.75rem calc(var(--form-cta-outset, 1rem) + 1px) calc(0.75rem + env(safe-area-inset-bottom));
   }
   html:has([data-app-frame]) .form-cta {
     bottom: calc(4.75rem + env(safe-area-inset-bottom));

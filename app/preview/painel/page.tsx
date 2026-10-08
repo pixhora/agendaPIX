@@ -55,7 +55,7 @@ export default async function PreviewPainelPage({ searchParams }: { searchParams
 
   return <main className="mx-auto min-w-0 max-w-3xl px-4 py-6">
     <h1 className="font-display text-2xl font-extrabold">Prévia do painel</h1>
-    {scene === "politica" && <div className="mt-4 rounded-card border border-line bg-surface p-4 sm:p-6">
+    {scene === "politica" && <div className="mt-4 rounded-card border border-line bg-surface p-4 [--form-cta-outset:1rem] sm:p-6 sm:[--form-cta-outset:1.5rem]">
       <ServiceForm
         businessId={BUSINESS_ID}
         businessName="Studio Bella"
@@ -63,7 +63,7 @@ export default async function PreviewPainelPage({ searchParams }: { searchParams
         service={{ id: SERVICE_ID, name: "Design de sobrancelha", durationMinutes: 45, priceCents: 6000, depositCents: 2000, active: true, depositPolicy: policy }}
       />
     </div>}
-    {scene === "aviso" && <div className="mt-4 rounded-card border border-line bg-surface p-4 sm:p-6">
+    {scene === "aviso" && <div className="mt-4 rounded-card border border-line bg-surface p-4 [--form-cta-outset:1rem] sm:p-6 sm:[--form-cta-outset:1.5rem]">
       <ServiceForm
         businessId={BUSINESS_ID}
         businessName="Studio Bella"
