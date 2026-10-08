@@ -7,6 +7,8 @@ import * as schema from "../../db/schema";
 import { authEnvSchema } from "../env";
 import { HttpError } from "../http";
 import { paymentsConfig } from "../payments/config";
+import { assertMpConnectedForDeposit } from "../mercadopago-oauth/bookability";
+import { createDrizzleMpStore } from "../mercadopago-oauth/repository";
 import { getPaymentProvider } from "../payments";
 import { pixChargeSchema, type PaymentProvider, type PixCharge } from "../payments/provider";
 import { callProvider, ProviderTimeoutError } from "../payments/timeout";
@@ -246,7 +248,10 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
     const access = await loadBookingAccess(business, transaction);
     if (access.bookingsPaused) throw new HttpError(403, "bookings_paused", BOOKINGS_PAUSED_MESSAGE);
     const service = await serviceById(business.id, input.serviceId, transaction);
-    if (service.depositCents > 0) assertDepositBookable(business);
+    if (service.depositCents > 0) {
+      assertDepositBookable(business);
+      await assertMpConnectedForDeposit(business.id, { store: createDrizzleMpStore(database) });
+    }
     const policy = service.depositCents > 0 ? depositPolicySchema.parse(service.depositPolicy) : null;
     const currentHash = policy ? policyHashFor(policy, { depositCents: service.depositCents }) : null;
     if (service.depositCents > 0 && !input.policyHash) throw new HttpError(400, "invalid_input", "Confira a política do sinal antes de agendar.");

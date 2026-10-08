@@ -1,12 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool, type PoolClient } from "pg";
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as schema from "../../db/schema";
 import { databaseEnvSchema } from "../../lib/env";
+import { maskEmail } from "../../lib/privacy/mask-email";
+import { dismissLegacyPixKeyNotice, hasUndismissedLegacyPixKey } from "../../lib/pix-key/notice";
 import { findOwnedBusiness } from "../../lib/tenancy";
-import { getBusinessPixKey, setBusinessPixKey } from "../../lib/pix-key/service";
 
 const pool = new Pool({ connectionString: databaseEnvSchema.parse(process.env).DATABASE_URL, connectionTimeoutMillis: 5000 });
 let client: PoolClient;
@@ -68,20 +68,90 @@ describe("isolamento entre negócios", () => {
     expect(await findOwnedBusiness(businessA, ownerB, database)).toBeNull();
     expect(await findOwnedBusiness(randomUUID(), ownerA, database)).toBeNull();
   });
-  it("cifra chave Pix e só devolve máscara ao dono do negócio", async () => {
-    const previousKey = process.env.PIX_KEY_ENCRYPTION_KEY;
-    process.env.PIX_KEY_ENCRYPTION_KEY = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-    try {
-      const saved = await setBusinessPixKey(businessA, ownerA, { type: "email", value: "dono@example.com" }, database);
-      const stored = await database.select().from(schema.businessPixKeys).where(eq(schema.businessPixKeys.businessId, businessA));
-      expect(saved).toEqual({ configured: true, type: "email", hint: "d••••@example.com" });
-      expect(stored[0].ciphertext).not.toContain("dono@example.com");
-      expect(await getBusinessPixKey(businessA, ownerA, database)).toEqual(saved);
-      await expect(getBusinessPixKey(businessA, ownerB, database)).rejects.toMatchObject({ status: 404 });
-    } finally {
-      if (previousKey === undefined) delete process.env.PIX_KEY_ENCRYPTION_KEY;
-      else process.env.PIX_KEY_ENCRYPTION_KEY = previousKey;
-    }
+  it("inativa a chave Pix antiga sem apagar o ciphertext e só expõe um booleano", async () => {
+    await client.query(
+      "INSERT INTO business_pix_keys (business_id, type, ciphertext, nonce, key_version, hint) VALUES ($1, 'email', 'cipher-text-not-a-key', 'nonce-value', 1, 'd••••@example.com')",
+      [businessA],
+    );
+    const stored = await client.query("SELECT ciphertext, hint, deactivated_at, deactivation_reason FROM business_pix_keys WHERE business_id = $1", [businessA]);
+    expect(stored.rows[0].ciphertext).toBe("cipher-text-not-a-key");
+    expect(stored.rows[0].hint).toBe("d••••@example.com");
+    expect(stored.rows[0].deactivated_at).toBeTruthy();
+    expect(stored.rows[0].deactivation_reason).toBe("pix_key_retired");
+    expect(await hasUndismissedLegacyPixKey(businessA, database)).toBe(true);
+    expect(await hasUndismissedLegacyPixKey(businessB, database)).toBe(false);
+    const first = await client.query("SELECT dismissed_at FROM owner_notices WHERE business_id = $1 AND kind = 'pix_key_retired'", [businessA]);
+    expect(first.rows).toEqual([]);
+    await dismissLegacyPixKeyNotice(businessA, database);
+    const dismissed = await client.query("SELECT dismissed_at, booking_id FROM owner_notices WHERE business_id = $1 AND kind = 'pix_key_retired'", [businessA]);
+    await dismissLegacyPixKeyNotice(businessA, database);
+    const again = await client.query("SELECT dismissed_at, booking_id FROM owner_notices WHERE business_id = $1 AND kind = 'pix_key_retired'", [businessA]);
+    expect(again.rows).toHaveLength(1);
+    expect(again.rows[0].dismissed_at).toEqual(dismissed.rows[0].dismissed_at);
+    expect(await hasUndismissedLegacyPixKey(businessA, database)).toBe(false);
+    expect(await client.query("SELECT ciphertext FROM business_pix_keys WHERE business_id = $1", [businessA])).toMatchObject({ rows: [{ ciphertext: "cipher-text-not-a-key" }] });
+    expect(again.rows[0].booking_id).toBeNull();
+  });
+  it("aceita um aviso por reserva e recusa o segundo do mesmo par", async () => {
+    const columns = await client.query(
+      "SELECT table_name, is_nullable FROM information_schema.columns WHERE column_name = 'consent_text_sha256' AND table_schema = 'public' ORDER BY table_name",
+    );
+    expect(columns.rows).toEqual([
+      { table_name: "mercadopago_connections", is_nullable: "YES" },
+      { table_name: "mercadopago_oauth_states", is_nullable: "NO" },
+    ]);
+    await dismissLegacyPixKeyNotice(businessA, database);
+    await client.query("SAVEPOINT pix_notice_dup");
+    await expect(client.query(
+      "INSERT INTO owner_notices (business_id, kind) VALUES ($1, 'pix_key_retired')",
+      [businessA],
+    )).rejects.toMatchObject({ code: "23505" });
+    await client.query("ROLLBACK TO SAVEPOINT pix_notice_dup");
+    const bookingB = randomUUID();
+    await database.insert(schema.bookings).values({
+      id: bookingB, businessId: businessA, serviceId: serviceA, customerId: customerA,
+      startsAt: new Date("2030-01-02T12:00:00Z"), endsAt: new Date("2030-01-02T12:30:00Z"),
+      priceCents: 5000, depositCents: 1000, status: "confirmed",
+    });
+    await client.query(
+      "INSERT INTO owner_notices (business_id, kind, booking_id) VALUES ($1, 'refund_deadline_eve', $2), ($1, 'refund_deadline_eve', $3)",
+      [businessA, bookingA, bookingB],
+    );
+    await client.query("SAVEPOINT booking_notice_dup");
+    await expect(client.query(
+      "INSERT INTO owner_notices (business_id, kind, booking_id) VALUES ($1, 'refund_deadline_eve', $2)",
+      [businessA, bookingA],
+    )).rejects.toMatchObject({ code: "23505" });
+    await client.query("ROLLBACK TO SAVEPOINT booking_notice_dup");
+    const indexes = await client.query("SELECT indexdef FROM pg_indexes WHERE tablename = 'owner_notices' ORDER BY indexname");
+    const defs = indexes.rows.map((row: { indexdef: string }) => row.indexdef).join("\n");
+    expect(defs).toMatch(/UNIQUE INDEX owner_notices_business_kind_uq .* WHERE \(booking_id IS NULL\)/);
+    expect(defs).toMatch(/UNIQUE INDEX owner_notices_booking_kind_uq .* WHERE \(booking_id IS NOT NULL\)/);
+    expect(defs).not.toMatch(/PRIMARY KEY/);
+  });
+  it("recusa o e-mail completo da conta Mercado Pago e aceita a máscara", async () => {
+    const columns = await client.query(
+      "SELECT column_name, is_nullable FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'mercadopago_connections' AND column_name IN ('account_display_name', 'account_email_masked') ORDER BY column_name",
+    );
+    expect(columns.rows).toEqual([
+      { column_name: "account_display_name", is_nullable: "YES" },
+      { column_name: "account_email_masked", is_nullable: "YES" },
+    ]);
+    await client.query("SAVEPOINT raw_email");
+    await expect(client.query(
+      "INSERT INTO mercadopago_connections (business_id, mp_user_id, connected_at, status, account_email_masked) VALUES ($1, '99887766', now(), 'needs_reconnect', 'ana.souza@gmail.com')",
+      [businessA],
+    )).rejects.toMatchObject({ code: "23514" });
+    await client.query("ROLLBACK TO SAVEPOINT raw_email");
+    const masked = maskEmail("ana.souza@gmail.com");
+    expect(maskEmail("ab@x.com")).toBe("a\u2022\u2022@x.com");
+    await client.query(
+      "INSERT INTO mercadopago_connections (business_id, mp_user_id, connected_at, status, account_display_name, account_email_masked) VALUES ($1, '99887766', now(), 'needs_reconnect', 'Ana S.', $2)",
+      [businessA, masked],
+    );
+    const stored = await client.query("SELECT account_display_name, account_email_masked FROM mercadopago_connections WHERE business_id = $1", [businessA]);
+    expect(stored.rows).toEqual([{ account_display_name: "Ana S.", account_email_masked: "an\u2022\u2022@gmail.com" }]);
+    expect(JSON.stringify(stored.rows)).not.toContain("ana.souza@gmail.com");
   });
   it.each(["service", "customer"])("impede reserva com %s de outro negócio", async (field) => {
     await expect(client.query(

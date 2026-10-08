@@ -10,6 +10,7 @@ import { FakePaymentProvider, signFakeWebhook } from "../../lib/payments/fake";
 import { processWebhook } from "../../lib/payments/webhook";
 import { simulateDevFakePayment } from "../../lib/payments/simulate-dev";
 import { padraoPolicyHash } from "../helpers/deposit-policy";
+import { insertConnectedMercadoPago } from "../helpers/connected-mp";
 
 const pool = new Pool({ connectionString: databaseEnvSchema.parse(process.env).DATABASE_URL, max: 10, connectionTimeoutMillis: 5000 });
 const database = drizzle(pool, { schema });
@@ -42,6 +43,7 @@ beforeEach(async () => {
     await database.insert(schema.businesses).values({ id: businessIds[index], ownerId, name: "Negócio de teste", slug: slugs[index] });
     await database.insert(schema.services).values({ id: serviceIds[index], businessId: businessIds[index], name: "Corte", durationMinutes: 30, priceCents: 5000, depositCents: 1000 });
     await database.insert(schema.businessHours).values({ businessId: businessIds[index], weekday: 2, opensAt: "09:00:00", closesAt: "18:00:00" });
+    await insertConnectedMercadoPago(database, businessIds[index]);
   }
 });
 
@@ -56,6 +58,7 @@ afterEach(async () => {
   await database.delete(schema.customers).where(inArray(schema.customers.businessId, businessIds));
   await database.delete(schema.businessHours).where(inArray(schema.businessHours.businessId, businessIds));
   await database.delete(schema.services).where(inArray(schema.services.businessId, businessIds));
+  await database.delete(schema.mercadopagoConnections).where(inArray(schema.mercadopagoConnections.businessId, businessIds));
   await database.delete(schema.businesses).where(inArray(schema.businesses.id, businessIds));
   await database.delete(schema.user).where(eq(schema.user.id, ownerId));
 });

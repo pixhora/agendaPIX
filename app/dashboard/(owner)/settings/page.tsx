@@ -1,6 +1,5 @@
 import { DashboardShell, Empty, SectionCard } from "@/components/dashboard/shell";
 import { HoursForm, WhatsappForm } from "@/components/dashboard/forms";
-import { PixKeyForm } from "@/components/dashboard/pix-key-form";
 import { PublicLink } from "@/components/dashboard/public-link";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { ownerContext } from "@/lib/dashboard/session";
@@ -13,14 +12,13 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const { businessId } = await searchParams;
   const { businesses, business, owner } = await ownerContext(businessId);
   const hours = business ? await dashboardHours(owner.id, business.id) : [];
-  return <DashboardShell title="Configurações" description="Link público, dias de atendimento, chave Pix e aparência do painel." path="/dashboard/settings" businesses={businesses} businessId={business?.id}>
+  return <DashboardShell title="Configurações" description="Link público, dias de atendimento e aparência do painel." path="/dashboard/settings" businesses={businesses} businessId={business?.id}>
     {business && <div className="grid gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(18rem,0.7fr)] lg:items-start">
       <div className="grid min-w-0 gap-6">
         {!hours.length && <Empty title="Sua agenda está fechada" icon={<Icon icon={ACTION_ICONS.hours} size="md" />}>Ligue os dias de atendimento e salve os horários para receber agendamentos.</Empty>}
         <SectionCard title="Horários de funcionamento" headingId="hours-title" icon={<Icon icon={ACTION_ICONS.hours} size="md" />} description={`Fuso horário: ${friendlyTimezoneLabel(business.timezone)}.`}>
           <HoursForm key={business.id} businessId={business.id} hours={hours} />
         </SectionCard>
-        <PixKeyForm key={`pix-${business.id}`} businessId={business.id} />
         <SectionCard title="WhatsApp do negócio" headingId="whatsapp-title" icon={<Icon icon={ACTION_ICONS.link} size="md" />} description="Opcional. Aparece para o cliente quando ele precisar falar com você.">
           <WhatsappForm key={`wa-${business.id}`} businessId={business.id} contactWhatsapp={business.contactWhatsapp} />
         </SectionCard>

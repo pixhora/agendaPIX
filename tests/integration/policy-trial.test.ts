@@ -13,6 +13,7 @@ import { FakePaymentProvider, signFakeWebhook } from "../../lib/payments/fake";
 import { processWebhook } from "../../lib/payments/webhook";
 import { FLEXIVEL_DEPOSIT_POLICY, PADRAO_DEPOSIT_POLICY } from "../../lib/policy/schema";
 import { policyHashFor } from "../../lib/policy/hash";
+import { insertConnectedMercadoPago } from "../helpers/connected-mp";
 import { padraoPolicyHash } from "../helpers/deposit-policy";
 
 const pool = new Pool({ connectionString: databaseEnvSchema.parse(process.env).DATABASE_URL, max: 4, connectionTimeoutMillis: 5000 });
@@ -41,6 +42,7 @@ beforeEach(async () => {
   await database.insert(schema.businesses).values({ id: businessId, ownerId, name: "Studio Bella", slug, contactWhatsapp: "+5511988887777" });
   await database.insert(schema.services).values({ id: serviceId, businessId, name: "Corte", durationMinutes: 30, priceCents: 5000, depositCents: 1000 });
   await database.insert(schema.businessHours).values({ businessId, weekday: 2, opensAt: "09:00:00", closesAt: "18:00:00" });
+  await insertConnectedMercadoPago(database, businessId);
 });
 
 afterEach(async () => {
@@ -60,6 +62,7 @@ afterEach(async () => {
   await database.delete(schema.businessHours).where(eq(schema.businessHours.businessId, businessId));
   await database.delete(schema.services).where(eq(schema.services.businessId, businessId));
   await database.delete(schema.subscriptions).where(eq(schema.subscriptions.businessId, businessId));
+  await database.delete(schema.mercadopagoConnections).where(eq(schema.mercadopagoConnections.businessId, businessId));
   await database.delete(schema.businesses).where(eq(schema.businesses.id, businessId));
   await database.delete(schema.user).where(eq(schema.user.id, ownerId));
 });
