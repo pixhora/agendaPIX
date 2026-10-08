@@ -177,6 +177,14 @@ function kindOf(row: { policyRefundRequestedOn: string | null; review: boolean }
   return "auto_failed";
 }
 
+/** O D+2 gravado em `email_sent_at` conta como o segundo lembrete. Sem linha, a contagem é zero. */
+export function dailyNoticeState(emailSentAt: Date | null, timezone: string, noticeAt: Date) {
+  if (!emailSentAt) return { reminderCount: 0, lastRemindedOn: null as string | null };
+  const lastRemindedOn = localDate(emailSentAt, timezone);
+  const reminderCount = lastRemindedOn === addCalendarDays(localDate(noticeAt, timezone), 2) ? 2 : 1;
+  return { reminderCount, lastRemindedOn };
+}
+
 export function createDrizzleReminderPorts(database: Database, mailer: ReminderPorts["send"] = async (mail) => {
   await sendOwnerEmail(mail.to, mail.subject, mail.text, mail.html);
 }): ReminderPorts {
@@ -231,20 +239,21 @@ export function createDrizzleReminderPorts(database: Database, mailer: ReminderP
           .where(eq(schema.paymentRefunds.paymentId, row.paymentId))
           .orderBy(asc(schema.paymentRefunds.createdAt))
           .limit(1);
+        const requestedOn = row.policyRefundRequestedOn;
+        const noticeAt = requestedOn ? zonedInstant(requestedOn, 12 * 60 * 60, row.timezone) : notice?.createdAt ?? row.dueAt;
         const [stored] = await database.select({
-          reminderCount: schema.ownerNotices.reminderCount,
-          lastRemindedOn: schema.ownerNotices.lastRemindedOn,
+          emailSentAt: schema.ownerNotices.emailSentAt,
         }).from(schema.ownerNotices).where(and(
-          eq(schema.ownerNotices.paymentId, row.paymentId),
+          eq(schema.ownerNotices.bookingId, row.bookingId),
           or(eq(schema.ownerNotices.kind, "auto_refund_failed"), eq(schema.ownerNotices.kind, "owner_review"), eq(schema.ownerNotices.kind, "policy_refund")),
         )).limit(1);
+        const daily = dailyNoticeState(stored?.emailSentAt ?? null, row.timezone, noticeAt);
         let disconnected = disconnectedByBusiness.get(row.businessId);
         if (disconnected === undefined) {
           try { disconnected = await isSellerDisconnected(row.businessId); }
           catch { disconnected = false; }
           disconnectedByBusiness.set(row.businessId, disconnected);
         }
-        const requestedOn = row.policyRefundRequestedOn;
         result.push({
           paymentId: row.paymentId,
           businessId: row.businessId,
@@ -255,13 +264,13 @@ export function createDrizzleReminderPorts(database: Database, mailer: ReminderP
           kind: kindOf({ policyRefundRequestedOn: requestedOn, review }),
           dueAt: row.dueAt,
           reminderSentAt: row.reminderSentAt,
-          noticeAt: requestedOn ? zonedInstant(requestedOn, 12 * 60 * 60, row.timezone) : notice?.createdAt ?? row.dueAt,
+          noticeAt,
           firstAttemptAt: firstAttempt?.createdAt ?? notice?.createdAt ?? null,
           startsAt: row.startsAt,
           paidAt: row.paidAt,
           requestedOn,
-          reminderCount: stored?.reminderCount ?? 0,
-          lastRemindedOn: stored?.lastRemindedOn ?? null,
+          reminderCount: daily.reminderCount,
+          lastRemindedOn: daily.lastRemindedOn,
           open,
           customerName: row.customerName,
           serviceName: row.serviceName,
@@ -303,26 +312,23 @@ export function createDrizzleReminderPorts(database: Database, mailer: ReminderP
       await database.insert(schema.ownerNotices).values({
         businessId: item.businessId,
         bookingId: item.bookingId,
-        paymentId: item.paymentId,
         kind: "refund_deadline_eve",
         emailSentAt: sentAt,
       });
     },
     async recordDaily(item, today) {
       const kind = item.kind === "review" ? "owner_review" : item.kind === "policy" ? "policy_refund" : "auto_refund_failed";
-      const [existing] = await database.select({ id: schema.ownerNotices.id, reminderCount: schema.ownerNotices.reminderCount }).from(schema.ownerNotices)
-        .where(and(eq(schema.ownerNotices.businessId, item.businessId), eq(schema.ownerNotices.bookingId, item.bookingId), eq(schema.ownerNotices.kind, kind))).limit(1);
+      const where = and(eq(schema.ownerNotices.businessId, item.businessId), eq(schema.ownerNotices.bookingId, item.bookingId), eq(schema.ownerNotices.kind, kind));
+      const [existing] = await database.select({ emailSentAt: schema.ownerNotices.emailSentAt }).from(schema.ownerNotices).where(where).limit(1);
       if (!existing) {
         await database.insert(schema.ownerNotices).values({
-          businessId: item.businessId, bookingId: item.bookingId, paymentId: item.paymentId, kind, reminderCount: 1, lastRemindedOn: today, emailSentAt: new Date(),
+          businessId: item.businessId, bookingId: item.bookingId, kind, emailSentAt: zonedInstant(today, 12 * 60 * 60, item.timezone),
         });
         return;
       }
       await database.update(schema.ownerNotices).set({
-        reminderCount: existing.reminderCount + 1,
-        lastRemindedOn: today,
-        emailSentAt: new Date(),
-      }).where(eq(schema.ownerNotices.id, existing.id));
+        emailSentAt: zonedInstant(today, 12 * 60 * 60, item.timezone),
+      }).where(where);
     },
   };
 }

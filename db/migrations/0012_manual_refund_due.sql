@@ -4,27 +4,21 @@ ALTER TABLE "payments" ADD COLUMN "manual_refund_reminder_sent_at" timestamp wit
 --> statement-breakpoint
 ALTER TABLE "payments" ADD COLUMN "policy_refund_requested_on" date;
 --> statement-breakpoint
-CREATE TABLE "owner_notices" (
-  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+CREATE TABLE IF NOT EXISTS "owner_notices" (
   "business_id" uuid NOT NULL,
-  "booking_id" uuid NOT NULL,
-  "payment_id" uuid,
   "kind" text NOT NULL,
+  "booking_id" uuid,
+  "dismissed_at" timestamp with time zone DEFAULT now() NOT NULL,
   "email_sent_at" timestamp with time zone,
-  "reminder_count" integer DEFAULT 0 NOT NULL,
-  "last_reminded_on" date,
-  "dismissed_at" timestamp with time zone,
-  "resolved_at" timestamp with time zone,
-  "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  CONSTRAINT "owner_notices_kind_not_empty" CHECK (length(trim("kind")) > 0),
+  CONSTRAINT "owner_notices_business_id_businesses_id_fk" FOREIGN KEY ("business_id") REFERENCES "public"."businesses"("id") ON DELETE restrict ON UPDATE no action
 );
 --> statement-breakpoint
-ALTER TABLE "owner_notices" ADD CONSTRAINT "owner_notices_business_id_businesses_id_fk" FOREIGN KEY ("business_id") REFERENCES "public"."businesses"("id") ON DELETE restrict ON UPDATE no action;
+ALTER TABLE "owner_notices" ADD COLUMN IF NOT EXISTS "email_sent_at" timestamp with time zone;
 --> statement-breakpoint
-ALTER TABLE "owner_notices" ADD CONSTRAINT "owner_notices_business_booking_kind_unique" UNIQUE("business_id","booking_id","kind");
+CREATE UNIQUE INDEX IF NOT EXISTS "owner_notices_business_kind_uq" ON "owner_notices" USING btree ("business_id","kind") WHERE "owner_notices"."booking_id" IS NULL;
 --> statement-breakpoint
-ALTER TABLE "owner_notices" ADD CONSTRAINT "owner_notices_kind_not_empty" CHECK (length(trim("kind")) > 0);
---> statement-breakpoint
-CREATE INDEX "owner_notices_business_kind_idx" ON "owner_notices" USING btree ("business_id","kind");
+CREATE UNIQUE INDEX IF NOT EXISTS "owner_notices_booking_kind_uq" ON "owner_notices" USING btree ("booking_id","kind") WHERE "owner_notices"."booking_id" IS NOT NULL;
 --> statement-breakpoint
 CREATE TABLE "payment_refunds" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,

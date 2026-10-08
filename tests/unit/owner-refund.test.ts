@@ -218,7 +218,13 @@ describe("prévia e devolução do dono", () => {
     expect(ports.attempts).toHaveLength(1);
     expect(ports.attempts[0]?.idempotencyKey).toBe("pay-1:1");
     expect(readFileSync("lib/payments/refund-flow.ts", "utf8")).toContain("for update");
-    expect(readFileSync("db/migrations/0012_manual_refund_due.sql", "utf8")).toContain("payment_refunds_one_active_per_payment");
+    const migration = readFileSync("db/migrations/0012_manual_refund_due.sql", "utf8");
+    expect(migration).toContain("payment_refunds_one_active_per_payment");
+    expect(migration).toContain('CREATE TABLE IF NOT EXISTS "owner_notices"');
+    expect(migration).toContain('ADD COLUMN IF NOT EXISTS "email_sent_at"');
+    expect(migration).toContain('CREATE UNIQUE INDEX IF NOT EXISTS "owner_notices_business_kind_uq"');
+    expect(migration).toContain('CREATE UNIQUE INDEX IF NOT EXISTS "owner_notices_booking_kind_uq"');
+    expect(migration).not.toContain("owner_notices_business_booking_kind_unique");
   });
 
   it("marca refunded quando o webhook observa o estorno e mantém o prazo", async () => {

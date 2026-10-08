@@ -233,25 +233,19 @@ export const paymentAudit = pgTable("payment_audit", {
 ]);
 
 /**
- * Avisos ao dono, uma linha por reserva e tipo.
- * O PR de OAuth pode criar `owner_notices` com unique `(business_id, kind)`.
- * Aqui a chave é `(business_id, booking_id, kind)`, porque o E5 é por reserva.
+ * Avisos ao dono. Mesmo desenho do PR de OAuth: sem chave primária,
+ * `booking_id` nulo e dois índices únicos parciais. `email_sent_at` é desta entrega.
+ * `refund_deadline_eve` preenche `booking_id`.
  */
 export const ownerNotices = pgTable("owner_notices", {
-  id: uuid("id").defaultRandom().primaryKey(),
   businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "restrict" }),
-  bookingId: uuid("booking_id").notNull(),
-  paymentId: uuid("payment_id"),
   kind: text("kind").notNull(),
+  bookingId: uuid("booking_id"),
+  dismissedAt: timestamp("dismissed_at", { withTimezone: true }).defaultNow().notNull(),
   emailSentAt: timestamp("email_sent_at", { withTimezone: true }),
-  reminderCount: integer("reminder_count").default(0).notNull(),
-  lastRemindedOn: date("last_reminded_on"),
-  dismissedAt: timestamp("dismissed_at", { withTimezone: true }),
-  resolvedAt: timestamp("resolved_at", { withTimezone: true }),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
-  unique("owner_notices_business_booking_kind_unique").on(table.businessId, table.bookingId, table.kind),
-  index("owner_notices_business_kind_idx").on(table.businessId, table.kind),
+  uniqueIndex("owner_notices_business_kind_uq").on(table.businessId, table.kind).where(sql`${table.bookingId} IS NULL`),
+  uniqueIndex("owner_notices_booking_kind_uq").on(table.bookingId, table.kind).where(sql`${table.bookingId} IS NOT NULL`),
   check("owner_notices_kind_not_empty", sql`length(trim(${table.kind})) > 0`),
 ]);
 

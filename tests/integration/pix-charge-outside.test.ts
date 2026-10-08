@@ -44,6 +44,8 @@ afterEach(async () => {
     await database.delete(schema.paymentEvents).where(inArray(schema.paymentEvents.externalId, externalIds));
     await database.delete(schema.paymentEvents).where(inArray(schema.paymentEvents.eventId, externalIds.map((id) => `poll:${id}`)));
   }
+  await database.delete(schema.paymentRefunds).where(eq(schema.paymentRefunds.businessId, businessId));
+  await database.delete(schema.ownerNotices).where(eq(schema.ownerNotices.businessId, businessId));
   await database.delete(schema.payments).where(eq(schema.payments.businessId, businessId));
   await database.delete(schema.bookings).where(eq(schema.bookings.businessId, businessId));
   await database.delete(schema.customers).where(eq(schema.customers.businessId, businessId));

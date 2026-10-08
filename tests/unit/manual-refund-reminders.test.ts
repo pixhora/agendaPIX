@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { manualRefundDueAtFromNotice } from "../../lib/payments/manual-refund-calendar";
-import { runManualRefundReminders, selectDaily, selectEve, type ReminderCase, type ReminderPorts } from "../../lib/payments/manual-refund-reminders";
+import { dailyNoticeState, runManualRefundReminders, selectDaily, selectEve, type ReminderCase, type ReminderPorts } from "../../lib/payments/manual-refund-reminders";
 
 const tz = "America/Sao_Paulo";
 const noticeAt = new Date("2026-10-17T02:50:00.000Z");
@@ -115,6 +115,14 @@ describe("lembretes da devolução manual", () => {
     const source = readFileSync("lib/payments/manual-refund-reminders.ts", "utf8");
     expect(source).toContain("manual_refund_reminder_sent_at is null");
     expect(source).toContain("returning id");
+    expect(source).toContain('kind: "refund_deadline_eve"');
     expect(source).not.toContain("refundCharge");
+    expect(source).not.toContain("ownerNotices.id");
+  });
+
+  it("o lembrete diário conta 2 quando o e-mail cai no D+2", () => {
+    expect(dailyNoticeState(null, tz, noticeAt)).toEqual({ reminderCount: 0, lastRemindedOn: null });
+    expect(dailyNoticeState(new Date("2026-10-17T15:00:00.000Z"), tz, noticeAt)).toEqual({ reminderCount: 1, lastRemindedOn: "2026-10-17" });
+    expect(dailyNoticeState(new Date("2026-10-18T15:00:00.000Z"), tz, noticeAt)).toEqual({ reminderCount: 2, lastRemindedOn: "2026-10-18" });
   });
 });

@@ -50,6 +50,8 @@ afterEach(async () => {
   const externalIds = payments.flatMap((payment) => payment.externalId ? [payment.externalId] : []);
   if (externalIds.length) await database.delete(schema.paymentEvents).where(inArray(schema.paymentEvents.externalId, externalIds));
   if (bodyHashes.length) await database.delete(schema.webhookDeliveries).where(inArray(schema.webhookDeliveries.bodyHash, bodyHashes));
+  await database.delete(schema.paymentRefunds).where(inArray(schema.paymentRefunds.businessId, businessIds));
+  await database.delete(schema.ownerNotices).where(inArray(schema.ownerNotices.businessId, businessIds));
   await database.delete(schema.payments).where(inArray(schema.payments.businessId, businessIds));
   await database.delete(schema.bookings).where(inArray(schema.bookings.businessId, businessIds));
   await database.delete(schema.customers).where(inArray(schema.customers.businessId, businessIds));
