@@ -96,7 +96,7 @@ describe("política do sinal, teste grátis e WhatsApp", () => {
     }, database);
     const [saved] = await database.select().from(schema.bookings).where(eq(schema.bookings.id, created.data.bookingId));
     expect(saved.policySnapshot).toMatchObject(PADRAO_DEPOSIT_POLICY);
-    const nextHash = policyHashFor(FLEXIVEL_DEPOSIT_POLICY, { businessName: "Studio Bella", depositCents: 1000 });
+    const nextHash = policyHashFor(FLEXIVEL_DEPOSIT_POLICY, { depositCents: 1000 });
     expect((await listPublicServices(slug, database)).services[0].policyHash).toBe(nextHash);
   });
 

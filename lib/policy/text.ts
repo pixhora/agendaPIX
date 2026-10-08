@@ -27,7 +27,6 @@ export type PolicyDetailsContext = {
 };
 
 export type OwnerPreviewContext = {
-  businessName: string;
   depositCents: number;
 };
 
@@ -101,10 +100,6 @@ function closedWindowReceipt(policy: DepositPolicy) {
   return "Este sinal não é devolvido se cancelar.";
 }
 
-function refundByBusiness(businessName: string) {
-  return `${businessName} devolve pelo AgendaPix, conforme a política, se confirmar no painel`;
-}
-
 function outcomePhrase(kind: DepositPolicy["lateCancel"] | DepositPolicy["noShow"], businessName: string) {
   if (kind === "credit") return creditSentence(businessName);
   if (kind === "refund") return "cabe a devolução";
@@ -119,10 +114,6 @@ function windowSentence(policy: DepositPolicy) {
   if (refund !== null) return `Cancele até ${refund} h antes. Não dá para remarcar usando o sinal.`;
   if (reschedule !== null) return `O sinal não é devolvido. Dá para remarcar até ${reschedule} h antes usando o sinal.`;
   return "O sinal não é devolvido nem remarcado.";
-}
-
-function refundNote(policy: DepositPolicy, businessName: string) {
-  return mentionsRefund(policy) ? `${refundByBusiness(businessName)}.` : "";
 }
 
 function outcomeSentence(policy: DepositPolicy, businessName: string) {
@@ -241,13 +232,48 @@ export function policyDetails(policy: DepositPolicy, context: PolicyDetailsConte
   ];
 }
 
+function ownerWindow(policy: DepositPolicy) {
+  const refund = policy.refundUntilHours;
+  const reschedule = policy.rescheduleUntilHours;
+  if (refund !== null && reschedule !== null && refund === reschedule) return `Pode cancelar ou remarcar até ${refund} h antes.`;
+  if (refund !== null && reschedule !== null) return `Pode cancelar até ${refund} h antes ou remarcar até ${reschedule} h antes.`;
+  if (refund !== null) return `Pode cancelar até ${refund} h antes.`;
+  if (reschedule !== null) return `Pode remarcar até ${reschedule} h antes, usando o sinal (1 vez).`;
+  return "";
+}
+
+function ownerOutcome(policy: DepositPolicy) {
+  const late = policy.lateCancel;
+  const missed = policy.noShow;
+  if (late === missed) {
+    return late === "credit"
+      ? `Depois disso, ou se faltar, o sinal vira ${CREDIT_PHRASE}.`
+      : "Depois disso, ou se faltar, o sinal fica com você.";
+  }
+  const lateLine = late === "credit"
+    ? `Depois disso, o sinal vira ${CREDIT_PHRASE}.`
+    : "Depois disso, o sinal fica com você.";
+  const missedLine = missed === "credit"
+    ? `Se faltar, o sinal vira ${CREDIT_PHRASE}.`
+    : missed === "refund"
+      ? "Se faltar, você devolve o sinal."
+      : "Se faltar, o sinal fica com você.";
+  return `${lateLine} ${missedLine}`;
+}
+
+function ownerClosing(policy: DepositPolicy) {
+  if (policy.noShow === "refund") return "Quando houver devolução, você faz pelo AgendaPix, depois de confirmar com o cliente.";
+  if (policy.refundUntilHours !== null) return "Quando o cliente cancelar no prazo, você devolve pelo AgendaPix, depois de confirmar o cancelamento.";
+  return "";
+}
+
 export function ownerPreview(policy: DepositPolicy, context: OwnerPreviewContext): string {
   if (context.depositCents <= 0) return "Sem sinal: a reserva confirma na hora, sem Pix.";
   return [
-    `Sinal de ${formatMoney(context.depositCents)} no Pix para reservar.`,
-    windowSentence(policy),
-    outcomeSentence(policy, context.businessName),
-    refundNote(policy, context.businessName),
+    `O cliente paga ${formatMoney(context.depositCents)} de sinal no Pix para reservar.`,
+    ownerWindow(policy),
+    ownerOutcome(policy),
+    ownerClosing(policy),
   ].filter(Boolean).join(" ");
 }
 

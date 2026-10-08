@@ -48,7 +48,7 @@ export default async function PreviewPainelPage({ searchParams }: { searchParams
   const policy = policyFor(query.preset);
   const tone = query.tone ?? "discreet";
   const trial = tone === "paused"
-    ? billing({ state: "paused", daysLeft: -1, bookingsPaused: true, trialEndsAt: "2026-10-24T02:59:59.000Z" })
+    ? billing({ state: "paused", daysLeft: -1, bookingsPaused: true, trialEndsAt: "2026-10-03T02:59:59.000Z" })
     : tone === "strong"
       ? billing({ state: "trial_ending", daysLeft: 2, trialEndsAt: "2026-10-17T02:59:59.000Z" })
       : billing({ state: "trial", daysLeft: 5, trialEndsAt: "2026-10-20T02:59:59.000Z" });

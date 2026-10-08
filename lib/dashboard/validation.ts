@@ -19,10 +19,35 @@ export const hoursSchema = z.array(z.object({
 }).strict().refine((value) => value.opensAt < value.closesAt, "A abertura deve ser anterior ao fechamento.")).max(7)
   .refine((value) => new Set(value.map((day) => day.weekday)).size === value.length, "Dia repetido.");
 
+const BRL_GROUPED = /^\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?$/;
+const BRL_PLAIN = /^\d+(?:,\d{1,2})?$/;
+const DOT_DECIMAL = /^\d+(?:\.\d{1,2})?$/;
+
+/** Valor de campo em reais, com vírgula e separador de milhar. Sem símbolo. */
+export function formatMoneyInput(cents: number) {
+  const value = Math.trunc(cents);
+  const sign = value < 0 ? "-" : "";
+  const absolute = Math.abs(value);
+  const whole = Math.floor(absolute / 100).toLocaleString("pt-BR");
+  const fraction = String(absolute % 100).padStart(2, "0");
+  return `${sign}${whole},${fraction}`;
+}
+
 // Converte a representação decimal em centavos sem multiplicar floats.
 export function parseMoney(value: FormDataEntryValue | null): number {
-  if (typeof value !== "string" || !/^\d+(?:[,.]\d{1,2})?$/.test(value.trim())) throw new Error("Informe o valor em reais, com até duas casas decimais.");
-  const [whole, decimal = ""] = value.trim().replace(",", ".").split(".");
+  if (typeof value !== "string") throw new Error("Informe o valor em reais, com até duas casas decimais.");
+  const text = value.trim();
+  let whole: string;
+  let decimal = "";
+  if (text.includes(",")) {
+    if (!BRL_GROUPED.test(text) && !BRL_PLAIN.test(text)) throw new Error("Informe o valor em reais, com até duas casas decimais.");
+    const [rawWhole, rawDecimal = ""] = text.replaceAll(".", "").split(",");
+    whole = rawWhole;
+    decimal = rawDecimal;
+  } else {
+    if (!DOT_DECIMAL.test(text)) throw new Error("Informe o valor em reais, com até duas casas decimais.");
+    [whole, decimal = ""] = text.split(".");
+  }
   return centsSchema.parse(Number(whole) * 100 + Number(decimal.padEnd(2, "0")));
 }
 export function shiftDate(date: string, days: number) {

@@ -13,7 +13,7 @@ describe("prévia da política no painel", () => {
       const customer = customerPreviewText(copy.summary, copy.details);
       expect(copy.summary).toBe(policySummary(policy, { depositCents: 2000, businessName: BUSINESS }));
       expect(copy.details).toEqual(policyDetails(policy, { businessName: BUSINESS, contactWhatsapp: null, timezone: "America/Sao_Paulo" }));
-      expect(copy.owner).toBe(ownerPreview(policy, { businessName: BUSINESS, depositCents: 2000 }));
+      expect(copy.owner).toBe(ownerPreview(policy, { depositCents: 2000 }));
       expect(customer).not.toContain("painel");
       expect(customer).not.toContain("Devolver pelo AgendaPix");
       expect(hasArticleBeforeBusiness(customer, BUSINESS)).toBe(false);
@@ -21,7 +21,8 @@ describe("prévia da política no painel", () => {
     const padrao = policyPreviewCopy(depositPolicyPresets.padrao, BUSINESS, 2000);
     expect(padrao.summary).toContain("Studio Bella pode devolver o sinal");
     expect(customerPreviewText(padrao.summary, padrao.details)).toContain("fica com Studio Bella");
-    expect(padrao.owner).toContain("painel");
+    expect(padrao.owner).toContain("você");
+    expect(padrao.owner).not.toContain(BUSINESS);
   });
 
   it("reconhece artigo grudado no nome", () => {

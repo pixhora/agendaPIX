@@ -63,6 +63,7 @@ describe("aviso de teste no painel", () => {
     expect(formatTrialEnd("2026-10-16T15:00:00.000Z", "America/Sao_Paulo")).toBe("sex, 16 out");
     expect(formatTrialEnd("2026-10-20T02:59:59.000Z", "America/Sao_Paulo")).toBe("seg, 19 out");
     expect(formatTrialEnd("2026-10-23T15:00:00.000Z", "America/Sao_Paulo")).toBe("sex, 23 out");
+    expect(formatTrialEnd("2026-10-03T02:59:59.000Z", "America/Sao_Paulo")).toBe("sex, 2 out");
     expect(formatTrialEnd("invalid", "America/Sao_Paulo")).toBe("");
     expect(trialCopy(billing({ daysLeft: 5 }), formatTrialEnd("2026-10-20T02:59:59.000Z", "America/Sao_Paulo"))?.body).toBe("Restam 5 dias. Termina seg, 19 out.");
   });

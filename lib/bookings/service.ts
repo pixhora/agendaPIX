@@ -63,7 +63,7 @@ function publicPolicy(service: { depositCents: number; depositPolicy: unknown },
   return {
     depositPolicy: policy,
     policySummary: policySummary(policy, { depositCents: service.depositCents, businessName }),
-    policyHash: policyHashFor(policy, { businessName, depositCents: service.depositCents }),
+    policyHash: policyHashFor(policy, { depositCents: service.depositCents }),
   };
 }
 
@@ -248,7 +248,7 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
     const service = await serviceById(business.id, input.serviceId, transaction);
     if (service.depositCents > 0) assertDepositBookable(business);
     const policy = service.depositCents > 0 ? depositPolicySchema.parse(service.depositPolicy) : null;
-    const currentHash = policy ? policyHashFor(policy, { businessName: business.name, depositCents: service.depositCents }) : null;
+    const currentHash = policy ? policyHashFor(policy, { depositCents: service.depositCents }) : null;
     if (service.depositCents > 0 && !input.policyHash) throw new HttpError(400, "invalid_input", "Confira a política do sinal antes de agendar.");
     if (policy && currentHash && input.policyHash !== currentHash) {
       throw new HttpError(409, POLICY_CHANGED_CODE, POLICY_CHANGED_MESSAGE, undefined, {

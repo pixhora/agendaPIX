@@ -13,7 +13,7 @@ export function policyPreviewCopy(
     details: depositCents > 0
       ? policyDetails(policy, { businessName, contactWhatsapp, timezone: "America/Sao_Paulo" })
       : [],
-    owner: ownerPreview(policy, { businessName, depositCents }),
+    owner: ownerPreview(policy, { depositCents }),
   };
 }
 

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { saveHours, saveService, saveWhatsapp } from "@/app/dashboard/(owner)/actions";
-import type { FormState } from "@/lib/dashboard/validation";
+import { formatMoneyInput, parseMoney, type FormState } from "@/lib/dashboard/validation";
 import { depositPolicySchema, PADRAO_DEPOSIT_POLICY, type DepositPolicy } from "@/lib/policy/schema";
 import { policyPreviewCopy } from "@/lib/dashboard/policy-preview";
 import {
@@ -63,7 +63,7 @@ function MoneyInput({ id, invalid, ...props }: React.ComponentProps<"input"> & {
   return <FieldShell invalid={invalid}>
     <span className="relative flex items-center">
       <span aria-hidden="true" className="pointer-events-none pl-3.5 text-sm font-semibold text-muted">R$</span>
-      <Input id={id} inputMode="decimal" aria-invalid={invalid || undefined} pattern="[0-9]+([,.][0-9]{1,2})?" className={cn(bareInput, "dash-disabled pl-2 tabular-nums")} {...props} />
+      <Input id={id} inputMode="decimal" aria-invalid={invalid || undefined} pattern="(?:\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:[.,]\d{1,2})?)" className={cn(bareInput, "dash-disabled pl-2 tabular-nums")} {...props} />
     </span>
   </FieldShell>;
 }
@@ -73,13 +73,14 @@ function TextInput({ invalid, className, ...props }: React.ComponentProps<"input
 }
 
 type Service = { id: string; name: string; durationMinutes: number; priceCents: number; depositCents: number; active: boolean; depositPolicy?: DepositPolicy };
-const initialValues = (service?: Service) => ({ name: service?.name ?? "", duration: String(service?.durationMinutes ?? 30), price: service ? (service.priceCents / 100).toFixed(2) : "", deposit: service ? (service.depositCents / 100).toFixed(2) : "0,00", active: service?.active ?? true });
+const initialValues = (service?: Service) => ({ name: service?.name ?? "", duration: String(service?.durationMinutes ?? 30), price: service ? formatMoneyInput(service.priceCents) : "", deposit: service ? formatMoneyInput(service.depositCents) : "0,00", active: service?.active ?? true });
 
 function centsFromInput(value: string) {
-  const normalized = value.trim().replace(",", ".");
-  if (!/^\d+(\.\d{1,2})?$/.test(normalized)) return 0;
-  const [whole, decimal = ""] = normalized.split(".");
-  return Number(whole) * 100 + Number(decimal.padEnd(2, "0"));
+  try {
+    return parseMoney(value);
+  } catch {
+    return 0;
+  }
 }
 
 export function ServiceForm({ businessId, businessName, contactWhatsapp = null, service, futureBookingsCount }: {
