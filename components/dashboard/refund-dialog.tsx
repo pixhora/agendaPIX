@@ -210,7 +210,7 @@ function RefundDialogBody({
 
   return (
     <div className="flex max-h-[88dvh] min-h-0 flex-col lg:max-h-[min(40rem,calc(100dvh-2rem))]" aria-busy={busy}>
-      <div className="shrink-0 px-5 pb-1 pt-8 sm:px-6">
+      <div className="shrink-0 border-b border-line px-5 pb-4 pt-8 sm:px-6">
         <div className="flex items-start justify-end">
           <Button variant="ghost" size="icon" onClick={onClose} aria-label="Fechar"><X aria-hidden="true" /></Button>
         </div>

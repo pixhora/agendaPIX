@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { refundEveScenario, refundRequestOrderHolds } from "../fixtures/refund-eve-scenario";
 import { formatBrlCents } from "../../lib/dashboard/summary";
+import { formatBusinessDate, formatBusinessDateTime } from "../../lib/payments/manual-refund-calendar";
 import {
   confirmLabel,
   customerLine,
@@ -81,11 +83,11 @@ describe("devolução no painel", () => {
 
   it("não mostra dois prazos diferentes no mesmo diálogo", () => {
     const eve = dialogDeadline({
-      requestedOn: "2026-10-02",
-      pickedOn: "2026-10-08",
-      todayLocal: "2026-10-08",
-      manualRefundDueAt: "2026-10-09",
-      timeZone: "America/Sao_Paulo",
+      requestedOn: refundEveScenario.requestedOn,
+      pickedOn: refundEveScenario.todayLocal,
+      todayLocal: refundEveScenario.todayLocal,
+      manualRefundDueAt: refundEveScenario.manualRefundDueAt,
+      timeZone: refundEveScenario.timeZone,
     });
     expect(eve).toEqual({ kind: "eve", text: "O prazo para devolver vence amanhã (sex, 9 out)." });
     expect(eve?.text).not.toContain("Devolva até");
@@ -108,6 +110,24 @@ describe("devolução no painel", () => {
     });
     expect(picking).toEqual({ kind: "returnBy", text: "Devolva até qui, 15 out." });
     expect(picking?.text).not.toContain("amanhã");
+  });
+
+  it("no cenário da véspera o pagamento vem antes do pedido, e o pedido não passa de hoje", () => {
+    expect(refundRequestOrderHolds(refundEveScenario)).toBe(true);
+    const bounds = requestedDateField({
+      requestedOn: null,
+      todayLocal: refundEveScenario.todayLocal,
+      paidOnLocal: refundEveScenario.paidOnLocal,
+    });
+    expect(bounds.readOnly).toBe(false);
+    if (!bounds.readOnly) {
+      expect(refundEveScenario.requestedOn >= bounds.min).toBe(true);
+      expect(refundEveScenario.requestedOn <= bounds.max).toBe(true);
+    }
+    expect(paidOnLabel(refundEveScenario.paidAt, refundEveScenario.timeZone)).toBe("ter, 29 set, 14:02");
+    expect(formatBusinessDate(refundEveScenario.requestedOn, refundEveScenario.timeZone)).toBe("sex, 2 out");
+    expect(formatBusinessDateTime(new Date(refundEveScenario.serviceStartsAt), refundEveScenario.timeZone)).toBe("sex, 2 out, 15:00");
+    expect(refundEveScenario.bookingStatus).toBe("cancelled");
   });
 
   it("trava a data gravada e limita o picker entre o pagamento e hoje", () => {
