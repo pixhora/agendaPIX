@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { FieldError } from "@/components/ui/field";
 import { MoneyInput } from "@/components/ui/money-input";
+import { DEPOSIT_NOW_LABEL, REMAINDER_LABEL } from "@/lib/copy/booking-summary";
 import { formatCents, depositFromPercent } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { StepActions } from "./chrome";
@@ -257,12 +258,12 @@ export function StepService({
             <p className="border-t border-line px-4 py-2.5 text-sm">{NO_DEPOSIT}</p>
           ) : (
             <div className="flex items-center justify-between gap-3 border-t border-line px-4 py-2.5 text-sm">
-              <span>Sinal no Pix agora</span>
+              <span>{DEPOSIT_NOW_LABEL}</span>
               <b className="tabular-nums text-pix">{priced ? moneyLabel(depositCents) : "R$ —"}</b>
             </div>
           )}
           <div className="flex items-center justify-between gap-3 border-t border-line px-4 py-2.5 text-sm text-muted">
-            <span>No dia do atendimento</span>
+            <span>{REMAINDER_LABEL}</span>
             <b className="tabular-nums">{priced ? moneyLabel(Math.max(0, priceCents - depositCents)) : "R$ —"}</b>
           </div>
         </section>

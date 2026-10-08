@@ -25,7 +25,7 @@ export default async function ConfirmLoginPage({ searchParams }: { searchParams:
 
   return (
     <main id="content" className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center bg-paper px-4 py-10">
-      <BrandLink label="AgendaPix" />
+      <BrandLink />
       {token ? (
         <>
           <h1 className="mt-8 font-display text-[28px] font-extrabold leading-tight tracking-tight text-ink">Confirme para entrar</h1>

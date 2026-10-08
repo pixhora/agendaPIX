@@ -181,7 +181,7 @@ export function ConfirmOnboarding({ draftId }: { draftId: string }) {
       <header className="border-b border-line bg-surface">
         <div className="mx-auto flex min-h-16 max-w-5xl items-center px-4 sm:px-6"><BrandLink /></div>
       </header>
-      <main id="content" className="flex flex-1 items-center justify-center px-4 py-10">
+      <main id="content" className="flex flex-1 items-start justify-center px-4 pt-6 pb-10 sm:pt-8">
         <div className="w-full max-w-md rounded-frame border border-line bg-surface p-6 shadow-[var(--shadow-card)] sm:p-8">
           {!ready ? (
             <div role="status" className="flex justify-center py-10">
