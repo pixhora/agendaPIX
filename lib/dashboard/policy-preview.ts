@@ -4,7 +4,7 @@ import { ownerPreview, policySummary } from "../policy/text";
 /** Texto que o cliente lê. Só as funções de lib/policy/text, sem frase montada aqui. */
 export function policyPreviewCopy(policy: DepositPolicy, businessName: string, depositCents: number) {
   return {
-    summary: policySummary(policy, { depositCents }),
+    summary: policySummary(policy, { depositCents, businessName }),
     preview: ownerPreview(policy, { businessName, depositCents }),
   };
 }

@@ -10,7 +10,7 @@ describe("prévia da política no painel", () => {
   it("mostra o texto do cliente sem artigo antes do nome", () => {
     for (const policy of Object.values(depositPolicyPresets)) {
       const copy = policyPreviewCopy(policy, BUSINESS, 2000);
-      expect(copy.summary).toBe(policySummary(policy, { depositCents: 2000 }));
+      expect(copy.summary).toBe(policySummary(policy, { depositCents: 2000, businessName: BUSINESS }));
       expect(copy.preview).toBe(ownerPreview(policy, { businessName: BUSINESS, depositCents: 2000 }));
       expect(hasArticleBeforeBusiness(`${copy.summary} ${copy.preview}`, BUSINESS)).toBe(false);
     }
