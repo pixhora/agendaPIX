@@ -16,6 +16,15 @@
  *   same-origin file (`'self'`). Script nonces stay strict.
  * - style-src-attr `'unsafe-inline'` — Sonner and Radix set style attributes.
  * - script-src `'unsafe-eval'` in development — React uses eval for debug stacks.
+ * - form-action is `'self'` plus the Mercado Pago OAuth hosts and the WhatsApp
+ *   hosts a form POST is redirected to. CSP Level 3 runs the form-action
+ *   pre-navigation check on the request URL, and Fetch runs that check on each
+ *   redirect (https://www.w3.org/TR/CSP3/#directive-form-action,
+ *   https://www.w3.org/TR/CSP3/#integration-with-fetch). Chrome enforces the
+ *   redirect; Firefox may not
+ *   (https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/form-action).
+ *   `wa.me` answers 302 to
+ *   `https://api.whatsapp.com`, so both origins are listed. No wildcards.
  * - `upgrade-insecure-requests` and `Strict-Transport-Security` only off localhost
  *   and never in development, so `next dev` / `next start` on http://127.0.0.1
  *   keep working. Production hostnames always send both.
@@ -67,6 +76,46 @@ export type DocumentSecurityHeaderOptions = ContentSecurityPolicyOptions & {
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 
+/**
+ * Destinations a document may navigate to after a form POST, including 303/302
+ * targets. Chrome applies `form-action` to those redirects (MDN); CSP3 checks
+ * each redirect in Fetch (https://www.w3.org/TR/CSP3/#integration-with-fetch).
+ * `https://wa.me` is required because checkout answers 303 there, and
+ * `https://api.whatsapp.com` because wa.me itself answers 302 to that host.
+ */
+export const FORM_ACTION_SOURCES = [
+  "'self'",
+  "https://auth.mercadopago.com",
+  "https://auth.mercadopago.com.br",
+  "https://wa.me",
+  "https://api.whatsapp.com",
+] as const;
+
+/** https origin of `MP_OAUTH_AUTHORIZE_URL`, or null when it is missing or not a plain https URL. */
+export function oauthAuthorizeOrigin(authorizeUrl: string | undefined): string | null {
+  if (!authorizeUrl || authorizeUrl.includes("*")) return null;
+  let url: URL;
+  try {
+    url = new URL(authorizeUrl);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== "https:" || url.username || url.password) return null;
+  if (!url.hostname || url.hostname.includes("*")) return null;
+  return url.origin;
+}
+
+export function formActionSources(authorizeUrl = process.env.MP_OAUTH_AUTHORIZE_URL): string[] {
+  const sources: string[] = [...FORM_ACTION_SOURCES];
+  const extra = oauthAuthorizeOrigin(authorizeUrl);
+  if (extra && !sources.includes(extra)) sources.push(extra);
+  return sources;
+}
+
+export function formActionDirective(authorizeUrl = process.env.MP_OAUTH_AUTHORIZE_URL): string {
+  return `form-action ${formActionSources(authorizeUrl).join(" ")}`;
+}
+
 export function isLocalHostname(hostname: string): boolean {
   const normalized = hostname.trim().toLowerCase().replace(/^\[|\]$/g, "");
   return LOCAL_HOSTS.has(normalized);
@@ -102,7 +151,7 @@ export function buildContentSecurityPolicy({ nonce, isDev, upgradeInsecureReques
     "connect-src 'self'",
     "object-src 'none'",
     "base-uri 'self'",
-    "form-action 'self'",
+    formActionDirective(),
     "frame-src 'none'",
     "frame-ancestors 'none'",
     "worker-src 'none'",
