@@ -57,7 +57,7 @@ export default async function ServicesPage({ searchParams }: { searchParams: Pro
             <ServiceBlockNotice reason={service.blockedReason} />
             <details className="group mt-3 border-t border-line pt-1">
               <summary className="flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-field text-sm font-semibold text-ink hover:text-pix focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden"><Pencil aria-hidden="true" className="size-4" />Editar serviço<span className="sr-only"> {service.name}</span></summary>
-              <div className="mt-2 rounded-field bg-subtle/60 p-3 [--form-cta-outset:0.75rem] [--form-cta-radius:var(--radius-field)] sm:p-4 sm:[--form-cta-outset:1rem]">
+              <div className="mt-2 rounded-field bg-subtle/60 p-3 sm:p-4">
                 <ServiceForm key={service.id} businessId={business.id} businessName={business.name} contactWhatsapp={business.contactWhatsapp} service={service} />
               </div>
             </details>

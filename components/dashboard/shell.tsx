@@ -64,6 +64,6 @@ export function SectionCard({ title, description, children, className, id, headi
       </div>
       {actions}
     </div>
-    <div className="p-5 [--form-cta-outset:1.25rem] sm:p-6 sm:[--form-cta-outset:1.5rem]">{children}</div>
+    <div className="p-5 sm:p-6">{children}</div>
   </section>;
 }
