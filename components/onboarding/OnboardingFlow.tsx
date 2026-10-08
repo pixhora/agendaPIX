@@ -106,8 +106,10 @@ export function OnboardingFlow() {
             <StepBusiness
               businessName={data.businessName}
               slug={data.slug}
+              contactWhatsapp={data.contactWhatsapp ?? ""}
               onChangeBusinessName={(businessName) => updateDraft({ businessName })}
               onChangeSlug={(slug) => updateDraft({ slug })}
+              onChangeContactWhatsapp={(contactWhatsapp) => updateDraft({ contactWhatsapp })}
               onNext={() => goToStep(2)}
             />
           )}

@@ -27,6 +27,7 @@ export function BookingSummary({ service, slot, timezone, variant = "hero", clas
             {formatCurrency(service.depositCents > 0 ? service.depositCents : service.priceCents)}
           </p>
           {service.depositCents > 0 && <p className="mt-1 text-sm text-muted">via Pix · o restante você paga no local</p>}
+          {service.policySummary && <p className="mt-2 max-w-[36ch] text-sm text-muted">{service.policySummary}</p>}
         </div>
       )}
       <dl className="space-y-3 p-5 text-sm">

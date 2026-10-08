@@ -21,7 +21,12 @@ export type ProvisioningResult =
  */
 export function buildProvisioningPayload(data: OnboardingData): ProvisioningPayload {
   const payload: ProvisioningPayload = {
-    business: { name: data.businessName, slug: data.slug, timezone: "America/Sao_Paulo" },
+    business: {
+      name: data.businessName,
+      slug: data.slug,
+      timezone: "America/Sao_Paulo",
+      ...(data.contactWhatsapp ? { contactWhatsapp: data.contactWhatsapp } : {}),
+    },
     service: {
       name: data.serviceName,
       durationMinutes: data.durationMinutes,

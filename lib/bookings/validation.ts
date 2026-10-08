@@ -41,5 +41,6 @@ export const bookingInputSchema = z.object({
     /** CPF do pagador (enviado ao gateway Pix; não persistido). Aceita máscara; normaliza para 11 dígitos. */
     cpfCnpj: z.string().trim().min(11).max(18).transform(cpfDigits).refine(isValidCpf, "CPF inválido."),
   }).strict(),
+  policyHash: z.string().regex(/^[a-f0-9]{64}$/).optional(),
 }).strict();
 export const requestKeySchema = z.uuid({ version: "v4" });

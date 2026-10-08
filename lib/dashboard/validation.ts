@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { depositPolicySchema } from "../policy/schema";
 import { centsSchema } from "../validation/service";
 
 export const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => {
@@ -9,6 +10,7 @@ export const serviceFormSchema = z.object({
   businessId: z.uuid(), id: z.uuid().optional(), name: z.string().trim().min(1).max(120),
   durationMinutes: z.coerce.number().int().min(1).max(1440),
   priceCents: centsSchema, depositCents: centsSchema, active: z.boolean(),
+  depositPolicy: depositPolicySchema.optional(),
 }).strict().refine((value) => value.depositCents <= value.priceCents, { path: ["depositCents"], message: "O sinal não pode superar o preço." });
 export const hoursSchema = z.array(z.object({
   weekday: z.number().int().min(0).max(6),

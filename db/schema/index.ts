@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { boolean, check, foreignKey, index, integer, jsonb, pgEnum, pgTable, primaryKey, text, time, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import type { DepositPolicy } from "../../lib/policy/schema";
 import { user } from "./auth";
 
 export * from "./auth";
@@ -11,6 +12,7 @@ const timestamps = () => ({
 
 export const bookingStatus = pgEnum("booking_status", ["pending_payment", "confirmed", "cancelled", "expired", "completed"]);
 export const paymentStatus = pgEnum("payment_status", ["creating", "pending", "paid", "expired", "cancelled", "failed", "refunded", "refund_pending"]);
+export const subscriptionStatus = pgEnum("subscription_status", ["trialing", "active", "past_due", "canceled"]);
 export const latePaymentPolicies = ["refund", "rebook_if_free"] as const;
 
 export const businesses = pgTable("businesses", {
@@ -21,12 +23,16 @@ export const businesses = pgTable("businesses", {
   timezone: text("timezone").default("America/Sao_Paulo").notNull(),
   // Política de pagamento tardio (webhook/reconciliação após o hold vencer): reembolso ou reabre o mesmo horário se livre.
   latePaymentPolicy: text("late_payment_policy", { enum: latePaymentPolicies }).default("refund").notNull(),
+  // Fim do teste grátis. Negócios novos: fim do 7º dia local. Já existentes: now() + 7 dias nesta migration.
+  trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }).default(sql`(now() + interval '7 days')`).notNull(),
+  contactWhatsapp: text("contact_whatsapp"),
   ...timestamps(),
 }, (table) => [
   index("businesses_owner_idx").on(table.ownerId),
   check("businesses_name_not_empty", sql`length(trim(${table.name})) > 0`),
   check("businesses_slug_format", sql`${table.slug} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`),
   check("businesses_late_payment_policy_valid", sql`${table.latePaymentPolicy} IN ('refund', 'rebook_if_free')`),
+  check("businesses_contact_whatsapp_format", sql`${table.contactWhatsapp} IS NULL OR ${table.contactWhatsapp} ~ '^[+][1-9][0-9]{7,14}$'`),
 ]);
 
 export const pixKeyTypes = ["cpf", "cnpj", "email", "phone", "evp"] as const;
@@ -61,6 +67,7 @@ export const services = pgTable("services", {
   durationMinutes: integer("duration_minutes").notNull(),
   priceCents: integer("price_cents").notNull(),
   depositCents: integer("deposit_cents").notNull(),
+  depositPolicy: jsonb("deposit_policy").$type<DepositPolicy>().notNull().default(sql`'{"version":1,"preset":"padrao","refundUntilHours":24,"rescheduleUntilHours":24,"maxReschedules":1,"lateCancel":"retain","noShow":"retain","creditValidityDays":60}'::jsonb`),
   active: boolean("active").default(true).notNull(),
   ...timestamps(),
 }, (table) => [
@@ -68,6 +75,7 @@ export const services = pgTable("services", {
   check("services_name_not_empty", sql`length(trim(${table.name})) > 0`),
   check("services_duration_positive", sql`${table.durationMinutes} > 0`),
   check("services_money_valid", sql`${table.priceCents} >= 0 AND ${table.depositCents} >= 0 AND ${table.depositCents} <= ${table.priceCents}`),
+  check("services_deposit_policy_object", sql`jsonb_typeof(${table.depositPolicy}) = 'object'`),
 ]);
 
 export const businessHours = pgTable("business_hours", {
@@ -113,6 +121,11 @@ export const bookings = pgTable("bookings", {
   depositCents: integer("deposit_cents").notNull(),
   status: bookingStatus("status").default("pending_payment").notNull(),
   expiresAt: timestamp("expires_at", { withTimezone: true }),
+  policySnapshot: jsonb("policy_snapshot").$type<DepositPolicy>(),
+  policyText: text("policy_text"),
+  refundDeadlineAt: timestamp("refund_deadline_at", { withTimezone: true }),
+  rescheduleDeadlineAt: timestamp("reschedule_deadline_at", { withTimezone: true }),
+  policyHash: text("policy_hash"),
   ...timestamps(),
 }, (table) => [
   unique("bookings_business_id_unique").on(table.businessId, table.id),
@@ -125,6 +138,8 @@ export const bookings = pgTable("bookings", {
   check("bookings_interval_valid", sql`${table.startsAt} < ${table.endsAt}`),
   check("bookings_money_valid", sql`${table.priceCents} >= 0 AND ${table.depositCents} >= 0 AND ${table.depositCents} <= ${table.priceCents}`),
   check("bookings_pending_expiry_required", sql`${table.status} <> 'pending_payment' OR (${table.expiresAt} IS NOT NULL AND ${table.expiresAt} > ${table.createdAt})`),
+  check("bookings_policy_hash_format", sql`${table.policyHash} IS NULL OR ${table.policyHash} ~ '^[a-f0-9]{64}$'`),
+  check("bookings_policy_snapshot_pair", sql`(${table.policySnapshot} IS NULL) = (${table.policyText} IS NULL) AND (${table.policySnapshot} IS NULL) = (${table.policyHash} IS NULL)`),
 ]);
 
 export const payments = pgTable("payments", {
@@ -220,6 +235,16 @@ export const paymentAudit = pgTable("payment_audit", {
   index("payment_audit_payment_idx").on(table.paymentId),
   check("payment_audit_action_not_empty", sql`length(trim(${table.action})) > 0`),
 ]);
+
+export const subscriptions = pgTable("subscriptions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  businessId: uuid("business_id").notNull().unique().references(() => businesses.id, { onDelete: "restrict" }),
+  status: subscriptionStatus("status").notNull(),
+  provider: text("provider"),
+  externalId: text("external_id"),
+  currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
+  ...timestamps(),
+});
 
 export const onboardingRequests = pgTable("onboarding_requests", {
   ownerId: text("owner_id").notNull().references(() => user.id, { onDelete: "restrict" }),

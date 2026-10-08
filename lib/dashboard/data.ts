@@ -1,9 +1,12 @@
-import { and, asc, eq, gte, lt } from "drizzle-orm";
+import { and, asc, eq, gt, gte, lt, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "../../db";
 import { businesses, bookings, businessHours, customers, services } from "../../db/schema";
+import { loadBookingAccess } from "../billing/load";
+import { serviceListingBookability } from "../bookings/deposit-bookability";
 import { HttpError } from "../http";
 import { findOwnedBusiness } from "../tenancy";
+import { contactWhatsappSchema } from "../validation/whatsapp";
 import { hoursSchema, serviceFormSchema, shiftDate, dateSchema } from "./validation";
 import { localDate } from "../bookings/availability";
 
@@ -17,8 +20,10 @@ async function authorize(ownerId: string, businessId: string, database: Database
   return business;
 }
 export async function dashboardServices(ownerId: string, businessId: string, database: Database = getDb()) {
-  await authorize(ownerId, businessId, database);
-  return database.select().from(services).where(eq(services.businessId, businessId)).orderBy(asc(services.name), asc(services.id));
+  const business = await authorize(ownerId, businessId, database);
+  const rows = await database.select().from(services).where(eq(services.businessId, businessId)).orderBy(asc(services.name), asc(services.id));
+  const access = await loadBookingAccess(business, database);
+  return rows.map((service) => ({ ...service, ...serviceListingBookability(business, service, access) }));
 }
 export async function dashboardCustomers(ownerId: string, businessId: string, database: Database = getDb()) {
   await authorize(ownerId, businessId, database);
@@ -52,6 +57,27 @@ export async function saveDashboardService(ownerId: string, input: unknown, data
     await database.insert(services).values({ businessId, ...values });
   }
 }
+export async function countFutureConfirmedBookings(ownerId: string, businessId: string, serviceId: string, database: Database = getDb(), now = new Date()) {
+  await authorize(ownerId, businessId, database);
+  const id = z.uuid().parse(serviceId);
+  const [service] = await database.select({ id: services.id }).from(services).where(and(eq(services.businessId, businessId), eq(services.id, id))).limit(1);
+  if (!service) throw new HttpError(404, "service_unavailable", "Este serviço não está disponível para seu negócio.");
+  const [row] = await database.select({ count: sql<number>`count(*)::int` }).from(bookings).where(and(
+    eq(bookings.businessId, businessId),
+    eq(bookings.serviceId, id),
+    eq(bookings.status, "confirmed"),
+    gt(bookings.startsAt, now),
+  ));
+  return { count: row?.count ?? 0 };
+}
+
+export async function saveContactWhatsapp(ownerId: string, businessId: string, input: unknown, database: Database = getDb()) {
+  await authorize(ownerId, z.uuid().parse(businessId), database);
+  const contactWhatsapp = contactWhatsappSchema.parse(input);
+  await database.update(businesses).set({ contactWhatsapp }).where(and(eq(businesses.id, businessId), eq(businesses.ownerId, ownerId)));
+  return { contactWhatsapp };
+}
+
 export async function saveDashboardHours(ownerId: string, businessId: string, input: unknown, database: Database = getDb()) {
   const values = hoursSchema.parse(input);
   await authorize(ownerId, businessId, database);

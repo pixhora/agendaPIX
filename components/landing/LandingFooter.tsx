@@ -18,7 +18,7 @@ export function LandingFooter() {
         </nav>
         <ThemeToggle />
       </div>
-      <p className="border-t border-line px-4 py-4 text-center text-xs text-muted">© {new Date().getFullYear()} Agenda. Feito para quem vive de atendimento no Brasil.</p>
+      <p className="border-t border-line px-4 py-4 text-center text-xs text-muted">© {new Date().getFullYear()} AgendaPix. Feito para quem vive de atendimento no Brasil.</p>
     </footer>
   );
 }

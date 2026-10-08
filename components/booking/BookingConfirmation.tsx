@@ -14,7 +14,14 @@ interface BookingConfirmationProps {
   timezone: string;
   customerName: string;
   customerPhone: string;
+  policyText?: string | null;
+  refundWindowClosedAtBooking?: boolean;
+  contactWhatsapp?: string | null;
   onNewBooking: () => void;
+}
+
+function icsText(value: string) {
+  return value.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
 }
 
 function buildIcs({
@@ -22,17 +29,22 @@ function buildIcs({
   service,
   slot,
   customerName,
+  policyText,
 }: {
   businessName: string;
   service: PublicService;
   slot: AvailabilitySlot;
   customerName: string;
+  policyText?: string | null;
 }) {
   const stamp = (iso: string) =>
     new Date(iso).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
   const uid = `agendapix-${stamp(slot.startsAt)}@agendapix`;
   const summary = `${service.name} · ${businessName}`;
-  const description = `Agendamento de ${customerName} em ${businessName}. Sinal pago via Pix.`;
+  const description = [
+    `Agendamento de ${customerName} em ${businessName}. Sinal pago via Pix.`,
+    policyText ?? "",
+  ].filter((part) => part.length > 0).join(" ");
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
@@ -45,7 +57,7 @@ function buildIcs({
     `DTSTART:${stamp(slot.startsAt)}`,
     `DTEND:${stamp(slot.endsAt)}`,
     `SUMMARY:${summary}`,
-    `DESCRIPTION:${description}`,
+    `DESCRIPTION:${icsText(description)}`,
     "END:VEVENT",
     "END:VCALENDAR",
   ];
@@ -59,12 +71,15 @@ export function BookingConfirmation({
   timezone,
   customerName,
   customerPhone,
+  policyText,
+  refundWindowClosedAtBooking,
+  contactWhatsapp,
   onNewBooking,
 }: BookingConfirmationProps) {
   const remainingCents = Math.max(0, service.priceCents - service.depositCents);
   const icsHref = useMemo(
-    () => buildIcs({ businessName, service, slot, customerName }),
-    [businessName, service, slot, customerName],
+    () => buildIcs({ businessName, service, slot, customerName, policyText }),
+    [businessName, service, slot, customerName, policyText],
   );
 
   const whatsappMessage = encodeURIComponent(
@@ -121,13 +136,13 @@ export function BookingConfirmation({
         </div>
       </article>
 
-      <p className="rounded-card border border-line bg-surface p-4 text-sm text-muted">
-        <strong className="font-semibold text-ink">Vai se atrasar ou precisa remarcar?</strong> Avise o estabelecimento pelo WhatsApp o quanto antes.
-      </p>
+      {policyText && (
+        <p className={refundWindowClosedAtBooking ? "rounded-card border border-warning/30 bg-warning-soft p-4 text-sm text-warning" : "rounded-card border border-line bg-surface p-4 text-sm text-muted"}>{policyText}</p>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <Button asChild size="lg">
-          <a href={`https://wa.me/?text=${whatsappMessage}`} target="_blank" rel="noopener noreferrer">
+          <a href={`https://wa.me/${contactWhatsapp ? contactWhatsapp.replace(/^\+/, "") : ""}?text=${whatsappMessage}`} target="_blank" rel="noopener noreferrer">
             <Icon icon={CONFIRMATION_ICONS.whatsapp} size="md" /> Enviar no WhatsApp
           </a>
         </Button>

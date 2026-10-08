@@ -6,7 +6,7 @@ export class HttpError extends Error {
     public code: string,
     message: string,
     public retryAfterSeconds?: number,
-    public extra?: Record<string, unknown>,
+    public details?: Record<string, unknown>,
   ) { super(message); }
 }
 
@@ -18,7 +18,7 @@ export async function handleHttp(run: () => Promise<Response>) {
   try { return await run(); }
   catch (error) {
     if (error instanceof HttpError) {
-      const response = json({ error: { code: error.code, message: error.message, ...error.extra } }, error.status);
+      const response = json({ error: { code: error.code, message: error.message, ...error.details } }, error.status);
       if (error.retryAfterSeconds) response.headers.set("Retry-After", String(Math.max(1, Math.ceil(error.retryAfterSeconds))));
       return response;
     }

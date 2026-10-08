@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { PreviewBadge } from "@/components/preview/PreviewBadge";
 
 export const metadata: Metadata = {
-  title: "Modo Preview · Agenda Micro-SaaS",
+  title: "Modo Preview · AgendaPix",
   description: "Ambiente de visualização de desenvolvimento sem dependências externas.",
 };
 

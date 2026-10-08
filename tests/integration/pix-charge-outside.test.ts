@@ -11,6 +11,7 @@ import { reconcileOnce } from "../../lib/payments/reconcile";
 import { applyPaidEvent } from "../../lib/payments/apply-paid";
 import { polledPaidEvent, type ChargeInput, type PaymentProvider } from "../../lib/payments/provider";
 import { hash } from "../../lib/bookings/service";
+import { padraoPolicyHash } from "../helpers/deposit-policy";
 
 const pool = new Pool({ connectionString: databaseEnvSchema.parse(process.env).DATABASE_URL, max: 10, connectionTimeoutMillis: 5000 });
 const database = drizzle(pool, { schema });
@@ -23,7 +24,7 @@ let store: FakeChargeStore;
 let provider: FakePaymentProvider;
 
 const slot = (index: number) => new Date(Date.UTC(2030, 0, 1, 12, 0) + index * 1800000).toISOString();
-const input = (index = 0, phone = "+5511999999900") => ({ serviceId, startsAt: slot(index), customer: { name: "Cliente", phone, cpfCnpj: "52998224725" } });
+const input = (index = 0, phone = "+5511999999900") => ({ serviceId, startsAt: slot(index), customer: { name: "Cliente", phone, cpfCnpj: "52998224725" }, policyHash: padraoPolicyHash("Negócio") });
 
 beforeEach(async () => {
   ownerId = randomUUID(); businessId = randomUUID(); serviceId = randomUUID(); slug = `out-${businessId}`;

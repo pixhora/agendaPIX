@@ -4,6 +4,9 @@ export interface PublicService {
   durationMinutes: number;
   priceCents: number;
   depositCents: number;
+  depositPolicy?: unknown;
+  policySummary?: string | null;
+  policyHash?: string | null;
 }
 
 export interface PublicBusinessData {
@@ -16,6 +19,8 @@ export interface PublicBusinessData {
   phone?: string | null;
   /** Logo do negócio; se ausente, o avatar usa ícone CalendarCheck. */
   logoUrl?: string | null;
+  contactWhatsapp?: string | null;
+  bookingsPaused?: boolean;
 }
 
 export interface AvailabilitySlot {
@@ -26,6 +31,7 @@ export interface AvailabilitySlot {
 export interface AvailabilityResponse {
   timezone: string;
   slots: AvailabilitySlot[];
+  bookingsPaused?: boolean;
 }
 
 /**
@@ -65,6 +71,13 @@ export interface BookingResponse {
   expiresAt: string | null;
   accessToken: string;
   payment: PixPaymentData | null;
+  policy?: {
+    text: string | null;
+    snapshot: unknown;
+    refundDeadlineAt: string | null;
+    rescheduleDeadlineAt: string | null;
+    refundWindowClosedAtBooking: boolean;
+  } | null;
 }
 
 export interface PaymentStatusResponse {

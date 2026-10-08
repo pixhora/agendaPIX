@@ -244,7 +244,7 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
       if (existing.amountCents !== data.amountCents) throw new Error("Chave de idempotência reutilizada com outros dados.");
       return this.toPix(existing);
     }
-    const names = data.customer ? splitName(data.customer.name) : { firstName: "Cliente", lastName: "AgendaPIX" };
+    const names = data.customer ? splitName(data.customer.name) : { firstName: "Cliente", lastName: "AgendaPix" };
     try {
       const created = orderSchema.parse(await this.request("/v1/orders", {
         method: "POST",
