@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { saveHours, saveService } from "@/app/dashboard/(owner)/actions";
-import { dayError, draftsFromHours, hoursError, hoursPayload, MULTI_INTERVAL_HOURS, withPause, withoutPause, type DayDraft, type HourRange } from "@/lib/dashboard/hours-form";
+import { dayError, draftsFromHours, hoursError, hoursPayload, MULTI_INTERVAL_HOURS, setDayOpen, withPause, withoutPause, type DayDraft, type HourRange } from "@/lib/dashboard/hours-form";
 import type { FormState } from "@/lib/dashboard/validation";
 import { cn } from "@/lib/utils";
 
@@ -121,14 +121,14 @@ export function HoursForm({ businessId, hours, multiInterval = MULTI_INTERVAL_HO
         const invalid = clientError !== "" && dayError(value, multiInterval) === clientError;
         return <fieldset key={day} aria-labelledby={`hours-day-${weekday}`} className="grid min-w-0 gap-3 px-3 py-3 sm:px-4">
           <div className="flex min-h-11 min-w-0 items-center gap-3">
-            <Switch name={`open-visible-${weekday}`} checked={value.open} onChange={(event) => changeDay(weekday, { open: event.target.checked })} aria-label={`${day}: aberto`} disabled={pending} />
+            <Switch name={`open-visible-${weekday}`} checked={value.open} onChange={(event) => changeDay(weekday, setDayOpen(value, event.target.checked))} aria-label={`${day}: aberto`} disabled={pending} />
             <span id={`hours-day-${weekday}`} className="font-semibold">{day}</span>
             <span className={cn("ml-auto text-xs font-semibold", value.open ? "text-success" : "text-muted")}>{value.open ? "Aberto" : "Fechado"}</span>
           </div>
-          <div className={cn("grid min-w-0 grid-cols-2 gap-3", !value.open && "dash-disabled")}>
-            <TimeField id={`start-${weekday}`} label="Abre às" value={value.start} onChange={(start) => changeDay(weekday, { start })} disabled={!value.open || pending} invalid={invalid} />
-            <TimeField id={`end-${weekday}`} label="Fecha às" value={value.end} onChange={(end) => changeDay(weekday, { end })} disabled={!value.open || pending} invalid={invalid} />
-          </div>
+          {value.open && <div className="grid min-w-0 grid-cols-2 gap-3">
+            <TimeField id={`start-${weekday}`} label="Abre às" value={value.start} onChange={(start) => changeDay(weekday, { start })} disabled={pending} invalid={invalid} />
+            <TimeField id={`end-${weekday}`} label="Fecha às" value={value.end} onChange={(end) => changeDay(weekday, { end })} disabled={pending} invalid={invalid} />
+          </div>}
           {multiInterval && value.open && (value.pause ? <div className="grid min-w-0 gap-2">
             <div className="grid min-w-0 grid-cols-2 gap-3">
               <TimeField id={`pause-start-${weekday}`} label="Pausa das" value={value.pause.start} onChange={(start) => changeDay(weekday, (current) => ({ ...current, pause: { start, end: current.pause?.end ?? "13:00" } }))} disabled={pending} invalid={invalid} />

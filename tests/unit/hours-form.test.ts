@@ -7,6 +7,7 @@ import {
   hoursError,
   hoursPayload,
   rangesOverlap,
+  setDayOpen,
   withPause,
   withoutPause,
   type DayDraft,
@@ -57,6 +58,21 @@ describe("horários com pausa", () => {
     expect(dayError(inverted, true)).toBe("O fim da pausa precisa ser depois do início.");
     expect(dayError(crossed, true)).toBe("O fim precisa ser depois do início.");
     expect(hoursError([outside, ...week(false).slice(1)], true)).toBe("A pausa precisa ficar dentro do horário de atendimento.");
+  });
+
+  it("religar devolve os mesmos horários e a pausa, e o dia fechado não vai no envio", () => {
+    const open = { open: true, start: "10:00", end: "19:00", pause: { start: "13:00", end: "14:30" } };
+    const closed = setDayOpen(open, false);
+    expect(closed).toEqual({ ...open, open: false });
+    expect(hoursPayload([closed], true)).toEqual([]);
+    expect(hoursPayload([closed], false)).toEqual([]);
+    const again = setDayOpen(closed, true);
+    expect(again).toEqual(open);
+    expect(hoursPayload([again], true)).toEqual([
+      { weekday: 0, opensAt: "10:00", closesAt: "13:00" },
+      { weekday: 0, opensAt: "14:30", closesAt: "19:00" },
+    ]);
+    expect(hoursPayload([again], false)).toEqual([{ weekday: 0, opensAt: "10:00", closesAt: "19:00" }]);
   });
 
   it("reconstrói a pausa só quando a flag está ligada", () => {

@@ -64,6 +64,11 @@ export function hoursError(days: DayDraft[], multiInterval: boolean): string | n
   return null;
 }
 
+/** Liga ou desliga o dia sem apagar horários nem pausa. */
+export function setDayOpen(day: DayDraft, open: boolean): DayDraft {
+  return day.open === open ? day : { ...day, open };
+}
+
 export function withPause(day: DayDraft): DayDraft {
   if (!day.open || day.pause) return day;
   return { ...day, pause: { start: "12:00", end: "13:00" } };
