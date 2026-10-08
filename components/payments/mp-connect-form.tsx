@@ -125,7 +125,7 @@ export function MpConnectForm({
   pending?: boolean;
   submitLabel: string;
   onBlocked: () => void;
-  buttonVariant?: "pix" | "default" | "outline";
+  buttonVariant?: "pix" | "default" | "outline" | "link";
   beside?: ReactNode;
   children?: ReactNode;
   /** Conteúdo rolável acima da caixa, quando só o botão fica grudado. */
@@ -191,22 +191,28 @@ export function MpConnectForm({
       <div
         className={cn(
           "mt-3",
-          beside && "grid gap-2 min-[360px]:grid-cols-2",
+          beside && buttonVariant !== "link" && "grid gap-2 min-[360px]:grid-cols-2",
+          buttonVariant === "link" && "flex flex-col items-stretch gap-1",
           pinActions &&
             "shrink-0 max-md:sticky max-md:bottom-0 max-md:z-20 max-md:mt-0 max-md:border-t max-md:border-line max-md:bg-paper/95 max-md:px-5 max-md:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:pt-3 max-md:backdrop-blur-md md:static md:px-5 md:pb-6",
         )}
         data-mp-sticky={pinActions ? "" : undefined}
       >
+        {buttonVariant === "link" ? beside : null}
         <button
           type="submit"
           aria-busy={pending || undefined}
-          className={cn(buttonVariants({ variant: buttonVariant, size: "lg" }), "w-full")}
+          className={
+            buttonVariant === "link"
+              ? "inline-flex min-h-11 w-fit items-center text-sm font-semibold text-ink underline underline-offset-4 outline-none focus-visible:shadow-[var(--shadow-focus)] focus-visible:outline-none"
+              : cn(buttonVariants({ variant: buttonVariant, size: "lg" }), "w-full")
+          }
         >
           {pending ? <Loader2 aria-hidden="true" className="animate-spin motion-reduce:animate-none" /> : null}
           {pending ? "Abrindo o Mercado Pago…" : submitLabel}
-          {pending || buttonVariant === "outline" ? null : <ExternalLink aria-hidden="true" />}
+          {pending || buttonVariant === "outline" || buttonVariant === "link" ? null : <ExternalLink aria-hidden="true" />}
         </button>
-        {beside}
+        {buttonVariant === "link" ? null : beside}
         {footer}
       </div>
     </form>

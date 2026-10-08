@@ -11,6 +11,7 @@ import type {
 import { cpfDigitsOnly, normalizePhoneToE164 } from "./formatters";
 import { publicBookingPagePath, publicBookingPaymentUrl, publicBookingsUrl, publicServicesUrl } from "@/lib/public-api";
 import { MP_ACCOUNT_NOT_CONNECTED } from "@/lib/mercadopago/contract";
+import { showDepositUnavailableCard } from "./deposit-availability";
 import { DepositUnavailableCard } from "./DepositUnavailable";
 import { StepProgress } from "./StepProgress";
 import { StepService } from "./StepService";
@@ -67,6 +68,7 @@ export function BookingFlow({ slug, initialBookingId, previewBusiness }: Booking
   });
 
   const [reloadCount, setReloadCount] = useState(0);
+  const noBookingFlow = Boolean(business && showDepositUnavailableCard(business.services));
 
   // Carrega serviços públicos do negócio
   useEffect(() => {
@@ -407,10 +409,12 @@ export function BookingFlow({ slug, initialBookingId, previewBusiness }: Booking
 
   const pageFooter = (
     <footer className="mx-auto flex max-w-5xl flex-col items-center gap-3 px-4 pb-10 pt-4 text-center text-xs text-muted sm:flex-row sm:justify-between sm:px-6 sm:text-left">
-      <p className="inline-flex items-center gap-1.5">
-        <Icon icon={PIX_ICONS.lock} />
-        O sinal garante o horário. Seus dados são usados só para este agendamento.
-      </p>
+      {noBookingFlow ? null : (
+        <p className="inline-flex items-center gap-1.5">
+          <Icon icon={PIX_ICONS.lock} />
+          O sinal garante o horário. Seus dados são usados só para este agendamento.
+        </p>
+      )}
       <div className="flex items-center gap-3">
         <ThemeToggle className="sm:hidden" />
         <Link href="/" className="inline-flex min-h-11 items-center gap-2 font-semibold text-ink">
@@ -485,7 +489,7 @@ export function BookingFlow({ slug, initialBookingId, previewBusiness }: Booking
       {pageHeader}
       <main id="content" className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-10 lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-10">
         <div className="min-w-0 space-y-5">
-          {depositBlocked ? (
+          {noBookingFlow || depositBlocked ? (
             <DepositUnavailableCard
               businessName={business.name}
               phone={business.contactWhatsapp ?? business.phone}
@@ -565,13 +569,13 @@ export function BookingFlow({ slug, initialBookingId, previewBusiness }: Booking
           )}
         </div>
 
-        <aside aria-label="Seu pedido" className="hidden lg:sticky lg:top-6 lg:block">
+        {noBookingFlow ? null : <aside aria-label="Seu pedido" className="hidden lg:sticky lg:top-6 lg:block">
           <BookingSummary service={selectedService} slot={selectedSlot} timezone={business.timezone} />
           <p className="mt-4 flex gap-2 px-1 text-xs leading-relaxed text-muted">
             <Icon icon={BUSINESS_HEADER_ICONS.secure} className="shrink-0 text-pix" />
             Você paga só o sinal agora. O horário fica pré-reservado enquanto o Pix é feito. O prazo aparece no contador da cobrança.
           </p>
-        </aside>
+        </aside>}
       </main>
       {pageFooter}
     </div>

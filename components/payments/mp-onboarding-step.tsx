@@ -6,7 +6,7 @@ import { ArrowRight, Check, CircleCheck, CircleX, Info, Percent, TriangleAlert, 
 import { BrandLink } from "@/components/ui/brand";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { PERMISSIONS, callbackFocusesAck, formatConnectedSince, mpAccountLines, presentMpCallback, type MpCallbackView } from "@/lib/mercadopago/contract";
+import { PERMISSIONS, callbackFocusesAck, formatConnectedSince, presentMpCallback, type MpCallbackView } from "@/lib/mercadopago/contract";
 import { MP_GOOD_TO_KNOW } from "@/lib/mercadopago/connect-copy";
 import { MpConnectForm } from "./mp-connect-form";
 
@@ -82,18 +82,15 @@ export function MpOnboardingStep({
   legalPagesPublished = false,
   callback = null,
   connectedAt = null,
-  accountName = null,
-  accountEmailMasked = null,
-  accountIdLast4 = null,
+  accountLabel = null,
   onDismissAccount,
 }: {
   businessId: string;
   legalPagesPublished?: boolean;
   callback?: MpCallbackView | null;
   connectedAt?: string | null;
-  accountName?: string | null;
-  accountEmailMasked?: string | null;
-  accountIdLast4?: string | null;
+  /** Rótulo da conta, até o status publicar o identificador. */
+  accountLabel?: string | null;
   onDismissAccount?: () => void;
 }) {
   const [acknowledged, setAcknowledged] = useState(false);
@@ -103,7 +100,6 @@ export function MpOnboardingStep({
   const connected = callback?.mp === "connected";
   const errorView = callback?.mp === "error" && !callbackFocusesAck(callback) ? callback : null;
   const since = formatConnectedSince(connectedAt);
-  const account = mpAccountLines({ accountName, accountEmailMasked, accountIdLast4 });
 
   useEffect(() => {
     if (errorView) errorTitle.current?.focus();
@@ -117,7 +113,7 @@ export function MpOnboardingStep({
           <p className="text-xs text-muted">Quase lá · recomendado</p>
         </header>
         {connected ? (
-          <ConnectedBody since={since} account={account} onDismissAccount={onDismissAccount} />
+          <ConnectedBody since={since} accountLabel={accountLabel} onDismissAccount={onDismissAccount} />
         ) : (
           <MpConnectForm
             businessId={businessId}
@@ -209,11 +205,11 @@ export function MpOnboardingStep({
 
 function ConnectedBody({
   since,
-  account,
+  accountLabel,
   onDismissAccount,
 }: {
   since: string | null;
-  account: { title: string; detail: string | null };
+  accountLabel: string | null;
   onDismissAccount?: () => void;
 }) {
   return (
@@ -227,8 +223,7 @@ function ConnectedBody({
         <div className="mt-4 rounded-card border border-line bg-paper p-4">
           <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
             <div className="max-w-full">
-              <p className="font-semibold">{account.title}</p>
-              {account.detail ? <p className="mt-0.5 text-[13px] text-muted">{account.detail}</p> : null}
+              {accountLabel ? <p className="font-semibold">{accountLabel}</p> : null}
               {since ? <p className="mt-1 text-[13px] text-muted">Conectado desde {since}</p> : null}
             </div>
             {onDismissAccount ? (

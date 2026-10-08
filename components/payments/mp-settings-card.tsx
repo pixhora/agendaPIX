@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Info, Loader2, Undo2 } from "lucide-react";
+import { ExternalLink, Info, Loader2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -10,7 +10,6 @@ import {
   LEGACY_PIX_NOTICE,
   MP_TARIFF_URL,
   formatConnectedSince,
-  mpAccountLines,
   legacyNoticeAfterDismiss,
   legacyNoticeVisible,
   legacyPixDismissUrl,
@@ -79,6 +78,7 @@ export function MpSettingsCard({
   status,
   timezone,
   pendingPixCount = 0,
+  accountLabel = null,
   onStatus,
   initialDisconnectOpen = false,
 }: {
@@ -86,6 +86,8 @@ export function MpSettingsCard({
   status: MpOwnerStatus;
   timezone: string;
   pendingPixCount?: number;
+  /** Rótulo da conta, até o status publicar o identificador. */
+  accountLabel?: string | null;
   onStatus: (status: MpOwnerStatus) => void;
   initialDisconnectOpen?: boolean;
 }) {
@@ -96,7 +98,6 @@ export function MpSettingsCard({
   const [dismissedNotice, setDismissedNotice] = useState(false);
   const requireAck = reconnectRequiresAck(status.consentVersion);
   const since = formatConnectedSince(status.connectedAt, timezone);
-  const account = mpAccountLines(status);
   const showNotice = legacyNoticeVisible(status.hadLegacyPixKey, dismissedNotice);
   const connected = status.status === "connected";
   const reconnect = status.status === "needs_reconnect";
@@ -119,9 +120,6 @@ export function MpSettingsCard({
         canReceiveDeposits: false,
         hadLegacyPixKey: status.hadLegacyPixKey,
         consentVersion: null,
-        accountName: null,
-        accountEmailMasked: null,
-        accountIdLast4: null,
       });
     } catch {
       toast("Sem internet. Tente de novo quando a conexão voltar.");
@@ -146,14 +144,14 @@ export function MpSettingsCard({
 
         {connected ? (
           <div className="mt-4">
-            <p className="font-semibold">{account.title}</p>
-            {account.detail ? <p className="mt-0.5 text-[13px] text-muted">{account.detail}</p> : null}
+            {accountLabel ? <p className="font-semibold">{accountLabel}</p> : null}
             {since ? <p className="mt-1 text-[13px] text-muted">Conectado desde {since}</p> : null}
             <p className="mt-3 text-sm leading-relaxed text-ink">
               O sinal dos clientes cai direto nesta conta. O Mercado Pago desconta a tarifa dele; o AgendaPix não cobra nada sobre o sinal.
             </p>
-            <a href={MP_TARIFF_URL} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-ink underline-offset-4 outline-none hover:underline focus-visible:shadow-[var(--shadow-focus)] focus-visible:outline-none">
+            <a href={MP_TARIFF_URL} target="_blank" rel="noopener" className="mt-3 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-ink underline underline-offset-4 outline-none focus-visible:shadow-[var(--shadow-focus)] focus-visible:outline-none">
               Ver tarifas no Mercado Pago
+              <ExternalLink aria-hidden="true" className="size-3.5" />
               <span className="sr-only"> (abre em nova aba)</span>
             </a>
           </div>
@@ -179,7 +177,7 @@ export function MpSettingsCard({
             }}
             ackInvalid={ackInvalid}
             submitLabel={status.status === "not_connected" ? "Conectar Mercado Pago" : "Reconectar"}
-            buttonVariant={connected ? "outline" : "pix"}
+            buttonVariant={connected ? "link" : "pix"}
             onBlocked={() => setAckInvalid(true)}
             beside={connected ? (
               <button type="button" onClick={() => setDialogOpen(true)} className={cn(buttonVariants({ variant: "ghost", size: "lg" }), "w-full text-danger hover:bg-danger-soft hover:text-danger")}>

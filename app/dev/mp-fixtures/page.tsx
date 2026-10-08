@@ -13,7 +13,6 @@ export const dynamic = "force-dynamic";
 const SCENES = [
   "onboarding",
   "onboarding-connected",
-  "onboarding-account-fallback",
   "onboarding-error",
   "settings-connected",
   "settings-legacy",

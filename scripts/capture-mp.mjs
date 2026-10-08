@@ -11,7 +11,6 @@ const scenes = [
   { name: "onboarding-unchecked", scene: "onboarding", long: true },
   { name: "onboarding-ack-error", scene: "onboarding", long: true, click: "Continuar para o Mercado Pago" },
   { name: "onboarding-connected", scene: "onboarding-connected" },
-  { name: "onboarding-account-fallback", scene: "onboarding-account-fallback" },
   { name: "onboarding-error", scene: "onboarding-error", long: true },
   { name: "settings-connected", scene: "settings-connected" },
   { name: "settings-legacy", scene: "settings-legacy" },

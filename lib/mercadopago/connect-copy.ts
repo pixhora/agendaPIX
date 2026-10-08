@@ -13,8 +13,8 @@ export const MP_GOOD_TO_KNOW = [
   "Você pode desconectar quando quiser, aqui no AgendaPix ou no Mercado Pago. Sem conexão, os serviços com sinal ficam pausados.",
 ] as const;
 
-/** Sexta, 16 out 2026, meio-dia em São Paulo. */
-export const MP_MOCK_FRIDAY_16 = "2026-10-16T15:00:00.000Z";
+/** Sexta, 2 out 2026, meio-dia em São Paulo. Anterior a 8 out 2026. */
+export const MP_MOCK_FRIDAY_2 = "2026-10-02T15:00:00.000Z";
 
-/** Sexta, 23 out 2026, meio-dia em São Paulo. */
-export const MP_MOCK_FRIDAY_23 = "2026-10-23T15:00:00.000Z";
+/** Sexta, 25 set 2026, meio-dia em São Paulo. */
+export const MP_MOCK_FRIDAY_25 = "2026-09-25T15:00:00.000Z";

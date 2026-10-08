@@ -4,7 +4,7 @@ import { useState } from "react";
 import { BookingFlow } from "@/components/booking/BookingFlow";
 import type { PublicBusinessData } from "@/components/booking/types";
 import { MP_ACCOUNT_NOT_CONNECTED, presentMpCallback, type MpOwnerStatus } from "@/lib/mercadopago/contract";
-import { MP_FIXTURE_BUSINESS_ID, MP_STATUS_FIXTURES, type MpFixtureName } from "@/lib/mercadopago/dev-fixtures";
+import { MP_FIXTURE_BUSINESS_ID, MP_MOCK_ACCOUNT_LABEL, MP_STATUS_FIXTURES, type MpFixtureName } from "@/lib/mercadopago/dev-fixtures";
 import { MpBannerList } from "./mp-banner";
 import { MpOnboardingStep } from "./mp-onboarding-step";
 import { MpSettingsCard } from "./mp-settings-card";
@@ -54,6 +54,7 @@ function SettingsScene({
             status={status}
             timezone="America/Sao_Paulo"
             pendingPixCount={disconnect ? 2 : 0}
+            accountLabel={initial.status === "connected" ? MP_MOCK_ACCOUNT_LABEL : null}
             onStatus={setStatus}
             initialDisconnectOpen={disconnect}
           />
@@ -70,22 +71,7 @@ export function MpFixtureScene({ scene }: { scene: string }) {
         businessId={MP_FIXTURE_BUSINESS_ID}
         callback={presentMpCallback("connected", null)}
         connectedAt={MP_STATUS_FIXTURES.connected.connectedAt}
-        accountName={MP_STATUS_FIXTURES.connected.accountName}
-        accountEmailMasked={MP_STATUS_FIXTURES.connected.accountEmailMasked}
-        accountIdLast4={MP_STATUS_FIXTURES.connected.accountIdLast4}
-        onDismissAccount={() => undefined}
-      />
-    );
-  }
-  if (scene === "onboarding-account-fallback") {
-    return (
-      <MpOnboardingStep
-        businessId={MP_FIXTURE_BUSINESS_ID}
-        callback={presentMpCallback("connected", null)}
-        connectedAt={MP_STATUS_FIXTURES.account_fallback.connectedAt}
-        accountName={MP_STATUS_FIXTURES.account_fallback.accountName}
-        accountEmailMasked={MP_STATUS_FIXTURES.account_fallback.accountEmailMasked}
-        accountIdLast4={MP_STATUS_FIXTURES.account_fallback.accountIdLast4}
+        accountLabel={MP_MOCK_ACCOUNT_LABEL}
         onDismissAccount={() => undefined}
       />
     );

@@ -1,6 +1,6 @@
 import type { MpOwnerStatus } from "./contract";
 import { MP_CONNECT_CONSENT_VERSION } from "./consent";
-import { MP_MOCK_FRIDAY_16 } from "./connect-copy";
+import { MP_MOCK_FRIDAY_2 } from "./connect-copy";
 
 /**
  * DEV ONLY. Payload de status enquanto o GET real não está neste branch.
@@ -9,16 +9,16 @@ import { MP_MOCK_FRIDAY_16 } from "./connect-copy";
  */
 export const MP_FIXTURE_BUSINESS_ID = "00000000-0000-4000-8000-0000000000a1";
 
+/** Texto da prévia. O status ainda não traz a conta; não é campo de API. */
+export const MP_MOCK_ACCOUNT_LABEL = "Conta Mercado Pago nº ••••3636";
+
 const base = {
-  connectedAt: MP_MOCK_FRIDAY_16,
+  connectedAt: MP_MOCK_FRIDAY_2,
   expiresAt: "2027-04-06T20:02:00.000Z",
   liveMode: true,
   canReceiveDeposits: true,
   hadLegacyPixKey: false,
   consentVersion: MP_CONNECT_CONSENT_VERSION,
-  accountName: "Ana S.",
-  accountEmailMasked: "an••@gmail.com",
-  accountIdLast4: "3636",
 } satisfies Omit<MpOwnerStatus, "status">;
 
 export const MP_STATUS_FIXTURES = {
@@ -32,17 +32,6 @@ export const MP_STATUS_FIXTURES = {
     canReceiveDeposits: false,
     hadLegacyPixKey: false,
     consentVersion: null,
-    accountName: null,
-    accountEmailMasked: null,
-    accountIdLast4: null,
-  },
-  /** Conectado sem nome nem e-mail: cai no número final da conta. */
-  account_fallback: {
-    ...base,
-    status: "connected",
-    accountName: null,
-    accountEmailMasked: null,
-    accountIdLast4: "3636",
   },
   /** Mesma versão aceita: reconectar sem a caixa. */
   needs_reconnect: { ...base, status: "needs_reconnect", canReceiveDeposits: false },
@@ -77,8 +66,5 @@ export function readMpFixture(name: string | null | undefined): MpOwnerStatus | 
     canReceiveDeposits: fixture.canReceiveDeposits === true,
     hadLegacyPixKey: fixture.hadLegacyPixKey === true,
     consentVersion: fixture.consentVersion ?? null,
-    accountName: fixture.accountName ?? null,
-    accountEmailMasked: fixture.accountEmailMasked ?? null,
-    accountIdLast4: fixture.accountIdLast4 ?? null,
   };
 }

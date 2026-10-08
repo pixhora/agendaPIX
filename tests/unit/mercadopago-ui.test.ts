@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
+import { BookingFlow } from "../../components/booking/BookingFlow";
 import { AutoRefundAck, MpConnectForm } from "../../components/payments/mp-connect-form";
 import { MpDisconnectDialog } from "../../components/payments/mp-disconnect-dialog";
 import { MpOnboardingStep } from "../../components/payments/mp-onboarding-step";
@@ -10,12 +11,13 @@ import {
   MP_AUTO_REFUND_ACK_ERROR,
   MP_AUTO_REFUND_ACK_HINT,
   MP_GOOD_TO_KNOW,
-  MP_MOCK_FRIDAY_16,
-  MP_MOCK_FRIDAY_23,
+  MP_MOCK_FRIDAY_2,
+  MP_MOCK_FRIDAY_25,
 } from "../../lib/mercadopago/connect-copy";
-import { MP_STATUS_FIXTURES } from "../../lib/mercadopago/dev-fixtures";
+import { MP_MOCK_ACCOUNT_LABEL, MP_STATUS_FIXTURES } from "../../lib/mercadopago/dev-fixtures";
 import {
   AUTO_REFUND_ACK_ERROR,
+  MP_ACCOUNT_NOT_CONNECTED,
   bannerDismissUntil,
   bannerHiddenUntil,
   callbackFocusesAck,
@@ -24,7 +26,6 @@ import {
   legacyNoticeAfterDismiss,
   legacyNoticeVisible,
   legacyPixDismissUrl,
-  mpAccountLines,
   parseMpOwnerStatus,
   presentMpCallback,
   reconnectRequiresAck,
@@ -148,72 +149,38 @@ describe("Mercado Pago connect consent", () => {
     expect(reconnectRequiresAck(MP_STATUS_FIXTURES.needs_reconnect_stale.consentVersion)).toBe(true);
     expect(MP_STATUS_FIXTURES.legacy.hadLegacyPixKey).toBe(true);
     expect(MP_STATUS_FIXTURES.connected.hadLegacyPixKey).toBe(false);
-    expect(MP_STATUS_FIXTURES.connected.accountName).toBe("Ana S.");
-    expect(MP_STATUS_FIXTURES.connected.accountEmailMasked).toBe("an••@gmail.com");
-    expect(MP_STATUS_FIXTURES.not_connected.accountName).toBeNull();
-    expect(MP_STATUS_FIXTURES.not_connected.accountEmailMasked).toBeNull();
-    expect(MP_STATUS_FIXTURES.not_connected.accountIdLast4).toBeNull();
-    expect(MP_STATUS_FIXTURES.account_fallback.accountName).toBeNull();
-    expect(MP_STATUS_FIXTURES.account_fallback.accountIdLast4).toBe("3636");
+    expect(MP_MOCK_ACCOUNT_LABEL).toBe("Conta Mercado Pago nº ••••3636");
   });
 
-  it("shows the account name and masked email, or the last four digits", () => {
-    expect(mpAccountLines({
-      accountName: "Ana S.",
-      accountEmailMasked: "an••@gmail.com",
-      accountIdLast4: "3636",
-    })).toEqual({ title: "Ana S.", detail: "an••@gmail.com" });
-    expect(mpAccountLines({
-      accountName: null,
-      accountEmailMasked: "an••@gmail.com",
-      accountIdLast4: "3636",
-    })).toEqual({ title: "an••@gmail.com", detail: null });
-    expect(mpAccountLines({
-      accountName: null,
-      accountEmailMasked: null,
-      accountIdLast4: "3636",
-    })).toEqual({ title: "Conta Mercado Pago nº ••••3636", detail: null });
-    expect(mpAccountLines({
-      accountName: null,
-      accountEmailMasked: null,
-      accountIdLast4: null,
-    })).toEqual({ title: "Conta Mercado Pago", detail: null });
-
+  it("shows the preview account label until the status publishes one", () => {
     const named = renderToStaticMarkup(createElement(MpOnboardingStep, {
       businessId: "biz",
       callback: presentMpCallback("connected", null),
-      connectedAt: MP_MOCK_FRIDAY_16,
-      accountName: "Ana S.",
-      accountEmailMasked: "an••@gmail.com",
-      accountIdLast4: "3636",
+      connectedAt: MP_MOCK_FRIDAY_2,
+      accountLabel: MP_MOCK_ACCOUNT_LABEL,
       onDismissAccount: () => undefined,
     }));
-    const nameAt = named.indexOf("Ana S.");
-    const emailAt = named.indexOf("an••@gmail.com");
+    const labelAt = named.indexOf(MP_MOCK_ACCOUNT_LABEL);
     const switchAt = named.indexOf("Não é essa conta?");
-    expect(nameAt).toBeGreaterThan(-1);
-    expect(nameAt).toBeLessThan(emailAt);
-    expect(switchAt).toBeGreaterThan(nameAt);
-
-    const fallback = renderToStaticMarkup(createElement(MpOnboardingStep, {
-      businessId: "biz",
-      callback: presentMpCallback("connected", null),
-      accountName: null,
-      accountEmailMasked: null,
-      accountIdLast4: "3636",
-      onDismissAccount: () => undefined,
-    }));
-    expect(fallback).toContain("Conta Mercado Pago nº ••••3636");
-    expect(fallback).toContain("Não é essa conta?");
+    expect(labelAt).toBeGreaterThan(-1);
+    expect(named).toContain("Conectado desde 2 out 2026");
+    expect(switchAt).toBeGreaterThan(labelAt);
 
     const settings = renderToStaticMarkup(createElement(MpSettingsCard, {
       businessId: "biz",
       status: MP_STATUS_FIXTURES.connected,
       timezone: "America/Sao_Paulo",
+      accountLabel: MP_MOCK_ACCOUNT_LABEL,
       onStatus: () => undefined,
     }));
-    expect(settings).toContain("Ana S.");
-    expect(settings).toContain("an••@gmail.com");
+    expect(settings).toContain(MP_MOCK_ACCOUNT_LABEL);
+    expect(settings).toContain("Conectado desde 2 out 2026");
+    expect(settings).toContain('rel="noopener"');
+    expect(settings).toContain("Ver tarifas no Mercado Pago");
+    expect(settings).toContain("(abre em nova aba)");
+    expect(settings).not.toContain("noreferrer");
+    expect(settings).toContain("underline");
+    expect(settings).toContain("Reconectar");
   });
 
   it("centers the disconnect dialog and links the Mercado Pago apps help", () => {
@@ -254,20 +221,8 @@ describe("legacy Pix notice", () => {
 
   it("treats a missing legacy flag as false", () => {
     const parsed = parseMpOwnerStatus({ status: "connected", canReceiveDeposits: true });
-    expect(parsed).toMatchObject({
-      hadLegacyPixKey: false,
-      consentVersion: null,
-      liveMode: null,
-      accountName: null,
-      accountEmailMasked: null,
-      accountIdLast4: null,
-    });
-    expect(parseMpOwnerStatus({
-      status: "connected",
-      accountName: "  ",
-      accountEmailMasked: "",
-      accountIdLast4: "3636",
-    })).toMatchObject({ accountName: null, accountEmailMasked: null, accountIdLast4: "3636" });
+    expect(parsed).toMatchObject({ hadLegacyPixKey: false, consentVersion: null, liveMode: null });
+    expect(parsed && "accountName" in parsed).toBe(false);
   });
 });
 
@@ -297,11 +252,37 @@ describe("Mercado Pago status mapping", () => {
 
   it("formats the 2026 mock Fridays in São Paulo", () => {
     const weekday = (iso: string) => new Intl.DateTimeFormat("pt-BR", { weekday: "long", timeZone: "America/Sao_Paulo" }).format(new Date(iso));
-    expect(formatConnectedSince(MP_MOCK_FRIDAY_16)).toBe("16 out 2026");
-    expect(weekday(MP_MOCK_FRIDAY_16)).toBe("sexta-feira");
-    expect(formatConnectedSince(MP_MOCK_FRIDAY_23)).toBe("23 out 2026");
-    expect(weekday(MP_MOCK_FRIDAY_23)).toBe("sexta-feira");
-    expect(MP_STATUS_FIXTURES.connected.connectedAt).toBe(MP_MOCK_FRIDAY_16);
+    expect(formatConnectedSince(MP_MOCK_FRIDAY_2)).toBe("2 out 2026");
+    expect(weekday(MP_MOCK_FRIDAY_2)).toBe("sexta-feira");
+    expect(formatConnectedSince(MP_MOCK_FRIDAY_25)).toBe("25 set 2026");
+    expect(weekday(MP_MOCK_FRIDAY_25)).toBe("sexta-feira");
+    expect(MP_STATUS_FIXTURES.connected.connectedAt).toBe(MP_MOCK_FRIDAY_2);
+  });
+
+  it("drops the booking steps when every service is unavailable", () => {
+    const html = renderToStaticMarkup(createElement(BookingFlow, {
+      slug: "studio-ana",
+      previewBusiness: {
+        name: "Studio Ana",
+        timezone: "America/Sao_Paulo",
+        phone: "5511999998888",
+        services: [
+          {
+            id: "corte",
+            name: "Corte",
+            durationMinutes: 45,
+            priceCents: 8000,
+            depositCents: 2000,
+            bookable: false,
+            reason: MP_ACCOUNT_NOT_CONNECTED,
+          },
+        ],
+      },
+    }));
+    expect(html).toContain("Agendamento online indisponível no momento");
+    expect(html).toContain("Feito com AgendaPix");
+    expect(html).not.toContain("Passo 1 de 4");
+    expect(html).not.toContain("O sinal garante o horário");
   });
 
   it("picks banners from connection status only", () => {
