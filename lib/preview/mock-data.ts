@@ -35,6 +35,8 @@ export const MOCK_SERVICES: PublicService[] = [
     durationMinutes: 60,
     priceCents: 8000,   // R$ 80,00
     depositCents: 2500, // R$ 25,00
+    policySummary: "Cancelou com 24h de antecedência, o sinal volta. Mais perto da hora, o sinal fica com o Studio Bella.",
+    policyHash: "preview-policy-corte",
   },
   {
     id: "srv-corte-escova",

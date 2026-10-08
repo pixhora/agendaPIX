@@ -6,6 +6,8 @@ import { formatCurrency, formatDateFull, formatTimeSlot, formatDuration } from "
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { CONFIRMATION_ICONS } from "@/lib/icons/registry";
+import { CancellationNotice } from "./CancellationNotice";
+import { ReservedTimeBand } from "./ReservedTimeBand";
 
 interface BookingConfirmationProps {
   businessName: string;
@@ -14,6 +16,8 @@ interface BookingConfirmationProps {
   timezone: string;
   customerName: string;
   customerPhone: string;
+  /** Snapshot gravado na reserva. Não usa a política atual do serviço. */
+  cancellationPolicy?: string | null;
   onNewBooking: () => void;
 }
 
@@ -59,6 +63,7 @@ export function BookingConfirmation({
   timezone,
   customerName,
   customerPhone,
+  cancellationPolicy,
   onNewBooking,
 }: BookingConfirmationProps) {
   const remainingCents = Math.max(0, service.priceCents - service.depositCents);
@@ -85,6 +90,8 @@ export function BookingConfirmation({
           Sinal recebido. Seu horário em <span className="font-semibold text-ink">{businessName}</span> está garantido.
         </p>
       </div>
+
+      <ReservedTimeBand startsAt={slot.startsAt} timezone={timezone} paid={service.depositCents > 0} />
 
       <article aria-label="Comprovante do agendamento" className="overflow-hidden rounded-card border border-line bg-surface">
         <div className="p-5">
@@ -118,6 +125,9 @@ export function BookingConfirmation({
             )}
             <div className="flex justify-between border-t border-line pt-2 font-bold text-ink"><dt>Restante no local</dt><dd className="tabular-nums">{formatCurrency(remainingCents)}</dd></div>
           </dl>
+        </div>
+        <div className="border-t border-line p-5">
+          <CancellationNotice policy={cancellationPolicy} businessName={businessName} />
         </div>
       </article>
 

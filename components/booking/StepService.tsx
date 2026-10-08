@@ -8,15 +8,18 @@ import type { PublicService } from "./types";
 import { formatCurrency, formatDuration } from "./formatters";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { depositServiceUnbookable } from "./booking-error";
+import { UnbookableNotice } from "./UnbookableNotice";
 
 interface StepServiceProps {
   services: PublicService[];
   selectedServiceId: string | null;
   onSelectService: (service: PublicService) => void;
   onNext: () => void;
+  contactWhatsapp?: string | null;
 }
 
-export function StepService({ services, selectedServiceId, onSelectService, onNext }: StepServiceProps) {
+export function StepService({ services, selectedServiceId, onSelectService, onNext, contactWhatsapp }: StepServiceProps) {
   const groupRef = React.useRef<HTMLDivElement>(null);
 
   if (services.length === 0) {
@@ -28,17 +31,21 @@ export function StepService({ services, selectedServiceId, onSelectService, onNe
     );
   }
 
-  const selectedService = services.find((s) => s.id === selectedServiceId);
-  const focusIndex = selectedService ? services.indexOf(selectedService) : 0;
+  const selectableIndexes = services.flatMap((service, index) => (depositServiceUnbookable(service.depositCents, service.bookable) ? [] : [index]));
+  const selectedService = services.find((service) => service.id === selectedServiceId && !depositServiceUnbookable(service.depositCents, service.bookable));
+  const focusIndex = selectedService ? services.indexOf(selectedService) : (selectableIndexes[0] ?? 0);
+  const hasUnbookableDeposit = services.some((service) => depositServiceUnbookable(service.depositCents, service.bookable));
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
     const forward = e.key === "ArrowDown" || e.key === "ArrowRight";
     const backward = e.key === "ArrowUp" || e.key === "ArrowLeft";
-    if (!forward && !backward) return;
+    if ((!forward && !backward) || selectableIndexes.length === 0) return;
     e.preventDefault();
-    const nextIndex = (index + (forward ? 1 : -1) + services.length) % services.length;
+    const position = selectableIndexes.indexOf(index);
+    const nextPosition = (position + (forward ? 1 : -1) + selectableIndexes.length) % selectableIndexes.length;
+    const nextIndex = selectableIndexes[nextPosition] ?? index;
     onSelectService(services[nextIndex]);
-    groupRef.current?.querySelectorAll<HTMLButtonElement>('[role="radio"]')[nextIndex]?.focus();
+    groupRef.current?.querySelector<HTMLButtonElement>(`[data-service-id="${services[nextIndex]?.id}"]`)?.focus();
   };
 
   return (
@@ -50,12 +57,22 @@ export function StepService({ services, selectedServiceId, onSelectService, onNe
 
       <div ref={groupRef} className="grid gap-3" role="radiogroup" aria-label="Serviços disponíveis">
         {services.map((service, index) => {
+          if (depositServiceUnbookable(service.depositCents, service.bookable)) {
+            return (
+              <div key={service.id} aria-disabled="true" className="rounded-card border border-line bg-surface p-4 opacity-80">
+                <span className="block font-semibold text-ink">{service.name}</span>
+                <span className="mt-1 block text-sm text-muted">{formatDuration(service.durationMinutes)} · {formatCurrency(service.priceCents)}</span>
+                <p className="mt-2 text-sm text-muted">Indisponível no momento</p>
+              </div>
+            );
+          }
           const isSelected = service.id === selectedServiceId;
           return (
             <button
               key={service.id}
               type="button"
               role="radio"
+              data-service-id={service.id}
               aria-checked={isSelected}
               tabIndex={index === focusIndex ? 0 : -1}
               onClick={() => onSelectService(service)}
@@ -95,6 +112,8 @@ export function StepService({ services, selectedServiceId, onSelectService, onNe
           );
         })}
       </div>
+
+      {hasUnbookableDeposit ? <UnbookableNotice contactWhatsapp={contactWhatsapp} /> : null}
 
       <div className="border-t border-line pt-5 sm:flex sm:justify-end">
         <Button type="button" size="lg" onClick={onNext} disabled={!selectedService} className="w-full sm:w-auto">

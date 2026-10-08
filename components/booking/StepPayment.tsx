@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import type { BookingResponse, PaymentStatusResponse } from "./types";
-import { formatCurrency } from "./formatters";
+import { formatCurrency, formatTimeSlot } from "./formatters";
 import { pixUiPhase } from "./pix-status";
 import { FlaskConical } from "lucide-react";
 import { Icon } from "@/components/ui/icon";
@@ -11,7 +11,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ValueSlab, StatusChip } from "@/components/ui/value-slab";
 import type { AvailabilitySlot, PublicService } from "./types";
-import { formatDateFull, formatTimeSlot } from "./formatters";
 import { devSimulatePixUrl, publicBookingPaymentUrl } from "@/lib/public-api";
 import {
   PAYMENT_CHECK_ERROR_MESSAGE,
@@ -21,6 +20,18 @@ import {
   pendingMessageForAttempts,
   withPaymentCheckTimeout,
 } from "./payment-check";
+import {
+  formatCountdown,
+  isDeadlineClose,
+  nextDeadlineAnnouncement,
+  paymentDeadlineIso,
+  type PixDeadlineMilestone,
+} from "./pix-deadline";
+import { ReservedTimeBand } from "./ReservedTimeBand";
+import { PixQr } from "./PixQr";
+import { PolicySummaryLine } from "@/components/policy/PolicySummaryLine";
+import { usePrefersReducedMotion } from "./use-prefers-reduced-motion";
+import { cn } from "@/lib/utils";
 
 interface StepPaymentProps {
   slug: string;
@@ -30,6 +41,9 @@ interface StepPaymentProps {
   checkStatusFn?: () => Promise<PaymentStatusResponse | null>;
   /** Dados do pedido para o resumo acima do QR. */
   summary?: { service: PublicService; slot: AvailabilitySlot; timezone: string };
+  /** Nome de quem recebe o Pix, vindo do servidor. */
+  pixRecipientDisplayName?: string | null;
+  onOpenPolicy?: (trigger: HTMLElement) => void;
 }
 
 export function StepPayment({
@@ -39,24 +53,33 @@ export function StepPayment({
   onRestart,
   checkStatusFn,
   summary,
+  pixRecipientDisplayName,
+  onOpenPolicy,
 }: StepPaymentProps) {
+  const payment = booking.payment;
+  const timezone = summary?.timezone ?? "America/Sao_Paulo";
+  const deadlineIso = paymentDeadlineIso(booking);
+  const deadlineMs = deadlineIso ? new Date(deadlineIso).getTime() : null;
+  const untilLabel = deadlineIso ? formatTimeSlot(deadlineIso, timezone) : null;
   const [copied, setCopied] = useState(false);
-  const [timeLeft, setTimeLeft] = useState<string>("");
+  const [now, setNow] = useState<number | null>(null);
+  const [announcement, setAnnouncement] = useState("");
   const [phase, setPhase] = useState(() => pixUiPhase(booking));
   /** Spinner do botão "Já paguei" — só em verificação manual. */
   const [isManualChecking, setIsManualChecking] = useState(false);
   /** Indicador suave no status (polling em segundo plano). */
-  const [isBackgroundChecking, setIsBackgroundChecking] = useState(false);
+  const [, setIsBackgroundChecking] = useState(false);
   const [checkError, setCheckError] = useState<string | null>(null);
   const [isSimulating, setIsSimulating] = useState(false);
+  const reducedMotion = usePrefersReducedMotion();
 
   const isCheckingRef = useRef(false);
   const hasCheckedOnExpireRef = useRef(false);
   const manualAttemptsRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
+  const announcedRef = useRef<Set<PixDeadlineMilestone>>(new Set());
+  const lastMinuteRef = useRef<number | null>(null);
 
-  const payment = booking.payment;
-  const expiresAt = payment?.expiresAt || booking.expiresAt;
   const showDevSimulate = canShowDevSimulatePix(payment?.provider);
   const isTerminal = phase === "expired" || phase === "cancelled";
 
@@ -156,38 +179,42 @@ export function StepPayment({
     [slug, booking.bookingId, booking.accessToken, checkStatusFn, applyStatus],
   );
 
-  // Atualiza contador regressivo a cada segundo
+  // Relógio visual. O texto acessível fica no horário-limite; o ao vivo só muda nos marcos.
   useEffect(() => {
-    if (!expiresAt || isTerminal) return;
+    announcedRef.current = new Set();
+    lastMinuteRef.current = null;
+  }, [deadlineIso]);
 
-    const targetTime = new Date(expiresAt).getTime();
+  useEffect(() => {
+    if (deadlineMs == null || isTerminal) return;
 
-    const updateTimer = () => {
-      const now = Date.now();
-      const diff = targetTime - now;
-
-      if (diff <= 0) {
-        setTimeLeft("00:00");
-        // Consulta o servidor antes de anunciar a expiração local
-        if (!hasCheckedOnExpireRef.current) {
-          hasCheckedOnExpireRef.current = true;
-          void checkStatus("background");
-        }
-        return;
+    const tick = () => {
+      const current = Date.now();
+      const remaining = deadlineMs - current;
+      const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const minute = Math.floor(current / 60000);
+      if (!reduced || lastMinuteRef.current !== minute || remaining <= 0) {
+        lastMinuteRef.current = minute;
+        setNow(current);
       }
 
-      const totalSeconds = Math.floor(diff / 1000);
-      const minutes = Math.floor(totalSeconds / 60);
-      const seconds = totalSeconds % 60;
-      setTimeLeft(
-        `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`,
-      );
+      const label = formatTimeSlot(new Date(deadlineMs).toISOString(), timezone);
+      const next = nextDeadlineAnnouncement(remaining, announcedRef.current, label);
+      if (!next) return;
+      announcedRef.current.add(next.milestone);
+      if (next.milestone === "one" || next.milestone === "expired") announcedRef.current.add("five");
+      if (next.milestone === "expired") announcedRef.current.add("one");
+      setAnnouncement(next.message);
+      if (next.milestone === "expired" && !hasCheckedOnExpireRef.current) {
+        hasCheckedOnExpireRef.current = true;
+        void checkStatus("background");
+      }
     };
 
-    updateTimer();
-    const interval = setInterval(updateTimer, 1000);
-    return () => clearInterval(interval);
-  }, [expiresAt, checkStatus, isTerminal]);
+    tick();
+    const interval = window.setInterval(tick, 1000);
+    return () => window.clearInterval(interval);
+  }, [deadlineMs, timezone, checkStatus, isTerminal]);
 
   // Polling automático a cada 4 segundos
   useEffect(() => {
@@ -211,10 +238,10 @@ export function StepPayment({
     try {
       await navigator.clipboard.writeText(payment.copyPaste);
       setCopied(true);
-      toast.success("Código Pix copiado", { description: "Cole no app do seu banco, em Pix › Copia e Cola." });
+      toast.success("Copiado", { description: "Cole no app do seu banco, em Pix, Copia e Cola." });
       setTimeout(() => setCopied(false), 2500);
     } catch {
-      // Fallback: o input readonly abaixo permite seleção manual
+      document.getElementById("pix-copypaste")?.focus();
     }
   };
 
@@ -248,12 +275,21 @@ export function StepPayment({
     }
   };
 
+  const remainingMs = now != null && deadlineMs != null ? deadlineMs - now : null;
+  const countdown = remainingMs != null ? formatCountdown(remainingMs) : null;
+  const close = remainingMs != null && isDeadlineClose(remainingMs);
+  const releasedTime = summary ? formatTimeSlot(summary.slot.startsAt, summary.timezone) : null;
+
   if (phase === "expired") {
     return (
       <div role="alert" aria-live="assertive" className="space-y-4 rounded-card border border-danger/30 bg-danger-soft p-6 text-center">
         <Icon icon={PIX_STATUS_ICONS.expired} size="xl" className="mx-auto text-danger" />
         <h2 className="font-display text-xl font-bold text-ink">Tempo de reserva esgotado</h2>
-        <p className="text-sm text-ink">O prazo para pagar o sinal acabou e o horário foi liberado para outros clientes.</p>
+        <p className="text-sm text-ink">
+          {releasedTime
+            ? `O prazo para pagar o sinal acabou e o horário das ${releasedTime} foi liberado para outros clientes.`
+            : "O prazo para pagar o sinal acabou e o horário foi liberado para outros clientes."}
+        </p>
         <Button onClick={onRestart} size="lg" className="w-full">
           Fazer novo agendamento
         </Button>
@@ -274,21 +310,31 @@ export function StepPayment({
     );
   }
 
-  const expiresLabel = expiresAt ? formatTimeSlot(expiresAt, summary?.timezone ?? "America/Sao_Paulo") : null;
-  const statusBusy = isManualChecking || isBackgroundChecking;
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="pix-step">
       <div>
         <h2 className="font-display text-xl font-bold tracking-tight text-ink sm:text-2xl">Pague o sinal por Pix</h2>
-        <p role="status" aria-live="polite" aria-atomic="true" className="mt-2 flex items-center gap-2 text-sm text-ink">
+        <p className="mt-2 flex items-center gap-2 text-sm text-ink">
           <span className="relative flex size-2.5" aria-hidden="true">
             <span className="absolute inline-flex size-full animate-ping rounded-full bg-pix opacity-60 motion-reduce:animate-none" />
             <span className="relative inline-flex size-2.5 rounded-full bg-pix" />
           </span>
-          {statusBusy ? "Verificando o pagamento…" : "Horário pré-reservado. Aguardando o pagamento do Pix."}
+          <span role="status" aria-live="polite" aria-atomic="true">
+            {isManualChecking ? "Verificando o pagamento…" : "Horário pré-reservado. Aguardando o pagamento do Pix."}
+          </span>
         </p>
       </div>
+
+      <p className="sr-only" aria-live="polite" aria-atomic="true" data-testid="pix-deadline-live">
+        {announcement}
+      </p>
+
+      {untilLabel ? (
+        <div className={cn("rounded-card px-4 py-3", close ? "bg-warning-soft" : "bg-pix-soft")} data-testid="pix-pay-until">
+          <p className={cn("text-sm font-semibold", close ? "text-warning" : "text-ink")}>Pague até {untilLabel}</p>
+          {close ? <p className="mt-1 text-sm text-warning">O prazo para pagar está acabando.</p> : null}
+        </div>
+      ) : null}
 
       {payment?.provider === "fake" && (
         <div role="note" className="flex gap-3 rounded-card border border-warning/30 bg-warning-soft p-4 text-sm text-warning">
@@ -299,51 +345,38 @@ export function StepPayment({
         </div>
       )}
 
-      {/* Resumo estilo Stripe: valor em destaque antes do QR */}
+      {summary ? <ReservedTimeBand startsAt={summary.slot.startsAt} timezone={summary.timezone} /> : null}
+
       <ValueSlab
         size="compact"
         label="Sinal a pagar por Pix"
         value={formatCurrency(payment?.amountCents ?? 0)}
         badge={
-          timeLeft ? (
-            <StatusChip active tone="slab">
+          countdown && remainingMs != null && remainingMs > 0 && !reducedMotion ? (
+            <StatusChip active tone="slab" className={close ? "bg-warning-soft text-warning" : undefined}>
               <Icon icon={PIX_ICONS.timer} className="size-3.5" />
-              <span aria-hidden="true" className="font-mono tabular-nums">{timeLeft}</span>
-              <span className="sr-only">{expiresLabel ? `Expira às ${expiresLabel}` : "Prazo em andamento"}</span>
+              <span aria-hidden="true" className="font-mono tabular-nums">{countdown}</span>
             </StatusChip>
           ) : undefined
         }
-        sublabel={
-          summary
-            ? `${summary.service.name} · ${formatDateFull(summary.slot.startsAt, summary.timezone)}, ${formatTimeSlot(summary.slot.startsAt, summary.timezone)}`
-            : "O horário é confirmado assim que o Pix cair."
-        }
+        sublabel={summary ? summary.service.name : "O horário é confirmado assim que o Pix cair."}
       />
 
+      {pixRecipientDisplayName ? <p className="text-sm text-muted">Pix para {pixRecipientDisplayName}</p> : null}
+      {summary?.service.policySummary && onOpenPolicy ? (
+        <PolicySummaryLine summary={summary.service.policySummary} compact onDetails={onOpenPolicy} />
+      ) : null}
+
       <div className="rounded-card border border-line bg-surface p-5 sm:p-6">
-        <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-start">
-          {payment?.qrCodeDataUrl?.startsWith("data:image/png;base64,") ? (
-            <div className="shrink-0 rounded-2xl border border-line bg-white p-3">
-              {/* QR sempre sobre branco, inclusive no modo escuro. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={payment.qrCodeDataUrl} alt="QR Code do Pix para pagar o sinal" width={208} height={208} className="block size-44 object-contain sm:size-52" />
-            </div>
-          ) : (
-            <div className="flex size-44 shrink-0 items-center justify-center rounded-2xl bg-subtle text-sm text-muted">QR Code indisponível</div>
-          )}
-          <div className="w-full min-w-0 space-y-4">
-            <ol className="space-y-2 text-sm text-ink">
-              <li className="flex gap-2"><span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-subtle text-xs font-bold">1</span>Abra o app do seu banco e vá em Pix.</li>
-              <li className="flex gap-2"><span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-subtle text-xs font-bold">2</span>Escaneie o QR ou use o Pix copia e cola.</li>
-              <li className="flex gap-2"><span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-subtle text-xs font-bold">3</span>Confirme o valor. A confirmação aparece aqui sozinha.</li>
-            </ol>
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
+          <div className="order-1 w-full min-w-0 space-y-4 lg:order-2">
             {payment?.copyPaste && (
               <div className="space-y-2">
-                <Button type="button" variant="pix" size="lg" onClick={handleCopy} className="w-full" data-testid="pix-copy-button">
+                <Button type="button" variant="pix" size="lg" onClick={() => void handleCopy()} className="w-full" data-testid="pix-copy-button">
                   {copied ? <Icon icon={PIX_ICONS.copied} size="md" /> : <Icon icon={PIX_ICONS.copy} size="md" />}
-                  {copied ? "Código copiado" : "Copiar código Pix"}
+                  {copied ? "Copiado" : "Copiar código"}
                 </Button>
-                <span className="sr-only" aria-live="polite">{copied ? "Código Pix copiado." : ""}</span>
+                <p className="sr-only" aria-live="polite" aria-atomic="true">{copied ? "Copiado." : ""}</p>
                 <label htmlFor="pix-copypaste" className="block text-xs font-semibold text-muted">Pix copia e cola</label>
                 <input
                   id="pix-copypaste"
@@ -356,6 +389,15 @@ export function StepPayment({
                 />
               </div>
             )}
+            <ol className="space-y-2 text-sm text-ink">
+              <li className="flex gap-2"><span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-subtle text-xs font-bold">1</span>Toque em Copiar código.</li>
+              <li className="flex gap-2"><span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-subtle text-xs font-bold">2</span>No app do banco, abra Pix e cole o código. Se preferir, escaneie o QR.</li>
+              <li className="flex gap-2"><span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-subtle text-xs font-bold">3</span>Confirme o valor. A confirmação aparece aqui sozinha.</li>
+            </ol>
+          </div>
+
+          <div className="order-2 flex justify-center lg:order-1 lg:justify-start">
+            <PixQr value={payment?.qrCodeDataUrl} />
           </div>
         </div>
       </div>
@@ -379,7 +421,6 @@ export function StepPayment({
         </Button>
         <p className="text-center text-xs text-muted">Verificamos automaticamente a cada poucos segundos. Guarde o comprovante.</p>
       </div>
-
 
       <p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted">
         <Icon icon={PIX_ICONS.secure} />

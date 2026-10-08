@@ -71,7 +71,7 @@ async function fillBookingUntilPix(page: import("@playwright/test").Page, testIn
   await page.locator("#customer-cpf").fill("52998224725");
   await page.getByRole("button", { name: /Gerar Pix de R\$\s?10,00/ }).filter({ visible: true }).first().click();
 
-  await expect(page.getByRole("button", { name: /Copiar código Pix/ })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("button", { name: /Copiar código/ })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText("Ambiente de teste")).toBeVisible();
 }
 
@@ -109,7 +109,7 @@ test("cliente agenda pela página pública, paga o sinal Pix (fake) e vê a rese
   await page.getByRole("button", { name: /Gerar Pix de R\$\s?10,00/ }).filter({ visible: true }).first().click();
 
   // 4. Pix gerado no contrato unificado (qrCodeDataUrl PNG + copyPaste EMV fake)
-  await expect(page.getByRole("button", { name: /Copiar código Pix/ })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("button", { name: /Copiar código/ })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText("Ambiente de teste")).toBeVisible();
   const qr = page.getByRole("img", { name: /QR Code do Pix/ });
   await expect(qr).toBeVisible();
@@ -127,7 +127,7 @@ test("cliente agenda pela página pública, paga o sinal Pix (fake) e vê a rese
 
   // Copia-e-cola: botão escreve o EMV no clipboard
   await page.getByTestId("pix-copy-button").click();
-  await expect(page.getByRole("button", { name: /Código copiado/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Copiado/ })).toBeVisible();
   const clipped = await page.evaluate(async () => navigator.clipboard.readText());
   expect(clipped).toMatch(/^FAKE-PIX-NOT-PAYABLE:/);
   expect(clipped).toBe(await copyPaste.inputValue());

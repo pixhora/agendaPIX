@@ -18,16 +18,24 @@ import { StepCustomer } from "@/components/booking/StepCustomer";
 import { BookingConfirmation } from "@/components/booking/BookingConfirmation";
 import { StepSlot } from "@/components/booking/StepSlot";
 import { StepPayment } from "@/components/booking/StepPayment";
+import type { PreviewScene } from "@/components/preview/scene";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { BusinessAvatar } from "@/components/ui/business-avatar";
 
-export function PreviewBookingFlow() {
+export function PreviewBookingFlow({ scene = "fluxo" }: { scene?: PreviewScene }) {
+  const services = scene === "indisponivel"
+    ? [
+        ...MOCK_SERVICES.map((service) => (service.depositCents > 0 ? { ...service, bookable: false } : service)),
+        { id: "srv-sem-sinal", name: "Ajuste de franja", durationMinutes: 20, priceCents: 0, depositCents: 0, bookable: false },
+      ]
+    : MOCK_SERVICES;
+  const contactWhatsapp = scene === "indisponivel" ? "5511987654321" : null;
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [isCompleted, setIsCompleted] = useState(false);
 
   const [selectedService, setSelectedService] = useState<PublicService | null>(
-    MOCK_SERVICES[0] // Corte feminino R$ 80,00 60min
+    services.find((service) => service.bookable !== false) ?? services[0]
   );
   const [selectedSlot, setSelectedSlot] = useState<AvailabilitySlot | null>(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -106,7 +114,7 @@ export function PreviewBookingFlow() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground pt-6 pb-24 sm:py-8 px-4 sm:px-6">
+    <div data-scene={scene} className="min-h-screen bg-background text-foreground pt-6 pb-24 sm:py-8 px-4 sm:px-6">
       <div className="w-full max-w-md mx-auto space-y-6">
         {/* Barra Superior do Preview */}
         <div className="flex items-center justify-between text-xs text-muted-foreground pb-2 border-b border-border">
@@ -154,7 +162,8 @@ export function PreviewBookingFlow() {
             >
               {step === 1 && (
                 <StepService
-                  services={MOCK_SERVICES}
+                  services={services}
+                  contactWhatsapp={contactWhatsapp}
                   selectedServiceId={selectedService?.id ?? null}
                   onSelectService={(srv) => {
                     setSelectedService(srv);

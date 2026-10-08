@@ -21,6 +21,9 @@ interface StepCustomerProps {
   cpf: string;
   isSubmitting: boolean;
   errorMessage: string | null;
+  errorContactHref?: string | null;
+  /** `calm` para o estabelecimento pausado: o cliente não errou o preenchimento. */
+  errorTone?: "danger" | "calm";
   onChangeName: (name: string) => void;
   onChangePhone: (phone: string) => void;
   onChangeCpf: (cpf: string) => void;
@@ -39,6 +42,8 @@ export function StepCustomer({
   cpf,
   isSubmitting,
   errorMessage,
+  errorContactHref,
+  errorTone = "danger",
   onChangeName,
   onChangePhone,
   onChangeCpf,
@@ -151,8 +156,25 @@ export function StepCustomer({
       </div>
 
       {errorMessage && (
-        <div role="alert" className="rounded-card border border-danger/30 bg-danger-soft p-4 text-sm font-medium text-danger">
-          {errorMessage}
+        <div
+          role="alert"
+          className={
+            errorTone === "calm"
+              ? "space-y-3 rounded-card border border-line bg-subtle p-4 text-sm text-ink"
+              : "space-y-3 rounded-card border border-danger/30 bg-danger-soft p-4 text-sm font-medium text-danger"
+          }
+        >
+          <p>{errorMessage}</p>
+          {errorContactHref ? (
+            <a
+              href={errorContactHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-11 items-center font-semibold text-ink underline decoration-line-strong underline-offset-4"
+            >
+              Falar no WhatsApp
+            </a>
+          ) : null}
         </div>
       )}
 

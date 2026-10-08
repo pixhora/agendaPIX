@@ -25,6 +25,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { BrandMark } from "@/components/ui/brand";
 import { BookingSummary } from "./BookingSummary";
+import { POLICY_CHANGED_MESSAGE, publicBookingErrorView, whatsappHref } from "./booking-error";
+import { PausedState } from "./PausedState";
 
 interface BookingFlowProps {
   slug: string;
@@ -50,7 +52,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
 
   // Submissão da Reserva
   const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
-  const [bookingError, setBookingError] = useState<string | null>(null);
+  const [bookingError, setBookingError] = useState<{ message: string; contactHref: string | null; tone: "danger" | "calm" } | null>(null);
   const [bookingResponse, setBookingResponse] = useState<BookingResponse | null>(null);
 
   // Chave de Idempotência fixa por tentativa de reserva
@@ -228,6 +230,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
           expiresAt: paymentData.expiresAt,
           accessToken: stored!.accessToken,
           payment: paymentData.payment,
+          policy: paymentData.policy ?? null,
         };
 
         setBookingResponse(fullResponse);
@@ -275,18 +278,42 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
+      const data: unknown = await res.json().catch(() => null);
 
       if (!res.ok) {
-        const errorMsg =
-          data?.error?.message ||
-          (res.status === 409
-            ? "Esse horário acabou de ser reservado por outra pessoa. Por favor, escolha outro horário."
-            : "Não foi possível criar o agendamento. Tente novamente.");
-        throw new Error(errorMsg);
+        const failure = publicBookingErrorView(res.status, data);
+        if (failure.kind === "paused") {
+          setBusiness((current) => (current ? { ...current, bookingsPaused: true } : current));
+          setBookingError(null);
+          return;
+        }
+        if (failure.kind === "unavailable") {
+          const contact = failure.contactWhatsapp ?? business?.contactWhatsapp ?? null;
+          setBookingError({ message: failure.message, contactHref: whatsappHref(contact), tone: "calm" });
+          if (selectedService.depositCents > 0) {
+            const next = { ...selectedService, bookable: false };
+            setSelectedService(next);
+            setBusiness((current) => (current ? { ...current, services: current.services.map((service) => (service.id === next.id ? next : service)) } : current));
+          }
+          return;
+        }
+        if (failure.kind === "policy_changed") {
+          setSelectedService((current) => (current ? {
+            ...current,
+            policySummary: failure.update.policySummary ?? current.policySummary,
+            policyHash: failure.update.policyHash ?? current.policyHash,
+            depositPolicy: failure.update.depositPolicy ?? current.depositPolicy,
+            policyDetails: failure.update.policyDetails ?? current.policyDetails,
+          } : current));
+          setBookingError({ message: POLICY_CHANGED_MESSAGE, contactHref: null, tone: "calm" });
+          if (typeof crypto !== "undefined" && crypto.randomUUID) setIdempotencyKey(crypto.randomUUID());
+          return;
+        }
+        setBookingError({ message: failure.message, contactHref: null, tone: "danger" });
+        return;
       }
 
-      const booking: BookingResponse = data;
+      const booking = data as BookingResponse;
       setBookingResponse(booking);
 
       // Se não há sinal ou já foi confirmado diretamente:
@@ -318,7 +345,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Erro ao agendar.";
-      setBookingError(msg);
+      setBookingError({ message: msg, contactHref: null, tone: "danger" });
     } finally {
       setIsSubmittingBooking(false);
     }
@@ -443,6 +470,18 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
     );
   }
 
+  if (business.bookingsPaused && !isCompleted && !(step === 4 && bookingResponse)) {
+    return (
+      <div className="min-h-dvh bg-paper">
+        {pageHeader}
+        <main id="content" className="mx-auto w-full max-w-xl px-4 py-8">
+          <PausedState businessName={business.name} contactWhatsapp={business.contactWhatsapp} services={business.services} autoFocus />
+        </main>
+        {pageFooter}
+      </div>
+    );
+  }
+
   if (isCompleted && selectedService && selectedSlot) {
     return (
       <div className="min-h-dvh bg-paper">
@@ -455,6 +494,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
             timezone={business.timezone}
             customerName={customerName}
             customerPhone={customerPhone}
+            cancellationPolicy={bookingResponse?.policy?.text}
             onNewBooking={handleRestart}
           />
         </main>
@@ -480,6 +520,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
                   setSelectedSlot(null);
                 }}
                 onNext={() => setStep(2)}
+                contactWhatsapp={business.contactWhatsapp}
               />
             )}
 
@@ -492,6 +533,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
                 onSelectSlot={(slot) => setSelectedSlot(slot)}
                 onBack={() => setStep(1)}
                 onNext={() => setStep(3)}
+                contactWhatsapp={business.contactWhatsapp}
               />
             )}
 
@@ -504,7 +546,9 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
                 phone={customerPhone}
                 cpf={customerCpf}
                 isSubmitting={isSubmittingBooking}
-                errorMessage={bookingError}
+                errorMessage={bookingError?.message ?? null}
+                errorContactHref={bookingError?.contactHref}
+                errorTone={bookingError?.tone ?? "danger"}
                 onChangeName={setCustomerName}
                 onChangePhone={setCustomerPhone}
                 onChangeCpf={setCustomerCpf}
@@ -540,7 +584,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
           <BookingSummary service={selectedService} slot={selectedSlot} timezone={business.timezone} />
           <p className="mt-4 flex gap-2 px-1 text-xs leading-relaxed text-muted">
             <Icon icon={BUSINESS_HEADER_ICONS.secure} className="shrink-0 text-pix" />
-            Você paga só o sinal agora. O horário fica pré-reservado enquanto o Pix é feito. O prazo aparece no contador da cobrança.
+            Você paga só o sinal agora. O horário fica reservado enquanto o Pix é feito. O prazo para pagar aparece na cobrança.
           </p>
         </aside>
       </main>

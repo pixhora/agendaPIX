@@ -1,4 +1,5 @@
 import type { BookingResponse, PaymentStatusResponse, PixPaymentStatus } from "./types";
+import { resolvePixQr } from "./pix-qr";
 
 /** Fase anunciável na tela de Pix (contrato interno do provider). */
 export type PixUiPhase = "pending" | "paid" | "expired" | "cancelled";
@@ -31,7 +32,7 @@ export function isPixQrUsable(
 ): boolean {
   return Boolean(
     payment?.status === "pending"
-      && payment.qrCodeDataUrl?.startsWith("data:image/png;base64,")
+      && resolvePixQr(payment.qrCodeDataUrl)
       && payment.copyPaste,
   );
 }
