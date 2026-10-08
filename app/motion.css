@@ -1,0 +1,267 @@
+/*
+ * Tokens e keyframes dos primitivos de movimento.
+ * Só transform e opacity. O estado final fica no CSS para prefers-reduced-motion.
+ */
+@theme {
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-1: 180ms;
+  --dur-2: 320ms;
+  --dur-3: 560ms;
+}
+
+/* Foco só no invólucro. O anel global sai dos elementos de dentro. */
+.motion-focus:focus-visible,
+.motion-focus:focus-within {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
+.motion-focus :focus-visible {
+  outline: none;
+}
+
+/* Rolling number: a coluna já nasce no dígito final (sem pulo de layout). */
+.roll-window {
+  display: inline-block;
+  height: 1em;
+  width: 1ch;
+  overflow: hidden;
+  line-height: 1;
+}
+
+.roll-strip {
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+}
+
+.roll-strip > span {
+  display: block;
+  height: 1em;
+  line-height: 1;
+  text-align: center;
+}
+
+.roll-strip[data-digit="0"] { transform: translateY(0); }
+.roll-strip[data-digit="1"] { transform: translateY(-1em); }
+.roll-strip[data-digit="2"] { transform: translateY(-2em); }
+.roll-strip[data-digit="3"] { transform: translateY(-3em); }
+.roll-strip[data-digit="4"] { transform: translateY(-4em); }
+.roll-strip[data-digit="5"] { transform: translateY(-5em); }
+.roll-strip[data-digit="6"] { transform: translateY(-6em); }
+.roll-strip[data-digit="7"] { transform: translateY(-7em); }
+.roll-strip[data-digit="8"] { transform: translateY(-8em); }
+.roll-strip[data-digit="9"] { transform: translateY(-9em); }
+
+.roll-mark {
+  white-space: pre;
+}
+
+/* Ilha da reserva: o miolo cresce só com scale. O texto expandido já está no HTML. */
+.phone-speaker {
+  background: color-mix(in srgb, var(--brand-tile-foreground) 28%, transparent);
+}
+
+.island-shell {
+  position: relative;
+}
+
+.island-body {
+  transform-origin: top center;
+}
+
+.island-compact {
+  position: absolute;
+  inset: 0 0 auto 0;
+  display: flex;
+  height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+}
+
+.island-detail {
+  opacity: 1;
+}
+
+@keyframes island-grow {
+  from { transform: scale(0.92, 0.48); }
+  to { transform: scale(1, 1); }
+}
+
+@keyframes island-fade-out {
+  0%, 30% { opacity: 1; }
+  60%, 100% { opacity: 0; }
+}
+
+@keyframes island-fade-in {
+  0%, 35% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .booking-island:not([data-inview]) .island-body {
+    transform: scale(0.92, 0.48);
+  }
+
+  .booking-island:not([data-inview]) .island-compact {
+    opacity: 1;
+  }
+
+  .booking-island:not([data-inview]) .island-detail {
+    opacity: 0;
+  }
+
+  .booking-island[data-inview] .island-body {
+    animation: island-grow var(--dur-3) var(--ease-out-quint) both;
+  }
+
+  .booking-island[data-inview] .island-compact {
+    animation: island-fade-out var(--dur-3) var(--ease-out-quint) both;
+  }
+
+  .booking-island[data-inview] .island-detail {
+    animation: island-fade-in var(--dur-3) var(--ease-out-quint) both;
+  }
+
+  .grade-loader[data-inview] svg g > rect,
+  .grade-loader[data-inview] svg > rect {
+    animation-name: grade-cell;
+    animation-duration: calc(var(--dur-3) * 3);
+    animation-timing-function: var(--ease-out-quint);
+    animation-iteration-count: infinite;
+  }
+
+  .grade-loader[data-inview] svg g > rect:nth-child(1) { animation-delay: 0ms; }
+  .grade-loader[data-inview] svg g > rect:nth-child(2) { animation-delay: 70ms; }
+  .grade-loader[data-inview] svg g > rect:nth-child(3) { animation-delay: 140ms; }
+  .grade-loader[data-inview] svg g > rect:nth-child(4) { animation-delay: 210ms; }
+  .grade-loader[data-inview] svg g > rect:nth-child(5) { animation-delay: 280ms; }
+  .grade-loader[data-inview] svg g > rect:nth-child(6) { animation-delay: 350ms; }
+  .grade-loader[data-inview] svg g > rect:nth-child(7) { animation-delay: 420ms; }
+  .grade-loader[data-inview] svg g > rect:nth-child(8) { animation-delay: 490ms; }
+  .grade-loader[data-inview] svg g > rect:nth-child(9) { animation-delay: 560ms; }
+  .grade-loader[data-inview] svg > rect { animation-delay: 280ms; }
+}
+
+@keyframes grade-cell {
+  0%, 100% { opacity: 0.28; }
+  45% { opacity: 1; }
+}
+
+/* Copiar: os dois ícones ocupam a mesma célula. Só opacity e scale. */
+.copy-glyphs {
+  display: inline-grid;
+  width: 1rem;
+  height: 1rem;
+  flex: none;
+}
+
+.copy-glyphs > svg {
+  grid-area: 1 / 1;
+  width: 1rem;
+  height: 1rem;
+  transition-property: opacity, transform;
+  transition-duration: var(--dur-1);
+  transition-timing-function: var(--ease-out-quint);
+}
+
+.copy-glyphs > svg[data-show="false"] {
+  opacity: 0;
+  transform: scale(0.6);
+}
+
+.copy-glyphs > svg[data-show="true"] {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Segmented: o polegar desliza com translate. Até 8 opções. */
+.seg-track {
+  --seg-i: 0;
+  --seg-n: 2;
+  position: relative;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--subtle);
+}
+
+.seg-track[data-count="1"] { --seg-n: 1; }
+.seg-track[data-count="2"] { --seg-n: 2; }
+.seg-track[data-count="3"] { --seg-n: 3; }
+.seg-track[data-count="4"] { --seg-n: 4; }
+.seg-track[data-count="5"] { --seg-n: 5; }
+.seg-track[data-count="6"] { --seg-n: 6; }
+.seg-track[data-count="7"] { --seg-n: 7; }
+.seg-track[data-count="8"] { --seg-n: 8; }
+
+.seg-track:has(.seg-options > label:nth-child(1) :checked) { --seg-i: 0; }
+.seg-track:has(.seg-options > label:nth-child(2) :checked) { --seg-i: 1; }
+.seg-track:has(.seg-options > label:nth-child(3) :checked) { --seg-i: 2; }
+.seg-track:has(.seg-options > label:nth-child(4) :checked) { --seg-i: 3; }
+.seg-track:has(.seg-options > label:nth-child(5) :checked) { --seg-i: 4; }
+.seg-track:has(.seg-options > label:nth-child(6) :checked) { --seg-i: 5; }
+.seg-track:has(.seg-options > label:nth-child(7) :checked) { --seg-i: 6; }
+.seg-track:has(.seg-options > label:nth-child(8) :checked) { --seg-i: 7; }
+
+.seg-thumb {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  z-index: 0;
+  width: calc((100% - 8px) / var(--seg-n));
+  border-radius: 999px;
+  background: var(--ink);
+  pointer-events: none;
+  transform: translateX(calc(var(--seg-i) * 100%));
+  transition: transform var(--dur-2) var(--ease-out-quint);
+}
+
+.seg-options {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+}
+
+.seg-options > label {
+  display: flex;
+  min-height: 2.75rem;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  padding-inline: 0.75rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.seg-options > label:has(:checked) {
+  color: var(--paper);
+}
+
+.seg-options > label:has(:disabled) {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seg-thumb,
+  .copy-glyphs > svg,
+  .island-body,
+  .island-compact,
+  .island-detail,
+  .grade-loader svg rect {
+    animation: none;
+    transition: none;
+  }
+
+  .island-body { transform: none; }
+  .island-compact { opacity: 0; }
+  .island-detail { opacity: 1; }
+  .grade-loader svg rect { opacity: 1; }
+}
