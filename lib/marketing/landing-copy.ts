@@ -8,6 +8,10 @@ export function holdCardCaption(): string {
   return "é o tempo que o cliente tem para pagar. Se não pagar, o código Pix vence e o horário volta para a sua agenda sozinho.";
 }
 
+export function minutesUnit(count: number): string {
+  return count === 1 ? "minuto" : "minutos";
+}
+
 export function holdAnswer(holdMinutes: number): string {
   return `${formatMinutes(holdMinutes)} depois de escolher o horário. Se o Pix não for pago nesse tempo, o código vence e o horário volta a ficar livre para outra pessoa.`;
 }

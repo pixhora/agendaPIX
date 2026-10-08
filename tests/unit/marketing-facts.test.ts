@@ -23,27 +23,46 @@ describe("formatMinutes", () => {
 });
 
 describe("getPublicBookingFacts", () => {
-  const previous = process.env.BOOKING_HOLD_MINUTES;
+  const previousHold = process.env.BOOKING_HOLD_MINUTES;
+  const previousCpf = process.env.MP_REQUIRES_PAYER_CPF;
 
   afterEach(() => {
-    if (previous === undefined) delete process.env.BOOKING_HOLD_MINUTES;
-    else process.env.BOOKING_HOLD_MINUTES = previous;
+    if (previousHold === undefined) delete process.env.BOOKING_HOLD_MINUTES;
+    else process.env.BOOKING_HOLD_MINUTES = previousHold;
+    if (previousCpf === undefined) delete process.env.MP_REQUIRES_PAYER_CPF;
+    else process.env.MP_REQUIRES_PAYER_CPF = previousCpf;
   });
 
-  it("reads the hold from booking config and returns a null recipient", async () => {
-    process.env.BOOKING_HOLD_MINUTES = "12";
+  it("defaults to a 30 minute hold, no CPF, and a null recipient", async () => {
+    delete process.env.BOOKING_HOLD_MINUTES;
+    delete process.env.MP_REQUIRES_PAYER_CPF;
     await expect(getPublicBookingFacts()).resolves.toEqual({
-      holdMinutes: 12,
+      holdMinutes: 30,
+      pixRecipientDisplayName: null,
+      requiresPayerCpf: false,
+    });
+  });
+
+  it("reads the hold and the CPF flag from the env", async () => {
+    process.env.BOOKING_HOLD_MINUTES = "28";
+    process.env.MP_REQUIRES_PAYER_CPF = "true";
+    await expect(getPublicBookingFacts()).resolves.toEqual({
+      holdMinutes: 28,
       pixRecipientDisplayName: null,
       requiresPayerCpf: true,
     });
   });
 
-  it("keeps the same public facts when a business id is passed", async () => {
-    process.env.BOOKING_HOLD_MINUTES = "30";
+  it("keeps the minimum hold at 28 minutes", async () => {
+    process.env.BOOKING_HOLD_MINUTES = "10";
+    await expect(getPublicBookingFacts()).resolves.toMatchObject({ holdMinutes: 30 });
+  });
+
+  it("keeps a null recipient when a business id is passed", async () => {
+    delete process.env.BOOKING_HOLD_MINUTES;
     const facts = await getPublicBookingFacts("studio-bella");
-    expect(facts.holdMinutes).toBe(30);
     expect(facts.pixRecipientDisplayName).toBeNull();
+    expect(facts.holdMinutes).toBe(30);
   });
 });
 

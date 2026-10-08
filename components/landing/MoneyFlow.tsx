@@ -1,5 +1,5 @@
-import { holdCardCaption, moneyLead } from "@/lib/marketing/landing-copy";
-import { minutesUnit, type PublicBookingFacts } from "@/lib/marketing/facts";
+import { holdCardCaption, minutesUnit, moneyLead } from "@/lib/marketing/landing-copy";
+import type { PublicBookingFacts } from "@/lib/marketing/facts";
 import { Eyebrow, Section, SectionTitle } from "./section";
 
 export function MoneyFlow({ facts }: { facts: PublicBookingFacts }) {

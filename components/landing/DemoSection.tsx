@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
-import { minutesUnit, type PublicBookingFacts } from "@/lib/marketing/facts";
-import { demoSteps } from "@/lib/marketing/landing-copy";
+import type { PublicBookingFacts } from "@/lib/marketing/facts";
+import { demoSteps, minutesUnit } from "@/lib/marketing/landing-copy";
 import { Eyebrow, Section, SectionTitle } from "./section";
 
 export function DemoSection({ facts }: { facts: PublicBookingFacts }) {
