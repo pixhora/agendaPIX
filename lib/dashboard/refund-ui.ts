@@ -120,10 +120,13 @@ export function policyLine(policy: RefundPreview["policy"]): string | null {
 
 const CALENDAR_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
-export function returnByLine(requestedOn: string, timeZone: string): string | null {
+export function returnByLine(requestedOn: string, timeZone: string, todayLocal?: string): string | null {
   if (!CALENDAR_DAY.test(requestedOn)) return null;
   try {
-    const due = formatBusinessDate(addCalendarDays(requestedOn, MANUAL_REFUND_DEADLINE_DAYS), timeZone);
+    const due = formatBusinessDate(addCalendarDays(requestedOn, MANUAL_REFUND_DEADLINE_DAYS), timeZone, {
+      style: "sentence",
+      todayLocal,
+    });
     return `Devolva até ${due}.`;
   } catch {
     return null;
@@ -168,7 +171,7 @@ export function dialogDeadline(input: {
   const dueDay = refundDueDay(input.manualRefundDueAt, input.timeZone);
   if (dueDay && isDueTomorrow(dueDay, input.todayLocal)) {
     try {
-      return { kind: "eve", text: eveDeadlineLine(formatBusinessDate(dueDay, input.timeZone)) };
+      return { kind: "eve", text: eveDeadlineLine(sentenceDate(dueDay, input.timeZone, input.todayLocal)) };
     } catch {
       return null;
     }
@@ -176,21 +179,25 @@ export function dialogDeadline(input: {
   if (input.requestedOn) {
     if (!dueDay) return null;
     try {
-      return { kind: "returnBy", text: `Devolva até ${formatBusinessDate(dueDay, input.timeZone)}.` };
+      return { kind: "returnBy", text: `Devolva até ${sentenceDate(dueDay, input.timeZone, input.todayLocal)}.` };
     } catch {
       return null;
     }
   }
-  return input.pickedOn ? returnByDeadline(input.pickedOn, input.timeZone) : null;
+  return input.pickedOn ? returnByDeadline(input.pickedOn, input.timeZone, input.todayLocal) : null;
 }
 
-function returnByDeadline(pickedOn: string, timeZone: string): DialogDeadline | null {
-  const text = returnByLine(pickedOn, timeZone);
+function sentenceDate(isoDate: string, timeZone: string, todayLocal: string) {
+  return formatBusinessDate(isoDate, timeZone, { style: "sentence", todayLocal });
+}
+
+function returnByDeadline(pickedOn: string, timeZone: string, todayLocal: string): DialogDeadline | null {
+  const text = returnByLine(pickedOn, timeZone, todayLocal);
   return text ? { kind: "returnBy", text } : null;
 }
 
 export function eveDeadlineLine(dueLabel: string) {
-  return `O prazo para devolver vence amanhã (${dueLabel}).`;
+  return `O prazo para devolver vence amanhã, ${dueLabel}.`;
 }
 
 export function paidOnLabel(paidAt: string | null, timeZone: string): string | null {
@@ -201,12 +208,13 @@ export function paidOnLabel(paidAt: string | null, timeZone: string): string | n
 }
 
 /** Janela do Mercado Pago: `paidAt` + 180 dias (`REFUND_WINDOW_MS`), a mesma conta de `refund_window_expired`. Sem `paidAt`, não inventa prazo. */
-export function refundWindowLine(paidAt: string | null, timeZone: string): string | null {
+export function refundWindowLine(paidAt: string | null, timeZone: string, todayLocal?: string): string | null {
   if (!paidAt) return null;
   const date = new Date(paidAt);
   if (Number.isNaN(date.getTime())) return null;
   const until = new Date(date.getTime() + REFUND_WINDOW_MS);
-  return `Dá para devolver até ${formatBusinessDate(localDate(until, timeZone), timeZone)} (180 dias).`;
+  const due = formatBusinessDate(localDate(until, timeZone), timeZone, { style: "sentence", todayLocal });
+  return `Dá para devolver até ${due} (180 dias).`;
 }
 
 export type RequestedDateField =

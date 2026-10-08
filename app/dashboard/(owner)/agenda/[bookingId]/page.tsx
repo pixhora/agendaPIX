@@ -7,7 +7,7 @@ import { dashboardOwnedBooking, ownedBusinesses } from "@/lib/dashboard/data";
 import { agendaHref, asRefundStatus } from "@/lib/dashboard/refund-ui";
 import { requireOwner } from "@/lib/dashboard/session";
 import { localDate } from "@/lib/bookings/availability";
-import { formatBusinessDateTime, formatBusinessDay } from "@/lib/payments/manual-refund-calendar";
+import { formatBusinessDate, formatBusinessDateTime } from "@/lib/payments/manual-refund-calendar";
 
 export default async function AgendaBookingPage({
   params,
@@ -26,7 +26,7 @@ export default async function AgendaBookingPage({
   const day = localDate(booking.startsAt, business.timezone);
   const when = formatBusinessDateTime(booking.startsAt, business.timezone);
   const dueLabel = booking.manualRefundDueAt
-    ? formatBusinessDay(new Date(booking.manualRefundDueAt), business.timezone, true)
+    ? formatBusinessDate(localDate(new Date(booking.manualRefundDueAt), business.timezone), business.timezone, { style: "sentence" })
     : null;
 
   return (

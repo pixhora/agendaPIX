@@ -143,7 +143,7 @@ function RefundDialogBody({
   const amountLabel = preview ? formatRefundAmount(preview.amountCents) : null;
   const rule = preview ? policyLine(preview.policy) : null;
   const paidLabel = preview ? paidOnLabel(preview.paidAt, timeZone) : null;
-  const windowLine = preview ? refundWindowLine(preview.paidAt, timeZone) : null;
+  const windowLine = preview ? refundWindowLine(preview.paidAt, timeZone, preview.todayLocal) : null;
   const deadline = preview ? dialogDeadline({
     requestedOn: preview.requestedOn,
     pickedOn: dateValue,

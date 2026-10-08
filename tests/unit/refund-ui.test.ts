@@ -32,7 +32,7 @@ const preview = {
   reason: null,
   amountCents: 2000,
   customer: { name: "Ana Souza", emailMasked: "a***@email.com" },
-  policy: { text: "Cancelou com mais de 48 h → devolução total.", refundDeadlineAt: "2026-10-16T02:59:59.999Z" },
+  policy: { text: "Cancelou com mais de 48 h de antecedência: devolução total.", refundDeadlineAt: "2026-10-16T02:59:59.999Z" },
   paidAt: "2026-10-08T17:02:00.000Z",
   requestedOn: null,
   todayLocal: "2026-10-08",
@@ -54,18 +54,19 @@ describe("devolução no painel", () => {
     expect(refundTitle(null, "Ana Souza")).toBe("Devolver o sinal para Ana Souza?");
     expect(confirmLabel("R$\u00a020,00")).toBe("Devolver R$\u00a020,00");
     expect(customerLine("Ana Souza", "a***@email.com")).toBe("Ana Souza · a***@email.com");
-    expect(policyLine(preview.policy)).toBe("Cancelou com mais de 48 h → devolução total.");
+    expect(policyLine(preview.policy)).toBe("Cancelou com mais de 48 h de antecedência: devolução total.");
+    expect(policyLine(preview.policy)).not.toContain("→");
     expect(policyLine(null)).toBeNull();
     expect(policyLine({ text: null, refundDeadlineAt: null })).toBeNull();
     expect(policyLine({ text: "  ", refundDeadlineAt: null })).toBeNull();
   });
 
   it("soma 7 dias ao pedido e descreve a véspera com a data real", () => {
-    expect(returnByLine("2026-10-09", "America/Sao_Paulo")).toBe("Devolva até sex, 16 out.");
+    expect(returnByLine("2026-10-09", "America/Sao_Paulo", "2026-10-08")).toBe("Devolva até sexta, 16 de outubro.");
     expect(returnByLine("09/10/2026", "America/Sao_Paulo")).toBeNull();
-    expect(eveDeadlineLine("sex, 23 out")).toBe("O prazo para devolver vence amanhã (sex, 23 out).");
+    expect(eveDeadlineLine("sexta, 9 de outubro")).toBe("O prazo para devolver vence amanhã, sexta, 9 de outubro.");
     expect(paidOnLabel("2026-10-08T17:02:00.000Z", "America/Sao_Paulo")).toBe("qui, 8 out, 14:02");
-    expect(refundWindowLine("2026-10-08T17:02:00.000Z", "America/Sao_Paulo")).toBe("Dá para devolver até ter, 6 abr (180 dias).");
+    expect(refundWindowLine("2026-10-08T17:02:00.000Z", "America/Sao_Paulo", "2026-10-08")).toBe("Dá para devolver até terça, 6 de abril de 2027 (180 dias).");
     expect(refundWindowLine(null, "America/Sao_Paulo")).toBeNull();
   });
 
@@ -89,7 +90,7 @@ describe("devolução no painel", () => {
       manualRefundDueAt: refundEveScenario.manualRefundDueAt,
       timeZone: refundEveScenario.timeZone,
     });
-    expect(eve).toEqual({ kind: "eve", text: "O prazo para devolver vence amanhã (sex, 9 out)." });
+    expect(eve).toEqual({ kind: "eve", text: "O prazo para devolver vence amanhã, sexta, 9 de outubro." });
     expect(eve?.text).not.toContain("Devolva até");
 
     const stored = dialogDeadline({
@@ -99,7 +100,7 @@ describe("devolução no painel", () => {
       manualRefundDueAt: "2026-10-20",
       timeZone: "America/Sao_Paulo",
     });
-    expect(stored).toEqual({ kind: "returnBy", text: "Devolva até ter, 20 out." });
+    expect(stored).toEqual({ kind: "returnBy", text: "Devolva até terça, 20 de outubro." });
 
     const picking = dialogDeadline({
       requestedOn: null,
@@ -108,7 +109,7 @@ describe("devolução no painel", () => {
       manualRefundDueAt: null,
       timeZone: "America/Sao_Paulo",
     });
-    expect(picking).toEqual({ kind: "returnBy", text: "Devolva até qui, 15 out." });
+    expect(picking).toEqual({ kind: "returnBy", text: "Devolva até quinta, 15 de outubro." });
     expect(picking?.text).not.toContain("amanhã");
   });
 

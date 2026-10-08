@@ -14,7 +14,7 @@ import { dashboardAgendaKpis, dashboardAgendaSummary, formatBrlCents } from "@/l
 import { ownerContext } from "@/lib/dashboard/session";
 import { dateSchema, shiftDate, weekDates } from "@/lib/dashboard/validation";
 import { localDate } from "@/lib/bookings/availability";
-import { formatBusinessDateTime, formatBusinessDay } from "@/lib/payments/manual-refund-calendar";
+import { formatBusinessDate, formatBusinessDateTime } from "@/lib/payments/manual-refund-calendar";
 import { asRefundStatus } from "@/lib/dashboard/refund-ui";
 import { cn } from "@/lib/utils";
 
@@ -77,7 +77,9 @@ export default async function AgendaPage({ searchParams }: { searchParams: Promi
     depositCents: booking.depositCents,
     refundStatus: asRefundStatus(booking.refundStatus),
     manualRefundDueTomorrow: booking.manualRefundDueTomorrow,
-    manualRefundDueLabel: booking.manualRefundDueAt ? formatBusinessDay(new Date(booking.manualRefundDueAt), timezone, true) : null,
+    manualRefundDueLabel: booking.manualRefundDueAt
+      ? formatBusinessDate(localDate(new Date(booking.manualRefundDueAt), timezone), timezone, { style: "sentence" })
+      : null,
     whenLabel: formatBusinessDateTime(booking.startsAt, timezone),
   }));
 
