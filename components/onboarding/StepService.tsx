@@ -5,6 +5,7 @@ import { FieldError } from "@/components/ui/field";
 import { MoneyInput } from "@/components/ui/money-input";
 import { DEPOSIT_NOW_LABEL, REMAINDER_LABEL } from "@/lib/copy/booking-summary";
 import { formatCents, depositFromPercent } from "@/lib/money";
+import { EMPTY_SERVICE_PREVIEW_HOLD, projectServicePreview } from "@/lib/onboarding/service-preview";
 import { cn } from "@/lib/utils";
 import { StepActions } from "./chrome";
 import { StepHeader, stepBodyClass } from "./parts";
@@ -28,10 +29,6 @@ const DEPOSIT_ERROR = "O sinal não pode ser maior que o preço.";
 
 function durationLabel(minutes: number) {
   return PRESETS.find((item) => item.minutes === minutes)?.label ?? `${minutes} min`;
-}
-
-function moneyLabel(cents: number) {
-  return cents > 0 ? `R$ ${formatCents(cents)}` : "R$ —";
 }
 
 export function StepService({
@@ -78,7 +75,23 @@ export function StepService({
   const showPolicy = !noDeposit && depositCents > 0 && policy != null;
   const canContinue = nameOk && durationOk && priceOk && depositOk;
   const priced = priceOk;
-  const summaryNoDeposit = noDeposit || (priced && depositCents === 0);
+  const [previewHold, setPreviewHold] = useState(EMPTY_SERVICE_PREVIEW_HOLD);
+  const preview = projectServicePreview(previewHold, {
+    durationMinutes,
+    customDuration: customOpen,
+    priceCents,
+    depositCents,
+    depositMode,
+  });
+  if (
+    preview.hold.durationMinutes !== previewHold.durationMinutes ||
+    preview.hold.priceCents !== previewHold.priceCents ||
+    preview.hold.depositCents !== previewHold.depositCents
+  ) {
+    setPreviewHold(preview.hold);
+  }
+  const shownDuration = preview.view.durationMinutes;
+  const summaryNoDeposit = preview.view.noDeposit && preview.view.priceCents != null;
 
   function setMode(mode: DepositMode) {
     onChangeDepositMode(mode);
@@ -251,20 +264,20 @@ export function StepService({
         <section className="overflow-hidden rounded-card border border-line bg-surface" aria-label="Como aparece para o seu cliente">
           <h2 className="border-b border-line bg-subtle px-4 py-3 text-xs text-muted">Como aparece para o seu cliente</h2>
           <div className="flex items-start justify-between gap-3 px-4 py-2.5 text-sm">
-            <span className="min-w-0">{serviceName.trim() || "Serviço"} · {durationLabel(durationMinutes || 0)}</span>
-            <b className="shrink-0 tabular-nums">{moneyLabel(priceCents)}</b>
+            <span className="min-w-0">{serviceName.trim() || "Serviço"}{shownDuration != null ? ` · ${durationLabel(shownDuration)}` : ""}</span>
+            <b className="shrink-0 tabular-nums">{preview.view.priceLabel}</b>
           </div>
-          {summaryNoDeposit && priced ? (
+          {summaryNoDeposit ? (
             <p className="border-t border-line px-4 py-2.5 text-sm">{NO_DEPOSIT}</p>
           ) : (
             <div className="flex items-center justify-between gap-3 border-t border-line px-4 py-2.5 text-sm">
               <span>{DEPOSIT_NOW_LABEL}</span>
-              <b className="tabular-nums text-pix">{priced ? moneyLabel(depositCents) : "R$ —"}</b>
+              <b className="tabular-nums text-pix">{preview.view.depositLabel}</b>
             </div>
           )}
           <div className="flex items-center justify-between gap-3 border-t border-line px-4 py-2.5 text-sm text-muted">
             <span>{REMAINDER_LABEL}</span>
-            <b className="tabular-nums">{priced ? moneyLabel(Math.max(0, priceCents - depositCents)) : "R$ —"}</b>
+            <b className="tabular-nums">{preview.view.remainderLabel}</b>
           </div>
         </section>
       </div>
