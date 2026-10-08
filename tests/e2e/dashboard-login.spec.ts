@@ -16,5 +16,5 @@ for (const colorScheme of ["light", "dark"] as const) {
 test("/dashboard/login legado redireciona para /login preservando o erro", async ({ page }) => {
   await page.goto("/dashboard/login?error=link");
   await expect(page).toHaveURL(/\/login\?error=link$/);
-  await expect(page.getByRole("alert")).toContainText("expirou ou já foi usado");
+  await expect(page.locator("#login-error")).toContainText("expirou ou já foi usado");
 });

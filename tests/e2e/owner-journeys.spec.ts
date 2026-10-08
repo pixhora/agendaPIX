@@ -46,7 +46,7 @@ test("login único: /login → link mágico → /dashboard; link reutilizado vol
   const reused = await other.newPage();
   await reused.goto(link);
   await expect(reused).toHaveURL(/\/login\?error=/);
-  await expect(reused.getByRole("alert")).toContainText("expirou ou já foi usado");
+  await expect(reused.locator("#login-error")).toContainText("expirou ou já foi usado");
   await other.close();
 });
 
