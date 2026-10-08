@@ -265,7 +265,7 @@ export function ConfirmOnboarding({ draftId }: { draftId: string }) {
                 <Button
                   type="submit"
                   size="lg"
-                  className={cn("w-full", quietCta && quietCtaClass)}
+                  className={cn("mt-6 w-full", quietCta && quietCtaClass)}
                   aria-busy={pending || undefined}
                   aria-disabled={quietCta || undefined}
                   onClick={(event) => {
