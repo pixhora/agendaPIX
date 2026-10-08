@@ -1,7 +1,16 @@
 import type { DepositMode } from "@/components/onboarding/types";
 import { formatCents } from "@/lib/money";
 
-const DURATION_PRESETS = [30, 45, 60, 90] as const;
+export const SERVICE_DURATION_PRESETS = [
+  { minutes: 30, label: "30 min" },
+  { minutes: 45, label: "45 min" },
+  { minutes: 60, label: "1 h" },
+  { minutes: 90, label: "1 h 30" },
+] as const;
+
+export function serviceDurationLabel(minutes: number): string {
+  return SERVICE_DURATION_PRESETS.find((item) => item.minutes === minutes)?.label ?? `${minutes} min`;
+}
 
 export type ServicePreviewHold = {
   durationMinutes: number | null;
@@ -36,7 +45,7 @@ export type ServicePreviewView = {
 
 export function isPreviewDurationValid(minutes: number, custom: boolean): boolean {
   if (!Number.isInteger(minutes)) return false;
-  if (!custom) return (DURATION_PRESETS as readonly number[]).includes(minutes);
+  if (!custom) return SERVICE_DURATION_PRESETS.some((item) => item.minutes === minutes);
   return minutes >= 5 && minutes <= 720 && minutes % 5 === 0;
 }
 

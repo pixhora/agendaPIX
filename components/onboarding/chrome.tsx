@@ -2,6 +2,7 @@
 
 import { ArrowLeft, CircleCheck, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { onboardingSaveStatus } from "@/lib/onboarding/save-status";
 import { cn } from "@/lib/utils";
 
 export function OnboardingTopBar({
@@ -13,7 +14,7 @@ export function OnboardingTopBar({
   saving: boolean;
   savedOnServer: boolean;
 }) {
-  const label = saving ? "Salvando…" : savedOnServer ? "Cadastro guardado" : "Salvo neste aparelho";
+  const label = onboardingSaveStatus(saving, savedOnServer);
   return (
     <div className="flex h-14 items-center justify-between pr-4 pl-1">
       {onBack ? (

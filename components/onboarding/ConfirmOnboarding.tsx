@@ -11,6 +11,7 @@ import { FieldError } from "@/components/ui/field";
 import { OtpInput, type OtpVisualStatus } from "@/components/ui/otp-input";
 import { BrandLink } from "@/components/ui/brand";
 import { cn } from "@/lib/utils";
+import { CONFIRM_CODE_MESSAGE, confirmIdleTarget, confirmSubmitReady } from "@/lib/onboarding/confirm-ready";
 import { INVALID_EMAIL_MESSAGE, isUsableEmail } from "@/lib/onboarding/email-hint";
 import { commitOnboardingDraft, getOnboardingDraft } from "@/lib/onboarding/drafts-client";
 import { followUpFromFailure } from "@/lib/onboarding/commit-follow-up";
@@ -76,11 +77,18 @@ export function ConfirmOnboarding({ draftId }: { draftId: string }) {
     });
   }, [draftId, router]);
 
+  function revealIdle(value = code) {
+    const problem = confirmIdleTarget({ code: value, email, emailRequired: needEmail, pending });
+    if (!problem) return;
+    setNeedEmail(problem.id === "confirm-email" || needEmail);
+    setMessage(problem.message);
+    window.setTimeout(() => document.getElementById(problem.id)?.focus(), 0);
+  }
+
   async function enter(value = code) {
-    if (value.length < OTP_LENGTH || pending) return;
-    if (!isUsableEmail(email)) {
-      setNeedEmail(true);
-      setMessage(INVALID_EMAIL_MESSAGE);
+    if (pending) return;
+    if (!confirmSubmitReady({ code: value, email, emailRequired: needEmail })) {
+      revealIdle(value);
       return;
     }
     if (!navigator.onLine) {
@@ -172,7 +180,9 @@ export function ConfirmOnboarding({ draftId }: { draftId: string }) {
     setMessage("Não conseguimos criar sua página agora. Seus dados estão guardados.");
   }
 
-  const quietCta = code.length < OTP_LENGTH && !pending;
+  const emailInvalid = needEmail && message === INVALID_EMAIL_MESSAGE;
+  const readyToConfirm = confirmSubmitReady({ code, email, emailRequired: needEmail });
+  const quietCta = !pending && !readyToConfirm;
   const primary = cn(buttonVariants({ size: "lg" }), "w-full");
   const showRestart = message?.includes("Comece de novo") || message?.includes("começar de novo") || message?.includes("Peça um código novo");
 
@@ -192,6 +202,10 @@ export function ConfirmOnboarding({ draftId }: { draftId: string }) {
               className="space-y-5"
               onSubmit={(event) => {
                 event.preventDefault();
+                if (pending || !readyToConfirm) {
+                  revealIdle();
+                  return;
+                }
                 void enter();
               }}
             >
@@ -208,9 +222,15 @@ export function ConfirmOnboarding({ draftId }: { draftId: string }) {
                     autoComplete="email"
                     autoCapitalize="none"
                     value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    className="onb-control min-h-12 w-full rounded-field border border-line-strong/60 bg-surface px-3.5 text-base"
+                    aria-invalid={emailInvalid ? true : undefined}
+                    aria-describedby={emailInvalid ? "confirm-message" : undefined}
+                    onChange={(event) => {
+                      setEmail(event.target.value);
+                      if (message === INVALID_EMAIL_MESSAGE) setMessage(null);
+                    }}
+                    className="onb-control min-h-12 w-full rounded-field border border-line-strong/60 bg-surface px-3.5 text-base aria-invalid:border-danger"
                   />
+                  {emailInvalid ? <FieldError id="confirm-message">{INVALID_EMAIL_MESSAGE}</FieldError> : null}
                 </div>
               ) : null}
               <OtpInput
@@ -218,13 +238,14 @@ export function ConfirmOnboarding({ draftId }: { draftId: string }) {
                 onChange={(next) => {
                   setCode(next);
                   if (status === "error") setStatus("idle");
+                  if (message === CONFIRM_CODE_MESSAGE) setMessage(null);
                 }}
                 onComplete={(next) => void enter(next)}
                 status={status}
                 readOnly={pending}
-                describedBy={message ? "confirm-message" : undefined}
+                describedBy={message && !emailInvalid ? "confirm-message" : undefined}
               />
-              {message ? <FieldError id="confirm-message">{message}</FieldError> : null}
+              {message && !emailInvalid ? <FieldError id="confirm-message">{message}</FieldError> : null}
               {showRestart ? (
                 <Link href="/onboarding" className={primary}>Receber novo código</Link>
               ) : (
@@ -235,7 +256,7 @@ export function ConfirmOnboarding({ draftId }: { draftId: string }) {
                   aria-busy={pending || undefined}
                   aria-disabled={quietCta || undefined}
                   onClick={(event) => {
-                    if (pending || code.length < OTP_LENGTH) event.preventDefault();
+                    if (pending) event.preventDefault();
                   }}
                 >
                   {pending ? <Loader2 aria-hidden="true" className="animate-spin motion-reduce:animate-none" /> : null}

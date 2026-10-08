@@ -5,18 +5,13 @@ import { FieldError } from "@/components/ui/field";
 import { MoneyInput } from "@/components/ui/money-input";
 import { DEPOSIT_NOW_LABEL, REMAINDER_LABEL } from "@/lib/copy/booking-summary";
 import { formatCents, depositFromPercent } from "@/lib/money";
-import { EMPTY_SERVICE_PREVIEW_HOLD, projectServicePreview } from "@/lib/onboarding/service-preview";
+import { EMPTY_SERVICE_PREVIEW_HOLD, projectServicePreview, SERVICE_DURATION_PRESETS, serviceDurationLabel } from "@/lib/onboarding/service-preview";
 import { cn } from "@/lib/utils";
 import { StepActions } from "./chrome";
 import { StepHeader, stepBodyClass } from "./parts";
 import type { DepositMode } from "./types";
 
-const PRESETS = [
-  { minutes: 30, label: "30 min" },
-  { minutes: 45, label: "45 min" },
-  { minutes: 60, label: "1 h" },
-  { minutes: 90, label: "1h30" },
-] as const;
+const PRESETS = SERVICE_DURATION_PRESETS;
 
 const PERCENTS = [20, 30, 50] as const;
 const NO_DEPOSIT = "Sem sinal: a reserva confirma na hora, sem Pix.";
@@ -28,7 +23,7 @@ const DURATION_ERROR = "Informe a duração em minutos, entre 5 e 720.";
 const DEPOSIT_ERROR = "O sinal não pode ser maior que o preço.";
 
 function durationLabel(minutes: number) {
-  return PRESETS.find((item) => item.minutes === minutes)?.label ?? `${minutes} min`;
+  return serviceDurationLabel(minutes);
 }
 
 export function StepService({
@@ -195,18 +190,21 @@ export function StepService({
             </button>
           </div>
           {customOpen ? (
-            <input
-              id="service-duration-custom"
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              aria-label="Duração em minutos"
-              aria-invalid={attempted && !durationOk ? true : undefined}
-              aria-describedby={attempted && !durationOk ? "duration-error" : undefined}
-              value={durationMinutes > 0 ? String(durationMinutes) : ""}
-              onChange={(event) => onChangeDuration(Number(event.target.value.replace(/\D/g, "").slice(0, 3)) || 0)}
-              className="onb-control min-h-12 w-full rounded-field border border-line-strong/60 bg-surface px-3.5 text-base tabular-nums text-ink aria-invalid:border-danger"
-            />
+            <div className={cn("onb-control-wrap flex min-h-12 items-center rounded-field border bg-surface px-3.5 focus-within:border-ring focus-within:shadow-focus", attempted && !durationOk ? "border-danger" : "border-line-strong/60")}>
+              <input
+                id="service-duration-custom"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                aria-label="Duração em minutos"
+                aria-invalid={attempted && !durationOk ? true : undefined}
+                aria-describedby={attempted && !durationOk ? "duration-error" : undefined}
+                value={durationMinutes > 0 ? String(durationMinutes) : ""}
+                onChange={(event) => onChangeDuration(Number(event.target.value.replace(/\D/g, "").slice(0, 3)) || 0)}
+                className="min-w-0 flex-1 bg-transparent py-3 text-base tabular-nums text-ink outline-none"
+              />
+              <span aria-hidden="true" className="shrink-0 pl-2 text-sm font-semibold text-muted">min</span>
+            </div>
           ) : null}
           <FieldError id="duration-error">{attempted && !durationOk ? DURATION_ERROR : null}</FieldError>
         </div>
