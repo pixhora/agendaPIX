@@ -3,6 +3,8 @@ import { Pencil, Plus } from "lucide-react";
 import { Icon } from "@/components/ui/icon";
 import { ACTION_ICONS, SUMMARY_ICONS } from "@/lib/icons/registry";
 import { DashboardShell, Empty, SectionCard } from "@/components/dashboard/shell";
+import { OwnerBillingNotice } from "@/components/dashboard/owner-billing-notice";
+import { ServiceBlockNotice } from "@/components/dashboard/service-block-notice";
 import { ServiceForm } from "@/components/dashboard/forms";
 import { buttonVariants } from "@/components/ui/button";
 import { ownerContext } from "@/lib/dashboard/session";
@@ -22,6 +24,7 @@ export default async function ServicesPage({ searchParams }: { searchParams: Pro
     path="/dashboard/services"
     businesses={businesses}
     businessId={business?.id}
+    notice={business ? <OwnerBillingNotice ownerId={owner.id} businessId={business.id} timeZone={business.timezone} publicSlug={business.slug} /> : undefined}
     actions={business && services.length > 0 ? <Link href="#new-service" className={buttonVariants({ className: "w-full sm:w-auto" })}><Plus aria-hidden="true" />Novo serviço</Link> : undefined}
   >
     {business && <div className="grid gap-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(20rem,0.75fr)] lg:items-start lg:gap-8">
@@ -51,8 +54,7 @@ export default async function ServicesPage({ searchParams }: { searchParams: Pro
                 <p className="text-sm text-muted">{policyListLabel(service.depositPolicy, service.depositCents)}</p>
               </div>
             </div>
-            {service.blockedReason === "bookings_paused" && <p className="mt-3 text-sm font-medium text-warning">Novos agendamentos estão pausados.</p>}
-            {service.blockedReason && service.blockedReason !== "bookings_paused" && <p className="mt-3 text-sm font-medium text-warning">Este serviço com sinal ainda não pode ser reservado.</p>}
+            <ServiceBlockNotice reason={service.blockedReason} />
             <details className="group mt-3 border-t border-line pt-1">
               <summary className="flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-field text-sm font-semibold text-ink hover:text-pix focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden"><Pencil aria-hidden="true" className="size-4" />Editar serviço<span className="sr-only"> {service.name}</span></summary>
               <div className="mt-2 rounded-field bg-subtle/60 p-3 sm:p-4">

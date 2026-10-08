@@ -163,7 +163,6 @@ export const ACTION_ICONS = {
   link: Link2,
   hours: Clock,
   appearance: Palette,
-  pixKey: Wallet,
   back: ChevronLeft,
 } as const;
 
