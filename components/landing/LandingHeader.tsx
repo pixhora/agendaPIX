@@ -1,4 +1,4 @@
-import { BrandMark } from "@/components/ui/brand-mark";
+import { BrandMark } from "@/components/ui/brand";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { landingNavLinks } from "./nav-links";

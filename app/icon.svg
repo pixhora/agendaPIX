@@ -1,13 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none" shape-rendering="crispEdges">
-<path d="M4.69 0H11.31C14.31 0 16 1.69 16 4.69V11.31C16 14.31 14.31 16 11.31 16H4.69C1.69 16 0 14.31 0 11.31V4.69C0 1.69 1.69 0 4.69 0Z" fill="#0B0B0C" shape-rendering="geometricPrecision"/>
-<rect x="5" y="3" width="2" height="2" fill="#F6F5F2"/>
-<rect x="7" y="3" width="2" height="2" fill="#F6F5F2"/>
-<rect x="9" y="3" width="2" height="2" fill="#F6F5F2"/>
-<rect x="3" y="5" width="2" height="2" fill="#F6F5F2"/>
-<rect x="11" y="5" width="2" height="2" fill="#F6F5F2"/>
-<rect x="3" y="9" width="2" height="2" fill="#F6F5F2"/>
-<rect x="11" y="9" width="2" height="2" fill="#F6F5F2"/>
-<rect x="3" y="11" width="2" height="2" fill="#F6F5F2"/>
-<rect x="11" y="11" width="2" height="2" fill="#F6F5F2"/>
-<rect x="2" y="7" width="12" height="2" fill="#3FD0BE"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none" >
+<defs>
+<style>@media (prefers-color-scheme: dark){.rim{stroke-opacity:.22}}</style>
+</defs>
+<path d="M9.38 0H22.62C28.62 0 32.00 3.38 32.00 9.38V22.62C32.00 28.62 28.62 32.00 22.62 32.00H9.38C3.38 32.00 0 28.62 0 22.62V9.38C0 3.38 3.38 0 9.38 0Z" fill="#0B0B0C"/>
+<path class="rim" d="M9.38 0H22.62C28.62 0 32.00 3.38 32.00 9.38V22.62C32.00 28.62 28.62 32.00 22.62 32.00H9.38C3.38 32.00 0 28.62 0 22.62V9.38C0 3.38 3.38 0 9.38 0Z" stroke="#fff" stroke-opacity="0" stroke-width="1.00"/>
+<circle cx="16" cy="16.0" r="6" stroke="#3FD0BE" stroke-width="4"/>
+<rect x="20" y="8" width="4" height="16" rx="2.0" fill="#F6F5F2"/>
 </svg>

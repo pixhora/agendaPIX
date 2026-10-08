@@ -1,4 +1,4 @@
-import { BrandMark } from "@/components/ui/brand-mark";
+import { BrandMark } from "@/components/ui/brand";
 import { legalPagesPublished, showPendingBlocks } from "@/lib/marketing/flags";
 import { cn } from "@/lib/utils";
 import { belowFold } from "./section";
