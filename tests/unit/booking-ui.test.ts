@@ -71,6 +71,8 @@ describe("Booking UI formatters and helpers", () => {
 
     const dateFormatted = formatDateFull(iso, timezone);
     expect(dateFormatted).toContain("outubro");
+    expect(formatDateFull("2026-10-09T14:30:00.000Z", timezone)).toBe("sexta-feira, 9 de outubro");
+    expect(formatDateFull("2026-10-09T14:30:00.000Z", timezone)).not.toContain("09");
   });
 });
 

@@ -11,8 +11,9 @@ export const metadata: Metadata = {
 export default async function PreviewBookingPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ etapa?: string; prazo?: string }>;
+  searchParams?: Promise<{ etapa?: string; prazo?: string; captura?: string; variante?: string }>;
 }) {
   const search = searchParams ? await searchParams : undefined;
-  return <PreviewBookingFlow scene={parsePreviewScene(search?.etapa, search?.prazo)} />;
+  const variant = search?.variante === "credito" || search?.variante === "credit" ? "credit" : search?.variante === "padrao" || search?.variante === "retain" ? "retain" : undefined;
+  return <PreviewBookingFlow scene={parsePreviewScene(search?.etapa, search?.prazo)} capture={search?.captura === "1"} variant={variant} />;
 }

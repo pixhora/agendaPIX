@@ -28,7 +28,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { BusinessAvatar } from "@/components/ui/business-avatar";
 import { PREVIEW_PIX_COPY_PASTE, PREVIEW_PIX_QR } from "@/lib/preview/sample-pix-qr";
-import { PIX_HOLD_MS, previewLateSlot, previewOpeningSlot, previewPayDeadline } from "@/lib/preview/preview-schedule";
+import { PIX_HOLD_MS, previewInsideRefundSlot, previewLateSlot, previewOpeningSlot, previewPayDeadline } from "@/lib/preview/preview-schedule";
 import { closedWindowReceipt, mirrorCustomerPolicy } from "@/components/booking/policy-copy";
 
 const CLOSED_WINDOW_VARIANTS = [
@@ -38,8 +38,12 @@ const CLOSED_WINDOW_VARIANTS = [
 
 function previewStep(scene: PreviewScene): 1 | 2 | 3 | 4 {
   if (scene === "dados" || scene === "politica" || scene === "politica-mudou") return 3;
-  if (scene === "pix" || scene === "pix-perto" || scene === "pix-expirado") return 4;
+  if (scene === "pix" || scene === "pix-perto" || scene === "pix-expirado" || scene === "pix-cima-hora" || scene === "pix-cima-hora-credito") return 4;
   return 1;
+}
+
+function isPixScene(scene: PreviewScene): boolean {
+  return scene === "pix" || scene === "pix-perto" || scene === "pix-expirado" || scene === "pix-cima-hora" || scene === "pix-cima-hora-credito";
 }
 
 function previewBooking(scene: PreviewScene, service: PublicService, slot: AvailabilitySlot): BookingResponse {
@@ -80,10 +84,31 @@ function closedPreviewPolicy(lateCancel: "retain" | "credit"): BookingPolicyView
   };
 }
 
-export function PreviewBookingFlow({ scene = "fluxo" }: { scene?: PreviewScene }) {
-  const openingSlot = scene === "cima-da-hora" ? previewLateSlot() : previewOpeningSlot();
+export function PreviewBookingFlow({
+  scene = "fluxo",
+  capture = false,
+  variant,
+}: {
+  scene?: PreviewScene;
+  /** Esconde a barra do hub só no modo de captura. A página normal continua com ela. */
+  capture?: boolean;
+  /** Uma variante da cena em cima da hora. Sem isto, o preview mostra as duas. */
+  variant?: "retain" | "credit";
+}) {
+  const paymentLate = scene === "pix-cima-hora" || scene === "pix-cima-hora-credito";
+  const openingSlot = scene === "cima-da-hora" ? previewLateSlot() : paymentLate ? previewInsideRefundSlot() : previewOpeningSlot();
   const previewServices = MOCK_SERVICES.map((service, index) => {
     if (index !== 0 || !openingSlot) return service;
+    if (paymentLate) {
+      return {
+        ...service,
+        depositPolicy: {
+          ...service.depositPolicy,
+          refundUntilHours: 24 as const,
+          lateCancel: scene === "pix-cima-hora-credito" ? "credit" as const : "retain" as const,
+        },
+      };
+    }
     const mirrored = mirrorCustomerPolicy({
       businessName: MOCK_PUBLIC_BUSINESS.name,
       hours: 24,
@@ -117,7 +142,7 @@ export function PreviewBookingFlow({ scene = "fluxo" }: { scene?: PreviewScene }
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [policyOpen, setPolicyOpen] = useState(scene === "politica" || scene === "politica-mudou");
   const [bookingResponse, setBookingResponse] = useState<BookingResponse | null>(() => {
-    if (!openingSlot || (scene !== "pix" && scene !== "pix-perto" && scene !== "pix-expirado")) return null;
+    if (!openingSlot || !isPixScene(scene)) return null;
     return previewBooking(scene, openingService, openingSlot);
   });
 
@@ -194,9 +219,13 @@ export function PreviewBookingFlow({ scene = "fluxo" }: { scene?: PreviewScene }
     </header>
   );
 
+  const closedVariants = variant
+    ? CLOSED_WINDOW_VARIANTS.filter((item) => item.lateCancel === variant)
+    : CLOSED_WINDOW_VARIANTS;
+
   if (scene === "pausada") {
     return (
-      <div data-scene={scene} className="min-h-screen bg-background px-4 pb-24 pt-6 text-foreground sm:py-8 sm:px-6">
+      <div data-scene={scene} data-capture={capture ? "1" : undefined} className="min-h-screen bg-background px-4 pb-24 pt-6 text-foreground sm:py-8 sm:px-6">
         <div className="mx-auto w-full max-w-[560px] space-y-6">
           {businessHeader}
           <PausedState businessName={MOCK_PUBLIC_BUSINESS.name} contactWhatsapp={contactWhatsapp} services={MOCK_SERVICES} />
@@ -206,9 +235,9 @@ export function PreviewBookingFlow({ scene = "fluxo" }: { scene?: PreviewScene }
   }
 
   return (
-    <div data-scene={scene} className="min-h-screen bg-background text-foreground pt-6 pb-24 sm:py-8 px-4 sm:px-6">
+    <div data-scene={scene} data-capture={capture ? "1" : undefined} className="min-h-screen bg-background text-foreground pt-6 pb-24 sm:py-8 px-4 sm:px-6">
       <div className="mx-auto w-full max-w-[560px] space-y-6">
-        {/* Barra Superior do Preview */}
+        {capture ? null : (
         <div className="flex items-center justify-between text-xs text-muted-foreground pb-2 border-b border-border">
           <Link href="/preview" className="font-bold text-pix dark:text-primary hover:underline">
             ← Voltar ao Hub Preview
@@ -217,15 +246,16 @@ export function PreviewBookingFlow({ scene = "fluxo" }: { scene?: PreviewScene }
             {MOCK_PUBLIC_BUSINESS.name}
           </span>
         </div>
+        )}
 
         {businessHeader}
 
         {isCompleted && selectedService && selectedSlot ? (
           lateScene ? (
             <div className="space-y-8">
-              {CLOSED_WINDOW_VARIANTS.map((variant) => (
-                <section key={variant.id} data-variant={variant.id} className="space-y-3">
-                  <p className="text-xs font-semibold text-muted-foreground">{variant.label}</p>
+              {closedVariants.map((item) => (
+                <section key={item.id} data-variant={item.id} className="space-y-3">
+                  {capture ? null : <p className="text-xs font-semibold text-muted-foreground">{item.label}</p>}
                   <div className="rounded-3xl border border-border bg-surface p-6 sm:p-7 shadow-sm">
                     <BookingConfirmation
                       businessName={MOCK_PUBLIC_BUSINESS.name}
@@ -234,7 +264,7 @@ export function PreviewBookingFlow({ scene = "fluxo" }: { scene?: PreviewScene }
                       timezone={MOCK_PUBLIC_BUSINESS.timezone}
                       customerName={customerName}
                       customerPhone={customerPhone}
-                      policy={closedPreviewPolicy(variant.lateCancel)}
+                      policy={closedPreviewPolicy(item.lateCancel)}
                       refundWindowClosedAtBooking
                       onNewBooking={handleRestart}
                     />

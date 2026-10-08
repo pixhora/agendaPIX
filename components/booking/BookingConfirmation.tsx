@@ -6,6 +6,7 @@ import { formatCurrency, formatDateFull, formatTimeSlot, formatDuration } from "
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { CONFIRMATION_ICONS } from "@/lib/icons/registry";
+import { TriangleAlert } from "lucide-react";
 import { ReservedTimeBand } from "./ReservedTimeBand";
 import { confirmationCardTone, confirmationPolicyText, isFutureInstant, policyReceiptRefund } from "./policy-copy";
 import { REMAINDER_LABEL } from "@/lib/copy/booking-summary";
@@ -158,7 +159,10 @@ export function BookingConfirmation({
           <div className="border-t border-line p-5" data-testid="policy-snapshot" data-tone={policyTone}>
             <p className="text-sm font-semibold text-ink">Política do sinal</p>
             {policyText ? (
-              <p className={policyTone === "warn" ? "mt-2 text-sm font-medium text-warning" : "mt-2 text-sm text-muted"}>{policyText}</p>
+              <p className={policyTone === "warn" ? "mt-2 flex items-start gap-2 text-sm font-medium text-warning" : "mt-2 text-sm text-muted"}>
+                {policyTone === "warn" ? <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" /> : null}
+                <span>{policyText}</span>
+              </p>
             ) : null}
             {rescheduleOpen && policy?.rescheduleDeadlineAt ? (
               <p className="mt-1 text-sm text-muted">Remarcação até {formatDateFull(policy.rescheduleDeadlineAt, timezone).replace(/^./, (letter) => letter.toLowerCase())}, às {formatTimeSlot(policy.rescheduleDeadlineAt, timezone)}.</p>

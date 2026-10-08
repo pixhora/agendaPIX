@@ -5,6 +5,7 @@ import {
   mirrorCustomerPolicy,
   closedWindowLine,
   closedWindowReceipt,
+  paymentLateWindowNotice,
   confirmationCardTone,
   confirmationPolicyText,
   policyHowToChange,
@@ -113,6 +114,46 @@ describe("telas do cliente", () => {
   });
 });
 
+describe("linha acima do Pix dentro do prazo", () => {
+  const startsAt = "2026-10-09T14:30:00.000Z";
+  const inside = new Date("2026-10-08T21:54:00.000Z");
+
+  it("usa o prazo em horas da política nas duas frases", () => {
+    expect(paymentLateWindowNotice({
+      refundUntilHours: 24,
+      lateCancel: "retain",
+      startsAt,
+      now: inside,
+    })).toBe("Faltam menos de 24 h para o horário: se cancelar, o sinal não é devolvido.");
+    expect(paymentLateWindowNotice({
+      refundUntilHours: 24,
+      lateCancel: "credit",
+      startsAt,
+      now: inside,
+    })).toBe("Faltam menos de 24 h para o horário: se cancelar, o sinal vira crédito para outro horário, válido por 60 dias.");
+    expect(paymentLateWindowNotice({
+      refundUntilHours: 12,
+      lateCancel: "retain",
+      startsAt,
+      now: new Date("2026-10-09T08:00:00.000Z"),
+    })).toBe("Faltam menos de 12 h para o horário: se cancelar, o sinal não é devolvido.");
+  });
+
+  it("não aparece fora da janela nem sem o prazo em horas", () => {
+    expect(paymentLateWindowNotice({
+      refundUntilHours: 24,
+      lateCancel: "retain",
+      startsAt,
+      now: new Date("2026-10-08T10:00:00.000Z"),
+    })).toBeNull();
+    expect(paymentLateWindowNotice({
+      lateCancel: "credit",
+      startsAt,
+      now: inside,
+    })).toBeNull();
+  });
+});
+
 describe("frases de crédito", () => {
   it("espelha as três frases da spec 06", () => {
     expect(policyOneLiner(business, 24, "credit")).toBe(
@@ -175,6 +216,8 @@ describe("policy.text do comprovante", () => {
     expect(confirmationCardTone(true)).toBe("warn");
     const confirmation = readFileSync("components/booking/BookingConfirmation.tsx", "utf8");
     expect(confirmation).toContain("refundWindowClosedAtBooking");
+    expect(confirmation).toContain("TriangleAlert");
+    expect(confirmation).toContain('aria-hidden="true"');
     expect(confirmation).not.toContain("lateBooking");
     expect(confirmation).not.toContain("Este sinal não é devolvido se cancelar.");
     expect(confirmation).not.toContain("vira crédito");

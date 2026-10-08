@@ -30,6 +30,17 @@ export function previewLateSlot(now = new Date()): AvailabilitySlot | null {
   return previewOpeningSlot(now, 1);
 }
 
+/** Horário que já está dentro do prazo de devolução, qualquer que seja a hora do relógio. */
+export function previewInsideRefundSlot(now = new Date(), hours = 24): AvailabilitySlot {
+  const late = previewLateSlot(now);
+  if (late) {
+    const distance = new Date(late.startsAt).getTime() - now.getTime();
+    if (distance > 0 && distance <= hours * 3_600_000) return late;
+  }
+  const starts = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+  return { startsAt: starts.toISOString(), endsAt: new Date(starts.getTime() + 60 * 60 * 1000).toISOString() };
+}
+
 export function previewPayDeadline(scene: "pix" | "pix-perto" | "pix-expirado", now = new Date()): Date {
   const offset = scene === "pix-perto" ? PIX_CLOSE_MS : scene === "pix-expirado" ? -60 * 1000 : PIX_HOLD_MS;
   return new Date(now.getTime() + offset);

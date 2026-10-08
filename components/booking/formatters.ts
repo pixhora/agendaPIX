@@ -59,7 +59,7 @@ export function formatDateFull(isoStringOrDate: string | Date, timezone: string)
   try {
     return new Intl.DateTimeFormat("pt-BR", {
       weekday: "long",
-      day: "2-digit",
+      day: "numeric",
       month: "long",
       timeZone: timezone,
     }).format(typeof isoStringOrDate === "string" ? new Date(isoStringOrDate) : isoStringOrDate);

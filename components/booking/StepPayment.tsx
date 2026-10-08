@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback, useRef } from "react";
 import type { BookingResponse, PaymentStatusResponse } from "./types";
 import { formatCurrency, formatTimeSlot } from "./formatters";
 import { pixUiPhase } from "./pix-status";
-import { FlaskConical } from "lucide-react";
+import { FlaskConical, TriangleAlert } from "lucide-react";
 import { Icon } from "@/components/ui/icon";
 import { PIX_ICONS, PIX_STATUS_ICONS } from "@/lib/icons/registry";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,7 @@ import { ReservedTimeBand } from "./ReservedTimeBand";
 import { PixQr } from "./PixQr";
 import { PolicySummaryLine } from "@/components/policy/PolicySummaryLine";
 import { policyLineTone } from "./policy-gate";
+import { paymentLateWindowNotice } from "./policy-copy";
 import { usePrefersReducedMotion } from "./use-prefers-reduced-motion";
 import { cn } from "@/lib/utils";
 
@@ -73,6 +74,13 @@ export function StepPayment({
   const [checkError, setCheckError] = useState<string | null>(null);
   const [isSimulating, setIsSimulating] = useState(false);
   const reducedMotion = usePrefersReducedMotion();
+  const lateNotice = summary
+    ? paymentLateWindowNotice({
+        refundUntilHours: summary.service.depositPolicy?.refundUntilHours,
+        lateCancel: summary.service.depositPolicy?.lateCancel,
+        startsAt: summary.slot.startsAt,
+      })
+    : null;
 
   const isCheckingRef = useRef(false);
   const hasCheckedOnExpireRef = useRef(false);
@@ -372,6 +380,13 @@ export function StepPayment({
           compact
           onDetails={onOpenPolicy}
         />
+      ) : null}
+
+      {lateNotice ? (
+        <div role="note" data-testid="late-window-notice" className="flex items-start gap-2 rounded-card border border-warning/30 bg-warning-soft p-4 text-sm font-medium text-warning">
+          <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+          <p>{lateNotice}</p>
+        </div>
       ) : null}
 
       <div className="rounded-card border border-line bg-surface p-5 sm:p-6">

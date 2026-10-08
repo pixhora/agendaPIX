@@ -91,6 +91,24 @@ export function closedWindowLine(policy: { refundUntilHours?: number | null; lat
   return `Faltam menos de ${hours} h para o horário: se cancelar, o sinal não é devolvido.`;
 }
 
+/**
+ * Linha acima do Pix quando `now` já está dentro do prazo de cancelamento.
+ * `{h}` e retain/crédito vêm de `depositPolicy`, que o serviço público já manda.
+ */
+export function paymentLateWindowNotice(input: {
+  refundUntilHours?: number | null;
+  lateCancel?: "retain" | "credit" | null;
+  startsAt?: string | Date | null;
+  now?: Date;
+}): string | null {
+  if (input.refundUntilHours == null || input.startsAt == null) return null;
+  const startsAt = input.startsAt instanceof Date ? input.startsAt : new Date(input.startsAt);
+  if (Number.isNaN(startsAt.getTime())) return null;
+  const now = input.now ?? new Date();
+  if (!refundWindowClosedAtBooking({ refundUntilHours: input.refundUntilHours }, startsAt, now)) return null;
+  return closedWindowLine({ refundUntilHours: input.refundUntilHours, lateCancel: input.lateCancel ?? "retain" });
+}
+
 /** Comprovante e calendário quando a janela já fechou. Byte a byte com `closedWindowReceipt`. */
 export function closedWindowReceipt(policy: { lateCancel?: "retain" | "credit" | null }): string {
   if (policy.lateCancel === "credit") return `Se cancelar, o sinal vira ${CREDIT_PHRASE}.`;
