@@ -14,7 +14,8 @@
   --subtle: #efeeea;
   --ink: #0b0b0c;
   --ink-hover: #26262a;
-  --muted: #5b5b5f;
+  /* Cinza neutro mais claro que ainda passa 4,5:1 sobre --subtle (#efeeea). */
+  --muted: #6c6c6c;
   --line: #dedcd6;
   --line-strong: #8d8c88;
   --slab: #0b0b0c;
@@ -284,4 +285,14 @@ h1, h2, h3, h4, h5, h6, .font-display {
 /* Painel no celular: foco e âncoras nunca ficam atrás das barras fixas (WCAG 2.4.11). */
 @media (max-width: 1023.98px) {
   html:has([data-app-frame]) { scroll-padding-block: 5rem; }
+}
+
+/*
+ * O Sonner anima a opacidade dos avisos empilhados (400ms). No meio do fade o
+ * título vira um cinza composto (~#989898 sobre branco, 2,88:1) e o axe reprova.
+ * A opacidade fica só em 0 (aviso recolhido) ou 1 (tinta legível).
+ */
+[data-sonner-toast],
+[data-sonner-toast] > * {
+  transition-property: transform, height, box-shadow !important;
 }
