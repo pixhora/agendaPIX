@@ -21,6 +21,9 @@ export function MpRecebimento({ legalPagesPublished }: { legalPagesPublished: bo
   const [businessId, setBusinessId] = useState<string | null | undefined>(undefined);
   const [callback, setCallback] = useState<MpCallbackView | null>(null);
   const [connectedAt, setConnectedAt] = useState<string | null>(null);
+  const [accountName, setAccountName] = useState<string | null>(null);
+  const [accountEmailMasked, setAccountEmailMasked] = useState<string | null>(null);
+  const [accountIdLast4, setAccountIdLast4] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -44,7 +47,11 @@ export function MpRecebimento({ legalPagesPublished }: { legalPagesPublished: bo
       .then((response) => (response.ok ? response.json() : null))
       .then((payload) => {
         const parsed = parseMpOwnerStatus(payload);
-        if (parsed?.connectedAt) setConnectedAt(parsed.connectedAt);
+        if (!parsed) return;
+        if (parsed.connectedAt) setConnectedAt(parsed.connectedAt);
+        setAccountName(parsed.accountName);
+        setAccountEmailMasked(parsed.accountEmailMasked);
+        setAccountIdLast4(parsed.accountIdLast4);
       })
       .catch(() => undefined);
     return () => controller.abort();
@@ -75,6 +82,9 @@ export function MpRecebimento({ legalPagesPublished }: { legalPagesPublished: bo
       legalPagesPublished={legalPagesPublished}
       callback={callback}
       connectedAt={connectedAt}
+      accountName={accountName}
+      accountEmailMasked={accountEmailMasked}
+      accountIdLast4={accountIdLast4}
       onDismissAccount={callback?.mp === "connected" ? () => {
         void fetch(mpConnectionUrl(businessId), { method: "DELETE" })
           .then((response) => {
@@ -85,6 +95,9 @@ export function MpRecebimento({ legalPagesPublished }: { legalPagesPublished: bo
             toast(DISCONNECTED_TOAST);
             setCallback(null);
             setConnectedAt(null);
+            setAccountName(null);
+            setAccountEmailMasked(null);
+            setAccountIdLast4(null);
           })
           .catch(() => {
             toast("Sem internet. Tente de novo quando a conexão voltar.");

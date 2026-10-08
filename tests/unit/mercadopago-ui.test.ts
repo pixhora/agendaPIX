@@ -14,9 +14,10 @@ import {
   MP_MOCK_FRIDAY_2,
   MP_MOCK_FRIDAY_25,
 } from "../../lib/mercadopago/connect-copy";
-import { MP_MOCK_ACCOUNT_LABEL, MP_STATUS_FIXTURES } from "../../lib/mercadopago/dev-fixtures";
+import { MP_STATUS_FIXTURES } from "../../lib/mercadopago/dev-fixtures";
 import {
   AUTO_REFUND_ACK_ERROR,
+  LEGACY_PIX_NOTICE,
   MP_ACCOUNT_NOT_CONNECTED,
   bannerDismissUntil,
   bannerHiddenUntil,
@@ -26,6 +27,7 @@ import {
   legacyNoticeAfterDismiss,
   legacyNoticeVisible,
   legacyPixDismissUrl,
+  mpAccountIdentity,
   parseMpOwnerStatus,
   presentMpCallback,
   reconnectRequiresAck,
@@ -149,31 +151,60 @@ describe("Mercado Pago connect consent", () => {
     expect(reconnectRequiresAck(MP_STATUS_FIXTURES.needs_reconnect_stale.consentVersion)).toBe(true);
     expect(MP_STATUS_FIXTURES.legacy.hadLegacyPixKey).toBe(true);
     expect(MP_STATUS_FIXTURES.connected.hadLegacyPixKey).toBe(false);
-    expect(MP_MOCK_ACCOUNT_LABEL).toBe("Conta Mercado Pago nº ••••3636");
+    expect(MP_STATUS_FIXTURES.not_connected).toMatchObject({
+      accountName: null,
+      accountEmailMasked: null,
+      accountIdLast4: null,
+    });
   });
 
-  it("shows the preview account label until the status publishes one", () => {
+  it("shows name and email, email alone, or the last-4 fallback", () => {
     const named = renderToStaticMarkup(createElement(MpOnboardingStep, {
       businessId: "biz",
       callback: presentMpCallback("connected", null),
       connectedAt: MP_MOCK_FRIDAY_2,
-      accountLabel: MP_MOCK_ACCOUNT_LABEL,
+      accountName: "Ana S.",
+      accountEmailMasked: "an••@gmail.com",
+      accountIdLast4: "7766",
       onDismissAccount: () => undefined,
     }));
-    const labelAt = named.indexOf(MP_MOCK_ACCOUNT_LABEL);
+    const nameAt = named.indexOf("Ana S.");
+    const emailAt = named.indexOf("an••@gmail.com");
     const switchAt = named.indexOf("Não é essa conta?");
-    expect(labelAt).toBeGreaterThan(-1);
+    expect(nameAt).toBeGreaterThan(-1);
+    expect(emailAt).toBeGreaterThan(nameAt);
+    expect(switchAt).toBeGreaterThan(nameAt);
     expect(named).toContain("Conectado desde 2 out 2026");
-    expect(switchAt).toBeGreaterThan(labelAt);
+    expect(named).not.toContain("••••7766");
+
+    const emailOnly = renderToStaticMarkup(createElement(MpSettingsCard, {
+      businessId: "biz",
+      status: MP_STATUS_FIXTURES.email_only,
+      timezone: "America/Sao_Paulo",
+      onStatus: () => undefined,
+    }));
+    expect(emailOnly).toContain("an••@gmail.com");
+    expect(emailOnly).not.toContain("Ana S.");
+    expect(emailOnly).not.toContain("••••7766");
+
+    const fallback = renderToStaticMarkup(createElement(MpSettingsCard, {
+      businessId: "biz",
+      status: MP_STATUS_FIXTURES.account_fallback,
+      timezone: "America/Sao_Paulo",
+      onStatus: () => undefined,
+    }));
+    expect(fallback).toContain("Conta Mercado Pago nº ••••7766");
+    expect(fallback).not.toContain("an••@gmail.com");
+    expect(mpAccountIdentity({ accountName: "Ana", accountEmailMasked: null, accountIdLast4: "7766" })?.title).toBe("Conta Mercado Pago nº ••••7766");
 
     const settings = renderToStaticMarkup(createElement(MpSettingsCard, {
       businessId: "biz",
       status: MP_STATUS_FIXTURES.connected,
       timezone: "America/Sao_Paulo",
-      accountLabel: MP_MOCK_ACCOUNT_LABEL,
       onStatus: () => undefined,
     }));
-    expect(settings).toContain(MP_MOCK_ACCOUNT_LABEL);
+    expect(settings).toContain("Ana S.");
+    expect(settings).toContain("an••@gmail.com");
     expect(settings).toContain("Conectado desde 2 out 2026");
     expect(settings).toContain('rel="noopener"');
     expect(settings).toContain("Ver tarifas no Mercado Pago");
@@ -181,6 +212,7 @@ describe("Mercado Pago connect consent", () => {
     expect(settings).not.toContain("noreferrer");
     expect(settings).toContain("underline");
     expect(settings).toContain("Reconectar");
+    expect(settings).not.toContain(LEGACY_PIX_NOTICE);
   });
 
   it("centers the disconnect dialog and links the Mercado Pago apps help", () => {
@@ -219,10 +251,65 @@ describe("legacy Pix notice", () => {
     expect(legacyPixDismissUrl("biz/1")).toBe("/api/businesses/biz%2F1/notices/pix_key_retired/dismiss");
   });
 
-  it("treats a missing legacy flag as false", () => {
+  it("treats a missing legacy flag as false and hides the notice", () => {
     const parsed = parseMpOwnerStatus({ status: "connected", canReceiveDeposits: true });
-    expect(parsed).toMatchObject({ hadLegacyPixKey: false, consentVersion: null, liveMode: null });
-    expect(parsed && "accountName" in parsed).toBe(false);
+    expect(parsed).toMatchObject({
+      hadLegacyPixKey: false,
+      consentVersion: null,
+      liveMode: null,
+      accountName: null,
+      accountEmailMasked: null,
+      accountIdLast4: null,
+    });
+    const quiet = renderToStaticMarkup(createElement(MpSettingsCard, {
+      businessId: "biz",
+      status: { ...MP_STATUS_FIXTURES.connected, hadLegacyPixKey: false },
+      timezone: "America/Sao_Paulo",
+      onStatus: () => undefined,
+    }));
+    expect(quiet).not.toContain(LEGACY_PIX_NOTICE);
+    const notice = renderToStaticMarkup(createElement(MpSettingsCard, {
+      businessId: "biz",
+      status: MP_STATUS_FIXTURES.legacy,
+      timezone: "America/Sao_Paulo",
+      onStatus: () => undefined,
+    }));
+    expect(notice).toContain(LEGACY_PIX_NOTICE);
+    expect(notice).toContain("não é mais usada");
+    expect(notice).not.toContain("chave ativa");
+  });
+
+  it("reads the connected account fields and clears them when not connected", () => {
+    expect(parseMpOwnerStatus({
+      status: "connected",
+      connectedAt: MP_MOCK_FRIDAY_2,
+      expiresAt: "2027-04-06T20:02:00.000Z",
+      liveMode: false,
+      canReceiveDeposits: true,
+      consentVersion: "2026-10-08.v3.2",
+      accountName: "Ana S.",
+      accountEmailMasked: "an••@gmail.com",
+      accountIdLast4: "7766",
+      hadLegacyPixKey: false,
+    })).toMatchObject({
+      status: "connected",
+      liveMode: false,
+      canReceiveDeposits: true,
+      accountName: "Ana S.",
+      accountEmailMasked: "an••@gmail.com",
+      accountIdLast4: "7766",
+      hadLegacyPixKey: false,
+    });
+    expect(parseMpOwnerStatus({
+      status: "not_connected",
+      accountName: "Ana S.",
+      accountEmailMasked: "an••@gmail.com",
+      accountIdLast4: "7766",
+    })).toMatchObject({
+      accountName: null,
+      accountEmailMasked: null,
+      accountIdLast4: null,
+    });
   });
 });
 

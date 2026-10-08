@@ -4,7 +4,7 @@ import { useState } from "react";
 import { BookingFlow } from "@/components/booking/BookingFlow";
 import type { PublicBusinessData } from "@/components/booking/types";
 import { MP_ACCOUNT_NOT_CONNECTED, presentMpCallback, type MpOwnerStatus } from "@/lib/mercadopago/contract";
-import { MP_FIXTURE_BUSINESS_ID, MP_MOCK_ACCOUNT_LABEL, MP_STATUS_FIXTURES, type MpFixtureName } from "@/lib/mercadopago/dev-fixtures";
+import { MP_FIXTURE_BUSINESS_ID, MP_STATUS_FIXTURES, type MpFixtureName } from "@/lib/mercadopago/dev-fixtures";
 import { MpBannerList } from "./mp-banner";
 import { MpOnboardingStep } from "./mp-onboarding-step";
 import { MpSettingsCard } from "./mp-settings-card";
@@ -54,7 +54,6 @@ function SettingsScene({
             status={status}
             timezone="America/Sao_Paulo"
             pendingPixCount={disconnect ? 2 : 0}
-            accountLabel={initial.status === "connected" ? MP_MOCK_ACCOUNT_LABEL : null}
             onStatus={setStatus}
             initialDisconnectOpen={disconnect}
           />
@@ -64,18 +63,25 @@ function SettingsScene({
   );
 }
 
+function ConnectedOnboarding({ fixture }: { fixture: MpFixtureName }) {
+  const status = MP_STATUS_FIXTURES[fixture];
+  return (
+    <MpOnboardingStep
+      businessId={MP_FIXTURE_BUSINESS_ID}
+      callback={presentMpCallback("connected", null)}
+      connectedAt={status.connectedAt}
+      accountName={status.accountName}
+      accountEmailMasked={status.accountEmailMasked}
+      accountIdLast4={status.accountIdLast4}
+      onDismissAccount={() => undefined}
+    />
+  );
+}
+
 export function MpFixtureScene({ scene }: { scene: string }) {
-  if (scene === "onboarding-connected") {
-    return (
-      <MpOnboardingStep
-        businessId={MP_FIXTURE_BUSINESS_ID}
-        callback={presentMpCallback("connected", null)}
-        connectedAt={MP_STATUS_FIXTURES.connected.connectedAt}
-        accountLabel={MP_MOCK_ACCOUNT_LABEL}
-        onDismissAccount={() => undefined}
-      />
-    );
-  }
+  if (scene === "onboarding-connected") return <ConnectedOnboarding fixture="connected" />;
+  if (scene === "onboarding-account-email") return <ConnectedOnboarding fixture="email_only" />;
+  if (scene === "onboarding-account-fallback") return <ConnectedOnboarding fixture="account_fallback" />;
   if (scene === "onboarding-error") {
     return (
       <MpOnboardingStep
@@ -85,6 +91,8 @@ export function MpFixtureScene({ scene }: { scene: string }) {
     );
   }
   if (scene === "settings-connected") return <SettingsScene fixture="connected" />;
+  if (scene === "settings-account-email") return <SettingsScene fixture="email_only" />;
+  if (scene === "settings-account-fallback") return <SettingsScene fixture="account_fallback" />;
   if (scene === "settings-legacy") return <SettingsScene fixture="legacy" />;
   if (scene === "settings-not-connected") return <SettingsScene fixture="not_connected" />;
   if (scene === "settings-needs-reconnect") return <SettingsScene fixture="needs_reconnect" />;

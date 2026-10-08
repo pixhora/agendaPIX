@@ -13,6 +13,7 @@ import {
   legacyNoticeAfterDismiss,
   legacyNoticeVisible,
   legacyPixDismissUrl,
+  mpAccountIdentity,
   mpConnectionUrl,
   reconnectRequiresAck,
   showsTestMode,
@@ -78,7 +79,6 @@ export function MpSettingsCard({
   status,
   timezone,
   pendingPixCount = 0,
-  accountLabel = null,
   onStatus,
   initialDisconnectOpen = false,
 }: {
@@ -86,8 +86,6 @@ export function MpSettingsCard({
   status: MpOwnerStatus;
   timezone: string;
   pendingPixCount?: number;
-  /** Rótulo da conta, até o status publicar o identificador. */
-  accountLabel?: string | null;
   onStatus: (status: MpOwnerStatus) => void;
   initialDisconnectOpen?: boolean;
 }) {
@@ -99,6 +97,7 @@ export function MpSettingsCard({
   const requireAck = reconnectRequiresAck(status.consentVersion);
   const since = formatConnectedSince(status.connectedAt, timezone);
   const showNotice = legacyNoticeVisible(status.hadLegacyPixKey, dismissedNotice);
+  const account = mpAccountIdentity(status);
   const connected = status.status === "connected";
   const reconnect = status.status === "needs_reconnect";
 
@@ -120,6 +119,9 @@ export function MpSettingsCard({
         canReceiveDeposits: false,
         hadLegacyPixKey: status.hadLegacyPixKey,
         consentVersion: null,
+        accountName: null,
+        accountEmailMasked: null,
+        accountIdLast4: null,
       });
     } catch {
       toast("Sem internet. Tente de novo quando a conexão voltar.");
@@ -144,7 +146,8 @@ export function MpSettingsCard({
 
         {connected ? (
           <div className="mt-4">
-            {accountLabel ? <p className="font-semibold">{accountLabel}</p> : null}
+            {account ? <p className="font-semibold">{account.title}</p> : null}
+            {account?.detail ? <p className="mt-0.5 text-sm text-muted">{account.detail}</p> : null}
             {since ? <p className="mt-1 text-[13px] text-muted">Conectado desde {since}</p> : null}
             <p className="mt-3 text-sm leading-relaxed text-ink">
               O sinal dos clientes cai direto nesta conta. O Mercado Pago desconta a tarifa dele; o AgendaPix não cobra nada sobre o sinal.

@@ -25,6 +25,9 @@ export type MpOwnerStatus = {
   canReceiveDeposits: boolean;
   hadLegacyPixKey: boolean;
   consentVersion: string | null;
+  accountName: string | null;
+  accountEmailMasked: string | null;
+  accountIdLast4: string | null;
 };
 
 export const MP_ACCOUNT_NOT_CONNECTED = "mp_account_not_connected";
@@ -75,11 +78,23 @@ export function isMpCallbackReason(value: unknown): value is MpCallbackReason {
   return typeof value === "string" && (MP_CALLBACK_REASONS as readonly string[]).includes(value);
 }
 
-/** Normaliza o GET de status. `hadLegacyPixKey` ausente ou não-true vira false. */
+function optionalText(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function optionalLast4(value: unknown): string | null {
+  const text = optionalText(value);
+  return text && /^\d{4}$/.test(text) ? text : null;
+}
+
+/** Normaliza o GET de status. `hadLegacyPixKey` ausente ou não-true vira false. Sem conexão, a conta não sai. */
 export function parseMpOwnerStatus(value: unknown): MpOwnerStatus | null {
   if (!value || typeof value !== "object") return null;
   const row = value as Record<string, unknown>;
   if (!isMpConnectionStatus(row.status)) return null;
+  const connected = row.status !== "not_connected";
   return {
     status: row.status,
     connectedAt: typeof row.connectedAt === "string" ? row.connectedAt : null,
@@ -88,7 +103,26 @@ export function parseMpOwnerStatus(value: unknown): MpOwnerStatus | null {
     canReceiveDeposits: row.canReceiveDeposits === true,
     hadLegacyPixKey: row.hadLegacyPixKey === true,
     consentVersion: typeof row.consentVersion === "string" && row.consentVersion.length > 0 ? row.consentVersion : null,
+    accountName: connected ? optionalText(row.accountName) : null,
+    accountEmailMasked: connected ? optionalText(row.accountEmailMasked) : null,
+    accountIdLast4: connected ? optionalLast4(row.accountIdLast4) : null,
   };
+}
+
+export type MpAccountIdentity = { title: string; detail: string | null };
+
+/** Nome e e-mail quando os dois vêm; só o e-mail quando o nome falta; senão o número com os 4 últimos dígitos. */
+export function mpAccountIdentity(status: Pick<MpOwnerStatus, "accountName" | "accountEmailMasked" | "accountIdLast4">): MpAccountIdentity | null {
+  if (status.accountName && status.accountEmailMasked) {
+    return { title: status.accountName, detail: status.accountEmailMasked };
+  }
+  if (!status.accountName && status.accountEmailMasked) {
+    return { title: status.accountEmailMasked, detail: null };
+  }
+  if (status.accountIdLast4) {
+    return { title: `Conta Mercado Pago nº ••••${status.accountIdLast4}`, detail: null };
+  }
+  return null;
 }
 
 /** A caixa volta quando a versão aceita falta ou é diferente da tela atual. */
