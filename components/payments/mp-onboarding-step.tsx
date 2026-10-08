@@ -6,7 +6,7 @@ import { ArrowRight, Check, CircleCheck, CircleX, Info, Percent, TriangleAlert, 
 import { BrandLink } from "@/components/ui/brand";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { PERMISSIONS, callbackFocusesAck, formatConnectedSince, presentMpCallback, type MpCallbackView } from "@/lib/mercadopago/contract";
+import { PERMISSIONS, callbackFocusesAck, formatConnectedSince, mpAccountLines, presentMpCallback, type MpCallbackView } from "@/lib/mercadopago/contract";
 import { MP_GOOD_TO_KNOW } from "@/lib/mercadopago/connect-copy";
 import { MpConnectForm } from "./mp-connect-form";
 
@@ -71,7 +71,7 @@ function SkipNote() {
 
 function ActionBar({ children }: { children: ReactNode }) {
   return (
-    <div className="z-20 border-t border-line bg-paper/95 px-5 pt-3 backdrop-blur-md max-md:sticky max-md:bottom-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:static md:mt-6 md:border-0 md:bg-transparent md:px-0 md:pt-0 md:backdrop-blur-none">
+    <div className="z-20 shrink-0 border-t border-line bg-paper/95 px-5 pt-3 backdrop-blur-md max-md:sticky max-md:bottom-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:static md:mt-6 md:border-0 md:bg-transparent md:px-0 md:pt-0 md:backdrop-blur-none">
       {children}
     </div>
   );
@@ -82,12 +82,18 @@ export function MpOnboardingStep({
   legalPagesPublished = false,
   callback = null,
   connectedAt = null,
+  accountName = null,
+  accountEmailMasked = null,
+  accountIdLast4 = null,
   onDismissAccount,
 }: {
   businessId: string;
   legalPagesPublished?: boolean;
   callback?: MpCallbackView | null;
   connectedAt?: string | null;
+  accountName?: string | null;
+  accountEmailMasked?: string | null;
+  accountIdLast4?: string | null;
   onDismissAccount?: () => void;
 }) {
   const [acknowledged, setAcknowledged] = useState(false);
@@ -97,6 +103,7 @@ export function MpOnboardingStep({
   const connected = callback?.mp === "connected";
   const errorView = callback?.mp === "error" && !callbackFocusesAck(callback) ? callback : null;
   const since = formatConnectedSince(connectedAt);
+  const account = mpAccountLines({ accountName, accountEmailMasked, accountIdLast4 });
 
   useEffect(() => {
     if (errorView) errorTitle.current?.focus();
@@ -104,16 +111,26 @@ export function MpOnboardingStep({
 
   return (
     <div className="min-h-dvh bg-paper md:py-10" style={{ scrollPaddingBottom: "calc(var(--sticky-cta-height) + 16px)" }}>
-      <div className="mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-paper md:min-h-0 md:rounded-frame md:border md:border-line md:bg-surface md:shadow-[var(--shadow-card)]">
+      <div className="mx-auto flex w-full max-w-[480px] flex-col bg-paper max-md:h-dvh max-md:max-h-dvh md:min-h-0 md:rounded-frame md:border md:border-line md:bg-surface md:shadow-[var(--shadow-card)]">
         <header className="flex h-14 shrink-0 items-center justify-between px-4">
           <BrandLink href="/onboarding" label="AgendaPix" />
           <p className="text-xs text-muted">Quase lá · recomendado</p>
         </header>
         {connected ? (
-          <ConnectedBody since={since} onDismissAccount={onDismissAccount} />
+          <ConnectedBody since={since} account={account} onDismissAccount={onDismissAccount} />
         ) : (
-          <>
-            <div className="flex-1 px-5 pt-2 max-md:pb-4">
+          <MpConnectForm
+            businessId={businessId}
+            returnTo="/onboarding"
+            requireAck
+            acknowledged={acknowledged}
+            onAcknowledgedChange={setAcknowledged}
+            ackInvalid={ackInvalid}
+            submitLabel={errorView ? "Tentar de novo" : "Continuar para o Mercado Pago"}
+            onBlocked={() => setAckBlocked(true)}
+            pinActions
+            lead={
+              <>
               <p className="inline-flex items-center gap-1.5 rounded-full bg-pix-soft px-2.5 py-1 text-xs font-semibold text-pix">
                 <CircleCheck aria-hidden="true" className="size-3.5" />
                 Conta criada
@@ -165,56 +182,62 @@ export function MpOnboardingStep({
               </div>}
               {errorView ? null : <KnowList />}
               <SkipNote />
+              </>
+            }
+            footer={
+              <>
+                <Link
+                  href="/onboarding/concluir"
+                  aria-describedby="mp-skip-note"
+                  className={cn(buttonVariants({ variant: "ghost", size: "lg" }), "mt-1 w-full")}
+                >
+                  Agora não
+                </Link>
+                <p className="pb-1 text-center text-xs leading-relaxed text-muted">Você será levado ao site do Mercado Pago. Não tem conta? Dá para criar lá.</p>
+              </>
+            }
+          >
+            <div className="mt-4">
+              <ConsentLine published={legalPagesPublished} />
             </div>
-            <ActionBar>
-              <MpConnectForm
-                businessId={businessId}
-                returnTo="/onboarding"
-                requireAck
-                acknowledged={acknowledged}
-                onAcknowledgedChange={setAcknowledged}
-                ackInvalid={ackInvalid}
-                submitLabel={errorView ? "Tentar de novo" : "Continuar para o Mercado Pago"}
-                onBlocked={() => setAckBlocked(true)}
-              >
-                <div className="mt-4">
-                  <ConsentLine published={legalPagesPublished} />
-                </div>
-              </MpConnectForm>
-              <Link
-                href="/onboarding/concluir"
-                aria-describedby="mp-skip-note"
-                className={cn(buttonVariants({ variant: "ghost", size: "lg" }), "mt-1 w-full")}
-              >
-                Agora não
-              </Link>
-              <p className="pb-1 text-center text-xs leading-relaxed text-muted">Você será levado ao site do Mercado Pago. Não tem conta? Dá para criar lá.</p>
-            </ActionBar>
-          </>
+          </MpConnectForm>
         )}
       </div>
     </div>
   );
 }
 
-function ConnectedBody({ since, onDismissAccount }: { since: string | null; onDismissAccount?: () => void }) {
+function ConnectedBody({
+  since,
+  account,
+  onDismissAccount,
+}: {
+  since: string | null;
+  account: { title: string; detail: string | null };
+  onDismissAccount?: () => void;
+}) {
   return (
     <>
-      <div className="flex-1 px-5 pt-4 max-md:pb-4" role="status">
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-4 max-md:pb-4 md:overflow-visible" role="status">
         <span aria-hidden="true" className="grid size-14 place-items-center rounded-2xl bg-pix-soft text-pix">
           <Check className="size-7" strokeWidth={2.5} />
         </span>
         <h1 tabIndex={-1} className="mt-4 font-display text-2xl font-extrabold tracking-tight outline-none">Conta Mercado Pago conectada</h1>
         <p className="mt-2 text-[15px] text-muted">Os Pix de sinal vão cair em:</p>
         <div className="mt-4 rounded-card border border-line bg-paper p-4">
-          <p className="font-semibold">Sua conta Mercado Pago</p>
-          {since ? <p className="mt-1 text-[13px] text-muted">Conectado desde {since}</p> : null}
+          <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold">{account.title}</p>
+              {account.detail ? <p className="mt-0.5 text-[13px] text-muted">{account.detail}</p> : null}
+              {since ? <p className="mt-1 text-[13px] text-muted">Conectado desde {since}</p> : null}
+            </div>
+            {onDismissAccount ? (
+              <button type="button" onClick={onDismissAccount} className="inline-flex min-h-11 shrink-0 items-center text-sm font-semibold text-ink underline-offset-4 outline-none hover:underline focus-visible:shadow-[var(--shadow-focus)] focus-visible:outline-none">
+                Não é essa conta? Desconectar e trocar
+              </button>
+            ) : null}
+          </div>
         </div>
-        {onDismissAccount ? (
-          <button type="button" onClick={onDismissAccount} className="mt-4 inline-flex min-h-11 items-center text-sm font-semibold text-ink underline-offset-4 outline-none hover:underline focus-visible:shadow-[var(--shadow-focus)] focus-visible:outline-none">
-            Não é essa conta? Desconectar e trocar
-          </button>
-        ) : null}
       </div>
       <ActionBar>
         <Link href="/onboarding/concluir" className={cn(buttonVariants({ size: "lg" }), "w-full")}>Continuar</Link>

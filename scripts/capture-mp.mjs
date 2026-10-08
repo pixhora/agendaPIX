@@ -5,12 +5,13 @@ process.env.LANG = "pt_BR.UTF-8";
 process.env.LC_ALL = "pt_BR.UTF-8";
 
 const base = process.env.MP_CAPTURE_URL ?? "http://127.0.0.1:3399";
-const outDir = "/opt/cursor/artifacts/mp";
+const outDir = "/opt/cursor/artifacts/mp-v2";
 
 const scenes = [
   { name: "onboarding-unchecked", scene: "onboarding", long: true },
   { name: "onboarding-ack-error", scene: "onboarding", long: true, click: "Continuar para o Mercado Pago" },
   { name: "onboarding-connected", scene: "onboarding-connected" },
+  { name: "onboarding-account-fallback", scene: "onboarding-account-fallback" },
   { name: "onboarding-error", scene: "onboarding-error", long: true },
   { name: "settings-connected", scene: "settings-connected" },
   { name: "settings-legacy", scene: "settings-legacy" },
@@ -55,7 +56,7 @@ for (const scene of scenes) {
     }
     const file = `${outDir}/${scene.name}-${viewport.label}.png`;
     await page.screenshot({ path: file });
-    if (scene.long && viewport.width === 390) {
+    if (viewport.width === 390) {
       await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
       await page.screenshot({ path: `${outDir}/${scene.name}-${viewport.label}-bottom.png` });
     }

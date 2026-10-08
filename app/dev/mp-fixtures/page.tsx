@@ -8,9 +8,12 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+export const dynamic = "force-dynamic";
+
 const SCENES = [
   "onboarding",
   "onboarding-connected",
+  "onboarding-account-fallback",
   "onboarding-error",
   "settings-connected",
   "settings-legacy",

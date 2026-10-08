@@ -36,7 +36,7 @@
 
   --ring: #0b0b0c;
   --shadow-focus: 0 0 0 4px color-mix(in srgb, var(--ring) 18%, transparent);
-  --sticky-cta-height: 16.5rem;
+  --sticky-cta-height: 11rem;
 
   --duration-feedback: 120ms;
   --duration-opening: 180ms;

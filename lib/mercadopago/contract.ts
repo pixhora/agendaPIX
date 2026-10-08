@@ -25,6 +25,9 @@ export type MpOwnerStatus = {
   canReceiveDeposits: boolean;
   hadLegacyPixKey: boolean;
   consentVersion: string | null;
+  accountName: string | null;
+  accountEmailMasked: string | null;
+  accountIdLast4: string | null;
 };
 
 export const MP_ACCOUNT_NOT_CONNECTED = "mp_account_not_connected";
@@ -88,7 +91,28 @@ export function parseMpOwnerStatus(value: unknown): MpOwnerStatus | null {
     canReceiveDeposits: row.canReceiveDeposits === true,
     hadLegacyPixKey: row.hadLegacyPixKey === true,
     consentVersion: typeof row.consentVersion === "string" && row.consentVersion.length > 0 ? row.consentVersion : null,
+    accountName: accountText(row.accountName),
+    accountEmailMasked: accountText(row.accountEmailMasked),
+    accountIdLast4: accountText(row.accountIdLast4),
   };
+}
+
+function accountText(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+/** Nome e e-mail mascarado, ou o número final da conta quando o Mercado Pago não devolveu a identidade. */
+export function mpAccountLines(status: Pick<MpOwnerStatus, "accountName" | "accountEmailMasked" | "accountIdLast4">): { title: string; detail: string | null } {
+  if (status.accountName || status.accountEmailMasked) {
+    return {
+      title: status.accountName ?? status.accountEmailMasked ?? "",
+      detail: status.accountName && status.accountEmailMasked ? status.accountEmailMasked : null,
+    };
+  }
+  if (status.accountIdLast4) {
+    return { title: `Conta Mercado Pago nº ••••${status.accountIdLast4}`, detail: null };
+  }
+  return { title: "Conta Mercado Pago", detail: null };
 }
 
 /** A caixa volta quando a versão aceita falta ou é diferente da tela atual. */

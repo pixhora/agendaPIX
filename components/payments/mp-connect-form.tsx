@@ -10,6 +10,11 @@ import { AUTO_REFUND_ACK_ERROR, gateConnectSubmit, mpConnectAction, type MpRetur
 
 const fieldReset = "outline-none focus:outline-none focus-visible:outline-none";
 
+function revealAck(node: HTMLInputElement | null) {
+  node?.scrollIntoView({ block: "center", behavior: "auto" });
+  node?.focus();
+}
+
 function AckCopy() {
   const colon = MP_CONNECT_CONSENT_TEXT.indexOf(":");
   if (colon < 1) {
@@ -100,6 +105,9 @@ export function MpConnectForm({
   buttonVariant = "pix",
   beside,
   children,
+  lead,
+  pinActions = false,
+  footer,
 }: {
   businessId: string;
   returnTo: MpReturnTo;
@@ -113,13 +121,34 @@ export function MpConnectForm({
   buttonVariant?: "pix" | "default" | "outline";
   beside?: ReactNode;
   children?: ReactNode;
+  /** Conteúdo rolável acima da caixa, quando só o botão fica grudado. */
+  lead?: ReactNode;
+  /** No celular, só o botão fica grudado. A caixa e o texto ficam no fluxo. */
+  pinActions?: boolean;
+  footer?: ReactNode;
 }) {
   const ackRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (!ackInvalid || !requireAck) return;
-    const timer = window.setTimeout(() => ackRef.current?.focus(), 0);
+    const timer = window.setTimeout(() => revealAck(ackRef.current), 0);
     return () => window.clearTimeout(timer);
   }, [ackInvalid, requireAck]);
+
+  const ack = requireAck ? (
+    <div className={pinActions ? "mt-4" : undefined}>
+      <AutoRefundAck
+        checked={acknowledged}
+        onChange={onAcknowledgedChange}
+        invalid={ackInvalid}
+        inputRef={ackRef}
+        onInvalid={() => {
+          onBlocked();
+          revealAck(ackRef.current);
+        }}
+      />
+    </div>
+  ) : null;
+
   return (
     <form
       method="post"
@@ -132,27 +161,35 @@ export function MpConnectForm({
         if (requireAck && !gateConnectSubmit(acknowledged).ok) {
           event.preventDefault();
           onBlocked();
-          ackRef.current?.focus();
+          revealAck(ackRef.current);
         }
       }}
+      className={pinActions ? "flex min-h-0 flex-1 flex-col md:block" : undefined}
     >
       <input type="hidden" name="returnTo" value={returnTo} />
       <input type="hidden" name="consentVersion" value={MP_CONNECT_CONSENT_VERSION} />
       {requireAck ? null : <input type="hidden" name="autoRefundAck" value="on" />}
-      {requireAck ? (
-        <AutoRefundAck
-          checked={acknowledged}
-          onChange={onAcknowledgedChange}
-          invalid={ackInvalid}
-          inputRef={ackRef}
-          onInvalid={() => {
-            onBlocked();
-            ackRef.current?.focus();
-          }}
-        />
-      ) : null}
-      {children}
-      <div className={cn("mt-3", beside && "grid gap-2 min-[360px]:grid-cols-2")}>
+      {pinActions ? (
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-2 max-md:pb-4 md:overflow-visible">
+          {lead}
+          {ack}
+          {children}
+        </div>
+      ) : (
+        <>
+          {ack}
+          {children}
+        </>
+      )}
+      <div
+        className={cn(
+          "mt-3",
+          beside && "grid gap-2 min-[360px]:grid-cols-2",
+          pinActions &&
+            "shrink-0 max-md:sticky max-md:bottom-0 max-md:z-20 max-md:mt-0 max-md:border-t max-md:border-line max-md:bg-paper/95 max-md:px-5 max-md:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:pt-3 max-md:backdrop-blur-md md:static md:px-5 md:pb-6",
+        )}
+        data-mp-sticky={pinActions ? "" : undefined}
+      >
         <button
           type="submit"
           aria-busy={pending || undefined}
@@ -163,6 +200,7 @@ export function MpConnectForm({
           {pending || buttonVariant === "outline" ? null : <ExternalLink aria-hidden="true" />}
         </button>
         {beside}
+        {footer}
       </div>
     </form>
   );

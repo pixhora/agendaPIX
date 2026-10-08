@@ -10,6 +10,7 @@ import {
   LEGACY_PIX_NOTICE,
   MP_TARIFF_URL,
   formatConnectedSince,
+  mpAccountLines,
   legacyNoticeAfterDismiss,
   legacyNoticeVisible,
   legacyPixDismissUrl,
@@ -95,6 +96,7 @@ export function MpSettingsCard({
   const [dismissedNotice, setDismissedNotice] = useState(false);
   const requireAck = reconnectRequiresAck(status.consentVersion);
   const since = formatConnectedSince(status.connectedAt, timezone);
+  const account = mpAccountLines(status);
   const showNotice = legacyNoticeVisible(status.hadLegacyPixKey, dismissedNotice);
   const connected = status.status === "connected";
   const reconnect = status.status === "needs_reconnect";
@@ -117,6 +119,9 @@ export function MpSettingsCard({
         canReceiveDeposits: false,
         hadLegacyPixKey: status.hadLegacyPixKey,
         consentVersion: null,
+        accountName: null,
+        accountEmailMasked: null,
+        accountIdLast4: null,
       });
     } catch {
       toast("Sem internet. Tente de novo quando a conexão voltar.");
@@ -141,7 +146,8 @@ export function MpSettingsCard({
 
         {connected ? (
           <div className="mt-4">
-            <p className="font-semibold">Sua conta Mercado Pago</p>
+            <p className="font-semibold">{account.title}</p>
+            {account.detail ? <p className="mt-0.5 text-[13px] text-muted">{account.detail}</p> : null}
             {since ? <p className="mt-1 text-[13px] text-muted">Conectado desde {since}</p> : null}
             <p className="mt-3 text-sm leading-relaxed text-ink">
               O sinal dos clientes cai direto nesta conta. O Mercado Pago desconta a tarifa dele; o AgendaPix não cobra nada sobre o sinal.

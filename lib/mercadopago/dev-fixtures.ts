@@ -16,6 +16,9 @@ const base = {
   canReceiveDeposits: true,
   hadLegacyPixKey: false,
   consentVersion: MP_CONNECT_CONSENT_VERSION,
+  accountName: "Ana S.",
+  accountEmailMasked: "an••@gmail.com",
+  accountIdLast4: "3636",
 } satisfies Omit<MpOwnerStatus, "status">;
 
 export const MP_STATUS_FIXTURES = {
@@ -29,6 +32,17 @@ export const MP_STATUS_FIXTURES = {
     canReceiveDeposits: false,
     hadLegacyPixKey: false,
     consentVersion: null,
+    accountName: null,
+    accountEmailMasked: null,
+    accountIdLast4: null,
+  },
+  /** Conectado sem nome nem e-mail: cai no número final da conta. */
+  account_fallback: {
+    ...base,
+    status: "connected",
+    accountName: null,
+    accountEmailMasked: null,
+    accountIdLast4: "3636",
   },
   /** Mesma versão aceita: reconectar sem a caixa. */
   needs_reconnect: { ...base, status: "needs_reconnect", canReceiveDeposits: false },
@@ -46,8 +60,9 @@ export const MP_STATUS_FIXTURES = {
 
 export type MpFixtureName = keyof typeof MP_STATUS_FIXTURES;
 
+/** Em produção a rota fica fechada. O build de captura liga com MP_CAPTURE=1. */
 export function mpFixturesAllowed(): boolean {
-  return process.env.NODE_ENV !== "production";
+  return process.env.NODE_ENV !== "production" || process.env.MP_CAPTURE === "1";
 }
 
 export function readMpFixture(name: string | null | undefined): MpOwnerStatus | null {
@@ -62,5 +77,8 @@ export function readMpFixture(name: string | null | undefined): MpOwnerStatus | 
     canReceiveDeposits: fixture.canReceiveDeposits === true,
     hadLegacyPixKey: fixture.hadLegacyPixKey === true,
     consentVersion: fixture.consentVersion ?? null,
+    accountName: fixture.accountName ?? null,
+    accountEmailMasked: fixture.accountEmailMasked ?? null,
+    accountIdLast4: fixture.accountIdLast4 ?? null,
   };
 }

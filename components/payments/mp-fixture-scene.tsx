@@ -70,6 +70,22 @@ export function MpFixtureScene({ scene }: { scene: string }) {
         businessId={MP_FIXTURE_BUSINESS_ID}
         callback={presentMpCallback("connected", null)}
         connectedAt={MP_STATUS_FIXTURES.connected.connectedAt}
+        accountName={MP_STATUS_FIXTURES.connected.accountName}
+        accountEmailMasked={MP_STATUS_FIXTURES.connected.accountEmailMasked}
+        accountIdLast4={MP_STATUS_FIXTURES.connected.accountIdLast4}
+        onDismissAccount={() => undefined}
+      />
+    );
+  }
+  if (scene === "onboarding-account-fallback") {
+    return (
+      <MpOnboardingStep
+        businessId={MP_FIXTURE_BUSINESS_ID}
+        callback={presentMpCallback("connected", null)}
+        connectedAt={MP_STATUS_FIXTURES.account_fallback.connectedAt}
+        accountName={MP_STATUS_FIXTURES.account_fallback.accountName}
+        accountEmailMasked={MP_STATUS_FIXTURES.account_fallback.accountEmailMasked}
+        accountIdLast4={MP_STATUS_FIXTURES.account_fallback.accountIdLast4}
         onDismissAccount={() => undefined}
       />
     );
