@@ -2,12 +2,12 @@ import { randomUUID } from "node:crypto";
 import { eq, inArray, sql } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
 import { POST as createDraft } from "../../app/api/onboarding/drafts/route";
-import { GET as readDraft } from "../../app/api/onboarding/drafts/[id]/route";
+import { GET as readDraft, PATCH as patchDraft } from "../../app/api/onboarding/drafts/[id]/route";
 import { POST as commitDraft } from "../../app/api/onboarding/drafts/[id]/commit/route";
 import { GET as slugAvailabilityRoute } from "../../app/api/public/slugs/availability/route";
 import { getDb } from "../../db";
-import { businesses, businessHours, onboardingDrafts, onboardingRequests, services, user } from "../../db/schema";
-import { commitOnboardingDraft, createOnboardingDraft, deleteExpiredOnboardingDrafts } from "../../lib/onboarding/drafts";
+import { businesses, businessHours, onboardingDrafts, onboardingRequests, services, user, verification } from "../../db/schema";
+import { commitOnboardingDraft, createOnboardingDraft, deleteExpiredOnboardingDrafts, signInOtpIdentifier } from "../../lib/onboarding/drafts";
 
 const db = getDb();
 const owners: string[] = [];
@@ -96,6 +96,29 @@ describe.sequential("rascunho de cadastro", () => {
     const denied = await commitDraft(originRequest(`http://localhost:3000/api/onboarding/drafts/${draftId}/commit`, { method: "POST" }), { params: Promise.resolve({ id: draftId }) });
     expect(denied.status).toBe(401);
     await db.delete(onboardingDrafts).where(eq(onboardingDrafts.id, draftId));
+  });
+
+  it("atualiza o e-mail e apaga o código anterior", async () => {
+    const ownerId = randomUUID();
+    owners.push(ownerId);
+    const email = `${ownerId}@example.com`;
+    const nextEmail = `novo-${ownerId}@example.com`;
+    const created = await createOnboardingDraft(draftBody(email, `patch-${ownerId.slice(0, 8)}`), db);
+    await db.insert(verification).values({
+      id: randomUUID(),
+      identifier: signInOtpIdentifier(email),
+      value: "hash:0",
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+    const response = await patchDraft(new Request(`http://localhost:3000/api/onboarding/drafts/${created.draftId}`, {
+      method: "PATCH",
+      headers: { cookie: `onb_draft=${created.draftId}`, "content-type": "application/json" },
+      body: JSON.stringify({ email: nextEmail }),
+    }), { params: Promise.resolve({ id: created.draftId }) });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ email: `n***@example.com`, draftId: created.draftId });
+    expect(await db.select().from(verification).where(eq(verification.identifier, signInOtpIdentifier(email)))).toHaveLength(0);
+    await db.delete(onboardingDrafts).where(eq(onboardingDrafts.id, created.draftId));
   });
 
   it("responde 410 quando o cadastro guardado venceu", async () => {
