@@ -46,7 +46,8 @@ test.describe("painel do dono — autenticado", () => {
 
     await page.goto(`/dashboard/settings?businessId=${meta.businessAId}`);
     await expect(page.getByRole("heading", { name: "Horários de funcionamento", exact: true })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Chave Pix do negócio" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Recebimento", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Mercado Pago", exact: true })).toBeVisible();
   });
 
   test("isolamento: negócio alheio não abre dados", async ({ page }) => {
