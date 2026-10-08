@@ -18,6 +18,15 @@ describe("texto da política do sinal", () => {
       "O cliente paga R$ 20,00 de sinal no Pix para reservar. Pode cancelar ou remarcar até 24 h antes. Depois disso, ou se faltar, o sinal fica com você. Quando o cliente cancelar no prazo, você devolve pelo AgendaPix, depois de confirmar o cancelamento.",
     );
     expect(ownerPreview(PADRAO_DEPOSIT_POLICY, { depositCents: 0 })).toBe("Sem sinal: a reserva confirma na hora, sem Pix.");
+    const different = (lateCancel: DepositPolicy["lateCancel"], noShow: DepositPolicy["noShow"]) =>
+      ownerPreview(policy({ refundUntilHours: 48, rescheduleUntilHours: 2, lateCancel, noShow }), { depositCents: 2000 });
+    expect(different("retain", "retain")).toBe(
+      "O cliente paga R$ 20,00 de sinal no Pix para reservar. Pode cancelar até 48 h antes ou remarcar até 2 h antes, usando o sinal (1 vez). Depois do prazo para cancelar, ou se faltar, o sinal fica com você. Quando o cliente cancelar no prazo, você devolve pelo AgendaPix, depois de confirmar o cancelamento.",
+    );
+    expect(different("credit", "credit")).toContain(`Depois do prazo para cancelar, ou se faltar, o sinal vira ${CREDIT_PHRASE}.`);
+    expect(different("retain", "credit")).toContain(`Depois do prazo para cancelar, o sinal fica com você. Se faltar, o sinal vira ${CREDIT_PHRASE}.`);
+    expect(different("credit", "refund")).toContain(`Depois do prazo para cancelar, o sinal vira ${CREDIT_PHRASE}. Se faltar, você devolve o sinal.`);
+    expect(different("retain", "retain")).not.toContain("Depois disso");
 
     for (const refundUntilHours of HOURS) {
       for (const rescheduleUntilHours of HOURS) {
@@ -30,24 +39,28 @@ describe("texto da política do sinal", () => {
             expect(text).not.toContain("Studio Bella");
             expect(text.startsWith("O cliente paga R$ 20,00 de sinal no Pix para reservar.")).toBe(true);
 
+            const split = refundUntilHours !== null && rescheduleUntilHours !== null && refundUntilHours !== rescheduleUntilHours;
+            const after = split ? "Depois do prazo para cancelar" : "Depois disso";
             if (refundUntilHours !== null && rescheduleUntilHours !== null && refundUntilHours === rescheduleUntilHours) {
               expect(text).toContain(`Pode cancelar ou remarcar até ${refundUntilHours} h antes.`);
             } else if (refundUntilHours !== null && rescheduleUntilHours !== null) {
-              expect(text).toContain(`Pode cancelar até ${refundUntilHours} h antes ou remarcar até ${rescheduleUntilHours} h antes.`);
+              expect(text).toContain(`Pode cancelar até ${refundUntilHours} h antes ou remarcar até ${rescheduleUntilHours} h antes, usando o sinal (1 vez).`);
             } else if (refundUntilHours !== null) {
               expect(text).toContain(`Pode cancelar até ${refundUntilHours} h antes.`);
             } else if (rescheduleUntilHours !== null) {
               expect(text).toContain(`Pode remarcar até ${rescheduleUntilHours} h antes, usando o sinal (1 vez).`);
             }
+            if (split) expect(text).not.toContain("Depois disso");
+            else expect(text).not.toContain("Depois do prazo para cancelar");
 
             if (lateCancel === noShow) {
               expect(text).toContain(lateCancel === "credit"
-                ? `Depois disso, ou se faltar, o sinal vira ${CREDIT_PHRASE}.`
-                : "Depois disso, ou se faltar, o sinal fica com você.");
+                ? `${after}, ou se faltar, o sinal vira ${CREDIT_PHRASE}.`
+                : `${after}, ou se faltar, o sinal fica com você.`);
             } else {
               expect(text).toContain(lateCancel === "credit"
-                ? `Depois disso, o sinal vira ${CREDIT_PHRASE}.`
-                : "Depois disso, o sinal fica com você.");
+                ? `${after}, o sinal vira ${CREDIT_PHRASE}.`
+                : `${after}, o sinal fica com você.`);
               expect(text).toContain(noShow === "credit"
                 ? `Se faltar, o sinal vira ${CREDIT_PHRASE}.`
                 : noShow === "refund"
