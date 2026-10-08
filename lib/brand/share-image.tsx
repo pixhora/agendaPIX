@@ -6,6 +6,11 @@ import { sitePromise } from "@/lib/site";
 
 export const shareImageSize = { width: 1200, height: 630 };
 export const shareImageAlt = `AgendaPix. ${sitePromise}`;
+/**
+ * O ponto final de "pago." vira um glifo solto no Satori (vão maior que o das letras).
+ * Só o cartão omite esse ponto. O texto da página e o alt continuam com ele.
+ */
+const shareTitle = sitePromise.replace(/\.$/u, "");
 /** Cartão neutro da página do negócio. Sem nome, serviço ou horário (BE-08). */
 export const neutralShareImageAlt = "AgendaPix. Agende online · sinal no Pix";
 
@@ -97,7 +102,7 @@ export async function renderShareImage() {
             color: brandColors.ink,
           }}
         >
-          {sitePromise}
+          {shareTitle}
         </div>
         <div
           style={{
