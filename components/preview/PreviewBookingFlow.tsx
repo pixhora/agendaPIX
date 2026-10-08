@@ -28,11 +28,12 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { BusinessAvatar } from "@/components/ui/business-avatar";
 import { PREVIEW_PIX_COPY_PASTE, PREVIEW_PIX_QR } from "@/lib/preview/sample-pix-qr";
-import { PIX_HOLD_MS, previewOpeningSlot, previewPayDeadline } from "@/lib/preview/preview-schedule";
-import { formatPolicyWindowTitle, policyHowToChange, policyLateCancelDetail, policyNoShowRefund, policyOneLiner, policyWindowBody } from "@/components/booking/policy-copy";
+import { PIX_HOLD_MS, previewLateSlot, previewOpeningSlot, previewPayDeadline } from "@/lib/preview/preview-schedule";
+import { mirrorCustomerPolicy, policyLinesForCustomer } from "@/components/booking/policy-copy";
+import { policyLineTone } from "@/components/booking/policy-gate";
 
 function previewStep(scene: PreviewScene): 1 | 2 | 3 | 4 {
-  if (scene === "dados" || scene === "politica" || scene === "politica-mudou") return 3;
+  if (scene === "dados" || scene === "politica" || scene === "politica-mudou" || scene === "cima-da-hora") return 3;
   if (scene === "pix" || scene === "pix-perto" || scene === "pix-expirado") return 4;
   return 1;
 }
@@ -69,20 +70,19 @@ function previewPolicy(slot: AvailabilitySlot): BookingPolicyView {
 }
 
 export function PreviewBookingFlow({ scene = "fluxo" }: { scene?: PreviewScene }) {
-  const openingSlot = previewOpeningSlot();
+  const openingSlot = scene === "cima-da-hora" ? previewLateSlot() : previewOpeningSlot();
   const previewServices = MOCK_SERVICES.map((service, index) => {
     if (index !== 0 || !openingSlot) return service;
-    const deadline = new Date(new Date(openingSlot.startsAt).getTime() - 24 * 60 * 60 * 1000);
-    const name = MOCK_PUBLIC_BUSINESS.name;
+    const mirrored = mirrorCustomerPolicy({
+      businessName: MOCK_PUBLIC_BUSINESS.name,
+      hours: 24,
+      startsAt: new Date(openingSlot.startsAt),
+      hasContact: true,
+    });
     return {
       ...service,
-      policySummary: policyOneLiner(name, 24, "keep"),
-      policyDetails: [
-        { title: formatPolicyWindowTitle(deadline), body: policyWindowBody(name), tone: "ok" as const },
-        { title: "Depois disso", body: policyLateCancelDetail(name, "keep"), tone: "warn" as const },
-        { title: "Se faltar", body: policyNoShowRefund(name), tone: "ok" as const },
-        { title: "Como cancelar ou remarcar", body: policyHowToChange(name, true), tone: "ok" as const },
-      ],
+      policySummary: mirrored.summary,
+      policyDetails: mirrored.details,
     };
   });
   const services = scene === "indisponivel"
@@ -350,7 +350,7 @@ export function PreviewBookingFlow({ scene = "fluxo" }: { scene?: PreviewScene }
           businessName={MOCK_PUBLIC_BUSINESS.name}
           serviceName={selectedService.name}
           depositLabel={formatCurrency(selectedService.depositCents)}
-          lines={selectedService.policyDetails}
+          lines={policyLinesForCustomer(selectedService.policyDetails, policyLineTone(selectedService.depositPolicy, selectedSlot?.startsAt) === "warn", selectedService.depositPolicy?.refundUntilHours ?? null)}
           text={selectedService.policySummary}
           notice={scene === "politica-mudou" ? POLICY_CHANGED_MESSAGE : null}
           onClose={() => setPolicyOpen(false)}

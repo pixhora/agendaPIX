@@ -2,17 +2,21 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import {
   formatPolicyWindowTitle,
+  mirrorCustomerPolicy,
   policyHowToChange,
   policyLateCancelDetail,
+  policyLinesForCustomer,
   policyNoShowRefund,
   policyOneLiner,
+  policyLateBookingNotice,
   policyReceiptRefund,
   policyWindowBody,
+  receiptRefundCopy,
 } from "../../components/booking/policy-copy";
-import { readPolicyChangedUpdate } from "../../components/booking/policy-gate";
+import { policyLineTone, readPolicyChangedUpdate } from "../../components/booking/policy-gate";
 import { serviceCardAside, serviceCardMeta } from "../../components/booking/service-card";
 import { isPreviewBadgeEnabled } from "../../components/preview/preview-badge-gate";
-import { previewOpeningSlot, previewPayDeadline } from "../../lib/preview/preview-schedule";
+import { previewLateSlot, previewOpeningSlot, previewPayDeadline } from "../../lib/preview/preview-schedule";
 import { MOCK_SERVICES } from "../../lib/preview/mock-data";
 
 const business = "Barbearia do Zé";
@@ -73,6 +77,7 @@ describe("telas do cliente", () => {
       policyHowToChange(business, true),
       policyHowToChange(business, false),
       policyReceiptRefund(business, "sexta-feira, 09 de outubro", "11:30"),
+      policyLateBookingNotice(24),
       MOCK_SERVICES[0]?.policySummary ?? "",
       ...(MOCK_SERVICES[0]?.policyDetails ?? []).map((line) => `${line.title} ${line.body}`),
     ];
@@ -126,13 +131,13 @@ describe("selo de preview", () => {
 });
 
 describe("datas do preview", () => {
-  it("marca o horário para amanhã e o prazo de pagamento antes dele", () => {
+  it("marca o horário para daqui a 3 dias e o prazo de pagamento antes dele", () => {
     const now = new Date("2026-10-08T21:54:00.000Z");
     const slot = previewOpeningSlot(now);
     expect(slot).not.toBeNull();
     const startsAt = new Date(slot!.startsAt);
     expect(startsAt.getTime()).toBeGreaterThan(now.getTime());
-    expect(startsAt.toISOString()).toBe("2026-10-09T14:30:00.000Z");
+    expect(startsAt.toISOString()).toBe("2026-10-11T14:30:00.000Z");
 
     const payBy = previewPayDeadline("pix", now);
     expect(payBy.toISOString()).toBe("2026-10-08T22:24:00.000Z");
@@ -141,5 +146,66 @@ describe("datas do preview", () => {
     const close = previewPayDeadline("pix-perto", now);
     expect(close.getTime() - now.getTime()).toBe(4 * 60 * 1000);
     expect(close.getTime()).toBeLessThan(startsAt.getTime());
+
+    expect(previewLateSlot(now)?.startsAt).toBe("2026-10-09T14:30:00.000Z");
+  });
+});
+
+describe("reserva dentro e fora do prazo de devolução", () => {
+  const name = "Studio Bella";
+
+  it("com o horário em 3 dias mostra a data futura e o tom ok", () => {
+    const now = new Date("2026-10-08T15:00:00.000Z");
+    const startsAt = new Date("2026-10-11T14:30:00.000Z");
+    const view = mirrorCustomerPolicy({ businessName: name, hours: 24, startsAt, now });
+    expect(view.tone).toBe("ok");
+    expect(view.summary).toBe("Com 24 h de antecedência, Studio Bella pode devolver o sinal. Mais perto da hora, o sinal fica com Studio Bella.");
+    expect(view.details[0]).toEqual({
+      title: "Até sáb, 10 out, 11:30",
+      body: "Cancele e Studio Bella pode devolver o sinal, ou remarque usando o sinal (1 vez).",
+      tone: "ok",
+    });
+    const receipt = receiptRefundCopy({
+      businessName: name,
+      hours: 24,
+      refundDeadlineAt: view.refundDeadlineAt,
+      dateLabel: "sábado, 10 de outubro",
+      timeLabel: "11:30",
+      now,
+    });
+    expect(receipt).toEqual({ tone: "ok", text: "Studio Bella pode devolver o sinal até sábado, 10 de outubro, às 11:30." });
+    expect(policyLineTone({ refundUntilHours: 24 }, startsAt.toISOString(), now.getTime())).toBe("ok");
+  });
+
+  it("com o horário amanhã avisa em âmbar e esconde a data que já passou", () => {
+    const now = new Date("2026-10-08T21:54:00.000Z");
+    const startsAt = new Date("2026-10-09T14:30:00.000Z");
+    const view = mirrorCustomerPolicy({ businessName: name, hours: 24, startsAt, now });
+    expect(view.tone).toBe("warn");
+    expect(view.summary).toBe("Faltam menos de 24 h para o horário: se cancelar, o sinal não é devolvido.");
+    expect(view.details[0]?.tone).toBe("warn");
+    expect(`${view.details[0]?.title}: ${view.details[0]?.body.charAt(0).toLowerCase()}${view.details[0]?.body.slice(1)}`).toBe(view.summary);
+    expect(view.details.map((line) => line.title).join(" ")).not.toMatch(/^Até | Até /);
+
+    const receipt = receiptRefundCopy({
+      businessName: name,
+      hours: 24,
+      refundDeadlineAt: view.refundDeadlineAt,
+      dateLabel: "quinta-feira, 08 de outubro",
+      timeLabel: "11:30",
+      now,
+    });
+    expect(receipt.tone).toBe("warn");
+    expect(receipt.text).toBe(view.summary);
+    expect(receipt.text).not.toMatch(/pode devolver o sinal até/);
+
+    const shown = policyLinesForCustomer(
+      [{ title: "Até qui, 08 out, 11:30", body: "Cancele e Studio Bella pode devolver o sinal, ou remarque usando o sinal (1 vez).", tone: "warn" }, view.details[1]!],
+      true,
+      24,
+    );
+    expect(shown.map((line) => line.title)).not.toContain("Até qui, 08 out, 11:30");
+    expect(shown[0]?.tone).toBe("warn");
+    expect(policyLineTone({ refundUntilHours: 24 }, startsAt.toISOString(), now.getTime())).toBe("warn");
   });
 });

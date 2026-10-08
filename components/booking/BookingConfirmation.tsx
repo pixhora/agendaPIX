@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { CONFIRMATION_ICONS } from "@/lib/icons/registry";
 import { ReservedTimeBand } from "./ReservedTimeBand";
-import { policyReceiptRefund } from "./policy-copy";
+import { isFutureInstant, receiptRefundCopy } from "./policy-copy";
+import { REMAINDER_LABEL } from "@/lib/copy/booking-summary";
 
 interface BookingConfirmationProps {
   businessName: string;
@@ -26,17 +27,19 @@ function buildIcs({
   service,
   slot,
   customerName,
+  policyLine,
 }: {
   businessName: string;
   service: PublicService;
   slot: AvailabilitySlot;
   customerName: string;
+  policyLine: string | null;
 }) {
   const stamp = (iso: string) =>
     new Date(iso).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
   const uid = `agendapix-${stamp(slot.startsAt)}@agendapix`;
   const summary = `${service.name} · ${businessName}`;
-  const description = `Agendamento de ${customerName} em ${businessName}. Sinal pago via Pix.`;
+  const description = [`Agendamento de ${customerName} em ${businessName}. Sinal pago via Pix.`, policyLine].filter(Boolean).join(" ");
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
@@ -67,9 +70,21 @@ export function BookingConfirmation({
   onNewBooking,
 }: BookingConfirmationProps) {
   const remainingCents = Math.max(0, service.priceCents - service.depositCents);
+  const hours = service.depositPolicy?.refundUntilHours ?? policy?.snapshot?.refundUntilHours ?? null;
+  const refundDeadlineAt = policy?.refundDeadlineAt;
+  const refundCopy = refundDeadlineAt
+    ? receiptRefundCopy({
+        businessName,
+        hours,
+        refundDeadlineAt,
+        dateLabel: formatDateFull(refundDeadlineAt, timezone).replace(/^./, (letter) => letter.toLowerCase()),
+        timeLabel: formatTimeSlot(refundDeadlineAt, timezone),
+      })
+    : { tone: "ok" as const, text: null };
+  const rescheduleOpen = isFutureInstant(policy?.rescheduleDeadlineAt);
   const icsHref = useMemo(
-    () => buildIcs({ businessName, service, slot, customerName }),
-    [businessName, service, slot, customerName],
+    () => buildIcs({ businessName, service, slot, customerName, policyLine: refundCopy.text }),
+    [businessName, service, slot, customerName, refundCopy.text],
   );
 
   const whatsappMessage = encodeURIComponent(
@@ -123,16 +138,16 @@ export function BookingConfirmation({
             {service.depositCents > 0 && (
               <div className="flex justify-between font-semibold text-success"><dt className="inline-flex items-center gap-1.5"><Icon icon={CONFIRMATION_ICONS.success} className="size-3.5" />Sinal pago no Pix</dt><dd className="tabular-nums">{formatCurrency(service.depositCents)}</dd></div>
             )}
-            <div className="flex justify-between border-t border-line pt-2 font-bold text-ink"><dt>Restante no local</dt><dd className="tabular-nums">{formatCurrency(remainingCents)}</dd></div>
+            <div className="flex justify-between border-t border-line pt-2 font-bold text-ink"><dt>{REMAINDER_LABEL}</dt><dd className="tabular-nums">{formatCurrency(remainingCents)}</dd></div>
           </dl>
         </div>
-        {policy?.refundDeadlineAt || policy?.rescheduleDeadlineAt ? (
-          <div className="border-t border-line p-5" data-testid="policy-snapshot">
+        {refundCopy.text || (rescheduleOpen && policy?.rescheduleDeadlineAt) ? (
+          <div className="border-t border-line p-5" data-testid="policy-snapshot" data-tone={refundCopy.tone}>
             <p className="text-sm font-semibold text-ink">Política do sinal</p>
-            {policy.refundDeadlineAt ? (
-              <p className="mt-2 text-sm text-muted">{policyReceiptRefund(businessName, formatDateFull(policy.refundDeadlineAt, timezone).replace(/^./, (letter) => letter.toLowerCase()), formatTimeSlot(policy.refundDeadlineAt, timezone))}</p>
+            {refundCopy.text ? (
+              <p className={refundCopy.tone === "warn" ? "mt-2 text-sm font-medium text-warning" : "mt-2 text-sm text-muted"}>{refundCopy.text}</p>
             ) : null}
-            {policy.rescheduleDeadlineAt ? (
+            {rescheduleOpen && policy?.rescheduleDeadlineAt ? (
               <p className="mt-1 text-sm text-muted">Remarcação até {formatDateFull(policy.rescheduleDeadlineAt, timezone).replace(/^./, (letter) => letter.toLowerCase())}, às {formatTimeSlot(policy.rescheduleDeadlineAt, timezone)}.</p>
             ) : null}
           </div>

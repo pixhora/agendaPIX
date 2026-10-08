@@ -29,6 +29,8 @@ import { POLICY_CHANGED_MESSAGE, publicBookingErrorView, whatsappHref } from "./
 import { buildPublicBookingBody } from "./booking-payload";
 import { PausedState } from "./PausedState";
 import { PolicySheet } from "@/components/policy/PolicySheet";
+import { policyLinesForCustomer } from "./policy-copy";
+import { policyLineTone } from "./policy-gate";
 
 interface BookingFlowProps {
   slug: string;
@@ -609,7 +611,11 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
           businessName={business.name}
           serviceName={selectedService.name}
           depositLabel={formatCurrency(selectedService.depositCents)}
-          lines={selectedService.policyDetails}
+          lines={policyLinesForCustomer(
+            selectedService.policyDetails,
+            policyLineTone(selectedService.depositPolicy, selectedSlot?.startsAt) === "warn",
+            selectedService.depositPolicy?.refundUntilHours ?? null,
+          )}
           text={selectedService.policySummary}
           notice={policySheet.notice}
           returnFocus={policySheet.trigger}

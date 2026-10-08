@@ -1,4 +1,4 @@
-export const PREVIEW_SCENES = ["fluxo", "dados", "pix", "pix-perto", "pix-expirado", "comprovante", "indisponivel", "politica", "politica-mudou", "pausada"] as const;
+export const PREVIEW_SCENES = ["fluxo", "dados", "pix", "pix-perto", "pix-expirado", "comprovante", "indisponivel", "politica", "politica-mudou", "pausada", "cima-da-hora"] as const;
 
 export type PreviewScene = (typeof PREVIEW_SCENES)[number];
 
@@ -9,6 +9,7 @@ export function parsePreviewScene(etapa?: string, prazo?: string): PreviewScene 
   if (etapa === "pausada" || etapa === "pausado") return "pausada";
   if (etapa === "politica-mudou" || etapa === "policy_changed") return "politica-mudou";
   if (etapa === "politica") return "politica";
+  if (etapa === "cima-da-hora" || etapa === "em-cima-da-hora") return "cima-da-hora";
   if (etapa === "dados" || etapa === "resumo") return "dados";
   if (etapa === "pix" && (prazo === "expirado" || prazo === "expired")) return "pix-expirado";
   if (etapa === "pix" && (prazo === "perto" || prazo === "expirando")) return "pix-perto";

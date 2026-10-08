@@ -30,6 +30,7 @@ import {
 import { ReservedTimeBand } from "./ReservedTimeBand";
 import { PixQr } from "./PixQr";
 import { PolicySummaryLine } from "@/components/policy/PolicySummaryLine";
+import { policyLineTone } from "./policy-gate";
 import { usePrefersReducedMotion } from "./use-prefers-reduced-motion";
 import { cn } from "@/lib/utils";
 
@@ -365,7 +366,12 @@ export function StepPayment({
           : "O horário é confirmado assim que o Pix cair."}
       />
       {summary?.service.policySummary && onOpenPolicy ? (
-        <PolicySummaryLine summary={summary.service.policySummary} compact onDetails={onOpenPolicy} />
+        <PolicySummaryLine
+          summary={summary.service.policySummary}
+          tone={policyLineTone(summary.service.depositPolicy, summary.slot.startsAt)}
+          compact
+          onDetails={onOpenPolicy}
+        />
       ) : null}
 
       <div className="rounded-card border border-line bg-surface p-5 sm:p-6">

@@ -27,7 +27,7 @@ export function PolicySummaryLine({ summary, tone = "ok", compact = false, onDet
 
   if (compact) {
     return (
-      <p data-testid="policy-summary" className="text-[13px] leading-relaxed text-muted">
+      <p data-testid="policy-summary" data-tone={warn ? "warn" : "ok"} className={cn("text-[13px] leading-relaxed", warn ? "text-warning" : "text-muted")}>
         <span>{summary}</span>
         <span aria-hidden="true"> · </span>
         {details}
@@ -38,6 +38,7 @@ export function PolicySummaryLine({ summary, tone = "ok", compact = false, onDet
   return (
     <div
       data-testid="policy-summary"
+      data-tone={warn ? "warn" : "ok"}
       className={cn(
         "flex items-start gap-3 rounded-card border border-line px-4 py-3",
         warn ? "bg-warning-soft" : "bg-surface",

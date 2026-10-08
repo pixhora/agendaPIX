@@ -26,7 +26,7 @@ export function policyLineTone(
   if (hours == null || !startsAt) return "ok";
   const start = new Date(startsAt).getTime();
   if (Number.isNaN(start)) return "ok";
-  return start - now < hours * 3_600_000 ? "warn" : "ok";
+  return start - now <= hours * 3_600_000 ? "warn" : "ok";
 }
 
 function readString(value: unknown): string | null {
