@@ -1,5 +1,6 @@
 import type { MpOwnerStatus } from "./contract";
 import { MP_CONNECT_CONSENT_VERSION } from "./consent";
+import { MP_MOCK_FRIDAY_16 } from "./connect-copy";
 
 /**
  * DEV ONLY. Payload de status enquanto o GET real não está neste branch.
@@ -9,7 +10,7 @@ import { MP_CONNECT_CONSENT_VERSION } from "./consent";
 export const MP_FIXTURE_BUSINESS_ID = "00000000-0000-4000-8000-0000000000a1";
 
 const base = {
-  connectedAt: "2026-10-08T20:02:00.000Z",
+  connectedAt: MP_MOCK_FRIDAY_16,
   expiresAt: "2027-04-06T20:02:00.000Z",
   liveMode: true,
   canReceiveDeposits: true,

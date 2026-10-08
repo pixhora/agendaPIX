@@ -7,21 +7,10 @@ import { BrandLink } from "@/components/ui/brand";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { PERMISSIONS, callbackFocusesAck, formatConnectedSince, presentMpCallback, type MpCallbackView } from "@/lib/mercadopago/contract";
+import { MP_GOOD_TO_KNOW } from "@/lib/mercadopago/connect-copy";
 import { MpConnectForm } from "./mp-connect-form";
 
-const KNOW = [
-  { icon: Percent, text: "A tarifa do Pix é do Mercado Pago e é descontada da sua conta, conforme o seu contrato com ele." },
-  {
-    icon: Undo2,
-    text: "Devoluções, contestações e MED acontecem na sua conta Mercado Pago. Devoluções dependem de saldo disponível e valem até 180 dias depois do pagamento (regras do Mercado Pago). Se uma devolução automática falhar, você é avisado e devolve manualmente.",
-  },
-  {
-    icon: Info,
-    text: "Se você desvincular o AgendaPix direto no Mercado Pago, podemos não conseguir verificar pagamentos: nesse caso, mandamos um e-mail para você conferir e resolver na sua conta.",
-  },
-  { icon: Wallet, text: "Conecte uma conta sua (ou do seu negócio), com uma chave Pix cadastrada. É nela que os clientes vão pagar.", emphasize: "sua" },
-  { icon: Unplug, text: "Você pode desconectar quando quiser, aqui no AgendaPix ou no Mercado Pago. Sem conexão, os serviços com sinal ficam pausados." },
-] as const;
+const KNOW_ICONS = [Percent, Undo2, Info, Wallet, Unplug] as const;
 
 function ConsentLine({ published }: { published: boolean }) {
   if (!published) {
@@ -45,19 +34,21 @@ function KnowList() {
     <section className="mt-5 rounded-card border border-line bg-surface" aria-label="Bom saber">
       <h2 className="border-b border-line px-4 py-3 font-display text-base font-bold">Bom saber</h2>
       <ul className="grid">
-        {KNOW.map((item) => {
-          const Icon = item.icon;
+        {MP_GOOD_TO_KNOW.map((text, index) => {
+          const Icon = KNOW_ICONS[index];
+          const ownAccount = text.startsWith("Conecte uma conta sua");
           return (
-            <li key={item.text.slice(0, 24)} className="flex min-h-11 items-start gap-3 px-4 py-3">
+            <li key={text.slice(0, 24)} className="flex min-h-11 items-start gap-3 px-4 py-3">
               <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-[10px] bg-pix-soft text-pix">
                 <Icon className="size-[18px]" />
               </span>
               <span className="text-sm leading-relaxed text-ink">
-                {"emphasize" in item ? (
+                {ownAccount ? (
                   <>
-                    Conecte uma conta <strong className="font-semibold">sua</strong> (ou do seu negócio), com uma chave Pix cadastrada. É nela que os clientes vão pagar.
+                    Conecte uma conta <strong className="font-semibold">sua</strong>
+                    {text.slice("Conecte uma conta sua".length)}
                   </>
-                ) : item.text}
+                ) : text}
               </span>
             </li>
           );

@@ -1,4 +1,5 @@
 import { MP_CONNECT_CONSENT_VERSION } from "./consent";
+import { MP_AUTO_REFUND_ACK_ERROR } from "./connect-copy";
 
 /** Status visto pelo dono. Campo ausente de chave antiga vale como false. */
 export const MP_CONNECTION_STATUSES = ["not_connected", "connected", "needs_reconnect"] as const;
@@ -28,7 +29,7 @@ export type MpOwnerStatus = {
 
 export const MP_ACCOUNT_NOT_CONNECTED = "mp_account_not_connected";
 
-export const AUTO_REFUND_ACK_ERROR = "Marque a autorização da devolução automática para continuar.";
+export const AUTO_REFUND_ACK_ERROR = MP_AUTO_REFUND_ACK_ERROR;
 
 export const LEGACY_PIX_NOTICE =
   "A chave Pix que você cadastrou antes não é mais usada. Agora o sinal cai direto na sua conta Mercado Pago.";

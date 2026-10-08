@@ -1,6 +1,9 @@
 import { mkdir } from "node:fs/promises";
 import { chromium } from "@playwright/test";
 
+process.env.LANG = "pt_BR.UTF-8";
+process.env.LC_ALL = "pt_BR.UTF-8";
+
 const base = process.env.MP_CAPTURE_URL ?? "http://127.0.0.1:3399";
 const outDir = "/opt/cursor/artifacts/mp";
 
@@ -26,7 +29,7 @@ const viewports = [
   { label: "1440-light", width: 1440, height: 900, theme: "light" },
 ];
 
-const browser = await chromium.launch();
+const browser = await chromium.launch({ args: ["--lang=pt-BR"] });
 await mkdir(outDir, { recursive: true });
 
 for (const scene of scenes) {
@@ -43,6 +46,9 @@ for (const scene of scenes) {
     }, viewport.theme);
     const page = await context.newPage();
     await page.goto(`${base}/dev/mp-fixtures?scene=${scene.scene}`, { waitUntil: "networkidle" });
+    await page.addStyleTag({
+      content: `nextjs-portal,[data-nextjs-dev-tools-button],[data-next-badge],[data-nextjs-toast],[aria-label="Controles do Modo Preview"]{display:none!important}`,
+    });
     if (scene.click) {
       await page.getByRole("button", { name: scene.click }).click();
       await page.getByText("Marque a autorização da devolução automática para continuar.").waitFor();

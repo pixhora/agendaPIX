@@ -4,20 +4,21 @@ import { useEffect, useRef, type ReactNode, type RefObject } from "react";
 import { ExternalLink, Loader2 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { MP_CONNECT_CONSENT_TEXT, MP_CONNECT_CONSENT_VERSION } from "@/lib/mercadopago/consent";
+import { MP_CONNECT_CONSENT_VERSION } from "@/lib/mercadopago/consent";
+import { MP_AUTO_REFUND_ACK_HINT, MP_AUTO_REFUND_ACK_TEXT } from "@/lib/mercadopago/connect-copy";
 import { AUTO_REFUND_ACK_ERROR, gateConnectSubmit, mpConnectAction, type MpReturnTo } from "@/lib/mercadopago/contract";
 
 const fieldReset = "outline-none focus:outline-none focus-visible:outline-none";
 const ACK_LEAD = "Entendi e autorizo:";
 
 function AckCopy() {
-  if (!MP_CONNECT_CONSENT_TEXT.startsWith(ACK_LEAD)) {
-    return <span className="text-sm leading-snug text-ink">{MP_CONNECT_CONSENT_TEXT}</span>;
+  if (!MP_AUTO_REFUND_ACK_TEXT.startsWith(ACK_LEAD)) {
+    return <span className="text-sm leading-snug text-ink">{MP_AUTO_REFUND_ACK_TEXT}</span>;
   }
   return (
     <span className="text-sm leading-snug text-ink">
       <strong className="font-semibold">{ACK_LEAD}</strong>
-      {MP_CONNECT_CONSENT_TEXT.slice(ACK_LEAD.length)}
+      {MP_AUTO_REFUND_ACK_TEXT.slice(ACK_LEAD.length)}
     </span>
   );
 }
@@ -71,8 +72,8 @@ export function AutoRefundAck({
         </span>
         <AckCopy />
       </label>
-      <p id={hintId} className="mt-2 pl-[34px] text-xs leading-relaxed text-muted">
-        Obrigatório para conectar. Essa devolução é regra do AgendaPix para proteger seus clientes e não pode ser desligada.
+      <p id={hintId} className="mt-2 pl-[34px] text-[12px] leading-relaxed text-muted">
+        {MP_AUTO_REFUND_ACK_HINT}
       </p>
       {invalid ? (
         <p id={errorId} role="alert" className="mt-2 pl-[34px] text-[13px] font-medium text-danger">

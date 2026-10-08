@@ -2,7 +2,16 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { MpConnectForm } from "../../components/payments/mp-connect-form";
-import { isAutoRefundAck, MP_CONNECT_CONSENT_VERSION } from "../../lib/mercadopago/consent";
+import { MpOnboardingStep } from "../../components/payments/mp-onboarding-step";
+import { isAutoRefundAck, MP_CONNECT_CONSENT_TEXT, MP_CONNECT_CONSENT_VERSION } from "../../lib/mercadopago/consent";
+import {
+  MP_AUTO_REFUND_ACK_ERROR,
+  MP_AUTO_REFUND_ACK_HINT,
+  MP_AUTO_REFUND_ACK_TEXT,
+  MP_GOOD_TO_KNOW,
+  MP_MOCK_FRIDAY_16,
+  MP_MOCK_FRIDAY_23,
+} from "../../lib/mercadopago/connect-copy";
 import { MP_STATUS_FIXTURES } from "../../lib/mercadopago/dev-fixtures";
 import {
   AUTO_REFUND_ACK_ERROR,
@@ -53,8 +62,9 @@ describe("Mercado Pago connect consent", () => {
     expect(html).toContain('type="checkbox"');
     expect(html).toContain('name="autoRefundAck" value="on"');
     expect(html).toContain("required");
+    expect(html).toContain(MP_AUTO_REFUND_ACK_HINT);
     expect(html).toContain("Entendi e autorizo:");
-    expect(html).toContain("7 dias corridos");
+    expect(html).toContain("7 dias corridos, contados do aviso.");
     expect(html).not.toMatch(/checked=/);
     expect(html).not.toMatch(/<button\b[^>]*\sdisabled[\s=>]/);
     expect(html).not.toContain('href="/api/');
@@ -79,6 +89,31 @@ describe("Mercado Pago connect consent", () => {
     expect(html).not.toContain('type="checkbox"');
     expect(html).not.toContain("noreferrer");
     expect(html).not.toContain("referrerpolicy");
+  });
+
+  it("keeps the published consent version and the v3.4 checkbox copy", () => {
+    expect(MP_CONNECT_CONSENT_VERSION).toBe("2026-10-08.v3.2");
+    expect(MP_AUTO_REFUND_ACK_TEXT).toBe(MP_CONNECT_CONSENT_TEXT);
+    expect(MP_AUTO_REFUND_ACK_ERROR).toBe("Marque a autorização da devolução automática para continuar.");
+    expect(MP_GOOD_TO_KNOW).toHaveLength(5);
+    expect(MP_GOOD_TO_KNOW[1]).toContain("em até 7 dias corridos, contados do aviso.");
+    expect(MP_GOOD_TO_KNOW[3]).toContain("conta sua");
+  });
+
+  it("leaves continue focusable and lets skip ignore the checkbox", () => {
+    const html = renderToStaticMarkup(createElement(MpOnboardingStep, { businessId: "biz" }));
+    expect(html).not.toMatch(/<button\b[^>]*\sdisabled[\s=>]/);
+    expect(html).toContain("Continuar para o Mercado Pago");
+    expect(html).toContain('href="/onboarding/concluir"');
+    expect(html).toContain("Agora não");
+    for (const line of MP_GOOD_TO_KNOW) {
+      if (line.startsWith("Conecte uma conta sua")) {
+        expect(html).toContain("Conecte uma conta");
+        expect(html).toContain("(ou do seu negócio), com uma chave Pix cadastrada. É nela que os clientes vão pagar.");
+      } else {
+        expect(html).toContain(line);
+      }
+    }
   });
 
   it("accepts the checkbox value on and the current consent mocks", () => {
@@ -134,8 +169,13 @@ describe("Mercado Pago status mapping", () => {
     });
   });
 
-  it("formats the connection date in São Paulo", () => {
-    expect(formatConnectedSince("2026-10-08T20:02:00.000Z")).toBe("8 out 2026");
+  it("formats the 2026 mock Fridays in São Paulo", () => {
+    const weekday = (iso: string) => new Intl.DateTimeFormat("pt-BR", { weekday: "long", timeZone: "America/Sao_Paulo" }).format(new Date(iso));
+    expect(formatConnectedSince(MP_MOCK_FRIDAY_16)).toBe("16 out 2026");
+    expect(weekday(MP_MOCK_FRIDAY_16)).toBe("sexta-feira");
+    expect(formatConnectedSince(MP_MOCK_FRIDAY_23)).toBe("23 out 2026");
+    expect(weekday(MP_MOCK_FRIDAY_23)).toBe("sexta-feira");
+    expect(MP_STATUS_FIXTURES.connected.connectedAt).toBe(MP_MOCK_FRIDAY_16);
   });
 
   it("picks banners from connection status only", () => {
