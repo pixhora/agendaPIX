@@ -1,30 +1,22 @@
 import Link from "next/link";
+import { aroGlyph } from "@/lib/brand/mark";
 import { cn } from "@/lib/utils";
 
 /**
- * Símbolo Grade A numa grade de 24 px (célula 4, vão 1), a mesma proporção do mark.svg.
- * crispEdges mantém o traço inteiro em 1x. A faixa usa o verde-água; as células seguem a cor do texto.
+ * Símbolo Aro. A geometria vem de lib/brand/mark.ts.
+ * O anel usa --pix-bright; a haste segue a cor do azulejo (currentColor).
  */
-function GradeAMark({ className }: { className?: string }) {
+function AroMark({ className }: { className?: string }) {
+  const { viewBox, ring, stem } = aroGlyph;
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" shapeRendering="crispEdges" className={className}>
-      <g fill="currentColor">
-        <rect x="5" y="0" width="4" height="4" rx="1" />
-        <rect x="10" y="0" width="4" height="4" rx="1" />
-        <rect x="15" y="0" width="4" height="4" rx="1" />
-        <rect x="0" y="5" width="4" height="4" rx="1" />
-        <rect x="20" y="5" width="4" height="4" rx="1" />
-        <rect x="0" y="15" width="4" height="4" rx="1" />
-        <rect x="20" y="15" width="4" height="4" rx="1" />
-        <rect x="0" y="20" width="4" height="4" rx="1" />
-        <rect x="20" y="20" width="4" height="4" rx="1" />
-      </g>
-      <rect x="0" y="10" width="24" height="4" rx="2" fill="currentColor" className="text-pix-bright" />
+    <svg viewBox={`0 0 ${viewBox} ${viewBox}`} aria-hidden="true" overflow="visible" className={className}>
+      <circle cx={ring.cx} cy={ring.cy} r={ring.r} fill="none" stroke="var(--pix-bright)" strokeWidth={ring.strokeWidth} />
+      <rect x={stem.x} y={stem.y} width={stem.width} height={stem.height} rx={stem.rx} fill="currentColor" />
     </svg>
   );
 }
 
-/** Quadrado de 32 px (raio 10/32). O mark ocupa 65,625% (21 px; razão 336/512 do icon.svg). */
+/** Quadrado de 32 px (raio 10). O glifo ocupa 65,625% (21 px), o mesmo encaixe de antes. */
 export function BrandMark({ className }: { className?: string }) {
   return (
     <span
@@ -34,7 +26,7 @@ export function BrandMark({ className }: { className?: string }) {
         className,
       )}
     >
-      <GradeAMark className="size-[65.625%]" />
+      <AroMark className="size-[65.625%]" />
     </span>
   );
 }
