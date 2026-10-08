@@ -76,7 +76,7 @@ test.describe("painel do dono — jornadas", () => {
     await expect(page.getByRole("link", { name: /Ligar para Cliente E2E/ })).toHaveAttribute("href", "tel:+5511987654321");
   });
 
-  test("configurações: salva horários e chave Pix; link público visível", async ({ page }) => {
+  test("configurações: salva horários; link público visível", async ({ page }) => {
     await page.goto(withBusiness("/dashboard/settings"));
     await expect(page.getByRole("heading", { name: "Configurações", level: 1 })).toBeVisible();
     await expect(page.getByText(meta.businessASlug).first()).toBeVisible();
@@ -88,13 +88,6 @@ test.describe("painel do dono — jornadas", () => {
     await hours.getByRole("button", { name: "Salvar horários de funcionamento" }).click();
     await expect(page.getByText("Horários de funcionamento salvos.").first()).toBeVisible();
 
-    const pix = page.getByRole("region", { name: "Chave Pix do negócio" });
-    await expect(pix.getByRole("form", { name: "Configurar chave Pix" })).toBeVisible();
-    await pix.getByLabel("Tipo de chave").selectOption("email");
-    await pix.getByLabel(/Chave Pix|Nova chave Pix/).fill("financeiro@example.com");
-    await pix.getByRole("button", { name: /Salvar chave|Substituir chave/ }).click();
-    await expect(page.getByText("Chave Pix salva com segurança.").first()).toBeVisible();
-    await expect(pix).toContainText("E-mail:");
     await expectNoAxeViolations(page, "painel: configurações");
   });
 });
@@ -102,14 +95,15 @@ test.describe("painel do dono — jornadas", () => {
 test.describe("painel do dono — isolamento entre negócios", () => {
   test.use({ storageState: ownerStorageState });
 
-  test("dono A não vê agenda, clientes nem chave Pix do negócio B", async ({ page }) => {
+  test("dono A não vê agenda nem clientes do negócio B", async ({ page }) => {
     for (const path of ["/dashboard", "/dashboard/customers", "/dashboard/settings"]) {
       await page.goto(`${path}?businessId=${meta.businessBId}`);
       await expect(page.getByRole("heading", { name: "Negócio indisponível" })).toBeVisible();
       await expect(page.getByText("Cliente E2E")).toHaveCount(0);
       await expect(page.getByText("Negócio E2E B")).toHaveCount(0);
     }
-    const pixKey = await page.request.get(`/api/businesses/${meta.businessBId}/pix-key`);
-    expect(pixKey.status()).toBe(404);
+    const retiredPixKey = await page.request.get(`/api/businesses/${meta.businessBId}/pix-key`);
+    expect(retiredPixKey.status()).toBe(410);
+    expect(await retiredPixKey.json()).toEqual({ error: { code: "pix_key_retired" } });
   });
 });

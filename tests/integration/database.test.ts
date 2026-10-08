@@ -1,12 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool, type PoolClient } from "pg";
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as schema from "../../db/schema";
 import { databaseEnvSchema } from "../../lib/env";
+import { dismissLegacyPixKeyNotice, hasUndismissedLegacyPixKey } from "../../lib/pix-key/notice";
 import { findOwnedBusiness } from "../../lib/tenancy";
-import { getBusinessPixKey, setBusinessPixKey } from "../../lib/pix-key/service";
 
 const pool = new Pool({ connectionString: databaseEnvSchema.parse(process.env).DATABASE_URL, connectionTimeoutMillis: 5000 });
 let client: PoolClient;
@@ -68,20 +67,28 @@ describe("isolamento entre negócios", () => {
     expect(await findOwnedBusiness(businessA, ownerB, database)).toBeNull();
     expect(await findOwnedBusiness(randomUUID(), ownerA, database)).toBeNull();
   });
-  it("cifra chave Pix e só devolve máscara ao dono do negócio", async () => {
-    const previousKey = process.env.PIX_KEY_ENCRYPTION_KEY;
-    process.env.PIX_KEY_ENCRYPTION_KEY = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-    try {
-      const saved = await setBusinessPixKey(businessA, ownerA, { type: "email", value: "dono@example.com" }, database);
-      const stored = await database.select().from(schema.businessPixKeys).where(eq(schema.businessPixKeys.businessId, businessA));
-      expect(saved).toEqual({ configured: true, type: "email", hint: "d••••@example.com" });
-      expect(stored[0].ciphertext).not.toContain("dono@example.com");
-      expect(await getBusinessPixKey(businessA, ownerA, database)).toEqual(saved);
-      await expect(getBusinessPixKey(businessA, ownerB, database)).rejects.toMatchObject({ status: 404 });
-    } finally {
-      if (previousKey === undefined) delete process.env.PIX_KEY_ENCRYPTION_KEY;
-      else process.env.PIX_KEY_ENCRYPTION_KEY = previousKey;
-    }
+  it("inativa a chave Pix antiga sem apagar o ciphertext e só expõe um booleano", async () => {
+    await client.query(
+      "INSERT INTO business_pix_keys (business_id, type, ciphertext, nonce, key_version, hint) VALUES ($1, 'email', 'cipher-text-not-a-key', 'nonce-value', 1, 'd••••@example.com')",
+      [businessA],
+    );
+    const stored = await client.query("SELECT ciphertext, hint, deactivated_at, deactivation_reason FROM business_pix_keys WHERE business_id = $1", [businessA]);
+    expect(stored.rows[0].ciphertext).toBe("cipher-text-not-a-key");
+    expect(stored.rows[0].hint).toBe("d••••@example.com");
+    expect(stored.rows[0].deactivated_at).toBeTruthy();
+    expect(stored.rows[0].deactivation_reason).toBe("pix_key_retired");
+    expect(await hasUndismissedLegacyPixKey(businessA, database)).toBe(true);
+    expect(await hasUndismissedLegacyPixKey(businessB, database)).toBe(false);
+    const first = await client.query("SELECT dismissed_at FROM owner_notices WHERE business_id = $1 AND kind = 'pix_key_retired'", [businessA]);
+    expect(first.rows).toEqual([]);
+    await dismissLegacyPixKeyNotice(businessA, database);
+    const dismissed = await client.query("SELECT dismissed_at FROM owner_notices WHERE business_id = $1 AND kind = 'pix_key_retired'", [businessA]);
+    await dismissLegacyPixKeyNotice(businessA, database);
+    const again = await client.query("SELECT dismissed_at FROM owner_notices WHERE business_id = $1 AND kind = 'pix_key_retired'", [businessA]);
+    expect(again.rows).toHaveLength(1);
+    expect(again.rows[0].dismissed_at).toEqual(dismissed.rows[0].dismissed_at);
+    expect(await hasUndismissedLegacyPixKey(businessA, database)).toBe(false);
+    expect(await client.query("SELECT ciphertext FROM business_pix_keys WHERE business_id = $1", [businessA])).toMatchObject({ rows: [{ ciphertext: "cipher-text-not-a-key" }] });
   });
   it.each(["service", "customer"])("impede reserva com %s de outro negócio", async (field) => {
     await expect(client.query(

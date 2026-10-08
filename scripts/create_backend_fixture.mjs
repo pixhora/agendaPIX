@@ -11,7 +11,7 @@ const output = process.argv[2];
 if (!output || process.env.NODE_ENV !== "development") {
   throw new Error("Use NODE_ENV=development node scripts/create_backend_fixture.mjs /caminho/privado/fixture.json");
 }
-const env = z.object({ DATABASE_URL: z.url(), BETTER_AUTH_URL: z.url(), BETTER_AUTH_SECRET: z.string().min(32), PIX_KEY_ENCRYPTION_KEY: z.string().regex(/^[a-fA-F0-9]{64}$/) }).parse(process.env);
+const env = z.object({ DATABASE_URL: z.url(), BETTER_AUTH_URL: z.url(), BETTER_AUTH_SECRET: z.string().min(32) }).parse(process.env);
 const databaseUrl = new URL(env.DATABASE_URL);
 const authUrl = new URL(env.BETTER_AUTH_URL);
 if (!["postgres:", "postgresql:"].includes(databaseUrl.protocol) || !["localhost", "127.0.0.1"].includes(databaseUrl.hostname)

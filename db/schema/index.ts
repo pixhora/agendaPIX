@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, check, foreignKey, index, integer, jsonb, pgEnum, pgTable, primaryKey, text, time, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, foreignKey, index, integer, jsonb, pgEnum, pgTable, primaryKey, text, time, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 
 export * from "./auth";
@@ -29,8 +29,6 @@ export const businesses = pgTable("businesses", {
   check("businesses_late_payment_policy_valid", sql`${table.latePaymentPolicy} IN ('refund', 'rebook_if_free')`),
 ]);
 
-export const pixKeyTypes = ["cpf", "cnpj", "email", "phone", "evp"] as const;
-
 export const bookingRateLimits = pgTable("booking_rate_limits", {
   businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "cascade" }),
   clientHash: text("client_hash").notNull(),
@@ -41,6 +39,10 @@ export const bookingRateLimits = pgTable("booking_rate_limits", {
   index("booking_rate_window_idx").on(table.windowStartedAt),
   check("booking_rate_attempts_valid", sql`${table.attempts} >= 1`),
 ]);
+
+export const pixKeyTypes = ["cpf", "cnpj", "email", "phone", "evp"] as const;
+
+/** Chave Pix antiga. Toda linha fica inativa; o ciphertext permanece e não entra em cobrança nem em resposta. */
 export const businessPixKeys = pgTable("business_pix_keys", {
   businessId: uuid("business_id").primaryKey().references(() => businesses.id, { onDelete: "restrict" }),
   type: text("type", { enum: pixKeyTypes }).notNull(),
@@ -48,10 +50,13 @@ export const businessPixKeys = pgTable("business_pix_keys", {
   nonce: text("nonce").notNull(),
   keyVersion: integer("key_version").notNull(),
   hint: text("hint").notNull(),
+  deactivatedAt: timestamp("deactivated_at", { withTimezone: true }).defaultNow().notNull(),
+  deactivationReason: text("deactivation_reason").default("pix_key_retired").notNull(),
   ...timestamps(),
 }, (table) => [
   check("business_pix_keys_cipher_valid", sql`length(${table.ciphertext}) > 0 AND length(${table.nonce}) > 0 AND ${table.keyVersion} > 0`),
   check("business_pix_keys_type_valid", sql`${table.type} IN ('cpf', 'cnpj', 'email', 'phone', 'evp')`),
+  check("business_pix_keys_retired", sql`${table.deactivatedAt} IS NOT NULL AND length(trim(${table.deactivationReason})) > 0`),
 ]);
 
 export const services = pgTable("services", {
@@ -219,6 +224,50 @@ export const paymentAudit = pgTable("payment_audit", {
   index("payment_audit_business_created_idx").on(table.businessId, table.createdAt),
   index("payment_audit_payment_idx").on(table.paymentId),
   check("payment_audit_action_not_empty", sql`length(trim(${table.action})) > 0`),
+]);
+
+export const mpConnectionStatuses = ["connected", "needs_reconnect", "disconnected"] as const;
+
+// Conta Mercado Pago do próprio negócio. O Pix do sinal cai na conta do vendedor; a plataforma não repassa.
+// Tokens só existem cifrados. mp_user_id é único entre conexões ativas (status connected).
+export const mercadopagoConnections = pgTable("mercadopago_connections", {
+  businessId: uuid("business_id").primaryKey().references(() => businesses.id, { onDelete: "restrict" }),
+  mpUserId: text("mp_user_id").notNull(),
+  accessTokenEnc: text("access_token_enc"),
+  refreshTokenEnc: text("refresh_token_enc"),
+  publicKey: text("public_key"),
+  scope: text("scope"),
+  liveMode: boolean("live_mode"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  connectedAt: timestamp("connected_at", { withTimezone: true }).notNull(),
+  refreshedAt: timestamp("refreshed_at", { withTimezone: true }),
+  status: text("status", { enum: mpConnectionStatuses }).notNull(),
+  lastError: text("last_error"),
+  disconnectedAt: timestamp("disconnected_at", { withTimezone: true }),
+  ...timestamps(),
+}, (table) => [
+  uniqueIndex("mercadopago_connections_mp_user_connected_uq").on(table.mpUserId).where(sql`${table.status} = 'connected'`),
+  index("mercadopago_connections_refresh_idx").on(table.expiresAt).where(sql`${table.status} = 'connected'`),
+  check("mercadopago_connections_status_valid", sql`${table.status} IN ('connected', 'needs_reconnect', 'disconnected')`),
+  check("mercadopago_connections_mp_user_not_empty", sql`length(trim(${table.mpUserId})) > 0`),
+  check("mercadopago_connections_tokens_match_status", sql`(
+    (${table.status} = 'connected' AND ${table.disconnectedAt} IS NULL AND ${table.accessTokenEnc} IS NOT NULL AND ${table.refreshTokenEnc} IS NOT NULL AND length(${table.accessTokenEnc}) > 0 AND length(${table.refreshTokenEnc}) > 0 AND ${table.expiresAt} IS NOT NULL)
+    OR (${table.status} = 'needs_reconnect' AND ${table.accessTokenEnc} IS NULL AND ${table.refreshTokenEnc} IS NULL)
+    OR (${table.status} = 'disconnected' AND ${table.disconnectedAt} IS NOT NULL AND (
+      (${table.accessTokenEnc} IS NULL AND ${table.refreshTokenEnc} IS NULL)
+      OR (${table.accessTokenEnc} IS NOT NULL AND ${table.refreshTokenEnc} IS NOT NULL AND length(${table.accessTokenEnc}) > 0 AND length(${table.refreshTokenEnc}) > 0)
+    ))
+  )`),
+]);
+
+/** Aviso dispensado pelo dono. Uma linha por negócio e tipo. Não guarda a chave Pix. */
+export const ownerNotices = pgTable("owner_notices", {
+  businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "restrict" }),
+  kind: text("kind").notNull(),
+  dismissedAt: timestamp("dismissed_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.businessId, table.kind] }),
+  check("owner_notices_kind_not_empty", sql`length(trim(${table.kind})) > 0`),
 ]);
 
 export const onboardingRequests = pgTable("onboarding_requests", {

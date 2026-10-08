@@ -5,7 +5,8 @@ import path from "node:path";
 import { eq } from "drizzle-orm";
 import { chromium, type FullConfig } from "@playwright/test";
 import { getDb } from "../../db";
-import { bookings, businesses, businessHours, customers, services, user } from "../../db/schema";
+import { bookings, businesses, businessHours, customers, mercadopagoConnections, services, user } from "../../db/schema";
+import { connectedMercadoPagoValues } from "../helpers/connected-mp";
 import { getAuth } from "../../lib/auth";
 
 const fixturePath = path.resolve("tests/e2e/.auth");
@@ -30,7 +31,10 @@ function todayInSaoPaulo() {
 async function ensureBusiness(ownerId: string, name: string, slug: string, seedBooking = false) {
   const database = getDb();
   const [existing] = await database.select().from(businesses).where(eq(businesses.slug, slug)).limit(1);
-  if (existing) return existing;
+  if (existing) {
+    await ensureSellerConnection(existing.id);
+    return existing;
+  }
   const [created] = await database.insert(businesses).values({
     ownerId, name, slug, timezone: "America/Sao_Paulo",
   }).returning();
@@ -60,7 +64,23 @@ async function ensureBusiness(ownerId: string, name: string, slug: string, seedB
       priceCents: 5000, depositCents: 1000, status: "cancelled",
     });
   }
+  await ensureSellerConnection(created.id);
   return created;
+}
+
+async function ensureSellerConnection(businessId: string) {
+  const database = getDb();
+  await database.insert(mercadopagoConnections).values(connectedMercadoPagoValues(businessId)).onConflictDoUpdate({
+    target: mercadopagoConnections.businessId,
+    set: {
+      mpUserId: businessId,
+      accessTokenEnc: "v1.fixture.access",
+      refreshTokenEnc: "v1.fixture.refresh",
+      expiresAt: new Date("2099-01-01T00:00:00.000Z"),
+      status: "connected",
+      disconnectedAt: null,
+    },
+  });
 }
 
 async function mintCookie(email: string) {

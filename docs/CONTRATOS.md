@@ -21,7 +21,7 @@ Tabelas de domínio têm `id`, `created_at` e `updated_at`. Tabelas de auditoria
 | Tabela | Campos principais | Regras |
 | --- | --- | --- |
 | `businesses` | `owner_id`, `name`, `slug`, `timezone` | Dono referencia `user`; slug único em minúsculas, números e hífens; nome não vazio. |
-| `business_pix_keys` | `business_id`, `type`, `ciphertext`, `nonce`, `key_version`, `hint` | Uma chave por negócio; AES-256-GCM; chave mestra só em `PIX_KEY_ENCRYPTION_KEY`; nunca incluir ciphertext ou chave completa em resposta/log. |
+| `business_pix_keys` | `business_id`, `type`, `ciphertext`, `nonce`, `key_version`, `hint`, `deactivated_at`, `deactivation_reason` | Uma chave por negócio. A migration adiciona `deactivated_at` e `deactivation_reason` e marca as linhas existentes como inativas (`deactivation_reason = pix_key_retired`). Não apaga ciphertext. A chave não entra em cobrança nem em payload. |
 | `services` | `business_id`, `name`, `duration_minutes`, `price_cents`, `deposit_cents`, `active` | Duração positiva; preço e sinal não negativos; sinal não supera preço. |
 | `business_hours` | `business_id`, `weekday`, `opens_at`, `closes_at` | Domingo = 0; sábado = 6; um intervalo por dia; abertura anterior ao fechamento. Ausência do dia significa fechado. |
 | `customers` | `business_id`, `name`, `phone`, `email` opcional | Telefone normalizado em E.164, único dentro do negócio; sem CPF ou endereço. |
@@ -59,15 +59,13 @@ A exclusão de conta e a política de retenção LGPD ainda precisam de definiç
 | `GET /api/auth/magic-link/verify` | Consome link válido e cria sessão. |
 | `GET /api/auth/get-session` | Sessão atual ou ausência de sessão. |
 | `POST /api/auth/sign-out` | Encerra a sessão atual. |
-| `GET /api/businesses/{businessId}/pix-key` | Exige sessão do dono. Retorna `{ configured, type, hint }`; nunca retorna chave nem ciphertext. |
-| `PUT /api/businesses/{businessId}/pix-key` | Exige sessão do dono, origem da aplicação e JSON `{ type, value }`. Valida tipo/chave, cifra com AES-256-GCM e retorna `{ configured, type, hint }`. |
-| `DELETE /api/businesses/{businessId}/pix-key` | Exige sessão do dono e origem da aplicação. Remove chave do negócio; resposta `{ configured: false, type: null, hint: null }`. |
+| `GET/POST/PUT/PATCH/DELETE/HEAD/OPTIONS /api/businesses/{businessId}/pix-key` | Qualquer método responde `410` `{ "error": { "code": "pix_key_retired" } }`. Não lê o corpo, não grava e não devolve a chave nem o hint. |
 
 A configuração é validada com Zod quando usada. Build não abre conexão ao banco nem exige segredos.
 Solicitação de link com SMTP inválido falha; nunca simula envio nem revela link no terminal.
 Falhas inesperadas de SMTP/adapter e `APIError` interno no handler de autenticação respondem `500` com `{ "code": "AUTHENTICATION_FAILED", "message": "Não foi possível concluir o acesso. Tente novamente." }`. O hook nativo `onAPIError` transforma erros inesperados antes do catch do Better Call; `onResponse` saneia também respostas 5xx produzidas diretamente por endpoints, preservando status/cookies e forçando JSON com `Cache-Control: no-store`. O console recebe apenas uma mensagem fixa, sem erro bruto, stack, SQL, token ou email. Erros esperados de autenticação conservam status e formato do Better Auth, incluindo validação, origem proibida e redirecionamentos. A verificação de origem fica explicitamente habilitada, inclusive nos testes.
 Falha ao inicializar a configuração de auth/banco responde `503` no Route Handler com `{ "error": { "code": "auth_unavailable", "message": "O acesso está indisponível. Tente novamente mais tarde." } }` e `Cache-Control: no-store`; nenhum segredo/configuração é publicado.
-As rotas de chave Pix respondem `404` para negócio inexistente ou alheio, `401` sem sessão, `403` para origem inválida, `400` para chave inválida e `503` quando a cifra não está configurada. `type` aceita `cpf`, `cnpj`, `email`, `phone` ou `evp`. A chave é normalizada e cifrada com AES-256-GCM antes de persistir; o `business_id` autentica o ciphertext. `hint` contém somente máscara. Configure `PIX_KEY_ENCRYPTION_KEY` com 32 bytes aleatórios em hexadecimal (`openssl rand -hex 32`) fora do repositório. `key_version` atual é 1; trocar a chave exige recriptografar os registros antes da troca. Não use a chave de exemplo em produção. Esta API não cria cobrança Pix nem confirma pagamento.
+A chave Pix antiga permanece no banco, inativa. Nenhum payload a trata como ativa. Cobrança de sinal usa a conta Mercado Pago do negócio.
 
 Um QR estático/copia-e-cola Pix contém a própria chave de recebimento, necessária para o pagador enviar o dinheiro. A chave não deve aparecer no catálogo público; gerá-la como cobrança não prova liquidação. Reserva só confirma por evento autenticado do provedor. Confirmação manual vs. provedor ainda aguarda decisão do humano.
 
@@ -83,10 +81,10 @@ Um QR estático/copia-e-cola Pix contém a própria chave de recebimento, necess
 
 Decisão do dono: um único app Next.js, sem backend separado. Em relação ao PR #1 (`feat/dashboard`):
 
-- Todas as rotas `app/api` de auth, public, webhooks, onboarding e pix-key permanecem intactas.
+- As rotas `app/api` de auth, public, webhooks e onboarding permanecem. A rota de chave Pix responde 410 e não grava.
 - A sessão do dono é validada **no mesmo processo** via `getAuth().api.getSession` (Better Auth), sem chamada HTTP a outra origem.
 - Leituras/gravações usam Drizzle com `findOwnedBusiness`; dono A não acessa dados do negócio B (páginas, actions e testes de isolamento).
-- Login em `/login` (`requestMagicLink`, mesma origem) e logout via `authClient`; chave Pix continua em `/api/businesses/[businessId]/pix-key`.
+- Login em `/login` (`requestMagicLink`, mesma origem) e logout via `authClient`. A conexão Mercado Pago do negócio fica em `/api/businesses/[businessId]/mercadopago`.
 - Base atual: `feat/backend`. Quando o PR de integração do backend entrar no master, esta branch será rebaseada.
 
 ### Leituras e sessão
@@ -234,7 +232,7 @@ Preços e horários acima são dados de teste, não uma definição comercial do
 
 Autoridade: http://localhost:3000. Em desenvolvimento, origem exata permitida: localhost na porta3000 (app único). Usar localhost, nunca alternar com127.0.0.1. Em produção somente origem de BETTER_AUTH_URL; portas locais não são automaticamente confiáveis. Cookies Better Auth permanecem HttpOnly, SameSite=Lax e host-only (sem Domain; Secure em HTTPS). Browser deve usar credentials: include; Server Components encaminham Cookie somente à autoridade fixa. Callbacks absolutos das origens permitidas aceitos pela biblioteca.
 
-GET/POST auth e GET/PUT/DELETE pix-key recebem CORS credenciado somente para origem exata permitida. OPTIONS valida origem, método e headers solicitados; devolve204 com Allow-Origin específico, Allow-Credentials:true, Allow-Methods e Allow-Headers(Content-Type,Authorization). Origem externa/método/header alheio responde403 sem Allow-Origin. Respostas têm Vary:Origin e no-store. CORS não substitui sessão, tenant, CSRF ou cifragem; mutações Pix continuam exigindo Origin válido. Chamadas server-side GET sem Origin permanecem permitidas.
+GET/POST auth recebem CORS credenciado somente para origem exata permitida. A rota pix-key não grava mais: qualquer método responde 410 `pix_key_retired`. OPTIONS de auth valida origem, método e headers solicitados; devolve204 com Allow-Origin específico, Allow-Credentials:true, Allow-Methods e Allow-Headers(Content-Type,Authorization). Origem externa/método/header alheio responde403 sem Allow-Origin. Respostas têm Vary:Origin e no-store. CORS não substitui sessão, tenant, CSRF ou cifragem. Chamadas server-side GET sem Origin permanecem permitidas.
 
 Fixture B02: `NODE_ENV=development node scripts/create_backend_fixture.mjs /caminho/privado/fixture.json`. Exige banco local, autoridade localhost3000 e segredo Pix válido; cria somente usuário/negócio/serviço/horários sintéticos e sessão de1h. Arquivo0600 exclusivo contém Cookie/IDs, nunca versionar nem copiar para frontend/logs. Prova sessão/tenant/Pix; não valida link mágico nem entrega SMTP. Cookie do servidor continua sem Domain, sem tornar endpoint público de bypass. Fixture operacional disponível nesta máquina em `/tmp/agenda-backend-b02-fixture.json`; expira em1h.
 
@@ -263,3 +261,25 @@ Migration aditiva cria apenas contadores, preservando schema/dados existentes. A
 ## Readiness
 
 `GET /api/health` permanece liveness200. `GET /api/ready` (novo):200 `{status:"ready"}` se SELECT1 PostgreSQL e autenticação/conexão SMTP passam;503 `{status:"unavailable"}` em qualquer falha. Sem autenticação, no-store, sem nomes de servidores, credenciais, erros brutos ou PII. Não envia e-mail, não cria cobrança, não testa domínio/remetente ou entrega do destinatário; pagamento bancário continua gate separado.
+
+## Mercado Pago OAuth por negócio
+
+O Pix do sinal cai na conta Mercado Pago do próprio negócio. A plataforma não faz split nem repasse. Tokens ficam cifrados com `MP_TOKEN_ENCRYPTION_KEY` (AES-256-GCM, pacote `v1.nonce.ciphertext`). Nunca saem em resposta, log ou status.
+
+| Método e rota | Comportamento |
+| --- | --- |
+| `GET /api/businesses/{id}/mercadopago/connect?returnTo=` | Dono autenticado. `returnTo` só em `/dashboard` ou `/onboarding`; o resto cai em `/dashboard`. Cookie httpOnly, Secure, SameSite=Lax, 10 min, com state e PKCE S256. 302 para `https://auth.mercadopago.com.br/authorization` sem parâmetro `scope`. |
+| `GET /api/integrations/mercadopago/callback` | Confere state, sessão e dono. Troca o code em `POST https://api.mercadopago.com/oauth/token` (JSON). Redireciona com `mp=connected` ou `mp=error&reason=` (`access_denied`, `state_mismatch`, `expired_code`, `exchange_failed`, `already_linked_elsewhere`). |
+| `GET /api/businesses/{id}/mercadopago` | `{ status: not_connected \| connected \| needs_reconnect, connectedAt, expiresAt, liveMode, canReceiveDeposits, hadLegacyPixKey }`. Sem token, sem `mp_user_id` e sem a chave ou o hint. `disconnected` local aparece como `not_connected`. `hadLegacyPixKey` é true só se existe chave inativa e não há aviso dispensado. |
+| `POST /api/businesses/{id}/notices/pix_key_retired/dismiss` | Só o dono. Grava `owner_notices` (`business_id`, `kind = pix_key_retired`, `dismissed_at`), unique em `(business_id, kind)`. Idempotente. Responde `204`. |
+| `DELETE /api/businesses/{id}/mercadopago` | 204. Marca `status=disconnected` e `disconnected_at`. Não apaga os tokens na hora. Idempotente. |
+| `POST /api/webhooks/payments/mercadopago` com tópico `mp-connect` | Valida `x-signature`. `application.deauthorized` marca `needs_reconnect` e zera os tokens. `application.authorized` não grava token. |
+| `GET/POST /api/cron/mercadopago-refresh` | Bearer `CRON_SECRET`. Renova conexões `connected` com `expires_at` em menos de 30 dias. Apaga tokens `disconnected` quando não há pagamento `creating`/`pending` ou o último `expires_at` mais 24h já passou. |
+
+Erros `{ error: { code, message } }`. Serviço ativo com sinal, e reserva nova com sinal, exigem conta `connected`. Sem isso: 409 `mp_account_not_connected`. Serviço com sinal zero não é bloqueado por este critério. A listagem do painel inclui `bookable` e `blockedReason`.
+
+`getSellerAccessToken(businessId)` cria cobrança e devolve null se não estiver `connected`. `getSellerAccessTokenForSettlement(businessId)` consulta ou confirma pagamento já criado e ainda devolve o token com `disconnected`, sem renovar. Não serve para criar cobrança. `needs_reconnect` devolve null nos dois. `findBusinessIdByMpUserId` só acha linha `connected`.
+
+A migration adiciona `deactivated_at` e `deactivation_reason` em `business_pix_keys` e preenche as linhas já existentes. Não faz DROP nem DELETE desses dados. Também cria `mercadopago_connections` e `owner_notices`. Não rodar em produção a partir deste PR.
+
+Pontos de encaixe do PR de pagamentos: criar cobrança com `getSellerAccessToken`; confirmar Pix pago depois da desconexão com `getSellerAccessTokenForSettlement` e avisar o dono (este PR não confirma nem notifica); achar o negócio pelo `user_id` com `findBusinessIdByMpUserId`. Disponibilidade pública (`bookable: false`) continua a cargo de quem publicar os horários.

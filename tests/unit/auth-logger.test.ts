@@ -14,8 +14,8 @@ it("não publica tokens, SQL ou dados pessoais recebidos pelo logger de autentic
     const sensitive = new Error("SQL token=private-token email=private@example.com");
     logger.log!("error", sensitive.message, sensitive, { token: "private-token" });
     logger.log!("warn", "private-token", sensitive);
-    expect(error.mock.calls).toEqual([["[Agenda auth] Authentication operation failed"]]);
-    expect(warn.mock.calls).toEqual([["[Agenda auth] Authentication warning"]]);
+    expect(error.mock.calls).toEqual([["[AgendaPix auth] Authentication operation failed"]]);
+    expect(warn.mock.calls).toEqual([["[AgendaPix auth] Authentication warning"]]);
   } finally {
     vi.unstubAllEnvs();
   }

@@ -7,6 +7,8 @@ import * as schema from "../../db/schema";
 import { authEnvSchema } from "../env";
 import { HttpError } from "../http";
 import { paymentsConfig } from "../payments/config";
+import { assertMpConnectedForDeposit } from "../mercadopago-oauth/bookability";
+import { createDrizzleMpStore } from "../mercadopago-oauth/repository";
 import { getPaymentProvider } from "../payments";
 import { pixChargeSchema, type PaymentProvider, type PixCharge } from "../payments/provider";
 import { callProvider, ProviderTimeoutError } from "../payments/timeout";
@@ -181,6 +183,7 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
       return { kind: "existing" as const, booking: existing, payment, token: accessToken(business.id, existing.id), now };
     }
     const service = await serviceById(business.id, input.serviceId, transaction);
+    if (service.depositCents > 0) await assertMpConnectedForDeposit(business.id, { store: createDrizzleMpStore(database) });
     const date = localDate(new Date(input.startsAt), business.timezone);
     const slots = await slotsFor(business, service, date, now, transaction);
     const slot = slots.find((candidate) => candidate.startsAt.toISOString() === input.startsAt);

@@ -15,3 +15,20 @@ export const smtpEnvSchema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASSWORD: z.string().optional(),
 }).refine((value) => Boolean(value.SMTP_USER) === Boolean(value.SMTP_PASSWORD), "Configure usuário e senha SMTP juntos.");
+
+const staticRedirectUri = z.url().refine((value) => {
+  const url = new URL(value);
+  const https = url.protocol === "https:";
+  const local = url.protocol === "http:" && url.hostname === "localhost";
+  return (https || local) && url.search === "" && url.hash === "";
+}, "MP_OAUTH_REDIRECT_URI deve ser uma URL estática https (ou http://localhost), sem query nem fragmento.");
+
+/** Credenciais da aplicação marketplace e a chave que cifra os tokens OAuth do vendedor. */
+export const mercadoPagoOAuthEnvSchema = z.object({
+  MP_CLIENT_ID: z.string().trim().min(1).max(64),
+  MP_CLIENT_SECRET: z.string().trim().min(1),
+  MP_OAUTH_REDIRECT_URI: staticRedirectUri,
+  MP_TOKEN_ENCRYPTION_KEY: z.string().regex(/^[a-fA-F0-9]{64}$/, "Configure MP_TOKEN_ENCRYPTION_KEY como 64 caracteres hexadecimais."),
+  // A doc de OAuth mostra auth.mercadopago.com; o guia de Split mostra auth.mercadopago.com.br. O padrão é .com.br.
+  MP_OAUTH_AUTHORIZE_URL: z.url().optional(),
+});

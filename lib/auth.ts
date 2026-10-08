@@ -18,7 +18,7 @@ const authErrorBody = {
 function createAuth() {
   const env = authEnvSchema.parse(process.env);
   return betterAuth({
-    appName: "Agenda",
+    appName: "AgendaPix",
     baseURL: env.BETTER_AUTH_URL,
     secret: env.BETTER_AUTH_SECRET,
     logger: { level: "warn", log: logAuthEvent },
