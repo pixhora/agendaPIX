@@ -40,11 +40,24 @@ function billing(patch: Partial<BillingView>): BillingView {
 
 /** Horas só desta prévia. O card lê o número do payload; não é o prazo real da assinatura. */
 const PREVIEW_ACTIVATION_HOURS = 6;
+const REQUESTED_TODAY = "2026-10-08T23:10:00.000Z";
 
 function previewCheckout(mode: string | undefined): SubscriptionCheckout {
-  if (mode === "assinar") return { available: true, unavailableReason: null, activationHours: null, pendingRequest: null };
-  if (mode === "pedido") return { available: true, unavailableReason: null, activationHours: PREVIEW_ACTIVATION_HOURS, pendingRequest: { status: "received" } };
+  if (mode === "assinar") return { available: true, unavailableReason: null, activationHours: PREVIEW_ACTIVATION_HOURS, pendingRequest: null };
+  if (mode === "pedido" || mode === "pedido-hoje" || mode === "pedido-outro-dia") {
+    return { available: true, unavailableReason: null, activationHours: PREVIEW_ACTIVATION_HOURS, pendingRequest: { requestedAt: REQUESTED_TODAY } };
+  }
+  if (mode === "pedido-sem-horas") {
+    return { available: true, unavailableReason: null, activationHours: null, pendingRequest: { requestedAt: REQUESTED_TODAY } };
+  }
+  if (mode === "config-missing") return { available: true, unavailableReason: "config_missing", activationHours: null, pendingRequest: null };
   return absentCheckout();
+}
+
+function previewNow(mode: string | undefined) {
+  if (mode === "pedido-outro-dia") return new Date("2026-10-09T15:00:00.000Z");
+  if (mode === "renovar") return new Date("2026-10-12T15:00:00.000Z");
+  return new Date("2026-10-08T23:30:00.000Z");
 }
 
 const BLOCKS = [
@@ -58,7 +71,16 @@ export default async function PreviewPainelPage({ searchParams }: { searchParams
   const scene = query.scene ?? "politica";
   const policy = policyFor(query.preset);
   const tone = query.tone ?? "discreet";
-  const trial = tone === "paused"
+  const renewing = query.checkout === "renovar";
+  const trial = renewing
+    ? billing({
+      state: "active",
+      daysLeft: 3,
+      bookingsPaused: false,
+      subscription: { status: "active", currentPeriodEnd: "2026-10-16T02:59:59.000Z", provider: null },
+      checkout: { available: true, unavailableReason: null, activationHours: PREVIEW_ACTIVATION_HOURS, pendingRequest: null },
+    })
+    : tone === "paused"
     ? billing({ state: "paused", daysLeft: -1, bookingsPaused: true, trialEndsAt: "2026-10-03T02:59:59.000Z", checkout: previewCheckout(query.checkout) })
     : tone === "strong"
       ? billing({ state: "trial_ending", daysLeft: 2, trialEndsAt: "2026-10-17T02:59:59.000Z" })
@@ -91,6 +113,6 @@ export default async function PreviewPainelPage({ searchParams }: { searchParams
         {item.reason === null && <p className="mt-3 text-sm text-muted">Clientes podem reservar este serviço.</p>}
       </li>)}
     </ul>}
-    {scene === "trial" && <div className="mt-4"><TrialBanner billing={trial} businessId={BUSINESS_ID} timeZone="America/Sao_Paulo" publicHref="/studio-bella" /></div>}
+    {scene === "trial" && <div className="mt-4"><TrialBanner billing={trial} businessId={BUSINESS_ID} timeZone="America/Sao_Paulo" publicHref="/studio-bella" now={previewNow(query.checkout)} /></div>}
   </main>;
 }

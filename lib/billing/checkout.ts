@@ -1,11 +1,10 @@
 import { z } from "zod";
 
 /**
- * Contrato BE-26, resposta de `GET /api/businesses/{businessId}/billing`.
- * O backend atual (#29) ainda não manda `checkout`. Ausência vira indisponível.
- * O front não monta o link do WhatsApp: o POST responde 303 e o back escolhe número e texto.
+ * Contrato BE-26. O GET billing do #29 ainda não manda `checkout`.
+ * O POST abre o WhatsApp no back (303). O front não monta esse endereço.
  */
-const pendingRequestSchema = z.object({}).catchall(z.unknown());
+const pendingRequestSchema = z.object({ requestedAt: z.string().optional() }).catchall(z.unknown());
 
 const checkoutFields = {
   available: z.boolean(),
@@ -23,15 +22,17 @@ export type SubscriptionCheckout = {
   pendingRequest: PendingSubscriptionRequest | null;
 };
 
-/** Mais de 3 dias até o fim do período ativo esconde o POST (409 do contrato §4). No 3º dia o botão continua. */
-export const CHECKOUT_BLOCK_AFTER_MS = 3 * 24 * 60 * 60 * 1000;
+export const CONFIG_MISSING = "config_missing";
+export const SUBSCRIPTION_ALREADY_ACTIVE_CODE = "subscription_already_active";
 
-/** Frase provisória, até o Pincel fechar o texto. */
-export const SUBSCRIPTION_UNAVAILABLE_COPY = "A assinatura está temporariamente indisponível. Tente de novo mais tarde.";
-
+export const SUBSCRIPTION_UNAVAILABLE_COPY = "A assinatura está indisponível no momento. Tente de novo mais tarde.";
 export const SUBSCRIPTION_ACTIVE_TOAST = "Assinatura ativa. Seus agendamentos online voltaram.";
-
+export const SUBSCRIPTION_ALREADY_ACTIVE_COPY = "Sua assinatura já está ativa.";
 export const SUBSCRIPTION_WHATSAPP_LABEL = "Falar no WhatsApp de novo";
+export const SUBSCRIPTION_PENDING_TITLE = "Pedido recebido";
+
+/** Renovação aparece com 3 dias corridos ou menos no fuso do negócio. Com 4, o botão some. */
+export const RENEWAL_WINDOW_DAYS = 3;
 
 export function absentCheckout(): SubscriptionCheckout {
   return { available: false, unavailableReason: null, activationHours: null, pendingRequest: null };
@@ -60,41 +61,129 @@ export function subscriptionCheckoutAction(businessId: string) {
   return `/api/businesses/${id.data}/subscription/checkout`;
 }
 
-export function checkoutBlockedBySubscription(
-  subscription: { status: string; currentPeriodEnd: string | null } | null,
-  now: Date,
-) {
-  if (!subscription || subscription.status !== "active" || !subscription.currentPeriodEnd) return false;
-  const end = new Date(subscription.currentPeriodEnd).getTime();
-  if (Number.isNaN(end)) return false;
-  return end - now.getTime() > CHECKOUT_BLOCK_AFTER_MS;
+function zonedDay(date: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
+  const read = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((part) => part.type === type)?.value);
+  const year = read("year");
+  const month = read("month");
+  const day = read("day");
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return null;
+  return { year, month, day };
 }
 
-export type PausedSubscriptionCta =
-  | { kind: "subscribe" }
-  | { kind: "pending"; activationHours: number | null; allowResend: boolean }
-  | { kind: "unavailable" }
-  | { kind: "blocked" };
+/** Dias corridos no fuso do negócio, do dia de `now` até o dia de `end`. */
+export function businessCalendarDaysUntil(end: Date, now: Date, timeZone: string) {
+  const from = zonedDay(now, timeZone);
+  const to = zonedDay(end, timeZone);
+  if (!from || !to) return null;
+  const start = Date.UTC(from.year, from.month - 1, from.day);
+  const finish = Date.UTC(to.year, to.month - 1, to.day);
+  return Math.round((finish - start) / 86_400_000);
+}
 
-export function pausedSubscriptionCta(
-  input: {
-    checkout: SubscriptionCheckout;
-    subscription: { status: string; currentPeriodEnd: string | null } | null;
-  },
-  now: Date,
-): PausedSubscriptionCta {
-  const blocked = checkoutBlockedBySubscription(input.subscription, now);
-  if (input.checkout.pendingRequest) {
-    return { kind: "pending", activationHours: input.checkout.activationHours, allowResend: !blocked };
+function sameBusinessDay(left: Date, right: Date, timeZone: string) {
+  const a = zonedDay(left, timeZone);
+  const b = zonedDay(right, timeZone);
+  return !!a && !!b && a.year === b.year && a.month === b.month && a.day === b.day;
+}
+
+function formatClock(date: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("pt-BR", { timeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(date);
+  const hour = parts.find((part) => part.type === "hour")?.value;
+  const minute = parts.find((part) => part.type === "minute")?.value;
+  if (!hour || !minute) return null;
+  return `${hour}:${minute}`;
+}
+
+function formatDayMonth(date: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("pt-BR", { timeZone, day: "numeric", month: "long" }).formatToParts(date);
+  const day = parts.find((part) => part.type === "day")?.value ?? "";
+  const month = parts.find((part) => part.type === "month")?.value.toLocaleLowerCase("pt-BR") ?? "";
+  if (!/^[1-9]\d?$/.test(day) || !month) return null;
+  return `${day} de ${month}`;
+}
+
+/** "hoje às 20:10" ou "em 8 de outubro, às 20:10". */
+export function receivedWhenPhrase(requestedAt: string, now: Date, timeZone: string) {
+  const date = new Date(requestedAt);
+  if (Number.isNaN(date.getTime())) return null;
+  const clock = formatClock(date, timeZone);
+  if (!clock) return null;
+  if (sameBusinessDay(date, now, timeZone)) return `hoje às ${clock}`;
+  const day = formatDayMonth(date, timeZone);
+  if (!day) return null;
+  return `em ${day}, às ${clock}`;
+}
+
+export function pendingRequestCopy(when: string, activationHours: number | null) {
+  if (activationHours == null) {
+    return `Recebemos seu pedido ${when}. Seus agendamentos online voltam assim que a assinatura for ativada.`;
   }
-  if (blocked) return { kind: "blocked" };
-  if (input.checkout.available) return { kind: "subscribe" };
-  return { kind: "unavailable" };
+  return `Recebemos seu pedido ${when}. Ativamos em até ${activationHours} h, e seus agendamentos online voltam sozinhos.`;
 }
 
-export function pendingActivationCopy(activationHours: number | null) {
-  if (activationHours == null) return "Recebemos seu pedido.";
-  return `Recebemos seu pedido. Ativamos em até ${activationHours} h.`;
+export function subscribeHelpCopy(activationHours: number | null) {
+  if (activationHours == null) return "Abre o WhatsApp com o pedido pronto.";
+  return `Abre o WhatsApp com o pedido pronto. Ativamos em até ${activationHours} h.`;
+}
+
+/** "quinta, 15 de outubro" no fuso informado. */
+export function formatRenewalDate(iso: string, timeZone: string) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  const parts = new Intl.DateTimeFormat("pt-BR", { timeZone, weekday: "long", day: "numeric", month: "long" }).formatToParts(date);
+  const weekdayLong = parts.find((part) => part.type === "weekday")?.value.toLocaleLowerCase("pt-BR") ?? "";
+  const day = parts.find((part) => part.type === "day")?.value ?? "";
+  const month = parts.find((part) => part.type === "month")?.value.toLocaleLowerCase("pt-BR") ?? "";
+  if (!weekdayLong || !/^[1-9]\d?$/.test(day) || !month) return null;
+  return `${weekdayLong.replace(/-feira$/u, "")}, ${day} de ${month}`;
+}
+
+export function renewalDueCopy(periodEnd: string, timeZone: string) {
+  const when = formatRenewalDate(periodEnd, timeZone);
+  if (!when) return null;
+  return `Sua assinatura vence em ${when}.`;
+}
+
+export function subscriptionRaceMessage(body: string) {
+  return body.includes(SUBSCRIPTION_ALREADY_ACTIVE_CODE) ? SUBSCRIPTION_ALREADY_ACTIVE_COPY : null;
+}
+
+type SubscriptionSnapshot = { status: string; currentPeriodEnd: string | null } | null;
+
+export type SubscriptionCta =
+  | { kind: "subscribe"; activationHours: number | null }
+  | { kind: "pending"; activationHours: number | null; requestedAt: string | null; allowResend: boolean }
+  | { kind: "unavailable" }
+  | { kind: "blocked" }
+  | { kind: "renew"; periodEnd: string };
+
+function activeDaysLeft(subscription: SubscriptionSnapshot, now: Date, timeZone: string) {
+  if (!subscription || subscription.status !== "active" || !subscription.currentPeriodEnd) return null;
+  const end = new Date(subscription.currentPeriodEnd);
+  if (Number.isNaN(end.getTime())) return null;
+  return businessCalendarDaysUntil(end, now, timeZone);
+}
+
+export function subscriptionCta(
+  input: { checkout: SubscriptionCheckout; subscription: SubscriptionSnapshot },
+  now: Date,
+  timeZone: string,
+): SubscriptionCta {
+  if (input.checkout.pendingRequest) {
+    const requestedAt = typeof input.checkout.pendingRequest.requestedAt === "string" ? input.checkout.pendingRequest.requestedAt : null;
+    return {
+      kind: "pending",
+      activationHours: input.checkout.activationHours,
+      requestedAt,
+      allowResend: input.checkout.activationHours != null,
+    };
+  }
+  const daysLeft = activeDaysLeft(input.subscription, now, timeZone);
+  if (daysLeft != null && daysLeft > RENEWAL_WINDOW_DAYS) return { kind: "blocked" };
+  if (daysLeft != null && input.subscription?.currentPeriodEnd) return { kind: "renew", periodEnd: input.subscription.currentPeriodEnd };
+  if (!input.checkout.available || input.checkout.unavailableReason === CONFIG_MISSING) return { kind: "unavailable" };
+  return { kind: "subscribe", activationHours: input.checkout.activationHours };
 }
 
 /** Toast uma vez, só na passagem de pedido pendente para assinatura ativa. */

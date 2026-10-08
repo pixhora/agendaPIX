@@ -92,6 +92,10 @@ export function subscribeCtaLabel(priceCents: number) {
   return `Assinar por ${formatPlanReais(priceCents)}/mês`;
 }
 
+export function renewCtaLabel(priceCents: number) {
+  return `Renovar por ${formatPlanReais(priceCents)}/mês`;
+}
+
 /** Data curta sem ponto de abreviação, para não virar "out.." quando a frase termina. */
 export function formatTrialEnd(isoDate: string, timeZone: string) {
   const date = new Date(isoDate);
