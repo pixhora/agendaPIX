@@ -1,0 +1,1 @@
+export const MP_CONNECT_CONSENT_VERSION = '2026-10-08.v3.2';

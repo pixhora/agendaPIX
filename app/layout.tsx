@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 import { Plus_Jakarta_Sans, Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/toaster";
+import { MercadoPagoCallback } from "@/components/payments/mp-callback";
 import { themeInitScript } from "@/lib/theme";
 import "./globals.css";
 
@@ -37,6 +39,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       </head>
       <body className="min-h-dvh bg-paper font-sans text-ink antialiased">
         {children}
+        <Suspense fallback={null}>
+          <MercadoPagoCallback />
+        </Suspense>
         <Toaster />
       </body>
     </html>

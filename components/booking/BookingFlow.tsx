@@ -10,6 +10,8 @@ import type {
 } from "./types";
 import { cpfDigitsOnly, normalizePhoneToE164 } from "./formatters";
 import { publicBookingPagePath, publicBookingPaymentUrl, publicBookingsUrl, publicServicesUrl } from "@/lib/public-api";
+import { MP_ACCOUNT_NOT_CONNECTED } from "@/lib/mercadopago/contract";
+import { DepositUnavailableCard } from "./DepositUnavailable";
 import { StepProgress } from "./StepProgress";
 import { StepService } from "./StepService";
 import { StepSlot } from "./StepSlot";
@@ -29,12 +31,14 @@ import { BookingSummary } from "./BookingSummary";
 interface BookingFlowProps {
   slug: string;
   initialBookingId?: string;
+  /** Só para a prévia de desenvolvimento. Em produção o fluxo busca a página pública. */
+  previewBusiness?: PublicBusinessData;
 }
 
-export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
+export function BookingFlow({ slug, initialBookingId, previewBusiness }: BookingFlowProps) {
   // Estado do Negócio
-  const [business, setBusiness] = useState<PublicBusinessData | null>(null);
-  const [isLoadingBusiness, setIsLoadingBusiness] = useState(true);
+  const [business, setBusiness] = useState<PublicBusinessData | null>(previewBusiness ?? null);
+  const [isLoadingBusiness, setIsLoadingBusiness] = useState(!previewBusiness);
   const [businessError, setBusinessError] = useState<string | null>(null);
 
   // Estado das Etapas
@@ -51,6 +55,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
   // Submissão da Reserva
   const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
+  const [depositBlocked, setDepositBlocked] = useState(false);
   const [bookingResponse, setBookingResponse] = useState<BookingResponse | null>(null);
 
   // Chave de Idempotência fixa por tentativa de reserva
@@ -65,6 +70,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
 
   // Carrega serviços públicos do negócio
   useEffect(() => {
+    if (previewBusiness) return;
     let isCancelled = false;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
@@ -113,7 +119,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
       clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [slug, reloadCount]);
+  }, [slug, reloadCount, previewBusiness]);
 
   // Retoma sessão Pix ativa se cliente fechar aba e reabrir /[slug]
   useEffect(() => {
@@ -275,15 +281,25 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => null) as { error?: { code?: string; message?: string } } | BookingResponse | null;
 
       if (!res.ok) {
+        const code = data && "error" in data ? data.error?.code : undefined;
+        if (res.status === 409 && code === MP_ACCOUNT_NOT_CONNECTED) {
+          setDepositBlocked(true);
+          setBookingError(null);
+          return;
+        }
+        const message = data && "error" in data ? data.error?.message : undefined;
         const errorMsg =
-          data?.error?.message ||
+          message ||
           (res.status === 409
             ? "Esse horário acabou de ser reservado por outra pessoa. Por favor, escolha outro horário."
             : "Não foi possível criar o agendamento. Tente novamente.");
         throw new Error(errorMsg);
+      }
+      if (!data || !("bookingId" in data)) {
+        throw new Error("Não foi possível criar o agendamento. Tente novamente.");
       }
 
       const booking: BookingResponse = data;
@@ -326,6 +342,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
 
   // Reiniciar fluxo
   const handleRestart = () => {
+    setDepositBlocked(false);
     setSelectedService(null);
     setSelectedSlot(null);
     setCustomerName("");
@@ -468,12 +485,22 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
       {pageHeader}
       <main id="content" className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-10 lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-10">
         <div className="min-w-0 space-y-5">
+          {depositBlocked ? (
+            <DepositUnavailableCard
+              businessName={business.name}
+              phone={business.contactWhatsapp ?? business.phone}
+              autoFocus
+            />
+          ) : (
+          <>
           <StepProgress currentStep={step} />
 
           <section key={step} aria-label="Etapa atual" className="rounded-[22px] border border-line bg-surface p-5 shadow-[var(--shadow-card)] animate-step-in sm:p-8">
             {step === 1 && (
               <StepService
                 services={business.services}
+                businessName={business.name}
+                contactPhone={business.contactWhatsapp ?? business.phone}
                 selectedServiceId={selectedService?.id ?? null}
                 onSelectService={(srv) => {
                   setSelectedService(srv);
@@ -534,6 +561,8 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
               />
             )}
           </section>
+          </>
+          )}
         </div>
 
         <aside aria-label="Seu pedido" className="hidden lg:sticky lg:top-6 lg:block">

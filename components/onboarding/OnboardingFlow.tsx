@@ -129,9 +129,13 @@ export function OnboardingFlow({ legalPagesPublished = false }: { legalPagesPubl
       const result = await commitOnboardingDraft(draftId);
       if (cancelled) return;
       if (result.ok) {
-        writeCommitResult({ slug: result.slug, publicPath: result.publicPath });
+        writeCommitResult({
+          slug: result.slug,
+          publicPath: result.publicPath,
+          businessId: result.businessId || undefined,
+        });
         clearOnboardingProgress();
-        router.push("/onboarding/concluir");
+        router.push("/onboarding/recebimento");
         return;
       }
       const follow = followUpFromFailure(result.status, result.error);

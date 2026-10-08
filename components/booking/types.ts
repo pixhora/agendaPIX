@@ -4,6 +4,9 @@ export interface PublicService {
   durationMinutes: number;
   priceCents: number;
   depositCents: number;
+  /** Ausente = agendável. `false` + `reason` descreve por que o cliente não pode seguir. */
+  bookable?: boolean;
+  reason?: string | null;
 }
 
 export interface PublicBusinessData {
@@ -14,6 +17,8 @@ export interface PublicBusinessData {
   address?: string | null;
   /** Telefone/WhatsApp do negócio (só dígitos ou formatado). */
   phone?: string | null;
+  /** WhatsApp do negócio quando o contrato público manda o campo separado. */
+  contactWhatsapp?: string | null;
   /** Logo do negócio; se ausente, o avatar usa ícone CalendarCheck. */
   logoUrl?: string | null;
 }
