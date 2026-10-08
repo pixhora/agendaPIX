@@ -6,6 +6,14 @@ const int = (min: number, max: number, fallback: number) => z.coerce.number().in
 const blankAsUndefined = (value: unknown) => (value === "" ? undefined : value);
 
 /**
+ * Mercado Pago Payments API: `date_of_expiration` aceita de 30 minutos a 30 dias.
+ * O hold da reserva usa a mesma faixa. O pedido soma 2 minutos de margem.
+ * https://www.mercadopago.com.br/developers/pt/docs/checkout-api-payments/integration-configuration/integrate-pix
+ */
+export const PIX_EXPIRATION_MIN_MINUTES = 30;
+export const PIX_EXPIRATION_MAX_MINUTES = 30 * 24 * 60;
+
+/**
  * Configuração antiabuso das reservas públicas. Lida a cada chamada para refletir o ambiente atual
  * (e permitir testes); valores inválidos tornam o agendamento indisponível em vez de cair em padrões silenciosos.
  */
@@ -15,7 +23,7 @@ export const bookingEnvSchema = z.object({
   BOOKING_TRUSTED_PROXY_HOPS: z.preprocess(blankAsUndefined, int(1, 10, 1)),
   BOOKING_RATE_LIMIT_PER_CLIENT: z.preprocess(blankAsUndefined, int(1, 1000, 10)),
   BOOKING_RATE_LIMIT_PER_BUSINESS: z.preprocess(blankAsUndefined, int(1, 100000, 120)),
-  BOOKING_HOLD_MINUTES: z.preprocess(blankAsUndefined, int(2, 30, 10)),
+  BOOKING_HOLD_MINUTES: z.preprocess(blankAsUndefined, int(PIX_EXPIRATION_MIN_MINUTES, PIX_EXPIRATION_MAX_MINUTES, PIX_EXPIRATION_MIN_MINUTES)),
   BOOKING_MAX_PENDING_PER_CLIENT: z.preprocess(blankAsUndefined, int(1, 100, 3)),
   BOOKING_MAX_PENDING_PER_PHONE: z.preprocess(blankAsUndefined, int(1, 100, 2)),
   BOOKING_MAX_PENDING_PER_BUSINESS: z.preprocess(blankAsUndefined, int(1, 10000, 50)),

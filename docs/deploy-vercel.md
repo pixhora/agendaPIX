@@ -14,7 +14,9 @@ links mágicos por SMTP (nodemailer) e Pix pelo Mercado Pago.
 
 A confirmação do Pix em produção depende do **webhook** do Mercado Pago
 (`https://<domínio>/api/webhooks/payments/mercadopago`). O cron é rede de segurança: cobranças
-`creating` presas, cancelamento no gateway de cobranças vencidas e webhooks perdidos.
+`creating` presas, cancelamento no gateway de cobranças vencidas, webhooks perdidos e a única
+devolução automática (Pix atrasado sem horário). O mesmo `POST /api/cron/reconcile` com `Authorization: Bearer $CRON_SECRET` continua
+válido para o agendador externo.
 Holds vencidos já expiram sozinhos em cada leitura/criação de reserva.
 
 - **Hobby:** a Vercel só aceita cron diário (`vercel.json` usa `0 6 * * *` UTC). Expressões mais

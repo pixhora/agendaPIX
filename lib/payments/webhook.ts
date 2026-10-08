@@ -7,7 +7,14 @@ import { hash } from "../bookings/service";
 import { HttpError, MAX_BODY_BYTES, readBody } from "../http";
 import { applyPaidEvent } from "./apply-paid";
 import { getPaymentProvider } from "./index";
-import { IgnoredWebhookEvent, paidEventSchema, type PaidEvent, type PaymentProvider } from "./provider";
+import {
+  drizzleRefundPorts,
+  markRefundedByExternalId,
+  notifyDisconnectedConfirmation,
+  recordUnverifiableSellerPayment,
+  settleAutomaticLateRefund,
+} from "./refund-flow";
+import { IgnoredWebhookEvent, ObservedRefundEvent, UnverifiableSellerPayment, paidEventSchema, type PaidEvent, type PaymentProvider } from "./provider";
 
 type Database = NodePgDatabase<typeof schema>;
 
@@ -25,7 +32,7 @@ export async function verifyWebhookDelivery(request: Request, providerName: stri
   try {
     event = paidEventSchema.parse(await paymentProvider.verifyWebhook(body, request.headers, now, request.url));
   } catch (error) {
-    if (error instanceof HttpError || error instanceof IgnoredWebhookEvent) throw error;
+    if (error instanceof HttpError || error instanceof IgnoredWebhookEvent || error instanceof ObservedRefundEvent || error instanceof UnverifiableSellerPayment) throw error;
     if (error instanceof z.ZodError || error instanceof SyntaxError) throw new HttpError(400, "invalid_event", "Evento inválido.");
     throw new HttpError(401, "invalid_signature", "Assinatura inválida ou vencida.");
   }
@@ -39,11 +46,19 @@ export async function processWebhook(request: Request, providerName: string, dat
   } catch (error) {
     // Autenticado, mas não é evento de pagamento: 200 sem escrita (evita o gateway pausar a fila).
     if (error instanceof IgnoredWebhookEvent) return { outcome: "ignored", reason: "unsupported_event" };
+    if (error instanceof UnverifiableSellerPayment) {
+      await recordUnverifiableSellerPayment(drizzleRefundPorts(database), error.externalId);
+      return { outcome: "ignored", reason: "unverifiable_seller_disconnected" };
+    }
+    if (error instanceof ObservedRefundEvent) {
+      await markRefundedByExternalId(drizzleRefundPorts(database), error.externalId, now);
+      return { outcome: "ignored", reason: "refund_observed" };
+    }
     throw error;
   }
   const { event } = verified;
   try {
-    return await database.transaction(async (transaction) => {
+    const outcome = await database.transaction(async (transaction) => {
       const [delivery] = await transaction.insert(schema.webhookDeliveries).values({ provider: verified.provider, eventId: event.eventId, bodyHash: verified.bodyHash })
         .onConflictDoNothing({ target: [schema.webhookDeliveries.provider, schema.webhookDeliveries.eventId] }).returning();
       if (!delivery) {
@@ -53,9 +68,25 @@ export async function processWebhook(request: Request, providerName: string, dat
         return { outcome: "duplicate", reason: existing?.reason ?? null };
       }
       const result = await applyPaidEvent(transaction, verified.provider, event, now);
-      await transaction.update(schema.webhookDeliveries).set(result).where(eq(schema.webhookDeliveries.id, delivery.id));
+      await transaction.update(schema.webhookDeliveries).set({ outcome: result.outcome, reason: result.reason }).where(eq(schema.webhookDeliveries.id, delivery.id));
       return result;
     });
+    const paymentProvider = provider ?? getPaymentProvider();
+    const ports = drizzleRefundPorts(database);
+    if (outcome.reason === "late_no_slot" && outcome.paymentId) {
+      try {
+        await settleAutomaticLateRefund(ports, paymentProvider, outcome.paymentId);
+      } catch {
+        // A reconciliação retoma. A resposta continua 200 para o gateway não reenviar o pago.
+      }
+    } else if (outcome.outcome === "processed" && outcome.paymentId) {
+      try {
+        await notifyDisconnectedConfirmation(ports, outcome.paymentId);
+      } catch {
+        // O aviso não desfaz a confirmação.
+      }
+    }
+    return outcome;
   } catch (error) {
     if (error instanceof HttpError && error.status < 500) throw error;
     throw new HttpError(503, "webhook_unavailable", "Não foi possível processar o evento. Tente novamente.");

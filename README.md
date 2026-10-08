@@ -220,7 +220,7 @@ Variáveis opcionais (padrões em `.env.example`); valor inválido deixa o agend
 | `BOOKING_TRUSTED_PROXY_HOPS` | `1` | Com `x-forwarded-for`: número de proxies confiáveis; o IP do cliente é o N-ésimo item a partir da direita. |
 | `BOOKING_RATE_LIMIT_PER_CLIENT` | `10` | Tentativas por minuto por cliente e negócio. |
 | `BOOKING_RATE_LIMIT_PER_BUSINESS` | `120` | Teto de tentativas por minuto por negócio, somando todos os clientes. |
-| `BOOKING_HOLD_MINUTES` | `10` | Tempo de reserva aguardando o Pix (2–30). |
+| `BOOKING_HOLD_MINUTES` | `30` | Tempo de reserva aguardando o Pix (30–43200). O Mercado Pago recebe esse prazo mais 2 minutos. |
 | `BOOKING_MAX_PENDING_PER_CLIENT` | `3` | Reservas pendentes simultâneas por cliente (IP) e negócio. |
 | `BOOKING_MAX_PENDING_PER_PHONE` | `2` | Reservas pendentes simultâneas por telefone e negócio. |
 | `BOOKING_MAX_PENDING_PER_BUSINESS` | `50` | Reservas pendentes simultâneas por negócio. |

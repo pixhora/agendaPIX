@@ -11,13 +11,13 @@ describe("configuração antiabuso", () => {
     expect(bookingConfig({})).toEqual({
       BOOKING_TRUST_PROXY: false, BOOKING_CLIENT_IP_HEADER: "x-real-ip", BOOKING_TRUSTED_PROXY_HOPS: 1,
       BOOKING_RATE_LIMIT_PER_CLIENT: 10, BOOKING_RATE_LIMIT_PER_BUSINESS: 120,
-      BOOKING_HOLD_MINUTES: 10, BOOKING_MAX_PENDING_PER_CLIENT: 3, BOOKING_MAX_PENDING_PER_PHONE: 2, BOOKING_MAX_PENDING_PER_BUSINESS: 50,
+      BOOKING_HOLD_MINUTES: 30, BOOKING_MAX_PENDING_PER_CLIENT: 3, BOOKING_MAX_PENDING_PER_PHONE: 2, BOOKING_MAX_PENDING_PER_BUSINESS: 50,
     });
-    expect(bookingConfig({ BOOKING_HOLD_MINUTES: "", BOOKING_TRUST_PROXY: "" }).BOOKING_HOLD_MINUTES).toBe(10);
+    expect(bookingConfig({ BOOKING_HOLD_MINUTES: "", BOOKING_TRUST_PROXY: "" }).BOOKING_HOLD_MINUTES).toBe(30);
   });
   it.each([
     { BOOKING_TRUST_PROXY: "yes" }, { BOOKING_CLIENT_IP_HEADER: "forwarded" }, { BOOKING_TRUSTED_PROXY_HOPS: "0" },
-    { BOOKING_HOLD_MINUTES: "1" }, { BOOKING_HOLD_MINUTES: "31" }, { BOOKING_MAX_PENDING_PER_CLIENT: "0" },
+    { BOOKING_HOLD_MINUTES: "1" }, { BOOKING_HOLD_MINUTES: "29" }, { BOOKING_HOLD_MINUTES: "43201" }, { BOOKING_MAX_PENDING_PER_CLIENT: "0" },
     { BOOKING_RATE_LIMIT_PER_CLIENT: "20", BOOKING_RATE_LIMIT_PER_BUSINESS: "10" }, { BOOKING_MAX_PENDING_PER_BUSINESS: "abc" },
   ])("recusa configuração inválida %o com 503 em vez de cair em padrão silencioso", (env) => {
     expect(() => bookingConfig(env)).toThrow(expect.objectContaining({ status: 503, code: "booking_unavailable" }));

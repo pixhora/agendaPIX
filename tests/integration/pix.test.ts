@@ -104,7 +104,7 @@ describe("reserva e cobrança do sinal", () => {
   });
   it("falha do provider reverte reserva e permite nova tentativa", async () => {
     const key = randomUUID();
-    const broken = { name: provider.name, createPixCharge: async () => { throw new Error("Falha simulada"); }, getCharge: provider.getCharge.bind(provider), findChargeByReference: provider.findChargeByReference.bind(provider), cancelCharge: provider.cancelCharge.bind(provider), verifyWebhook: provider.verifyWebhook.bind(provider) };
+    const broken = { name: provider.name, createPixCharge: async () => { throw new Error("Falha simulada"); }, getCharge: provider.getCharge.bind(provider), findChargeByReference: provider.findChargeByReference.bind(provider), cancelCharge: provider.cancelCharge.bind(provider), verifyWebhook: provider.verifyWebhook.bind(provider), refundCharge: provider.refundCharge.bind(provider) };
     await expect(createBooking(slugs[0], input(), key, database, broken)).rejects.toMatchObject({ status: 503 });
     const stuck = await database.select().from(schema.bookings).where(eq(schema.bookings.businessId, businessIds[0]));
     expect(stuck).toHaveLength(1);
@@ -200,9 +200,10 @@ describe("webhook transacional e auditável", () => {
     await database.update(schema.bookings).set({ createdAt: new Date(Date.now() - 60000), expiresAt: new Date(Date.now() - 1000) }).where(eq(schema.bookings.id, first.data.bookingId));
     await database.update(schema.payments).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(schema.payments.id, first.data.payment!.id));
     const second = await createBooking(slugs[0], input(), randomUUID(), database, provider);
-    expect(await processWebhook(webhook(first.data.payment!.externalId!), "fake", database, provider)).toMatchObject({ outcome: "ignored", reason: "late_payment_refund_pending" });
+    provider.markPaid(first.data.payment!.externalId!);
+    expect(await processWebhook(webhook(first.data.payment!.externalId!), "fake", database, provider)).toMatchObject({ outcome: "ignored", reason: "late_no_slot" });
     const old = await getBookingPayment(slugs[0], first.data.bookingId, `Bearer ${first.data.accessToken}`, database);
-    expect(old.status).toBe("expired"); expect(old.payment?.status).toBe("refund_pending");
+    expect(old.status).toBe("expired"); expect(old.payment?.status).toBe("refunded");
     expect((await getBookingPayment(slugs[0], second.data.bookingId, `Bearer ${second.data.accessToken}`, database)).status).toBe("pending_payment");
   });
   it("evento de um negócio não altera a reserva do outro", async () => {

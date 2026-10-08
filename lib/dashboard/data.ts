@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, lt } from "drizzle-orm";
+import { and, asc, eq, gte, lt, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "../../db";
 import { businesses, bookings, businessHours, customers, services } from "../../db/schema";
@@ -33,13 +33,35 @@ export async function dashboardBookings(ownerId: string, businessId: string, dat
   const first = dateSchema.parse(dates[0]);
   const last = shiftDate(dateSchema.parse(dates[dates.length - 1]), 1);
   // Intervalo amplo de UTC cobre o dia local em qualquer offset; filtro final usa o fuso do negócio.
-  const rows = await database.select({ id: bookings.id, startsAt: bookings.startsAt, endsAt: bookings.endsAt, status: bookings.status, expiresAt: bookings.expiresAt, priceCents: bookings.priceCents, depositCents: bookings.depositCents, serviceName: services.name, customerName: customers.name, customerPhone: customers.phone })
+  const rows = await database.select({ id: bookings.id, startsAt: bookings.startsAt, endsAt: bookings.endsAt, status: bookings.status, expiresAt: bookings.expiresAt, priceCents: bookings.priceCents, depositCents: bookings.depositCents, serviceName: services.name, customerName: customers.name, customerPhone: customers.phone, refundStatus: refundStatusSql(), refundedAt: refundedAtSql() })
     .from(bookings)
     .innerJoin(services, and(eq(services.id, bookings.serviceId), eq(services.businessId, bookings.businessId)))
     .innerJoin(customers, and(eq(customers.id, bookings.customerId), eq(customers.businessId, bookings.businessId)))
     .where(and(eq(bookings.businessId, businessId), gte(bookings.startsAt, new Date(`${shiftDate(first, -1)}T00:00:00Z`)), lt(bookings.startsAt, new Date(`${shiftDate(last, 1)}T00:00:00Z`))))
     .orderBy(asc(bookings.startsAt), asc(bookings.id));
-  return rows.filter((row) => dates.includes(localDate(row.startsAt, business.timezone)));
+  return rows.filter((row) => dates.includes(localDate(row.startsAt, business.timezone))).map(presentBooking);
+}
+export async function dashboardBookingDetail(ownerId: string, businessId: string, bookingId: string, database: Database = getDb()) {
+  await authorize(ownerId, businessId, database);
+  const [row] = await database.select({ id: bookings.id, startsAt: bookings.startsAt, endsAt: bookings.endsAt, status: bookings.status, expiresAt: bookings.expiresAt, priceCents: bookings.priceCents, depositCents: bookings.depositCents, serviceName: services.name, customerName: customers.name, customerPhone: customers.phone, refundStatus: refundStatusSql(), refundedAt: refundedAtSql() })
+    .from(bookings)
+    .innerJoin(services, and(eq(services.id, bookings.serviceId), eq(services.businessId, bookings.businessId)))
+    .innerJoin(customers, and(eq(customers.id, bookings.customerId), eq(customers.businessId, bookings.businessId)))
+    .where(and(eq(bookings.businessId, businessId), eq(bookings.id, bookingId)))
+    .limit(1);
+  if (!row) throw new HttpError(404, "booking_not_found", "Agendamento não encontrado.");
+  return presentBooking(row);
+}
+function refundStatusSql() {
+  return sql<string | null>`(select p.refund_status from payments p where p.business_id = ${bookings.businessId} and p.booking_id = ${bookings.id} order by p.created_at desc limit 1)`;
+}
+function refundedAtSql() {
+  return sql<Date | string | null>`(select p.refunded_at from payments p where p.business_id = ${bookings.businessId} and p.booking_id = ${bookings.id} order by p.created_at desc limit 1)`;
+}
+function presentBooking<T extends { refundStatus: string | null; refundedAt: Date | string | null }>(row: T) {
+  const refundStatus = row.refundStatus === "in_process" || row.refundStatus === "refunded" || row.refundStatus === "failed" ? row.refundStatus : null;
+  const refundedAt = row.refundedAt ? new Date(row.refundedAt).toISOString() : null;
+  return { ...row, refundStatus, refundedAt };
 }
 export type DashboardBooking = Awaited<ReturnType<typeof dashboardBookings>>[number];
 export async function saveDashboardService(ownerId: string, input: unknown, database: Database = getDb()) {

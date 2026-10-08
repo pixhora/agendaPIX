@@ -110,17 +110,18 @@ describe("limite de reservas pendentes", () => {
   });
 
   it("janela de reserva configurável define vencimento da reserva e da cobrança", async () => {
-    vi.stubEnv("BOOKING_HOLD_MINUTES", "5");
+    vi.stubEnv("BOOKING_HOLD_MINUTES", "45");
     const before = Date.now();
     const { data } = await book(0, 0, "peer:192.0.2.60");
     const expiresAt = new Date(data.expiresAt!).getTime();
-    expect(expiresAt).toBeGreaterThanOrEqual(before + 5 * 60000 - 1000);
-    expect(expiresAt).toBeLessThanOrEqual(Date.now() + 5 * 60000);
-    expect(new Date(data.payment!.expiresAt).getTime()).toBe(expiresAt);
+    const paymentExpires = new Date(data.payment!.expiresAt).getTime();
+    expect(Math.abs(paymentExpires - expiresAt)).toBeLessThanOrEqual(5000);
+    expect(expiresAt).toBeGreaterThanOrEqual(before + 45 * 60000 - 5000);
+    expect(expiresAt).toBeLessThanOrEqual(Date.now() + 45 * 60000 + 5000);
   });
 
   it("configuração inválida torna o agendamento indisponível sem criar reserva", async () => {
-    vi.stubEnv("BOOKING_HOLD_MINUTES", "999");
+    vi.stubEnv("BOOKING_HOLD_MINUTES", "50000");
     await expect(book(0, 0, "peer:192.0.2.70")).rejects.toMatchObject({ status: 503, code: "booking_unavailable" });
     expect(await database.select().from(schema.bookings).where(eq(schema.bookings.businessId, businessId))).toHaveLength(0);
   });

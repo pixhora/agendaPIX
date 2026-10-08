@@ -140,6 +140,9 @@ export const payments = pgTable("payments", {
   status: paymentStatus("status").default("creating").notNull(),
   paidAt: timestamp("paid_at", { withTimezone: true }),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  /** Devolução do sinal, separada do status da reserva e de `refund_pending`. */
+  refundStatus: text("refund_status", { enum: ["in_process", "refunded", "failed"] }),
+  refundedAt: timestamp("refunded_at", { withTimezone: true }),
   ...timestamps(),
 }, (table) => [
   unique("payments_business_id_unique").on(table.businessId, table.id),
@@ -153,6 +156,8 @@ export const payments = pgTable("payments", {
   // creating: cobrando o gateway; pending: QR anexado; demais estados finais ou de auditoria.
   check("payments_creating_has_no_qr", sql`${table.status} <> 'creating' OR (${table.qrCodeDataUrl} IS NULL AND ${table.copyPaste} IS NULL AND ${table.externalId} IS NULL)`),
   check("payments_pending_has_qr", sql`${table.status} <> 'pending' OR (${table.externalId} IS NOT NULL AND ${table.qrCodeDataUrl} IS NOT NULL AND ${table.copyPaste} IS NOT NULL)`),
+  check("payments_refund_status_valid", sql`${table.refundStatus} IS NULL OR ${table.refundStatus} IN ('in_process', 'refunded', 'failed')`),
+  check("payments_refunded_timestamp_required", sql`${table.refundStatus} IS DISTINCT FROM 'refunded' OR ${table.refundedAt} IS NOT NULL`),
 ]);
 
 

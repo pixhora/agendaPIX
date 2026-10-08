@@ -35,7 +35,21 @@ export async function sendMagicLinkEmail(email: string, url: string) {
   await transporter.sendMail({
     from: env.SMTP_FROM,
     to: email,
-    subject: "Seu link para acessar a Agenda",
-    text: `Acesse sua conta pelo link abaixo. O link vale por 5 minutos e pode ser usado uma vez.\n\n${url}\n\nSe você não pediu este acesso, ignore esta mensagem.`,
+    subject: "Seu link para entrar no AgendaPix",
+    text: `Entre no AgendaPix pelo link abaixo. O link vale por 5 minutos e pode ser usado uma vez.\n\n${url}\n\nSe você não pediu este acesso, ignore esta mensagem.`,
   });
+}
+
+export type OwnerMailer = (to: string, subject: string, text: string) => Promise<void>;
+
+/** Mesmo transporte do link de acesso. Não há central de avisos no painel: o e-mail é o aviso. */
+export async function sendOwnerEmail(to: string, subject: string, text: string) {
+  const capture = process.env.MAGIC_LINK_CAPTURE_FILE;
+  if (capture) {
+    await mkdir(path.dirname(capture), { recursive: true });
+    await writeFile(capture, `${to}\n${subject}\n${text}\n`, "utf8");
+    return;
+  }
+  const { env, transporter } = emailTransport();
+  await transporter.sendMail({ from: env.SMTP_FROM, to, subject, text });
 }

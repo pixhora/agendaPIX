@@ -16,7 +16,7 @@ type StoredCharge = ProviderCharge & { idempotencyKey: string };
  */
 export class FakeChargeStore {
   readonly byIdempotencyKey = new Map<string, StoredCharge>();
-  readonly calls = { create: 0, get: 0, find: 0, cancel: 0 };
+  readonly calls = { create: 0, get: 0, find: 0, cancel: 0, refund: 0 };
   get chargeCount() { return this.byIdempotencyKey.size; }
   findByExternalId(externalId: string) { return [...this.byIdempotencyKey.values()].find((charge) => charge.externalId === externalId); }
   findByReference(reference: string) { return [...this.byIdempotencyKey.values()].find((charge) => charge.reference === reference); }
@@ -43,7 +43,10 @@ export class FakePaymentProvider implements PaymentProvider {
   readonly name = "fake";
   readonly store: FakeChargeStore;
   latencyMs: number;
+  /** `fail` não muda a cobrança. `in_process` aceita o estorno sem marcar `refunded`. */
+  refundMode: "refunded" | "in_process" | "fail" = "refunded";
   private readonly secret: string;
+  private readonly refunds = new Map<string, { status: "refunded" | "in_process"; refundId: string }>();
   constructor(secret: string, options: { store?: FakeChargeStore; latencyMs?: number } = {}) {
     this.secret = z.string().min(32).refine((value) => !value.startsWith("replace-this-")).parse(secret);
     this.store = options.store ?? processStore;
@@ -83,8 +86,28 @@ export class FakePaymentProvider implements PaymentProvider {
     await wait(this.latencyMs, options.signal);
     const charge = this.store.findByExternalId(externalId);
     if (!charge) return null;
-    if (charge.status !== "paid") charge.status = "cancelled";
+    if (charge.status !== "paid" && charge.status !== "refunded") charge.status = "cancelled";
     return view(charge);
+  }
+  async refundCharge(externalId: string, input: { idempotencyKey: string }, options: ProviderCallOptions = {}) {
+    await wait(this.latencyMs, options.signal);
+    const charge = this.store.findByExternalId(externalId);
+    if (!charge) return null;
+    const existing = this.refunds.get(input.idempotencyKey);
+    if (existing) return existing;
+    if (charge.status === "refunded") return { status: "refunded" as const, refundId: `fake_ref_${input.idempotencyKey}` };
+    if (charge.status !== "paid") throw new Error("Só é possível estornar uma cobrança paga.");
+    if (this.refundMode === "fail") throw new Error("collector has insufficient available balance");
+    this.store.calls.refund++;
+    if (this.refundMode === "in_process") {
+      const pending = { status: "in_process" as const, refundId: `fake_ref_${input.idempotencyKey}` };
+      this.refunds.set(input.idempotencyKey, pending);
+      return pending;
+    }
+    charge.status = "refunded";
+    const result = { status: "refunded" as const, refundId: `fake_ref_${input.idempotencyKey}` };
+    this.refunds.set(input.idempotencyKey, result);
+    return result;
   }
   /** Simulação local: marca a cobrança como paga, como faria o banco do pagador. Não existe rota pública para isso. */
   markPaid(externalId: string, paidAt = new Date()) {

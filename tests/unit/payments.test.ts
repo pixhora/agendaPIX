@@ -77,6 +77,26 @@ describe("regras do evento pago", () => {
   it.each(["failed", "refunded"])("não sobrescreve pagamento %s", (status) => {
     expect(decidePaidEvent({ ...payment, status }, booking, event, now)).toMatchObject({ outcome: "rejected", recordPaid: false, confirm: false });
   });
+  it("pago aos 29:59 do hold de 30 min confirma", () => {
+    const expiresAt = new Date("2030-01-01T12:30:00.000Z");
+    const paidAt = new Date(expiresAt.getTime() - 1000);
+    expect(decidePaidEvent(
+      { ...payment, expiresAt },
+      { ...booking, expiresAt, startsAt: new Date("2030-01-01T14:00:00.000Z") },
+      { ...event, paidAt: paidAt.toISOString() },
+      paidAt,
+    )).toMatchObject({ outcome: "processed", confirm: true, recordPaid: true });
+  });
+  it("pago aos 30:01 do hold de 30 min não confirma", () => {
+    const expiresAt = new Date("2030-01-01T12:30:00.000Z");
+    const paidAt = new Date(expiresAt.getTime() + 1000);
+    expect(decidePaidEvent(
+      { ...payment, expiresAt },
+      { ...booking, expiresAt, startsAt: new Date("2030-01-01T14:00:00.000Z") },
+      { ...event, paidAt: paidAt.toISOString() },
+      paidAt,
+    )).toMatchObject({ outcome: "ignored", reason: "late_payment", confirm: false, recordPaid: true });
+  });
   it("rejeita data de pagamento no futuro além da tolerância", () => {
     expect(decidePaidEvent(payment, booking, { ...event, paidAt: "2030-01-01T12:06:00Z" }, now)).toMatchObject({ outcome: "rejected", reason: "future_payment" });
   });
