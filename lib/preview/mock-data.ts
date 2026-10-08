@@ -39,7 +39,7 @@ export const MOCK_SERVICES: PublicService[] = [
     policyHash: "preview-policy-corte",
     depositPolicy: { refundUntilHours: 24, rescheduleUntilHours: 24 },
     policyDetails: [
-      { title: "Devolução do sinal", body: "Até 24 horas antes, a devolução fica a cargo do Studio Bella.", tone: "ok" },
+      { title: "Devolução do sinal", body: "Até 24 horas antes, o Studio Bella pode devolver o sinal.", tone: "ok" },
       { title: "Perto do horário", body: "Com menos de 24 horas, o sinal fica com o Studio Bella.", tone: "warn" },
     ],
   },

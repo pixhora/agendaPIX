@@ -21,10 +21,10 @@ export function PixQr({ value, className }: PixQrProps) {
   }
 
   return (
-    <div className="shrink-0 rounded-2xl border border-line bg-white p-3">
-      {/* QR sempre sobre branco. data: ou blob: — sem host externo. */}
+    <div className="w-full shrink-0 rounded-2xl border border-line bg-white p-3">
+      {/* QR sempre sobre branco, 100% da moldura. data: ou blob: — sem host externo. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt="QR Code do Pix para pagar o sinal" width={208} height={208} className={className ?? "block size-44 object-contain lg:size-52"} />
+      <img src={src} alt="QR Code do Pix para pagar o sinal" width={208} height={208} className={className ?? "block aspect-square h-auto w-full"} />
     </div>
   );
 }

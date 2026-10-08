@@ -18,7 +18,7 @@ export function PolicySummaryLine({ summary, tone = "ok", compact = false, onDet
   const details = (
     <button
       type="button"
-      className="inline-flex min-h-11 items-center font-semibold text-ink underline decoration-line-strong underline-offset-4"
+      className="relative inline bg-transparent p-0 font-semibold text-ink underline decoration-line-strong underline-offset-4 before:absolute before:-inset-x-2 before:-inset-y-3 before:content-[''] focus-visible:outline-none focus-visible:shadow-focus"
       onClick={(event) => onDetails(event.currentTarget)}
     >
       Ver detalhes

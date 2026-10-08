@@ -13,7 +13,7 @@ interface StepProgressProps {
 const BOOKING_STEPS = [
   { step: 1, label: "Serviço" },
   { step: 2, label: "Data e hora" },
-  { step: 3, label: "Seus dados" },
+  { step: 3, label: "Dados" },
   { step: 4, label: "Pix" },
 ] as const;
 
@@ -49,7 +49,7 @@ export function StepProgress({ currentStep, steps = BOOKING_STEPS, label = "Etap
                     <StepIcon size={12} strokeWidth={ICON_STROKE} absoluteStrokeWidth aria-hidden="true" />
                   )}
                 </span>
-                <span className="truncate">{s.label}</span>
+                <span>{s.label}</span>
               </span>
               <span className="sr-only">
                 {s.label}: {isDone ? "concluído" : isCurrent ? "etapa atual" : "pendente"}

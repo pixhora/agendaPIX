@@ -7,8 +7,8 @@ import { pixUiPhase } from "./pix-status";
 import { FlaskConical } from "lucide-react";
 import { Icon } from "@/components/ui/icon";
 import { PIX_ICONS, PIX_STATUS_ICONS } from "@/lib/icons/registry";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ValueSlab, StatusChip } from "@/components/ui/value-slab";
 import type { AvailabilitySlot, PublicService } from "./types";
 import { devSimulatePixUrl, publicBookingPaymentUrl } from "@/lib/public-api";
@@ -238,7 +238,6 @@ export function StepPayment({
     try {
       await navigator.clipboard.writeText(payment.copyPaste);
       setCopied(true);
-      toast.success("Copiado", { description: "Cole no app do seu banco, em Pix, Copia e Cola." });
       setTimeout(() => setCopied(false), 2500);
     } catch {
       document.getElementById("pix-copypaste")?.focus();
@@ -368,8 +367,8 @@ export function StepPayment({
       ) : null}
 
       <div className="rounded-card border border-line bg-surface p-5 sm:p-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
-          <div className="order-1 w-full min-w-0 space-y-4 lg:order-2">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
+          <div className="order-1 min-w-0 flex-1 space-y-4 sm:order-2">
             {payment?.copyPaste && (
               <div className="space-y-2">
                 <Button type="button" variant="pix" size="lg" onClick={() => void handleCopy()} className="w-full" data-testid="pix-copy-button">
@@ -378,14 +377,14 @@ export function StepPayment({
                 </Button>
                 <p className="sr-only" aria-live="polite" aria-atomic="true">{copied ? "Copiado." : ""}</p>
                 <label htmlFor="pix-copypaste" className="block text-xs font-semibold text-muted">Pix copia e cola</label>
-                <input
+                <Input
                   id="pix-copypaste"
                   data-testid="pix-copypaste"
                   type="text"
                   readOnly
                   value={payment.copyPaste}
                   onFocus={(e) => e.currentTarget.select()}
-                  className="min-h-11 w-full truncate rounded-field border border-line bg-subtle px-3 font-mono text-xs text-ink"
+                  className="truncate font-mono"
                 />
               </div>
             )}
@@ -396,7 +395,7 @@ export function StepPayment({
             </ol>
           </div>
 
-          <div className="order-2 flex justify-center lg:order-1 lg:justify-start">
+          <div className="order-2 mx-auto w-full max-w-[200px] shrink-0 sm:order-1 sm:mx-0">
             <PixQr value={payment?.qrCodeDataUrl} />
           </div>
         </div>
@@ -413,10 +412,11 @@ export function StepPayment({
           type="button"
           variant="outline"
           disabled={isManualChecking || isSimulating}
+          aria-busy={isManualChecking || undefined}
           onClick={() => void checkStatus("manual")}
           className="w-full"
         >
-          {isManualChecking ? <Icon icon={PIX_ICONS.loading} size="md" className="animate-spin" /> : <Icon icon={PIX_ICONS.refresh} size="md" />}
+          {isManualChecking ? <Icon icon={PIX_ICONS.loading} size="md" className="animate-spin motion-reduce:animate-none" /> : <Icon icon={PIX_ICONS.refresh} size="md" />}
           {isManualChecking ? "Verificando confirmação…" : "Já paguei, verificar agora"}
         </Button>
         <p className="text-center text-xs text-muted">Verificamos automaticamente a cada poucos segundos. Guarde o comprovante.</p>

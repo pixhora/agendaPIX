@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import type { PublicService, AvailabilitySlot } from "./types";
 import { formatTimeSlot, formatCurrency, formatDateFull } from "./formatters";
-import { ArrowLeft, ArrowRight, CalendarX2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarX2, Loader2 } from "lucide-react";
 import { Icon } from "@/components/ui/icon";
 import { PERIOD_ICONS } from "@/lib/icons/registry";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -356,7 +356,7 @@ export function StepSlot({
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
               {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-12 rounded-xl" />)}
             </div>
-            <span className="sr-only">Carregando horários disponíveis...</span>
+            <p className="inline-flex items-center gap-2 text-sm text-muted"><Loader2 aria-hidden="true" className="size-4 animate-spin motion-reduce:animate-none" />Carregando horários…</p>
           </div>
         ) : errorSlots ? (
           <div role="alert" className="rounded-card border border-danger/30 bg-danger-soft p-4 text-center">

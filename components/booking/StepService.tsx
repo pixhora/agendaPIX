@@ -8,7 +8,7 @@ import type { PublicService } from "./types";
 import { formatCurrency, formatDuration } from "./formatters";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { depositServiceUnbookable } from "./booking-error";
+import { SOME_SERVICES_UNAVAILABLE_MESSAGE, depositServiceUnbookable } from "./booking-error";
 import { UnbookableNotice } from "./UnbookableNotice";
 
 interface StepServiceProps {
@@ -55,11 +55,15 @@ export function StepService({ services, selectedServiceId, onSelectService, onNe
         <p className="mt-1 text-sm text-muted">O sinal é pago por Pix e garante o seu horário. O restante você paga no local.</p>
       </div>
 
+      {hasUnbookableDeposit ? (
+        <UnbookableNotice contactWhatsapp={contactWhatsapp} message={SOME_SERVICES_UNAVAILABLE_MESSAGE} />
+      ) : null}
+
       <div ref={groupRef} className="grid gap-3" role="radiogroup" aria-label="Serviços disponíveis">
         {services.map((service, index) => {
           if (depositServiceUnbookable(service.depositCents, service.bookable)) {
             return (
-              <div key={service.id} aria-disabled="true" className="rounded-card border border-line bg-surface p-4 opacity-80">
+              <div key={service.id} aria-disabled="true" className="cursor-default rounded-card border border-line bg-surface p-4">
                 <span className="block font-semibold text-ink">{service.name}</span>
                 <span className="mt-1 block text-sm text-muted">{formatDuration(service.durationMinutes)} · {formatCurrency(service.priceCents)}</span>
                 <p className="mt-2 text-sm text-muted">Indisponível no momento</p>
@@ -112,8 +116,6 @@ export function StepService({ services, selectedServiceId, onSelectService, onNe
           );
         })}
       </div>
-
-      {hasUnbookableDeposit ? <UnbookableNotice contactWhatsapp={contactWhatsapp} /> : null}
 
       <div className="border-t border-line pt-5 sm:flex sm:justify-end">
         <Button type="button" size="lg" onClick={onNext} disabled={!selectedService} className="w-full sm:w-auto">

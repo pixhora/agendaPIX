@@ -27,9 +27,7 @@ import type { PreviewScene } from "@/components/preview/scene";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { BusinessAvatar } from "@/components/ui/business-avatar";
-import { cn } from "@/lib/utils";
-
-const PREVIEW_QR = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+import { PREVIEW_PIX_COPY_PASTE, PREVIEW_PIX_QR } from "@/lib/preview/sample-pix-qr";
 
 function previewStep(scene: PreviewScene): 1 | 2 | 3 | 4 {
   if (scene === "dados" || scene === "politica" || scene === "politica-mudou") return 3;
@@ -55,8 +53,8 @@ function previewBooking(scene: PreviewScene, service: PublicService, slot: Avail
       amountCents: service.depositCents,
       status: expired ? "expired" : "pending",
       expiresAt,
-      qrCodeDataUrl: expired ? null : PREVIEW_QR,
-      copyPaste: expired ? null : "00020126580014br.gov.bcb.pix0136studio-bella-preview52040000530398654025.005802BR5912Studio Bella6009Sao Paulo62070503***6304PREV",
+      qrCodeDataUrl: expired ? null : PREVIEW_PIX_QR,
+      copyPaste: expired ? null : PREVIEW_PIX_COPY_PASTE,
     },
   };
 }
@@ -118,10 +116,6 @@ export function PreviewBookingFlow({ scene = "fluxo" }: { scene?: PreviewScene }
     const mockBookingId = `bk-preview-${Date.now()}`;
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
-    // PNG 1×1 (data URL) — mesmo prefixo do contrato PixCharge (`data:image/png;base64,`)
-    const sampleQr =
-      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
-
     const mockResponse: BookingResponse = {
       bookingId: mockBookingId,
       status: "pending_payment",
@@ -136,10 +130,8 @@ export function PreviewBookingFlow({ scene = "fluxo" }: { scene?: PreviewScene }
         amountCents: selectedService.depositCents,
         status: "pending",
         expiresAt,
-        qrCodeDataUrl: sampleQr,
-        copyPaste: `00020126580014br.gov.bcb.pix0136studio-bella-preview-${selectedService.id}520400005303986540${(
-          selectedService.depositCents / 100
-        ).toFixed(2)}5802BR5912Studio Bella6009Sao Paulo62070503***6304PREV`,
+        qrCodeDataUrl: PREVIEW_PIX_QR,
+        copyPaste: PREVIEW_PIX_COPY_PASTE,
       },
     };
 
@@ -163,21 +155,35 @@ export function PreviewBookingFlow({ scene = "fluxo" }: { scene?: PreviewScene }
     setStep(1);
   };
 
+  const businessHeader = (
+    <header className="flex flex-col items-center space-y-2 text-center">
+      <BusinessAvatar name={MOCK_PUBLIC_BUSINESS.name} logoUrl={MOCK_PUBLIC_BUSINESS.logoUrl} size="lg" className="shadow-xs ring-2 ring-pix/20" />
+      <div className="space-y-0.5">
+        <h1 className="font-display text-2xl font-extrabold tracking-tight text-foreground">
+          {MOCK_PUBLIC_BUSINESS.name}
+        </h1>
+        <p className="flex items-center justify-center gap-1.5 text-xs font-medium text-muted-foreground">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-success" />
+          São Paulo, SP · Agendamento com sinal Pix garantido
+        </p>
+      </div>
+    </header>
+  );
+
   if (scene === "pausada") {
     return (
-      <div data-scene={scene} className="min-h-screen bg-paper px-4 py-8">
-        <div className="mx-auto w-full max-w-md">
+      <div data-scene={scene} className="min-h-screen bg-background px-4 pb-24 pt-6 text-foreground sm:py-8 sm:px-6">
+        <div className="mx-auto w-full max-w-[560px] space-y-6">
+          {businessHeader}
           <PausedState businessName={MOCK_PUBLIC_BUSINESS.name} contactWhatsapp={contactWhatsapp} services={MOCK_SERVICES} />
         </div>
       </div>
     );
   }
 
-  const widePix = scene === "pix" || scene === "pix-perto" || scene === "pix-expirado";
-
   return (
     <div data-scene={scene} className="min-h-screen bg-background text-foreground pt-6 pb-24 sm:py-8 px-4 sm:px-6">
-      <div className={cn("mx-auto w-full space-y-6", widePix ? "max-w-3xl" : "max-w-md")}>
+      <div className="mx-auto w-full max-w-[560px] space-y-6">
         {/* Barra Superior do Preview */}
         <div className="flex items-center justify-between text-xs text-muted-foreground pb-2 border-b border-border">
           <Link href="/preview" className="font-bold text-pix dark:text-primary hover:underline">
@@ -188,19 +194,7 @@ export function PreviewBookingFlow({ scene = "fluxo" }: { scene?: PreviewScene }
           </span>
         </div>
 
-        {/* Cabeçalho do Estabelecimento */}
-        <header className="flex flex-col items-center text-center space-y-2">
-          <BusinessAvatar name={MOCK_PUBLIC_BUSINESS.name} logoUrl={MOCK_PUBLIC_BUSINESS.logoUrl} size="lg" className="shadow-xs ring-2 ring-pix/20" />
-          <div className="space-y-0.5">
-            <h1 className="font-display text-2xl font-extrabold text-foreground tracking-tight">
-              {MOCK_PUBLIC_BUSINESS.name}
-            </h1>
-            <p className="text-xs text-muted-foreground flex items-center justify-center gap-1.5 font-medium">
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-success" />
-              São Paulo, SP · Agendamento com sinal Pix garantido
-            </p>
-          </div>
-        </header>
+        {businessHeader}
 
         {isCompleted && selectedService && selectedSlot ? (
           <div className="rounded-3xl border border-border bg-surface p-6 sm:p-7 shadow-sm">

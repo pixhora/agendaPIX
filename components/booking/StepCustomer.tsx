@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import type { PublicService, AvailabilitySlot } from "./types";
 import { formatCurrency, formatCpfMask, formatPhoneMask, isValidBrazilianPhone, isValidCpf } from "./formatters";
-import { ArrowLeft, Lock } from "lucide-react";
+import { ArrowLeft, Loader2, Lock } from "lucide-react";
 import { Icon } from "@/components/ui/icon";
 import { CUSTOMER_FIELD_ICONS } from "@/lib/icons/registry";
 import { Button } from "@/components/ui/button";
@@ -204,8 +204,8 @@ export function StepCustomer({
         <Button type="button" variant="ghost" disabled={isSubmitting} onClick={onBack} className="sm:-ml-3">
           <ArrowLeft aria-hidden="true" /> Voltar
         </Button>
-        <Button type="submit" size="lg" variant={service.depositCents > 0 ? "pix" : "default"} disabled={isSubmitting || policyBlocked} className="w-full sm:w-auto">
-          {service.depositCents > 0 && <Lock aria-hidden="true" />}
+        <Button type="submit" size="lg" variant={service.depositCents > 0 ? "pix" : "default"} disabled={isSubmitting || policyBlocked} aria-busy={isSubmitting || undefined} className="w-full sm:w-auto">
+          {isSubmitting ? <Loader2 aria-hidden="true" className="animate-spin motion-reduce:animate-none" /> : service.depositCents > 0 ? <Lock aria-hidden="true" /> : null}
           {isSubmitting
             ? "Gerando Pix…"
             : service.depositCents > 0

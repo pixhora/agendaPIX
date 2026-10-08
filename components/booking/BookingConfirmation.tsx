@@ -130,7 +130,7 @@ export function BookingConfirmation({
             <p className="text-sm font-semibold text-ink">Política do sinal</p>
             {policy.text?.trim() ? <p className="mt-1 text-sm leading-relaxed text-ink">{policy.text.trim()}</p> : null}
             {policy.refundDeadlineAt ? (
-              <p className="mt-2 text-sm text-muted">O estabelecimento pode devolver o sinal até {formatDateFull(policy.refundDeadlineAt, timezone)} às {formatTimeSlot(policy.refundDeadlineAt, timezone)}.</p>
+              <p className="mt-2 text-sm text-muted">O {businessName} pode devolver o sinal até {formatDateFull(policy.refundDeadlineAt, timezone).replace(/^./, (letter) => letter.toLowerCase())}, às {formatTimeSlot(policy.refundDeadlineAt, timezone)}.</p>
             ) : null}
             {policy.rescheduleDeadlineAt ? (
               <p className="mt-1 text-sm text-muted">Remarcação até {formatDateFull(policy.rescheduleDeadlineAt, timezone)} às {formatTimeSlot(policy.rescheduleDeadlineAt, timezone)}.</p>

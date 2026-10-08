@@ -3,6 +3,8 @@ import type { PolicyChangedUpdate } from "./types";
 
 export const SERVICE_UNAVAILABLE_MESSAGE = "Este serviço não está disponível para reserva online no momento.";
 
+export const SOME_SERVICES_UNAVAILABLE_MESSAGE = "Alguns serviços não estão disponíveis para reserva online no momento.";
+
 export const POLICY_CHANGED_MESSAGE = "As regras do sinal mudaram. Confira antes de gerar o Pix.";
 
 export const POLICY_MISSING_MESSAGE = "Não conseguimos carregar as regras do sinal. Tente de novo.";

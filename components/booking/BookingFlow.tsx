@@ -448,7 +448,10 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
             <Skeleton className="h-24 rounded-card" />
             <Skeleton className="h-24 rounded-card" />
           </div>
-          <span className="sr-only">Carregando informações do estabelecimento...</span>
+          <p className="mt-4 inline-flex items-center gap-2 text-sm text-muted">
+            <Icon icon={PIX_ICONS.loading} size="md" className="animate-spin motion-reduce:animate-none" />
+            Carregando…
+          </p>
         </main>
       </div>
     );

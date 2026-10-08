@@ -59,6 +59,7 @@ Aliases shadcn mantidos para compatibilidade: `background`, `foreground`, `prima
 | `--radius-field` | 12px | Campos, itens de menu |
 | `--shadow-card` | sutil | Cartões e botões preenchidos |
 | `--shadow-raised` | elevada | Popover, painel lateral, prints da landing |
+| `--shadow-focus` | `0 0 0 4px` com `--ring` a 18% | Halo de foco no invólucro do campo |
 | `--duration-feedback` / `--duration-opening` / `--duration-step` | 120 / 180 / 240ms | Hover/press, abertura, troca de etapa |
 | `--ease-standard` | `cubic-bezier(0.16, 1, 0.3, 1)` | Todas as transições |
 
