@@ -274,7 +274,7 @@ Erros deste fluxo usam `{ error: { code, message, ... } }`. `409 policy_changed`
 
 `GET /api/public/[slug]/availability` inclui `bookingsPaused`. Com a agenda pausada, `slots` vem vazio. A consulta da reserva e a criação respondem `policy: { text, snapshot, refundDeadlineAt, rescheduleDeadlineAt, refundWindowClosedAtBooking }` ou `null`. Na confirmação, no comprovante, na página da reserva e no arquivo de calendário, o front lê `policy.text`. Não há e-mail de reserva ao cliente.
 
-`businesses.trial_ends_at` é obrigatório. Negócio novo termina às 23:59:59 do 7º dia local. Negócio já existente recebe `now() + interval '7 days'` na migration `0011`. `subscriptions` guarda status `trialing | active | past_due | canceled`. `GET /api/businesses/{businessId}/billing` exige sessão do dono e responde `{ state, trialEndsAt, daysLeft, bookingsPaused, plan: { name: "AgendaPix", priceCents: 4900 }, subscription }`. `state` é `trial`, `trial_ending`, `trial_last_day`, `paused` ou `active`.
+`businesses.trial_ends_at` é obrigatório. Negócio novo termina às 23:59:59 do 7º dia local. Negócio já existente recebe `now() + interval '7 days'` na migration `0011`. `subscriptions` guarda status `trialing | active | past_due | canceled` e `provider` (`manual` | `pix_platform`, ou nulo enquanto ninguém ativou). `GET /api/businesses/{businessId}/billing` exige sessão do dono e responde `{ state, trialEndsAt, daysLeft, bookingsPaused, plan: { name: "AgendaPix", priceCents: 4900 }, subscription, checkout }`. `state` é `trial`, `trial_ending`, `trial_last_day`, `paused` ou `active`. O objeto `checkout` está na seção da assinatura manual.
 
 Agenda pausada: `createBooking` responde `403 bookings_paused` antes do limite de tentativas. Replay da mesma `Idempotency-Key` não é bloqueado. Pix já gerado ainda confirma. Disponibilidade pública fica vazia com `bookingsPaused: true`.
 
@@ -283,3 +283,86 @@ Agenda pausada: `createBooking` responde `403 bookings_paused` antes do limite d
 A listagem do dono (`dashboardServices`) inclui em cada serviço `bookable` e `blockedReason`. Hoje: `bookable: true` e `blockedReason: null`, ou `bookable: false` e `blockedReason: "bookings_paused"` quando o teste acabou sem assinatura ativa. Serviço sem sinal não herda um bloqueio futuro de conta Mercado Pago. `GET /api/businesses/{businessId}/services/{serviceId}/future-bookings-count` responde `{ count }` de reservas confirmadas com início futuro.
 
 `businesses.contact_whatsapp` é opcional, E.164. Entra no onboarding, em Ajustes e em `contactWhatsapp` no payload público.
+
+## Assinatura de R$ 49 — ativação manual (BE-26)
+
+O dono clica em "Assinar por R$ 49/mês", abre o WhatsApp do suporte com a mensagem pronta e o time ativa pelo script admin. O Pix mensal automático (`provider = pix_platform`) fica para depois. A cobrança futura usa só o token da plataforma (`MERCADOPAGO_ACCESS_TOKEN`), nunca o token OAuth de um dono. Esse provedor não está registrado.
+
+Não há valor padrão no código. As duas variáveis ficam na Vercel. Se qualquer uma faltar ou for inválida, o checkout fica indisponível e o processo não quebra no boot.
+
+| Env | Formato |
+|---|---|
+| `SUPPORT_WHATSAPP_NUMBER` | só dígitos, E.164 sem `+` (`^[1-9][0-9]{7,14}$`) |
+| `SUBSCRIPTION_MANUAL_ACTIVATION_HOURS` | inteiro >= 1, sem zero à esquerda |
+
+`.env.example` traz números fictícios. O número real do suporte não entra no repositório.
+
+### GET `/api/businesses/{businessId}/billing`
+
+Mesma autorização do GET billing do #29: sessão do dono. Sem sessão, `401 unauthorized`. Negócio de outro dono ou inexistente, `404 business_unavailable` (o #29 não separa os dois). `businessId` que não é UUID, `400 invalid_input`.
+
+O shape anterior permanece. Entra `checkout`:
+
+```ts
+checkout: {
+  provider: "manual";
+  available: boolean;
+  unavailableReason: "config_missing" | null;
+  activationHours: number | null;
+  pendingRequest: { id: string; requestedAt: string } | null;
+}
+```
+
+`activationHours` é `null` quando `available` é false. `pendingRequest` é o pedido com `handled_at` nulo e continua presente mesmo com `available: false` (a env pode sair depois do pedido). `requestedAt` é ISO 8601.
+
+Texto de referência para o front, quando houver `pendingRequest`: "Recebemos seu pedido. Ativamos em até {activationHours} h." O texto final é do front. Sem prazo (`activationHours` nulo), o front mostra que o pedido foi recebido e omite as horas.
+
+### POST `/api/businesses/{businessId}/subscription/checkout`
+
+Dono autenticado. A origem segue as outras rotas POST: `403 origin_not_allowed` se o `Origin` não for o do app. Sem body. O provider é o ativo, hoje `manual`.
+
+Cria um pedido ou reaproveita o aberto. Há no máximo um pedido aberto por negócio (índice parcial). Repetir o POST devolve o mesmo `id` e o mesmo `requestedAt`. A URL do WhatsApp é montada de novo com o slug atual.
+
+`Accept` sem `application/json` (form HTML): **303** `Location` = `https://wa.me/{SUPPORT_WHATSAPP_NUMBER}?text=` + `encodeURIComponent` de `Quero assinar o AgendaPix. Meu link: {url pública}`. A URL pública é a origem de `BETTER_AUTH_URL` mais `publicBookingPagePath(slug)`.
+
+`Accept: application/json`: **200**
+
+```ts
+{
+  provider: "manual";
+  request: { id: string; requestedAt: string };
+  whatsappUrl: string;
+  activationHours: number;
+}
+```
+
+O form do front deve usar `target="_blank"` (`<form method="post" action="/api/businesses/{businessId}/subscription/checkout" target="_blank">`). Funciona sem JS, não esbarra em bloqueio de popup e o painel continua aberto. Ao voltar o foco, o front refaz o GET billing.
+
+Erros deste POST são JSON, também no form. Não há redirect de erro. O envelope segue o helper das rotas: `{ error: { code, message } }`. O front decide pelo `code`.
+
+| HTTP | code | Quando |
+|---|---|---|
+| 401 | `unauthorized` | sem sessão |
+| 403 | `origin_not_allowed` | origem fora do app |
+| 404 | `business_unavailable` | negócio inexistente ou de outro dono |
+| 409 | `subscription_already_active` | `subscription.status === "active"` e faltam mais de 3 dias de calendário, no fuso do negócio, até `currentPeriodEnd` |
+| 503 | `checkout_unavailable` | env ausente ou inválida, ou a URL pública não pôde ser montada |
+
+A partir do D-3 (3, 2, 1, 0 ou dia já passado) o POST é aceito: é renovação. `trialing`, `past_due`, `canceled` e assinatura sem `currentPeriodEnd` não geram 409. O front só mostra "Assinar por R$ 49/mês" quando `checkout.available === true` e não haveria 409.
+
+Não há helper de limite reutilizável para rota autenticada do dono. O limite de `lib/bookings/rate-limit.ts` é só do agendamento público. Este POST não cria outro.
+
+### Pedido, script e fim do período
+
+Tabela `subscription_requests`: `id`, `business_id`, `provider`, `requested_at`, `handled_at`, `handled_by`. `handled_at` e `handled_by` são os dois nulos ou os dois preenchidos.
+
+`pnpm billing:activate -- --business <id|slug> --by <operador> [--months 1] [--dry-run]` e `pnpm billing:requests`. `--months` padrão 1. `--by` é obrigatório. Sem `DATABASE_URL` válida o script para com erro claro e não conecta. Só roda com aprovação do dono. Não apontar para produção por conta própria.
+
+Na transação, a ativação grava `subscriptions.status = active`, `provider = manual` e `current_period_end`. Se a regra de acesso do #29 ainda libera (status `active` ou `trialing` com fim no futuro), soma os meses a esse fim, no fuso do negócio. Senão, soma a agora. Fecha o pedido aberto (`handled_at`, `handled_by`). Não há tabela de auditoria para assinatura (`payment_audit` exige pagamento e reserva): o script escreve um log JSON `subscription_activated` (ou `subscription_activation_dry_run`). `--dry-run` não grava. A pausa sai na hora porque `bookingsPaused` é calculado a cada request.
+
+Quando `current_period_end` passa sem renovação, o acesso cai pela regra do #29 e a agenda volta a pausar.
+
+O #29 tem cron de reconciliação de Pix (`lib/payments/cron.ts`), não de aviso de assinatura. O lembrete idempotente de D-3 do período pago, com botão para o mesmo checkout, fica pendente. Esta entrega não cria essa infra.
+
+Nesta branch a migration é a `0012`, logo depois da `0011` do #29. No merge da fila ela vira **0014**: #29 `0011`, #32 `0012`, #33 `0013`, esta `0014`.
+

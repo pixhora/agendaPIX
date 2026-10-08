@@ -24,7 +24,9 @@
     "build:bundles": "node scripts/bundle.mjs",
     "db:migrate:prod": "node dist/migrate.cjs",
     "reconcile:prod": "node dist/reconcile.mjs",
-    "pix:simulate": "node --env-file=.env scripts/simulate-pix.mjs"
+    "pix:simulate": "node --env-file=.env scripts/simulate-pix.mjs",
+    "billing:activate": "node --experimental-transform-types --import ./scripts/ts-register.mjs scripts/billing/activate-subscription.ts",
+    "billing:requests": "node --experimental-transform-types --import ./scripts/ts-register.mjs scripts/billing/list-requests.ts"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "1.7.7",

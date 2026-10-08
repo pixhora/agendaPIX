@@ -66,6 +66,25 @@ function subscriptionGrantsAccess(subscription: SubscriptionAccess | null, now: 
   );
 }
 
+/** Renovação antecipada a partir de D-3 (dias de calendário no fuso do negócio). */
+export const SUBSCRIPTION_RENEWAL_LEAD_DAYS = 3;
+
+/**
+ * 409 subscription_already_active: status active e faltam mais de 3 dias para currentPeriodEnd.
+ * Trialing, past_due, canceled, sem fim de período ou dentro da janela D-3 não bloqueiam.
+ */
+export function subscriptionCheckoutBlocked(subscription: SubscriptionAccess | null, timeZone: string, now: Date) {
+  if (!subscription || subscription.status !== "active" || !subscription.currentPeriodEnd) return false;
+  const daysUntilEnd = calendarDaysBetween(zonedDate(now, timeZone), zonedDate(subscription.currentPeriodEnd, timeZone));
+  return daysUntilEnd > SUBSCRIPTION_RENEWAL_LEAD_DAYS;
+}
+
+/** Fim de período que ainda libera acesso pela regra do #29. Fora isso, a renovação conta de agora. */
+export function accessGrantingPeriodEnd(subscription: SubscriptionAccess | null, now: Date) {
+  if (!subscription?.currentPeriodEnd || !subscriptionGrantsAccess(subscription, now)) return null;
+  return subscription.currentPeriodEnd;
+}
+
 export function getBookingAccess(
   business: { trialEndsAt: Date; timezone: string },
   subscription: SubscriptionAccess | null,
