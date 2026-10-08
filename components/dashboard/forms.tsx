@@ -82,9 +82,10 @@ function centsFromInput(value: string) {
   return Number(whole) * 100 + Number(decimal.padEnd(2, "0"));
 }
 
-export function ServiceForm({ businessId, businessName, service, futureBookingsCount }: {
+export function ServiceForm({ businessId, businessName, contactWhatsapp = null, service, futureBookingsCount }: {
   businessId: string;
   businessName: string;
+  contactWhatsapp?: string | null;
   service?: Service;
   /** Número fixo para prévia. Sem ele, o formulário consulta as reservas futuras. */
   futureBookingsCount?: number;
@@ -227,11 +228,12 @@ export function ServiceForm({ businessId, businessName, service, futureBookingsC
     {policyState.chargeDeposit && depositCents > 0 ? <PolicyEditor
       idPrefix={prefix}
       businessName={businessName}
+      contactWhatsapp={contactWhatsapp}
       depositCents={depositCents}
       policy={policyState.policy}
       onPreset={(preset: PresetChoice) => { setClientError(""); setPolicyState(selectPreset(policyState, preset)); }}
       onCustom={customize}
-    /> : <p aria-live="polite" className="rounded-card bg-pix-soft p-4 text-sm text-ink">{policyPreviewCopy(policyState.policy, businessName, 0).preview}</p>}
+    /> : <p aria-live="polite" className="rounded-card bg-pix-soft p-4 text-sm text-ink">{policyPreviewCopy(policyState.policy, businessName, 0, contactWhatsapp).summary}</p>}
     {service && future.kind === "loading" && <PendingLine>Conferindo reservas futuras…</PendingLine>}
     {futureWarning && <p role="status" className="flex items-start gap-2 rounded-field border border-warning/30 bg-warning-soft p-3 text-sm text-ink"><AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-warning" />{futureWarning}</p>}
     {service && future.kind === "error" && <p role="alert" className="text-sm text-danger">Não foi possível conferir as reservas futuras. <button type="button" className="inline-flex min-h-11 items-center font-semibold underline" onClick={() => setAttempt((value) => value + 1)}>Tentar de novo</button></p>}

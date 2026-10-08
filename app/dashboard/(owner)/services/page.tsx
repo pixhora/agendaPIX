@@ -58,14 +58,14 @@ export default async function ServicesPage({ searchParams }: { searchParams: Pro
             <details className="group mt-3 border-t border-line pt-1">
               <summary className="flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-field text-sm font-semibold text-ink hover:text-pix focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden"><Pencil aria-hidden="true" className="size-4" />Editar serviço<span className="sr-only"> {service.name}</span></summary>
               <div className="mt-2 rounded-field bg-subtle/60 p-3 sm:p-4">
-                <ServiceForm key={service.id} businessId={business.id} businessName={business.name} service={service} />
+                <ServiceForm key={service.id} businessId={business.id} businessName={business.name} contactWhatsapp={business.contactWhatsapp} service={service} />
               </div>
             </details>
           </li>)}
         </ul>}
       </section>
       <SectionCard id="new-service" title="Cadastrar serviço" description="Aparece na sua página pública assim que estiver disponível." className="scroll-mt-24 lg:sticky lg:top-8">
-        <ServiceForm businessId={business.id} businessName={business.name} />
+        <ServiceForm businessId={business.id} businessName={business.name} contactWhatsapp={business.contactWhatsapp} />
       </SectionCard>
     </div>}
   </DashboardShell>;

@@ -1,12 +1,24 @@
 import type { DepositPolicy } from "../policy/schema";
-import { ownerPreview, policySummary } from "../policy/text";
+import { ownerPreview, policyDetails, policySummary, type PolicyDetailLine } from "../policy/text";
 
-/** Texto que o cliente lê. Só as funções de lib/policy/text, sem frase montada aqui. */
-export function policyPreviewCopy(policy: DepositPolicy, businessName: string, depositCents: number) {
+/** O que o cliente lê vem de policySummary e policyDetails. ownerPreview fica só no aviso do dono. */
+export function policyPreviewCopy(
+  policy: DepositPolicy,
+  businessName: string,
+  depositCents: number,
+  contactWhatsapp: string | null = null,
+) {
   return {
     summary: policySummary(policy, { depositCents, businessName }),
-    preview: ownerPreview(policy, { businessName, depositCents }),
+    details: depositCents > 0
+      ? policyDetails(policy, { businessName, contactWhatsapp, timezone: "America/Sao_Paulo" })
+      : [],
+    owner: ownerPreview(policy, { businessName, depositCents }),
   };
+}
+
+export function customerPreviewText(summary: string, details: PolicyDetailLine[]) {
+  return [summary, ...details.map((line) => `${line.title}. ${line.body}`)].join(" ");
 }
 
 const ARTICLE_BEFORE_NAME = String.raw`(?:^|\s)(?:[OoAa]|[Dd]o|[Dd]a|[Nn]o|[Nn]a|[Pp]elo|[Pp]ela|com o|com a)\s+`;

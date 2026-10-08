@@ -48,6 +48,7 @@ export function PolicyEditor({
   idPrefix,
   businessName,
   depositCents,
+  contactWhatsapp = null,
   policy,
   onPreset,
   onCustom,
@@ -55,11 +56,12 @@ export function PolicyEditor({
   idPrefix: string;
   businessName: string;
   depositCents: number;
+  contactWhatsapp?: string | null;
   policy: PolicyFormState["policy"];
   onPreset: (preset: PresetChoice) => void;
   onCustom: (patch: Partial<Pick<DepositPolicy, "refundUntilHours" | "rescheduleUntilHours" | "lateCancel" | "noShow">>) => void;
 }) {
-  const { summary, preview } = policyPreviewCopy(policy, businessName, depositCents);
+  const { summary, details, owner } = policyPreviewCopy(policy, businessName, depositCents, contactWhatsapp);
   const harsh = isHarshPolicy(policy);
 
   return (
@@ -76,7 +78,7 @@ export function PolicyEditor({
               <input className="sr-only" type="radio" name={`${idPrefix}-preset`} value={preset} checked={selected} onChange={() => onPreset(preset)} />
               {preset === "padrao" && <span className="text-[11px] font-bold text-pix">Recomendada</span>}
               <span className="font-display text-[15px] font-bold">{PRESET_LABEL[preset]}</span>
-              <span className="line-clamp-2 text-xs leading-snug text-muted">{policyPreviewCopy(depositPolicyPresets[preset], businessName, depositCents).summary}</span>
+              <span className="line-clamp-2 text-xs leading-snug text-muted">{policyPreviewCopy(depositPolicyPresets[preset], businessName, depositCents, contactWhatsapp).summary}</span>
             </label>
           );
         })}
@@ -127,9 +129,15 @@ export function PolicyEditor({
 
       <div aria-live="polite" className="rounded-card bg-pix-soft p-4">
         <p className="text-xs font-bold text-pix">Seu cliente vai ler assim</p>
-        <p className="mt-2 text-sm font-semibold leading-snug text-ink">{summary}</p>
-        <p className="mt-2 max-w-[65ch] text-[15px] leading-relaxed text-ink">{preview}</p>
+        <p className="mt-2 max-w-[65ch] text-sm font-semibold leading-snug text-ink">{summary}</p>
+        {details.length > 0 && <ul className="mt-3 grid gap-3">
+          {details.map((line) => <li key={line.title}>
+            <p className="text-sm font-semibold text-ink">{line.title}</p>
+            <p className="max-w-[65ch] text-sm leading-relaxed text-ink">{line.body}</p>
+          </li>)}
+        </ul>}
       </div>
+      {depositCents > 0 && <p className="max-w-[65ch] text-sm leading-relaxed text-muted"><span className="font-semibold text-ink">Para você. </span>{owner}</p>}
 
       {harsh && (
         <p className="flex items-start gap-2 text-sm text-warning">
