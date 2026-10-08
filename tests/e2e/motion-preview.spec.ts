@@ -12,7 +12,8 @@ test.describe("preview de movimento", () => {
     await expectNoHorizontalOverflow(page);
     await expectNoAxeViolations(page, "preview movimento");
 
-    await expect(page.locator("#preview-hold")).toHaveText(/\d+ minutos/);
+    await expect(page.locator("#preview-hold")).toHaveText("30 minutos");
+    await expect(page.getByTestId("booking-island")).toContainText("sex, 9 out, 14:00");
     await expect(page.locator("#preview-deposit")).toHaveText(/R\$\s*15,00/);
     const loader = page.locator("[data-testid='grade-loader'].is-loop").first();
     await expect(loader).toHaveAttribute("role", "status");

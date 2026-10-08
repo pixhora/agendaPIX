@@ -98,12 +98,12 @@ describe("movimento: acessibilidade e movimento reduzido", () => {
       compactLabel: "Nova reserva",
       guestName: "Ana",
       serviceName: "Corte feminino",
-      whenLabel: "sex, 09 out, 14:00",
+      whenLabel: "sex, 9 out, 14:00",
       statusLabel: "Confirmado · sinal pago",
-      label: "Nova reserva de Ana: Corte feminino, sex, 09 out, 14:00. Confirmado, sinal pago.",
+      label: "Nova reserva de Ana: Corte feminino, sex, 9 out, 14:00. Confirmado, sinal pago.",
     }));
     expect(html).toContain('role="img"');
-    expect(html).toContain('aria-label="Nova reserva de Ana: Corte feminino, sex, 09 out, 14:00. Confirmado, sinal pago."');
+    expect(html).toContain('aria-label="Nova reserva de Ana: Corte feminino, sex, 9 out, 14:00. Confirmado, sinal pago."');
     expect(html).toContain("Nova reserva");
     expect(html).toContain("Confirmado · sinal pago");
     expect(html).toContain('aria-hidden="true"');

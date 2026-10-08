@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { bookingConfig } from "@/lib/bookings/config";
+import { MERCADOPAGO_PIX_MIN_EXPIRATION_MS } from "@/lib/payments/mercadopago";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { BookingIsland } from "@/components/motion/booking-island";
 import { CopyButton } from "@/components/motion/copy-button";
@@ -61,7 +61,7 @@ function GradeLoaderStage({ tone, title }: { tone: "light" | "dark"; title: stri
 
 export default function MotionPreviewPage() {
   if (!isMotionPreviewOpen(process.env.NODE_ENV)) notFound();
-  const holdMinutes = bookingConfig().BOOKING_HOLD_MINUTES;
+  const pixWindowMinutes = MERCADOPAGO_PIX_MIN_EXPIRATION_MS / 60_000;
 
   return (
     <div className="min-h-screen bg-paper px-4 pt-16 pb-24 text-ink">
@@ -88,7 +88,7 @@ export default function MotionPreviewPage() {
             </article>
             <article className="rounded-card bg-surface p-4 shadow-card ring-1 ring-line">
               <p className="text-sm text-muted">Tempo para pagar o sinal</p>
-              <RollingNumber id="preview-hold" value={holdMinutes} suffix=" minutos" className="mt-2 font-display text-[40px] font-bold" />
+              <RollingNumber id="preview-hold" value={pixWindowMinutes} suffix=" minutos" className="mt-2 font-display text-[40px] font-bold" />
             </article>
           </div>
         </section>
@@ -99,9 +99,9 @@ export default function MotionPreviewPage() {
             compactLabel="Nova reserva"
             guestName="Ana"
             serviceName="Corte feminino"
-            whenLabel="sex, 09 out, 14:00"
+            whenLabel="sex, 9 out, 14:00"
             statusLabel="Confirmado · sinal pago"
-            label="Nova reserva de Ana: Corte feminino, sex, 09 out, 14:00. Confirmado, sinal pago."
+            label="Nova reserva de Ana: Corte feminino, sex, 9 out, 14:00. Confirmado, sinal pago."
           />
         </section>
 
