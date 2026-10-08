@@ -4,7 +4,7 @@ import { Mail, ShieldCheck } from "lucide-react";
 import { OtpInput, type OtpVisualStatus } from "@/components/ui/otp-input";
 import { OTP_LENGTH, formatResendWait } from "@/lib/onboarding/otp";
 import { StepActions } from "./chrome";
-import { StepHeader } from "./parts";
+import { StepHeader, stepBodyClass } from "./parts";
 
 export function StepCode({
   email,
@@ -45,7 +45,7 @@ export function StepCode({
         onComplete(code);
       }}
     >
-      <div className="flex-1 space-y-5 px-5 pt-6 pb-4">
+      <div className={stepBodyClass}>
         <StepHeader
           title="Digite o código que mandamos"
           description={
@@ -66,7 +66,7 @@ export function StepCode({
           describedBy={message ? "otp-message" : "otp-hint"}
         />
         <p id="otp-hint" className="text-sm text-muted">O código vale por 30 minutos. Pode colar direto do e-mail.</p>
-        {message ? <p id="otp-message" role="alert" className="text-sm font-medium text-danger">{message}</p> : null}
+        {message ? <p id="otp-message" role="alert" aria-live="assertive" className="text-sm font-medium text-danger">{message}</p> : null}
         <div className="space-y-1">
           <p className="text-sm text-muted">Não chegou? Olhe o spam.</p>
           {showFreshCode ? (
@@ -96,7 +96,7 @@ export function StepCode({
       {locked ? null : (
         <StepActions
           onBack={onBack}
-          submitLabel={pending ? "Entrando…" : "Entrar"}
+          submitLabel={pending ? "Confirmando…" : "Confirmar código"}
           pending={pending || status === "success"}
           disabled={code.length < OTP_LENGTH}
           onInvalid={() => document.getElementById("otp-code")?.focus()}

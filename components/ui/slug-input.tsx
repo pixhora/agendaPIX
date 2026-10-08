@@ -49,18 +49,20 @@ export function SlugInput({
     <div className="grid gap-2">
       <div
         className={cn(
-          "flex min-h-[52px] items-stretch overflow-hidden rounded-field border bg-surface focus-within:outline-2 focus-within:outline-offset-1",
-          danger && "border-2 border-danger focus-within:outline-danger",
-          success && "border-2 border-success focus-within:outline-success",
-          !danger && !success && "border-line-strong/60 focus-within:border-ink focus-within:outline-ring",
+          "onb-control-wrap flex min-h-[52px] items-stretch overflow-hidden rounded-field border bg-surface focus-within:shadow-focus",
+          danger && "border-danger",
+          success && "border-success",
+          !danger && !success && "border-line-strong/60 focus-within:border-ring",
         )}
         data-slug-status={status}
       >
-        <span className="flex max-w-[45%] shrink-0 items-center border-r border-line bg-subtle px-3 text-sm text-muted">
-          <span dir="rtl" className="truncate">
-            <span dir="ltr">{host}/</span>
+        {host ? (
+          <span className="flex max-w-[45%] shrink-0 items-center border-r border-line bg-subtle px-3 text-sm text-muted">
+            <span dir="rtl" className="truncate">
+              <span dir="ltr">{host}/</span>
+            </span>
           </span>
-        </span>
+        ) : null}
         <input
           ref={inputRef}
           id={id}

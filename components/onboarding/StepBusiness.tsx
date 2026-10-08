@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { FieldError } from "@/components/ui/field";
 import { SlugInput, type SlugVisualStatus } from "@/components/ui/slug-input";
 import { isPublicSlug, normalizeSlug } from "@/lib/slug";
 import { StepActions } from "./chrome";
-import { StepHeader, usePublicHost } from "./parts";
+import { StepHeader, stepBodyClass } from "./parts";
 import { useSlugAvailability } from "./use-slug-availability";
 
 const FORMAT_HINT = "Use letras, números e hífen. Acentos e espaços a gente ajusta.";
@@ -34,6 +35,7 @@ export function StepBusiness({
   conflict,
   notice,
   pending,
+  publicHost,
 }: {
   businessName: string;
   slug: string;
@@ -43,11 +45,12 @@ export function StepBusiness({
   onSlugTouched: (touched: boolean) => void;
   onBack?: () => void;
   onNext: () => void;
+  publicHost: string;
   conflict?: { slug: string; message: string; suggestions: string[] } | null;
   notice?: string | null;
   pending?: boolean;
 }) {
-  const host = usePublicHost();
+  const host = publicHost;
   const check = useSlugAvailability(slug);
   const [nameBlurred, setNameBlurred] = useState(false);
   const [slugBlurred, setSlugBlurred] = useState(false);
@@ -89,7 +92,7 @@ export function StepBusiness({
         onNext();
       }}
     >
-      <div className="flex-1 space-y-5 px-5 pt-6 pb-4">
+      <div className={stepBodyClass}>
         <StepHeader title="Nome e link da sua página" description="O link é o que você manda no WhatsApp e coloca na bio." />
         {notice ? <p role="alert" className="rounded-field border border-danger/30 bg-danger-soft p-3 text-sm font-medium text-danger">{notice}</p> : null}
 
@@ -109,7 +112,7 @@ export function StepBusiness({
               onChangeBusinessName(next);
               if (!slugTouched) onChangeSlug(normalizeSlug(next, { final: true }));
             }}
-            className="min-h-12 w-full rounded-field border border-line-strong/60 bg-surface px-3.5 text-base text-ink outline-none focus-visible:border-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring aria-invalid:border-danger"
+            className="onb-control min-h-12 w-full rounded-field border border-line-strong/60 bg-surface px-3.5 text-base text-ink aria-invalid:border-danger"
           />
           <FieldError id="business-name-error">{showNameError ? NAME_ERROR : null}</FieldError>
         </div>
@@ -143,13 +146,16 @@ export function StepBusiness({
                 onSlugTouched(false);
                 onChangeSlug(normalizeSlug(businessName, { final: true }));
               }}
-              className="inline-flex min-h-11 items-center self-start text-sm font-semibold text-ink underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              className="inline-flex min-h-11 items-center self-start rounded-full border border-line bg-surface px-4 text-sm font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             >
               Usar o nome do negócio
             </button>
           ) : null}
           <p id="business-slug-permanent" className="text-sm text-muted">{PERMANENT_HINT}</p>
         </div>
+        <p className="text-center text-sm text-muted">
+          Já tem conta? <Link href="/login" className="inline-flex min-h-11 items-center px-1 font-semibold text-ink underline-offset-4 hover:underline">Entrar</Link>
+        </p>
       </div>
       <StepActions submitLabel="Continuar" disabled={!canContinue} pending={pending} onInvalid={focusFirstProblem} onBack={onBack} />
     </form>

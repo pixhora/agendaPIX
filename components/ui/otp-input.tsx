@@ -43,7 +43,7 @@ export function OtpInput({
   }
 
   return (
-    <div className="relative">
+    <div className="otp-slots relative">
       <div className="grid grid-cols-6 gap-2 max-[359px]:gap-1.5" aria-hidden="true">
         {Array.from({ length: OTP_LENGTH }, (_, index) => {
           const char = value[index] ?? "";
@@ -52,12 +52,13 @@ export function OtpInput({
           return (
             <div
               key={index}
+              aria-invalid={status === "error" ? true : undefined}
               className={cn(
                 "flex h-14 min-w-0 items-center justify-center rounded-xl border bg-surface font-display text-2xl font-bold tabular-nums max-[359px]:h-11",
                 status === "error" && "border-danger",
                 status === "success" && "border-success",
-                status !== "error" && status !== "success" && filled && "border-ink",
-                status !== "error" && status !== "success" && active && "border-2 border-ink",
+                status !== "error" && status !== "success" && filled && !active && "border-ink",
+                active && "border-ring shadow-focus",
                 status !== "error" && status !== "success" && !filled && !active && "border-line-strong/60",
               )}
             >
@@ -81,7 +82,7 @@ export function OtpInput({
         aria-describedby={describedBy}
         readOnly={readOnly}
         autoFocus
-        className="absolute inset-0 h-full w-full cursor-text bg-transparent text-transparent caret-transparent outline-none"
+        className="absolute inset-0 h-full w-full cursor-text bg-transparent text-transparent caret-transparent outline-none shadow-none"
       />
     </div>
   );

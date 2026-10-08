@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { quietCtaClass } from "@/components/onboarding/chrome";
 import { FieldError } from "@/components/ui/field";
 import { OtpInput, type OtpVisualStatus } from "@/components/ui/otp-input";
 import { BrandLink } from "@/components/ui/brand";
@@ -83,7 +84,7 @@ export function ConfirmOnboarding({ draftId }: { draftId: string }) {
       return;
     }
     if (!navigator.onLine) {
-      setMessage("Sem internet. Quando voltar, toque em Entrar.");
+      setMessage("Sem internet. Quando voltar, toque em Confirmar código.");
       return;
     }
     setPending(true);
@@ -171,7 +172,7 @@ export function ConfirmOnboarding({ draftId }: { draftId: string }) {
     setMessage("Não conseguimos criar sua página agora. Seus dados estão guardados.");
   }
 
-  const title = businessName ? `Continuar o cadastro da ${businessName}` : "Continuar o cadastro";
+  const quietCta = code.length < OTP_LENGTH && !pending;
   const primary = cn(buttonVariants({ size: "lg" }), "w-full");
   const showRestart = message?.includes("Comece de novo") || message?.includes("começar de novo") || message?.includes("Peça um código novo");
 
@@ -194,7 +195,8 @@ export function ConfirmOnboarding({ draftId }: { draftId: string }) {
                 void enter();
               }}
             >
-              <h1 className="font-display text-[28px] font-bold leading-tight tracking-tight">{title}</h1>
+              <h1 className="font-display text-[28px] font-bold leading-tight tracking-tight">Continuar seu cadastro</h1>
+              {businessName ? <p className="font-display text-xl font-bold leading-tight tracking-tight">{businessName}</p> : null}
               <p className="text-[15px] text-muted">Digite o código ou confira o que veio no link. Abrir esta página não gasta o código.</p>
               {needEmail ? (
                 <div className="grid gap-1.5">
@@ -207,7 +209,7 @@ export function ConfirmOnboarding({ draftId }: { draftId: string }) {
                     autoCapitalize="none"
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
-                    className="min-h-12 w-full rounded-field border border-line-strong/60 bg-surface px-3.5 text-base outline-none focus-visible:border-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
+                    className="onb-control min-h-12 w-full rounded-field border border-line-strong/60 bg-surface px-3.5 text-base"
                   />
                 </div>
               ) : null}
@@ -226,9 +228,18 @@ export function ConfirmOnboarding({ draftId }: { draftId: string }) {
               {showRestart ? (
                 <Link href="/onboarding" className={primary}>Receber novo código</Link>
               ) : (
-                <Button type="submit" size="lg" className="w-full" aria-busy={pending || undefined} disabled={code.length < OTP_LENGTH || pending}>
+                <Button
+                  type="submit"
+                  size="lg"
+                  className={cn("w-full", quietCta && quietCtaClass)}
+                  aria-busy={pending || undefined}
+                  aria-disabled={quietCta || undefined}
+                  onClick={(event) => {
+                    if (pending || code.length < OTP_LENGTH) event.preventDefault();
+                  }}
+                >
                   {pending ? <Loader2 aria-hidden="true" className="animate-spin motion-reduce:animate-none" /> : null}
-                  Entrar
+                  Confirmar código
                 </Button>
               )}
             </form>

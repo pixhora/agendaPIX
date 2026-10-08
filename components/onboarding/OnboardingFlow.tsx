@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { isValidEmail } from "@/lib/onboarding/email-hint";
@@ -60,7 +59,7 @@ function onlineNow() {
   return typeof navigator === "undefined" ? true : navigator.onLine;
 }
 
-export function OnboardingFlow({ legalPagesPublished = false }: { legalPagesPublished?: boolean }) {
+export function OnboardingFlow({ legalPagesPublished = false, publicHost }: { legalPagesPublished?: boolean; publicHost: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialPlan = searchParams.get("plano") === "base" ? "base" : "completo";
@@ -326,7 +325,7 @@ export function OnboardingFlow({ legalPagesPublished = false }: { legalPagesPubl
   async function submitCode(value: string) {
     if (signingIn.current || codeLocked || value.length < 6) return;
     if (!onlineNow()) {
-      setCodeMessage("Sem internet. Quando voltar, toque em Entrar.");
+      setCodeMessage("Sem internet. Quando voltar, toque em Confirmar código.");
       setCodeStatus("idle");
       return;
     }
@@ -338,7 +337,7 @@ export function OnboardingFlow({ legalPagesPublished = false }: { legalPagesPubl
     if (!result.ok) {
       if (result.code === "network") {
         setCodeStatus("idle");
-        setCodeMessage("Sem internet. Quando voltar, toque em Entrar.");
+        setCodeMessage("Sem internet. Quando voltar, toque em Confirmar código.");
         return;
       }
       const failure = mapOtpError(result.code, attemptsUsed);
@@ -380,12 +379,12 @@ export function OnboardingFlow({ legalPagesPublished = false }: { legalPagesPubl
 
   async function resendCode() {
     if (!onlineNow()) {
-      setCodeMessage("Sem internet. Quando voltar, toque em Entrar.");
+      setCodeMessage("Sem internet. Quando voltar, toque em Confirmar código.");
       return;
     }
     const sent = await sendSignInOtp(data.email);
     if (!sent.ok) {
-      setCodeMessage(sent.code === "network" ? "Sem internet. Quando voltar, toque em Entrar." : GENERIC);
+      setCodeMessage(sent.code === "network" ? "Sem internet. Quando voltar, toque em Confirmar código." : GENERIC);
       setCodeStatus("error");
       return;
     }
@@ -432,6 +431,7 @@ export function OnboardingFlow({ legalPagesPublished = false }: { legalPagesPubl
                 onChangeBusinessName={(businessName) => update({ businessName })}
                 onChangeSlug={(slug) => update({ slug })}
                 onSlugTouched={(slugTouched) => update({ slugTouched })}
+                publicHost={publicHost}
                 onNext={() => void continueBusiness()}
               />
             )}
@@ -521,13 +521,8 @@ export function OnboardingFlow({ legalPagesPublished = false }: { legalPagesPubl
               />
             )}
           </div>
-          {step === "creating" ? null : (
-            <p className="px-5 pb-4 text-center text-sm text-muted">
-              Já tem conta? <Link href="/login" className="inline-flex min-h-11 items-center px-1 font-semibold text-ink underline-offset-4 hover:underline">Entrar</Link>
-            </p>
-          )}
         </div>
-        <OnboardingPreview data={data} />
+        <OnboardingPreview data={data} publicHost={publicHost} />
       </div>
     </div>
   );

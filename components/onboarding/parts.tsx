@@ -1,13 +1,6 @@
 "use client";
 
-import { useSyncExternalStore, type ReactNode } from "react";
-
-const subscribeNoop = () => () => {};
-
-/** Domínio exibido antes do link: o host real no navegador; no servidor, um texto neutro. */
-export function usePublicHost() {
-  return useSyncExternalStore(subscribeNoop, () => window.location.host, () => "seu-site");
-}
+import type { ReactNode } from "react";
 
 export function StepHeader({ title, description }: { title: string; description: ReactNode }) {
   return (
@@ -17,5 +10,7 @@ export function StepHeader({ title, description }: { title: string; description:
     </div>
   );
 }
+
+export const stepBodyClass = "flex-1 space-y-5 px-5 pt-6 max-md:pb-[calc(var(--sticky-cta-height)+1rem)] md:pb-4";
 
 export { StepActions } from "./chrome";

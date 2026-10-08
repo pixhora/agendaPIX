@@ -2,11 +2,11 @@
 
 import { useState, type ReactNode } from "react";
 import { FieldError } from "@/components/ui/field";
-import { MoneyInput, MoneyReadout } from "@/components/ui/money-input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { formatCents, depositFromPercent } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { StepActions } from "./chrome";
-import { StepHeader } from "./parts";
+import { StepHeader, stepBodyClass } from "./parts";
 import type { DepositMode } from "./types";
 
 const PRESETS = [
@@ -128,7 +128,7 @@ export function StepService({
         onNext();
       }}
     >
-      <div className="flex-1 space-y-5 px-5 pt-6 pb-4">
+      <div className={stepBodyClass}>
         <StepHeader title="Seu primeiro serviço" description="É o que o cliente vai ver na sua página. Depois você cadastra os outros." />
 
         <div className="grid gap-1.5">
@@ -141,7 +141,7 @@ export function StepService({
             aria-invalid={attempted && !nameOk ? true : undefined}
             aria-describedby={attempted && !nameOk ? "service-name-error" : undefined}
             onChange={(event) => onChangeServiceName(event.target.value)}
-            className="min-h-12 w-full rounded-field border border-line-strong/60 bg-surface px-3.5 text-base text-ink outline-none focus-visible:border-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring aria-invalid:border-danger"
+            className="onb-control min-h-12 w-full rounded-field border border-line-strong/60 bg-surface px-3.5 text-base text-ink aria-invalid:border-danger"
           />
           <FieldError id="service-name-error">{attempted && !nameOk ? NAME_ERROR : null}</FieldError>
         </div>
@@ -191,7 +191,7 @@ export function StepService({
               aria-describedby={attempted && !durationOk ? "duration-error" : undefined}
               value={durationMinutes > 0 ? String(durationMinutes) : ""}
               onChange={(event) => onChangeDuration(Number(event.target.value.replace(/\D/g, "").slice(0, 3)) || 0)}
-              className="min-h-12 w-full rounded-field border border-line-strong/60 bg-surface px-3.5 text-base tabular-nums text-ink outline-none aria-invalid:border-danger"
+              className="onb-control min-h-12 w-full rounded-field border border-line-strong/60 bg-surface px-3.5 text-base tabular-nums text-ink aria-invalid:border-danger"
             />
           ) : null}
           <FieldError id="duration-error">{attempted && !durationOk ? DURATION_ERROR : null}</FieldError>
@@ -235,7 +235,11 @@ export function StepService({
               error={!depositOk ? DEPOSIT_ERROR : null}
             />
           ) : null}
-          {!noDeposit && depositMode !== "custom" ? <MoneyReadout cents={priced ? depositCents : null} label="Valor do sinal" /> : null}
+          {!noDeposit && depositMode !== "custom" ? (
+            <p className="text-sm font-semibold">
+              Sinal: <span className="tabular-nums">{priced ? `R$ ${formatCents(depositCents)}` : "R$ —"}</span>
+            </p>
+          ) : null}
           {!noDeposit ? <p className="text-sm text-muted">{DEPOSIT_HINT}</p> : null}
           <FieldError>{depositMode !== "custom" && !depositOk ? DEPOSIT_ERROR : null}</FieldError>
         </div>
