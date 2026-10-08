@@ -102,7 +102,7 @@ export function HoursForm({ businessId, hours, multiInterval = MULTI_INTERVAL_HO
   const payload = hoursPayload(days, multiInterval);
   const order = [1, 2, 3, 4, 5, 6, 0];
   const feedback = clientError ? { error: clientError } : state;
-  return <form action={action} onSubmit={submit} className="grid gap-4 pb-24 md:pb-0" aria-busy={pending} aria-label="Horários de funcionamento">
+  return <form action={action} onSubmit={submit} className="grid gap-4" aria-busy={pending} aria-label="Horários de funcionamento">
     <div className="hidden">
       <input type="hidden" name="businessId" value={businessId} />
       {multiInterval ? <input type="hidden" name="hoursJson" value={JSON.stringify(payload)} /> : order.map((weekday) => {
