@@ -11,6 +11,19 @@ export const siteDescription =
 /** H1 da landing (02 §3). Usado na imagem de compartilhamento. */
 export const sitePromise = "Seu cliente agenda sozinho e já chega com o sinal pago.";
 
+/**
+ * Open Graph compartilhado. O nome é masculino ("o AgendaPix").
+ * `openGraph` no Next substitui o objeto inteiro do layout pai: a home
+ * espalha este objeto e acrescenta `url`.
+ */
+export const siteOpenGraph = {
+  type: "website" as const,
+  locale: "pt_BR",
+  siteName,
+  title: siteTitle,
+  description: siteDescription,
+};
+
 /** Origem canônica. `NEXT_PUBLIC_SITE_URL` quando for http(s); senão o host final. */
 export function siteOrigin(): URL {
   const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim();

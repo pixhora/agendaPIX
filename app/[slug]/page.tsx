@@ -6,6 +6,7 @@ import { z } from "zod";
 import { BookingFlow } from "@/components/booking/BookingFlow";
 import { listPublicServices } from "@/lib/bookings/service";
 import { HttpError } from "@/lib/http";
+import { siteName } from "@/lib/site";
 
 const loadPublicBusiness = cache(async (slug: string) => {
   await connection();
@@ -27,12 +28,27 @@ export async function generateMetadata({
   const business = await loadPublicBusiness(slug);
   if (!business) return { title: { absolute: "Página não encontrada · AgendaPix" }, robots: { index: false, follow: false } };
   const primary = business.services[0]?.name;
+  const title = `${business.name} · Agende online`;
+  const description = primary
+    ? `Agende ${primary} com ${business.name}. Sinal pelo Pix, confirmação na hora.`
+    : `Agende com ${business.name}. Sinal pelo Pix, confirmação na hora.`;
   return {
-    title: { absolute: `${business.name} · Agende online` },
-    description: primary
-      ? `Agende ${primary} com ${business.name}. Sinal pelo Pix, confirmação na hora.`
-      : `Agende com ${business.name}. Sinal pelo Pix, confirmação na hora.`,
+    title: { absolute: title },
+    description,
     alternates: { canonical: `/${slug}` },
+    openGraph: {
+      type: "website",
+      locale: "pt_BR",
+      siteName,
+      title,
+      description,
+      url: `/${slug}`,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+    },
   };
 }
 

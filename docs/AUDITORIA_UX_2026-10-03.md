@@ -292,7 +292,7 @@ Status: Auditoria independente concluída
 - **No entanto, do ponto de vista do dono do negócio (usuário leigo)**:
   1. No Onboarding (`/onboarding` Steps 1 a 4), o dono cadastra o serviço, preço total e sinal (ex: R$ 20), mas não há nenhuma explicação de **onde ou como o dinheiro cai** (chave Pix de repasse, conta bancária ou cadastro Asaas).
   2. No Painel de Configurações (`/preview/configuracoes`), há seções para "Perfil do Estabelecimento" e "Horários de Atendimento", mas **nenhuma menção ou card sobre recebimento Pix e conta de repasse**.
-  3. Na Landing Page (`LandingPainSolution.tsx:44`), a copy corretamente destaca a dor: *"Desconforto de cobrar sinal: passar sua chave Pix pessoal, esperar o comprovante e conferir extrato enquanto atende"*. Porém, não detalha explicitamente como a AgendaPix liquida esse valor na conta do profissional.
+  3. Na Landing Page (`LandingPainSolution.tsx:44`), a copy corretamente destaca a dor: *"Desconforto de cobrar sinal: passar sua chave Pix pessoal, esperar o comprovante e conferir extrato enquanto atende"*. Porém, não detalha explicitamente como o AgendaPix liquida esse valor na conta do profissional.
 
 ---
 

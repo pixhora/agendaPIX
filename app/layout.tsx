@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans, Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/toaster";
-import { siteDescription, siteName, siteOrigin, siteTitle } from "@/lib/site";
+import { siteDescription, siteName, siteOpenGraph, siteOrigin, siteTitle } from "@/lib/site";
 import { themeInitScript } from "@/lib/theme";
 import "./globals.css";
 
@@ -23,15 +23,7 @@ export const metadata: Metadata = {
   title: { default: siteTitle, template: `%s · ${siteName}` },
   description: siteDescription,
   applicationName: siteName,
-  alternates: { canonical: "/" },
-  openGraph: {
-    type: "website",
-    locale: "pt_BR",
-    siteName: siteName,
-    title: siteTitle,
-    description: siteDescription,
-    url: "/",
-  },
+  openGraph: siteOpenGraph,
   twitter: {
     card: "summary_large_image",
     title: siteTitle,

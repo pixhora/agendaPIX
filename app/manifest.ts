@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { brandColors } from "@/lib/brand/colors";
 import { siteDescription, siteName } from "@/lib/site";
 
 export default function manifest(): MetadataRoute.Manifest {
@@ -6,11 +7,12 @@ export default function manifest(): MetadataRoute.Manifest {
     name: siteName,
     short_name: siteName,
     description: siteDescription,
+    id: "/",
     start_url: "/",
     scope: "/",
     display: "standalone",
-    background_color: "#F6F5F2",
-    theme_color: "#0B0B0C",
+    background_color: brandColors.paper,
+    theme_color: brandColors.ink,
     lang: "pt-BR",
     icons: [
       { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },

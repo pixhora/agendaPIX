@@ -106,7 +106,7 @@ export function AppFrame({ ownerName, businesses, children }: { ownerName: strin
 
       <div className="flex min-h-dvh min-w-0 flex-col">
         <header data-sticky-chrome className="sticky top-0 z-30 flex min-h-16 items-center gap-3 border-b border-line bg-surface/95 px-4 backdrop-blur lg:hidden">
-          <Link href="/dashboard" aria-label="AgendaPix, início do painel" className="rounded-field focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"><BrandMark /></Link>
+          <Link href="/dashboard" aria-label="AgendaPix, início do painel" className="inline-flex size-11 items-center justify-center rounded-field focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"><BrandMark /></Link>
           <div className="min-w-0 flex-1 leading-tight">
             <p className="truncate text-sm font-bold"><Suspense fallback="Seu painel"><CurrentBusinessName businesses={businesses} /></Suspense></p>
             <p className="truncate text-xs text-muted">{ownerName}</p>
