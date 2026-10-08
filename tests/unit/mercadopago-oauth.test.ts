@@ -12,7 +12,9 @@ import { GET as connectGet } from "../../app/api/businesses/[businessId]/mercado
 import { createMemoryMpStore } from "../../lib/mercadopago-oauth/memory-store";
 import { sanitizeMpReturnTo } from "../../lib/mercadopago-oauth/return-to";
 import { disconnectedTokensReadyToPurge, purgeDisconnectedMercadoPagoTokens, refreshMercadoPagoConnection } from "../../lib/mercadopago-oauth/refresh";
-import { openMpOAuthState } from "../../lib/mercadopago-oauth/state";
+import { HttpError } from "../../lib/http";
+import { register } from "../../instrumentation";
+import { openMpOAuthState, sealMpOAuthState, type MpOAuthCookie } from "../../lib/mercadopago-oauth/state";
 import type { MpConnection } from "../../lib/mercadopago-oauth/types";
 
 const businessId = "11111111-1111-4111-8111-111111111111";
@@ -83,21 +85,154 @@ function connection(overrides: Partial<MpConnection> = {}): MpConnection {
 }
 
 describe("OAuth Mercado Pago por negócio", () => {
-  it("monta a autorização com PKCE e sem scope", () => {
+  it("monta a autorização sem PKCE por padrão e sem scope", () => {
     const started = beginMercadoPagoConnect({ businessId, returnTo: "/onboarding/pagamento", now, env });
     const url = new URL(started.authorizationUrl);
-    expect(url.origin).toBe("https://auth.mercadopago.com.br");
+    expect(url.origin).toBe("https://auth.mercadopago.com");
     expect(url.searchParams.get("response_type")).toBe("code");
     expect(url.searchParams.get("platform_id")).toBe("mp");
-    expect(url.searchParams.get("code_challenge_method")).toBe("S256");
-    expect(url.searchParams.get("code_challenge")).toMatch(/^[A-Za-z0-9_-]{43,}$/);
+    expect(url.searchParams.get("state")?.length).toBeGreaterThanOrEqual(32);
+    expect(url.searchParams.has("code_challenge")).toBe(false);
+    expect(url.searchParams.has("code_challenge_method")).toBe(false);
     expect(url.searchParams.has("scope")).toBe(false);
+    const opened = openMpOAuthState(started.cookie, secret, now.getTime());
+    expect(opened.ok).toBe(true);
+    if (opened.ok) {
+      expect(opened.payload.pkce).toBe(false);
+      expect("verifier" in opened.payload).toBe(false);
+    }
+    const custom = beginMercadoPagoConnect({
+      businessId,
+      returnTo: "/dashboard",
+      now,
+      env: { ...env, MP_OAUTH_AUTHORIZE_URL: "https://auth.mercadopago.com.br/authorization" },
+    });
+    expect(new URL(custom.authorizationUrl).origin).toBe("https://auth.mercadopago.com.br");
     expect(url.searchParams.get("redirect_uri")).toBe(env.MP_OAUTH_REDIRECT_URI);
     expect(assertPlaintextAbsent(started.cookie, ["mp-client-secret", "seller-access"])).toBe(true);
     expect(sanitizeMpReturnTo("/dashboard/settings?tab=pagamento")).toBe("/dashboard/settings?tab=pagamento");
     expect(sanitizeMpReturnTo("/onboarding/concluir")).toBe("/onboarding/concluir");
     for (const hostile of ["https://evil.example", "//evil.example", "/\\evil", "/dashboard@evil", "/dashboarding", "javascript:alert(1)"]) {
       expect(sanitizeMpReturnTo(hostile)).toBe("/dashboard");
+    }
+  });
+
+  it("com PKCE ligado manda challenge e code_verifier, e o callback segue o cookie", async () => {
+    const onEnv = { ...env, MP_OAUTH_PKCE: " on " };
+    const offEnv = { ...env, MP_OAUTH_PKCE: "off" };
+    const on = beginMercadoPagoConnect({ businessId, returnTo: "/dashboard", now, env: onEnv });
+    const onUrl = new URL(on.authorizationUrl);
+    expect(onUrl.searchParams.get("code_challenge_method")).toBe("S256");
+    expect(onUrl.searchParams.get("code_challenge")).toMatch(/^[A-Za-z0-9_-]{43,}$/);
+    expect(onUrl.searchParams.get("state")?.length).toBeGreaterThanOrEqual(32);
+    const onCookie = openMpOAuthState(on.cookie, secret, now.getTime());
+    expect(onCookie.ok && onCookie.payload.pkce).toBe(true);
+    const verifier = onCookie.ok && onCookie.payload.pkce ? onCookie.payload.verifier : "";
+    expect(verifier).toHaveLength(43);
+
+    const store = createMemoryMpStore();
+    await pinConsent(store, on.authorizationUrl);
+    let onBody: Record<string, unknown> | null = null;
+    await completeMercadoPagoConnect({
+      requestUrl: `https://app.example.com/callback?code=abc&state=${onUrl.searchParams.get("state")}`,
+      cookie: on.cookie,
+      ownerId: "owner",
+      now,
+      env: offEnv,
+      store,
+      ownsBusiness: async () => true,
+      fetchImpl: async (url, init) => {
+        if (url === MP_USERS_ME_URL) return Response.json({ nickname: "ana" });
+        onBody = JSON.parse(String(init?.body));
+        return tokenResponse();
+      },
+    });
+    expect(onBody).toMatchObject({ grant_type: "authorization_code", code_verifier: verifier });
+
+    const off = beginMercadoPagoConnect({ businessId, returnTo: "/dashboard", now, env: offEnv });
+    const offUrl = new URL(off.authorizationUrl);
+    expect(offUrl.searchParams.has("code_challenge")).toBe(false);
+    expect(offUrl.searchParams.has("code_challenge_method")).toBe(false);
+    const storeOff = createMemoryMpStore();
+    await pinConsent(storeOff, off.authorizationUrl);
+    let offBody: Record<string, unknown> | null = null;
+    await completeMercadoPagoConnect({
+      requestUrl: `https://app.example.com/callback?code=abc&state=${offUrl.searchParams.get("state")}`,
+      cookie: off.cookie,
+      ownerId: "owner",
+      now,
+      env: onEnv,
+      store: storeOff,
+      ownsBusiness: async () => true,
+      fetchImpl: async (url, init) => {
+        if (url === MP_USERS_ME_URL) return Response.json({ nickname: "ana" });
+        offBody = JSON.parse(String(init?.body));
+        return tokenResponse();
+      },
+    });
+    expect(offBody).not.toHaveProperty("code_verifier");
+  });
+
+  it("aceita state sem verifier no modo off e rejeita no modo on", () => {
+    const exp = now.getTime() + 60_000;
+    const without = sealMpOAuthState({
+      state: "a".repeat(43),
+      pkce: false,
+      businessId,
+      returnTo: "/dashboard",
+      exp,
+    }, secret);
+    const opened = openMpOAuthState(without, secret, now.getTime());
+    expect(opened.ok).toBe(true);
+    if (opened.ok) expect(opened.payload.pkce).toBe(false);
+
+    const missing = sealMpOAuthState({
+      state: "b".repeat(43),
+      pkce: true,
+      businessId,
+      returnTo: "/dashboard",
+      exp,
+    } as MpOAuthCookie, secret);
+    expect(openMpOAuthState(missing, secret, now.getTime()).ok).toBe(false);
+
+    const short = sealMpOAuthState({
+      state: "c".repeat(43),
+      pkce: true,
+      verifier: "x".repeat(42),
+      businessId,
+      returnTo: "/dashboard",
+      exp,
+    } as MpOAuthCookie, secret);
+    expect(openMpOAuthState(short, secret, now.getTime()).ok).toBe(false);
+
+    const long = sealMpOAuthState({
+      state: "d".repeat(43),
+      pkce: true,
+      verifier: "y".repeat(129),
+      businessId,
+      returnTo: "/dashboard",
+      exp,
+    } as MpOAuthCookie, secret);
+    expect(openMpOAuthState(long, secret, now.getTime()).ok).toBe(false);
+  });
+
+  it("rejeita MP_OAUTH_PKCE diferente de on ou off no uso e no boot", async () => {
+    for (const value of ["yes", "ON", ""]) {
+      expect(() => beginMercadoPagoConnect({
+        businessId,
+        returnTo: "/dashboard",
+        now,
+        env: { ...env, MP_OAUTH_PKCE: value },
+      })).toThrow(expect.objectContaining({ status: 503, code: "mp_oauth_pkce_invalid", message: "MP_OAUTH_PKCE deve ser on ou off." }));
+    }
+    const previous = process.env.MP_OAUTH_PKCE;
+    process.env.MP_OAUTH_PKCE = "talvez";
+    try {
+      await expect(register()).rejects.toBeInstanceOf(HttpError);
+      await expect(register()).rejects.toMatchObject({ status: 503, code: "mp_oauth_pkce_invalid", message: "MP_OAUTH_PKCE deve ser on ou off." });
+    } finally {
+      if (previous === undefined) delete process.env.MP_OAUTH_PKCE;
+      else process.env.MP_OAUTH_PKCE = previous;
     }
   });
 
@@ -152,7 +287,7 @@ describe("OAuth Mercado Pago por negócio", () => {
         calls += 1;
         const body = JSON.parse(String(init?.body));
         expect(body.grant_type).toBe("authorization_code");
-        expect(body.code_verifier).toHaveLength(43);
+        expect(body).not.toHaveProperty("code_verifier");
         expect(body).not.toHaveProperty("scope");
         return tokenResponse();
       },
@@ -385,7 +520,7 @@ describe("OAuth Mercado Pago por negócio", () => {
     });
     expect(referer.kind).toBe("redirect");
     if (referer.kind !== "redirect" || !referer.cookie) throw new Error("redirect sem cookie");
-    expect(referer.location).toContain("https://auth.mercadopago.com.br/authorization");
+    expect(referer.location).toContain("https://auth.mercadopago.com/authorization");
     expect(new URL(referer.location).searchParams.has("scope")).toBe(false);
     const state = new URL(referer.location).searchParams.get("state");
     const pending = await store.findOAuthState(state ?? "");

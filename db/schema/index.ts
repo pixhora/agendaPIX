@@ -269,7 +269,7 @@ export const mercadopagoConnections = pgTable("mercadopago_connections", {
   )`),
 ]);
 
-/** State do OAuth enquanto o dono está no Mercado Pago. O verifier PKCE continua só no cookie. */
+/** State do OAuth enquanto o dono está no Mercado Pago. O verifier PKCE, quando existe, fica só no cookie. */
 export const mercadopagoOauthStates = pgTable("mercadopago_oauth_states", {
   state: text("state").primaryKey(),
   businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "restrict" }),

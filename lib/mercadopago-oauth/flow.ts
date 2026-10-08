@@ -21,25 +21,23 @@ export function beginMercadoPagoConnect(input: { businessId: string; returnTo: u
   const now = input.now ?? new Date();
   const returnTo = sanitizeMpReturnTo(input.returnTo);
   const state = createOAuthState();
-  const verifier = createCodeVerifier();
-  const challenge = codeChallengeS256(verifier);
+  const verifier = config.pkce ? createCodeVerifier() : undefined;
   const url = new URL(config.authorizeUrl);
   url.searchParams.set("client_id", config.clientId);
   url.searchParams.set("response_type", "code");
   url.searchParams.set("platform_id", "mp");
   url.searchParams.set("state", state);
   url.searchParams.set("redirect_uri", config.redirectUri);
-  url.searchParams.set("code_challenge", challenge);
-  url.searchParams.set("code_challenge_method", "S256");
+  if (verifier) {
+    url.searchParams.set("code_challenge", codeChallengeS256(verifier));
+    url.searchParams.set("code_challenge_method", "S256");
+  }
   // Não enviamos `scope`: a doc lista read, write e offline_access, e o padrão da aplicação já inclui write.
   // Pedir um subconjunto poderia restringir a escrita usada no estorno.
-  const cookie = sealMpOAuthState({
-    state,
-    verifier,
-    businessId: input.businessId,
-    returnTo,
-    exp: now.getTime() + MP_OAUTH_COOKIE_MAX_AGE_SECONDS * 1000,
-  }, config.authSecret);
+  const exp = now.getTime() + MP_OAUTH_COOKIE_MAX_AGE_SECONDS * 1000;
+  const cookie = sealMpOAuthState(verifier
+    ? { state, pkce: true, verifier, businessId: input.businessId, returnTo, exp }
+    : { state, pkce: false, businessId: input.businessId, returnTo, exp }, config.authSecret);
   return { authorizationUrl: url.toString(), cookie, returnTo };
 }
 
@@ -84,14 +82,15 @@ export async function completeMercadoPagoConnect(input: {
   if (!pending || pending.businessId !== opened.payload.businessId || pending.expiresAt.getTime() <= now.getTime()) {
     return { path: mpResultPath(returnTo, { mp: "error", reason: "state_mismatch" }) };
   }
-  const exchanged = await requestMpToken({
+  const tokenBody: Record<string, string> = {
     grant_type: "authorization_code",
     client_id: config.clientId,
     client_secret: config.clientSecret,
     code,
     redirect_uri: config.redirectUri,
-    code_verifier: opened.payload.verifier,
-  }, input.fetchImpl);
+  };
+  if (opened.payload.pkce) tokenBody.code_verifier = opened.payload.verifier;
+  const exchanged = await requestMpToken(tokenBody, input.fetchImpl);
   if (!exchanged.ok) {
     const reason: MpCallbackReason = exchanged.reason === "expired_code" ? "expired_code" : "exchange_failed";
     return { path: mpResultPath(returnTo, { mp: "error", reason }) };
