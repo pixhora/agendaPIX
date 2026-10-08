@@ -9,7 +9,7 @@ it("coloca o código no corpo e só no fragmento do botão", () => {
     draftId: "11111111-1111-4111-8111-111111111111",
     businessName: "Studio Bella",
   });
-  expect(message.subject).toBe("Seu código da AgendaPix: 481 927");
+  expect(message.subject).toBe("Seu código do AgendaPix: 481 927");
   expect(message.text).toContain("481 927");
   expect(message.text).toContain("vale por 30 minutos");
   expect(message.text).toContain("Studio Bella");
@@ -19,7 +19,7 @@ it("coloca o código no corpo e só no fragmento do botão", () => {
   expect(button.searchParams.get("d")).toBe("11111111-1111-4111-8111-111111111111");
   expect(button.search).not.toContain("481927");
   expect(button.hash).toBe("#c=481927");
-  expect(message.html).toContain("Entrar na AgendaPix");
+  expect(message.html).toContain("Entrar no AgendaPix");
   expect(message.html).not.toContain("<script");
 });
 
