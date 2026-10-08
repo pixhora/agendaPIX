@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { INVALID_EMAIL_MESSAGE } from "@/lib/onboarding/email-hint";
-import { CONFIRM_CODE_MESSAGE, confirmIdleTarget, confirmSubmitReady } from "@/lib/onboarding/confirm-ready";
+import { CONFIRM_CODE_MESSAGE, CONFIRM_FRAGMENT_COPY, CONFIRM_MANUAL_COPY, confirmIdleTarget, confirmMaskedEmailHint, confirmSubmitReady, confirmSupportCopy } from "@/lib/onboarding/confirm-ready";
 import { onboardingSaveStatus } from "@/lib/onboarding/save-status";
 import { serviceDurationLabel } from "@/lib/onboarding/service-preview";
 
@@ -27,6 +27,20 @@ describe("confirm link without a usable email", () => {
     const input = { code: "48", email: "ana@studiobella.com.br", emailRequired: false };
     expect(confirmSubmitReady(input)).toBe(false);
     expect(confirmIdleTarget(input)).toEqual({ id: "otp-code", message: CONFIRM_CODE_MESSAGE });
+  });
+});
+
+describe("confirm email hint from the draft", () => {
+  it("prints the server mask and does not build one from a full address", () => {
+    expect(confirmMaskedEmailHint("a***@studiobella.com.br")).toBe("Use o e-mail do cadastro: a***@studiobella.com.br");
+    expect(confirmMaskedEmailHint("ana@gmail.com")).toBeNull();
+    expect(confirmMaskedEmailHint("")).toBeNull();
+    expect(confirmMaskedEmailHint(null)).toBeNull();
+  });
+
+  it("switches the support sentence when the code arrived in the link", () => {
+    expect(confirmSupportCopy(true)).toBe(CONFIRM_FRAGMENT_COPY);
+    expect(confirmSupportCopy(false)).toBe(CONFIRM_MANUAL_COPY);
   });
 });
 

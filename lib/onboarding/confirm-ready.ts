@@ -2,6 +2,19 @@ import { INVALID_EMAIL_MESSAGE, isUsableEmail } from "@/lib/onboarding/email-hin
 import { OTP_LENGTH, otpDigits } from "@/lib/onboarding/otp";
 
 export const CONFIRM_CODE_MESSAGE = "Digite o código de 6 dígitos.";
+export const CONFIRM_MANUAL_COPY = "Digite o código ou confira o que veio no link. Abrir esta página não gasta o código.";
+export const CONFIRM_FRAGMENT_COPY = "O código do link já está preenchido. Confirme seu e-mail para continuar.";
+
+export function confirmSupportCopy(fromFragment: boolean): string {
+  return fromFragment ? CONFIRM_FRAGMENT_COPY : CONFIRM_MANUAL_COPY;
+}
+
+/** Hint under the e-mail field. The mask is the server string; a full address is not rewritten. */
+export function confirmMaskedEmailHint(serverEmail: string | null | undefined): string | null {
+  const value = serverEmail?.trim() ?? "";
+  if (!value || isUsableEmail(value)) return null;
+  return `Use o e-mail do cadastro: ${value}`;
+}
 
 export type ConfirmReadyInput = {
   code: string;

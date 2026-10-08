@@ -11,7 +11,7 @@ import { FieldError } from "@/components/ui/field";
 import { OtpInput, type OtpVisualStatus } from "@/components/ui/otp-input";
 import { BrandLink } from "@/components/ui/brand";
 import { cn } from "@/lib/utils";
-import { CONFIRM_CODE_MESSAGE, confirmIdleTarget, confirmSubmitReady } from "@/lib/onboarding/confirm-ready";
+import { CONFIRM_CODE_MESSAGE, confirmIdleTarget, confirmMaskedEmailHint, confirmSubmitReady, confirmSupportCopy } from "@/lib/onboarding/confirm-ready";
 import { INVALID_EMAIL_MESSAGE, isUsableEmail } from "@/lib/onboarding/email-hint";
 import { commitOnboardingDraft, getOnboardingDraft } from "@/lib/onboarding/drafts-client";
 import { followUpFromFailure } from "@/lib/onboarding/commit-follow-up";
@@ -39,6 +39,8 @@ export function ConfirmOnboarding({ draftId }: { draftId: string }) {
   const [code, setCode] = useState("");
   const [email, setEmail] = useState("");
   const [needEmail, setNeedEmail] = useState(false);
+  const [maskedEmail, setMaskedEmail] = useState<string | null>(null);
+  const [fromFragment, setFromFragment] = useState(false);
   const [businessName, setBusinessName] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [status, setStatus] = useState<OtpVisualStatus>("idle");
@@ -52,7 +54,10 @@ export function ConfirmOnboarding({ draftId }: { draftId: string }) {
     const stored = restoreOnboardingDraft(readOnboardingDraftRaw(), "completo");
     const storedEmail = isUsableEmail(stored.email) ? stored.email : "";
     queueMicrotask(() => {
-      if (fragmentCode.length === OTP_LENGTH) setCode(fragmentCode);
+      if (fragmentCode.length === OTP_LENGTH) {
+        setCode(fragmentCode);
+        setFromFragment(true);
+      }
       setEmail(storedEmail);
       setNeedEmail(!storedEmail);
       setReady(true);
@@ -70,6 +75,9 @@ export function ConfirmOnboarding({ draftId }: { draftId: string }) {
         return;
       }
       if (result.draft.businessName) setBusinessName(result.draft.businessName);
+      if (!storedEmail && result.draft.email && !isUsableEmail(result.draft.email)) {
+        setMaskedEmail(result.draft.email);
+      }
       if (!storedEmail && isUsableEmail(result.draft.email) && result.draft.email) {
         setEmail(result.draft.email);
         setNeedEmail(false);
@@ -181,6 +189,7 @@ export function ConfirmOnboarding({ draftId }: { draftId: string }) {
   }
 
   const emailInvalid = needEmail && message === INVALID_EMAIL_MESSAGE;
+  const emailHint = needEmail ? confirmMaskedEmailHint(maskedEmail) : null;
   const readyToConfirm = confirmSubmitReady({ code, email, emailRequired: needEmail });
   const quietCta = !pending && !readyToConfirm;
   const primary = cn(buttonVariants({ size: "lg" }), "w-full");
@@ -211,7 +220,7 @@ export function ConfirmOnboarding({ draftId }: { draftId: string }) {
             >
               <h1 className="font-display text-[28px] font-bold leading-tight tracking-tight">Continuar seu cadastro</h1>
               {businessName ? <p className="font-display text-xl font-bold leading-tight tracking-tight">{businessName}</p> : null}
-              <p className="text-[15px] text-muted">Digite o código ou confira o que veio no link. Abrir esta página não gasta o código.</p>
+              <p className="text-[15px] text-muted">{confirmSupportCopy(fromFragment)}</p>
               {needEmail ? (
                 <div className="grid gap-1.5">
                   <label htmlFor="confirm-email" className="text-sm font-semibold">E-mail</label>
@@ -223,28 +232,32 @@ export function ConfirmOnboarding({ draftId }: { draftId: string }) {
                     autoCapitalize="none"
                     value={email}
                     aria-invalid={emailInvalid ? true : undefined}
-                    aria-describedby={emailInvalid ? "confirm-message" : undefined}
+                    aria-describedby={[emailHint ? "confirm-email-hint" : "", emailInvalid ? "confirm-message" : ""].filter(Boolean).join(" ") || undefined}
                     onChange={(event) => {
                       setEmail(event.target.value);
                       if (message === INVALID_EMAIL_MESSAGE) setMessage(null);
                     }}
                     className="onb-control min-h-12 w-full rounded-field border border-line-strong/60 bg-surface px-3.5 text-base aria-invalid:border-danger"
                   />
+                  {emailHint ? <p id="confirm-email-hint" className="text-sm text-muted">{emailHint}</p> : null}
                   {emailInvalid ? <FieldError id="confirm-message">{INVALID_EMAIL_MESSAGE}</FieldError> : null}
                 </div>
               ) : null}
-              <OtpInput
-                value={code}
-                onChange={(next) => {
-                  setCode(next);
-                  if (status === "error") setStatus("idle");
-                  if (message === CONFIRM_CODE_MESSAGE) setMessage(null);
-                }}
-                onComplete={(next) => void enter(next)}
-                status={status}
-                readOnly={pending}
-                describedBy={message && !emailInvalid ? "confirm-message" : undefined}
-              />
+              <fieldset className="m-0 min-w-0 border-0 p-0">
+                <legend className="mb-1.5 px-0 text-sm font-semibold">Código de 6 dígitos</legend>
+                <OtpInput
+                  value={code}
+                  onChange={(next) => {
+                    setCode(next);
+                    if (status === "error") setStatus("idle");
+                    if (message === CONFIRM_CODE_MESSAGE) setMessage(null);
+                  }}
+                  onComplete={(next) => void enter(next)}
+                  status={status}
+                  readOnly={pending}
+                  describedBy={message && !emailInvalid ? "confirm-message" : undefined}
+                />
+              </fieldset>
               {message && !emailInvalid ? <FieldError id="confirm-message">{message}</FieldError> : null}
               {showRestart ? (
                 <Link href="/onboarding" className={primary}>Receber novo código</Link>
