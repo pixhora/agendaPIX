@@ -32,6 +32,8 @@ function fromRow(row: Row): MpConnection {
     consentTextSha256: row.consentTextSha256,
     autoRefundAckAt: row.autoRefundAckAt,
     consentUserId: row.consentUserId,
+    accountDisplayName: row.accountDisplayName,
+    accountEmailMasked: row.accountEmailMasked,
   };
 }
 
@@ -54,6 +56,8 @@ function toValues(connection: MpConnection) {
     consentTextSha256: connection.consentTextSha256,
     autoRefundAckAt: connection.autoRefundAckAt,
     consentUserId: connection.consentUserId,
+    accountDisplayName: connection.accountDisplayName,
+    accountEmailMasked: connection.accountEmailMasked,
     updatedAt: new Date(),
   };
 }
@@ -101,6 +105,8 @@ export function createDrizzleMpStore(database: Database = getDb()): MpConnection
               consentTextSha256: values.consentTextSha256,
               autoRefundAckAt: values.autoRefundAckAt,
               consentUserId: values.consentUserId,
+              accountDisplayName: values.accountDisplayName,
+              accountEmailMasked: values.accountEmailMasked,
               updatedAt: values.updatedAt,
             },
           });
@@ -173,8 +179,21 @@ export function createDrizzleMpStore(database: Database = getDb()): MpConnection
     async consumeOAuthState(state) {
       await database.delete(mercadopagoOauthStates).where(eq(mercadopagoOauthStates.state, state));
     },
-    async recordConsentEvent(event) {
-      await database.insert(mpConnectionEvents).values({ businessId: event.businessId, kind: event.kind, ip: event.ip, createdAt: event.createdAt });
+    async recordConnectionEvent(event) {
+      await database.insert(mpConnectionEvents).values({
+        businessId: event.businessId,
+        kind: event.kind,
+        ip: event.ip,
+        detail: event.detail ?? null,
+        createdAt: event.createdAt,
+      });
+    },
+    async updateAccountProfile(businessId, profile) {
+      await database.update(mercadopagoConnections).set({
+        accountDisplayName: profile.accountDisplayName,
+        accountEmailMasked: profile.accountEmailMasked,
+        updatedAt: new Date(),
+      }).where(eq(mercadopagoConnections.businessId, businessId));
     },
     async listRefreshCandidates(expiresBefore) {
       const rows = await database.select({ businessId: mercadopagoConnections.businessId }).from(mercadopagoConnections).where(and(

@@ -4,6 +4,7 @@ import { Pool, type PoolClient } from "pg";
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as schema from "../../db/schema";
 import { databaseEnvSchema } from "../../lib/env";
+import { maskEmail } from "../../lib/privacy/mask-email";
 import { dismissLegacyPixKeyNotice, hasUndismissedLegacyPixKey } from "../../lib/pix-key/notice";
 import { findOwnedBusiness } from "../../lib/tenancy";
 
@@ -127,6 +128,30 @@ describe("isolamento entre negócios", () => {
     expect(defs).toMatch(/UNIQUE INDEX owner_notices_business_kind_uq .* WHERE \(booking_id IS NULL\)/);
     expect(defs).toMatch(/UNIQUE INDEX owner_notices_booking_kind_uq .* WHERE \(booking_id IS NOT NULL\)/);
     expect(defs).not.toMatch(/PRIMARY KEY/);
+  });
+  it("recusa o e-mail completo da conta Mercado Pago e aceita a máscara", async () => {
+    const columns = await client.query(
+      "SELECT column_name, is_nullable FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'mercadopago_connections' AND column_name IN ('account_display_name', 'account_email_masked') ORDER BY column_name",
+    );
+    expect(columns.rows).toEqual([
+      { column_name: "account_display_name", is_nullable: "YES" },
+      { column_name: "account_email_masked", is_nullable: "YES" },
+    ]);
+    await client.query("SAVEPOINT raw_email");
+    await expect(client.query(
+      "INSERT INTO mercadopago_connections (business_id, mp_user_id, connected_at, status, account_email_masked) VALUES ($1, '99887766', now(), 'needs_reconnect', 'ana.souza@gmail.com')",
+      [businessA],
+    )).rejects.toMatchObject({ code: "23514" });
+    await client.query("ROLLBACK TO SAVEPOINT raw_email");
+    const masked = maskEmail("ana.souza@gmail.com");
+    expect(maskEmail("ab@x.com")).toBe("a\u2022\u2022@x.com");
+    await client.query(
+      "INSERT INTO mercadopago_connections (business_id, mp_user_id, connected_at, status, account_display_name, account_email_masked) VALUES ($1, '99887766', now(), 'needs_reconnect', 'Ana S.', $2)",
+      [businessA, masked],
+    );
+    const stored = await client.query("SELECT account_display_name, account_email_masked FROM mercadopago_connections WHERE business_id = $1", [businessA]);
+    expect(stored.rows).toEqual([{ account_display_name: "Ana S.", account_email_masked: "an\u2022\u2022@gmail.com" }]);
+    expect(JSON.stringify(stored.rows)).not.toContain("ana.souza@gmail.com");
   });
   it.each(["service", "customer"])("impede reserva com %s de outro negócio", async (field) => {
     await expect(client.query(

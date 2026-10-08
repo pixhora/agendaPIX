@@ -1,3 +1,4 @@
+import { accountIdLast4 } from "./account-profile";
 import { mpOAuthConfig } from "./config";
 import { decryptMpToken } from "./crypto";
 import { createDrizzleMpStore } from "./repository";
@@ -45,6 +46,9 @@ export type MpOwnerStatus = {
   liveMode: boolean | null;
   canReceiveDeposits: boolean;
   consentVersion: string | null;
+  accountName: string | null;
+  accountEmailMasked: string | null;
+  accountIdLast4: string | null;
 };
 
 /** Status visto pelo dono. `disconnected` (desconexão nossa) aparece como `not_connected` e não revela token nem mp_user_id. */
@@ -52,9 +56,15 @@ export async function getMercadoPagoOwnerStatus(businessId: string, deps?: Refre
   const now = deps?.now ?? new Date();
   const row = await storeOf(deps).findByBusinessId(businessId);
   const consentVersion = row?.consentVersion ?? null;
+  const hidden = { accountName: null, accountEmailMasked: null, accountIdLast4: null };
   if (!row || row.status === "disconnected") {
-    return { status: "not_connected", connectedAt: null, expiresAt: null, liveMode: null, canReceiveDeposits: false, consentVersion };
+    return { status: "not_connected", connectedAt: null, expiresAt: null, liveMode: null, canReceiveDeposits: false, consentVersion, ...hidden };
   }
+  const account = {
+    accountName: row.accountDisplayName,
+    accountEmailMasked: row.accountEmailMasked,
+    accountIdLast4: accountIdLast4(row.mpUserId),
+  };
   if (row.status === "needs_reconnect") {
     return {
       status: "needs_reconnect",
@@ -63,6 +73,7 @@ export async function getMercadoPagoOwnerStatus(businessId: string, deps?: Refre
       liveMode: row.liveMode,
       canReceiveDeposits: false,
       consentVersion,
+      ...account,
     };
   }
   return {
@@ -72,6 +83,7 @@ export async function getMercadoPagoOwnerStatus(businessId: string, deps?: Refre
     liveMode: row.liveMode,
     canReceiveDeposits: connectionCanCharge(row, now),
     consentVersion,
+    ...account,
   };
 }
 

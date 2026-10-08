@@ -18,6 +18,8 @@ export type MpConnection = {
   consentTextSha256: string | null;
   autoRefundAckAt: Date | null;
   consentUserId: string | null;
+  accountDisplayName: string | null;
+  accountEmailMasked: string | null;
 };
 
 export type MpOAuthState = {
@@ -31,10 +33,11 @@ export type MpOAuthState = {
   expiresAt: Date;
 };
 
-export type MpConsentEvent = {
+export type MpConnectionEvent = {
   businessId: string;
-  kind: "consent_recorded";
+  kind: "consent_recorded" | "account_profile_failed";
   ip: string | null;
+  detail?: string | null;
   createdAt: Date;
 };
 
@@ -58,5 +61,6 @@ export type MpConnectionStore = {
   saveOAuthState(row: MpOAuthState): Promise<void>;
   findOAuthState(state: string): Promise<MpOAuthState | null>;
   consumeOAuthState(state: string): Promise<void>;
-  recordConsentEvent(event: MpConsentEvent): Promise<void>;
+  recordConnectionEvent(event: MpConnectionEvent): Promise<void>;
+  updateAccountProfile(businessId: string, profile: { accountDisplayName: string | null; accountEmailMasked: string | null }): Promise<void>;
 };

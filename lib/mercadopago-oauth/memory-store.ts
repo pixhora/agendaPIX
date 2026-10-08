@@ -1,4 +1,4 @@
-import type { MpConnection, MpConnectionStore, MpConsentEvent, MpOAuthState } from "./types";
+import type { MpConnection, MpConnectionEvent, MpConnectionStore, MpOAuthState } from "./types";
 
 function clone(row: MpConnection): MpConnection {
   return {
@@ -12,12 +12,12 @@ function clone(row: MpConnection): MpConnection {
 }
 
 /** Store em memória com o mesmo contrato do Postgres, inclusive o lock por negócio. Só para testes. */
-export function createMemoryMpStore(seed: MpConnection[] = []): MpConnectionStore & { pendingExpiresAt: Map<string, Date | null>; consentEvents: MpConsentEvent[] } {
+export function createMemoryMpStore(seed: MpConnection[] = []): MpConnectionStore & { pendingExpiresAt: Map<string, Date | null>; consentEvents: MpConnectionEvent[] } {
   const rows = new Map<string, MpConnection>();
   for (const row of seed) rows.set(row.businessId, clone(row));
   const pendingExpiresAt = new Map<string, Date | null>();
   const oauthStates = new Map<string, MpOAuthState>();
-  const consentEvents: MpConsentEvent[] = [];
+  const consentEvents: MpConnectionEvent[] = [];
   const locks = new Map<string, Promise<void>>();
 
   async function withKeyLock<T>(key: string, run: () => Promise<T>): Promise<T> {
@@ -101,8 +101,13 @@ export function createMemoryMpStore(seed: MpConnection[] = []): MpConnectionStor
     async consumeOAuthState(state) {
       oauthStates.delete(state);
     },
-    async recordConsentEvent(event) {
+    async recordConnectionEvent(event) {
       consentEvents.push({ ...event, createdAt: new Date(event.createdAt) });
+    },
+    async updateAccountProfile(businessId, profile) {
+      const row = rows.get(businessId);
+      if (!row) return;
+      rows.set(businessId, { ...row, accountDisplayName: profile.accountDisplayName, accountEmailMasked: profile.accountEmailMasked });
     },
     async withBusinessLock(businessId, run) {
       return withKeyLock(`biz:${businessId}`, () => run({

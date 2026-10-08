@@ -3,6 +3,7 @@ import { isAutoRefundAck, MP_CONNECT_CONSENT_TEXT, MP_CONNECT_CONSENT_VERSION } 
 import { normalizeClientAddress } from "../bookings/rate-limit";
 import { findOwnedBusiness } from "../tenancy";
 import { readBody } from "../http";
+import { syncAccountProfile } from "./account-profile";
 import { mpOAuthConfig, type MpOAuthConfig } from "./config";
 import { encryptMpToken } from "./crypto";
 import { createDrizzleMpStore } from "./repository";
@@ -58,6 +59,7 @@ export async function completeMercadoPagoConnect(input: {
   store?: MpConnectionStore;
   ownsBusiness?: (businessId: string, ownerId: string) => Promise<boolean>;
   clientIp?: string | null;
+  profileTimeoutMs?: number;
 }): Promise<MpConnectFinish> {
   const config = mpOAuthConfig(input.env);
   const now = input.now ?? new Date();
@@ -113,10 +115,24 @@ export async function completeMercadoPagoConnect(input: {
     consentTextSha256: pending.consentTextSha256,
     autoRefundAckAt: pending.autoRefundAckAt,
     consentUserId: pending.consentUserId,
+    accountDisplayName: null,
+    accountEmailMasked: null,
   });
   if (saved === "already_linked_elsewhere") return { path: mpResultPath(returnTo, { mp: "error", reason: "already_linked_elsewhere" }) };
   await store.consumeOAuthState(pending.state);
-  await store.recordConsentEvent({ businessId: opened.payload.businessId, kind: "consent_recorded", ip: input.clientIp ?? null, createdAt: now });
+  await store.recordConnectionEvent({ businessId: opened.payload.businessId, kind: "consent_recorded", ip: input.clientIp ?? null, createdAt: now });
+  try {
+    await syncAccountProfile({
+      businessId: opened.payload.businessId,
+      accessToken: exchanged.tokens.accessToken,
+      store,
+      fetchImpl: input.fetchImpl,
+      now,
+      timeoutMs: input.profileTimeoutMs,
+    });
+  } catch {
+    // A consulta do perfil não desfaz a conexão já gravada.
+  }
   return { path: mpResultPath(returnTo, { mp: "connected" }) };
 }
 

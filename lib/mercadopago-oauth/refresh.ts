@@ -1,4 +1,5 @@
 import { HttpError } from "../http";
+import { syncAccountProfile } from "./account-profile";
 import { mpOAuthConfig } from "./config";
 import { decryptMpToken, encryptMpToken } from "./crypto";
 import { createDrizzleMpStore } from "./repository";
@@ -14,6 +15,7 @@ export type RefreshDeps = {
   env?: Readonly<Record<string, string | undefined>>;
   fetchImpl?: MpFetch;
   store?: MpConnectionStore;
+  profileTimeoutMs?: number;
 };
 
 export type RefreshResult =
@@ -41,7 +43,7 @@ export async function refreshMercadoPagoConnection(businessId: string, deps: Ref
   const now = deps.now ?? new Date();
   const windowMs = deps.windowMs ?? MP_REFRESH_ON_DEMAND_WINDOW_MS;
   const store = deps.store ?? createDrizzleMpStore();
-  return store.withBusinessLock(businessId, async (lock) => {
+  const result = await store.withBusinessLock(businessId, async (lock): Promise<RefreshResult> => {
     const current = await lock.read();
     if (!current || current.status !== "connected" || !current.accessTokenEnc || !current.refreshTokenEnc || !current.expiresAt) {
       return current?.status === "needs_reconnect" ? { outcome: "needs_reconnect" as const, connection: current } : { outcome: "missing" as const };
@@ -83,8 +85,27 @@ export async function refreshMercadoPagoConnection(businessId: string, deps: Ref
       disconnectedAt: null,
     };
     await lock.write(connection);
-    return { outcome: "refreshed", connection };
+    return { outcome: "refreshed" as const, connection };
   });
+  if (result.outcome !== "refreshed" || result.connection.accountDisplayName || result.connection.accountEmailMasked || !result.connection.accessTokenEnc) {
+    return result;
+  }
+  try {
+    const accessToken = decryptMpToken(result.connection.accessTokenEnc, businessId, "access", config.encryptionKey);
+    await syncAccountProfile({
+      businessId,
+      accessToken,
+      store,
+      fetchImpl: deps.fetchImpl,
+      now,
+      timeoutMs: deps.profileTimeoutMs,
+    });
+    const updated = await store.findByBusinessId(businessId);
+    if (updated) return { outcome: "refreshed", connection: updated };
+  } catch {
+    // Perfil ausente não desfaz o par de tokens já renovado.
+  }
+  return result;
 }
 
 export async function refreshDueMercadoPagoConnections(deps: RefreshDeps = {}) {

@@ -16,11 +16,15 @@ CREATE TABLE "mercadopago_connections" (
 	"consent_text_sha256" text,
 	"auto_refund_ack_at" timestamp with time zone,
 	"consent_user_id" text,
+	"account_display_name" text,
+	"account_email_masked" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "mercadopago_connections_status_valid" CHECK ("mercadopago_connections"."status" IN ('connected', 'needs_reconnect', 'disconnected')),
 	CONSTRAINT "mercadopago_connections_mp_user_not_empty" CHECK (length(trim("mercadopago_connections"."mp_user_id")) > 0),
 	CONSTRAINT "mercadopago_connections_consent_hash" CHECK ("mercadopago_connections"."consent_text_sha256" IS NULL OR "mercadopago_connections"."consent_text_sha256" ~ '^[0-9a-f]{64}$'),
+	CONSTRAINT "mercadopago_connections_account_display_name" CHECK ("mercadopago_connections"."account_display_name" IS NULL OR char_length("mercadopago_connections"."account_display_name") BETWEEN 1 AND 80),
+	CONSTRAINT "mercadopago_connections_account_email_masked" CHECK ("mercadopago_connections"."account_email_masked" IS NULL OR "mercadopago_connections"."account_email_masked" ~ '^.{1,2}••@.+$'),
 	CONSTRAINT "mercadopago_connections_tokens_match_status" CHECK ((
     ("mercadopago_connections"."status" = 'connected' AND "mercadopago_connections"."disconnected_at" IS NULL AND "mercadopago_connections"."access_token_enc" IS NOT NULL AND "mercadopago_connections"."refresh_token_enc" IS NOT NULL AND length("mercadopago_connections"."access_token_enc") > 0 AND length("mercadopago_connections"."refresh_token_enc") > 0 AND "mercadopago_connections"."expires_at" IS NOT NULL)
     OR ("mercadopago_connections"."status" = 'needs_reconnect' AND "mercadopago_connections"."access_token_enc" IS NULL AND "mercadopago_connections"."refresh_token_enc" IS NULL)
@@ -49,8 +53,10 @@ CREATE TABLE "mp_connection_events" (
 	"business_id" uuid NOT NULL,
 	"kind" text NOT NULL,
 	"ip" text,
+	"detail" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "mp_connection_events_kind_not_empty" CHECK (length(trim("mp_connection_events"."kind")) > 0)
+	CONSTRAINT "mp_connection_events_kind_not_empty" CHECK (length(trim("mp_connection_events"."kind")) > 0),
+	CONSTRAINT "mp_connection_events_detail_safe" CHECK ("mp_connection_events"."detail" IS NULL OR "mp_connection_events"."detail" ~ '^(timeout|unreachable|invalid_response|http_[1-5][0-9]{2})$')
 );
 --> statement-breakpoint
 CREATE TABLE "owner_notices" (

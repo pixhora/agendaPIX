@@ -5,6 +5,8 @@ import { mercadoPagoManifest, handleMpConnectWebhook } from "../../lib/mercadopa
 import { encryptMpToken } from "../../lib/mercadopago-oauth/crypto";
 import { disconnectMercadoPago, findBusinessIdByMpUserId, getMercadoPagoOwnerStatus, getSellerAccessToken, getSellerAccessTokenForSettlement, isMpConnected } from "../../lib/mercadopago-oauth/credentials";
 import { MP_CONNECT_CONSENT_TEXT, MP_CONNECT_CONSENT_VERSION } from "../../lib/mercadopago/consent";
+import { MP_USERS_ME_URL } from "../../lib/mercadopago-oauth/account-profile";
+import { maskEmail } from "../../lib/privacy/mask-email";
 import { assertPlaintextAbsent, beginMercadoPagoConnect, completeMercadoPagoConnect, submitMercadoPagoConnect } from "../../lib/mercadopago-oauth/flow";
 import { GET as connectGet } from "../../app/api/businesses/[businessId]/mercadopago/connect/route";
 import { createMemoryMpStore } from "../../lib/mercadopago-oauth/memory-store";
@@ -74,6 +76,8 @@ function connection(overrides: Partial<MpConnection> = {}): MpConnection {
     consentTextSha256: null,
     autoRefundAckAt: null,
     consentUserId: null,
+    accountDisplayName: null,
+    accountEmailMasked: null,
     ...overrides,
   };
 }
@@ -134,7 +138,17 @@ describe("OAuth Mercado Pago por negócio", () => {
       store,
       ownsBusiness: async () => true,
       clientIp: "203.0.113.10",
-      fetchImpl: async (_url, init) => {
+      fetchImpl: async (url, init) => {
+        if (url === MP_USERS_ME_URL) {
+          return Response.json({
+            id: 99887766,
+            first_name: "Ana",
+            last_name: "Silva",
+            nickname: "ana",
+            email: "ana.souza@gmail.com",
+            identification: { type: "CPF", number: "12345678900" },
+          });
+        }
         calls += 1;
         const body = JSON.parse(String(init?.body));
         expect(body.grant_type).toBe("authorization_code");
@@ -148,6 +162,14 @@ describe("OAuth Mercado Pago por negócio", () => {
     expect(saved?.consentVersion).toBe(MP_CONNECT_CONSENT_VERSION);
     expect(saved?.consentTextSha256).toBe(createHash("sha256").update(MP_CONNECT_CONSENT_TEXT).digest("hex"));
     expect(saved?.consentUserId).toBe("owner");
+    expect(saved?.accountDisplayName).toBe("Ana S.");
+    expect(saved?.accountEmailMasked).toBe(maskEmail("ana.souza@gmail.com"));
+    expect(saved?.accountEmailMasked).toBe("an\u2022\u2022@gmail.com");
+    expect(JSON.stringify(saved)).not.toContain("ana.souza@gmail.com");
+    expect(JSON.stringify(saved)).not.toContain("12345678900");
+    expect(JSON.stringify(saved)).not.toContain("seller-access");
+    expect(JSON.stringify(store.consentEvents)).not.toContain("ana.souza@gmail.com");
+    expect(JSON.stringify(store.consentEvents)).not.toContain("seller-access");
     expect(JSON.stringify(saved)).not.toContain("203.0.113.10");
     expect(store.consentEvents).toEqual([{ businessId, kind: "consent_recorded", ip: "203.0.113.10", createdAt: now }]);
     expect(await store.findOAuthState(state ?? "")).toBeNull();
@@ -189,7 +211,8 @@ describe("OAuth Mercado Pago por negócio", () => {
   it("rotaciona o refresh uma vez sob concorrência e marca needs_reconnect no invalid_grant", async () => {
     const store = createMemoryMpStore([connection({ expiresAt: new Date("2026-10-08T18:00:00.000Z") })]);
     let calls = 0;
-    const fetchImpl = async () => {
+    const fetchImpl = async (url: string) => {
+      if (url === MP_USERS_ME_URL) return Response.json({});
       calls += 1;
       await new Promise((resolve) => setTimeout(resolve, 20));
       return tokenResponse("rotated-access", "rotated-refresh");
@@ -240,6 +263,9 @@ describe("OAuth Mercado Pago por negócio", () => {
       liveMode: null,
       canReceiveDeposits: false,
       consentVersion: null,
+      accountName: null,
+      accountEmailMasked: null,
+      accountIdLast4: null,
     });
     expect(await getSellerAccessToken(businessId, { store, env, now })).toBeNull();
     expect(await isMpConnected(businessId, { store, now })).toBe(false);
@@ -399,5 +425,161 @@ describe("OAuth Mercado Pago por negócio", () => {
     expect(getServiceBlockedReason({ depositCents: 0 }, { mpConnected: false })).toBeNull();
     expect(getServiceBlockedReason({ depositCents: 1000 }, { mpConnected: false })).toBe("mp_account_not_connected");
     expect(getServiceBlockedReason({ depositCents: 1000 }, { mpConnected: true })).toBeNull();
+  });
+
+  it("mostra o nome da conta e o e-mail mascarado, e esconde os dois quando desconectado", async () => {
+    expect(maskEmail("ana.souza@gmail.com")).toBe("an\u2022\u2022@gmail.com");
+    expect(maskEmail("ab@x.com")).toBe("a\u2022\u2022@x.com");
+    const store = createMemoryMpStore();
+    const started = beginMercadoPagoConnect({ businessId, returnTo: "/dashboard", now, env });
+    await pinConsent(store, started.authorizationUrl);
+    const state = new URL(started.authorizationUrl).searchParams.get("state");
+    const finished = await completeMercadoPagoConnect({
+      requestUrl: `https://app.example.com/callback?code=abc&state=${state}`,
+      cookie: started.cookie,
+      ownerId: "owner",
+      now,
+      env,
+      store,
+      ownsBusiness: async () => true,
+      fetchImpl: async (url) => {
+        if (url === MP_USERS_ME_URL) return Response.json({ nickname: "barbearia", last_name: "Silva", email: "ab@x.com" });
+        return tokenResponse();
+      },
+    });
+    expect(finished.path).toContain("mp=connected");
+    const saved = await store.findByBusinessId(businessId);
+    expect(saved?.status).toBe("connected");
+    expect(saved?.accountDisplayName).toBe("barbearia");
+    expect(saved?.accountEmailMasked).toBe("a\u2022\u2022@x.com");
+    expect(JSON.stringify(saved)).not.toContain("ab@x.com");
+    const visible = await getMercadoPagoOwnerStatus(businessId, { store, now });
+    expect(visible).toMatchObject({
+      status: "connected",
+      accountName: "barbearia",
+      accountEmailMasked: "a\u2022\u2022@x.com",
+      accountIdLast4: "4242",
+    });
+    expect(JSON.stringify(visible)).not.toContain("ab@x.com");
+    const shown = createMemoryMpStore([connection({
+      mpUserId: "99887766",
+      accountDisplayName: "Ana S.",
+      accountEmailMasked: "an\u2022\u2022@gmail.com",
+    })]);
+    const open = await getMercadoPagoOwnerStatus(businessId, { store: shown, now });
+    expect(open).toMatchObject({ status: "connected", accountName: "Ana S.", accountEmailMasked: "an\u2022\u2022@gmail.com", accountIdLast4: "7766" });
+    expect(JSON.stringify(open)).not.toContain("99887766");
+    expect(JSON.stringify(open)).not.toContain("ana.souza@gmail.com");
+    const named = createMemoryMpStore([connection({
+      mpUserId: "99887766",
+      accountDisplayName: "Ana S.",
+      accountEmailMasked: "an\u2022\u2022@gmail.com",
+      status: "disconnected",
+      disconnectedAt: now,
+    })]);
+    const hidden = await getMercadoPagoOwnerStatus(businessId, { store: named, now });
+    expect(hidden).toMatchObject({ status: "not_connected", accountName: null, accountEmailMasked: null, accountIdLast4: null });
+    expect(JSON.stringify(hidden)).not.toContain("99887766");
+    expect(JSON.stringify(hidden)).not.toContain("ana.souza@gmail.com");
+  });
+
+  it("mantém a conexão quando /users/me estoura o tempo ou responde 500", async () => {
+    const fullEmail = "ana.souza@gmail.com";
+    const timeoutStore = createMemoryMpStore();
+    const timeoutStart = beginMercadoPagoConnect({ businessId, returnTo: "/dashboard", now, env });
+    await pinConsent(timeoutStore, timeoutStart.authorizationUrl);
+    const timeoutState = new URL(timeoutStart.authorizationUrl).searchParams.get("state");
+    const timedOut = await completeMercadoPagoConnect({
+      requestUrl: `https://app.example.com/callback?code=abc&state=${timeoutState}`,
+      cookie: timeoutStart.cookie,
+      ownerId: "owner",
+      now,
+      env,
+      store: timeoutStore,
+      ownsBusiness: async () => true,
+      profileTimeoutMs: 20,
+      fetchImpl: async (url, init) => {
+        if (url === MP_USERS_ME_URL) {
+          await new Promise((_resolve, reject) => {
+            const abort = () => reject(Object.assign(new Error("The operation was aborted"), { name: "AbortError" }));
+            if (init?.signal?.aborted) abort();
+            else init?.signal?.addEventListener("abort", abort, { once: true });
+          });
+        }
+        return tokenResponse();
+      },
+    });
+    expect(timedOut.path).toContain("mp=connected");
+    const timedOutRow = await timeoutStore.findByBusinessId(businessId);
+    expect(timedOutRow?.status).toBe("connected");
+    expect(timedOutRow?.accessTokenEnc).toContain("v1.");
+    expect(timedOutRow?.accountDisplayName).toBeNull();
+    expect(timedOutRow?.accountEmailMasked).toBeNull();
+    expect(timeoutStore.consentEvents).toContainEqual(expect.objectContaining({ kind: "account_profile_failed", detail: "timeout" }));
+    expect(JSON.stringify(timeoutStore.consentEvents)).not.toContain("seller-access");
+
+    const failedStore = createMemoryMpStore();
+    const failedStart = beginMercadoPagoConnect({ businessId, returnTo: "/dashboard", now, env });
+    await pinConsent(failedStore, failedStart.authorizationUrl);
+    const failedState = new URL(failedStart.authorizationUrl).searchParams.get("state");
+    const failed = await completeMercadoPagoConnect({
+      requestUrl: `https://app.example.com/callback?code=abc&state=${failedState}`,
+      cookie: failedStart.cookie,
+      ownerId: "owner",
+      now,
+      env,
+      store: failedStore,
+      ownsBusiness: async () => true,
+      fetchImpl: async (url) => {
+        if (url === MP_USERS_ME_URL) return Response.json({ email: fullEmail, first_name: "Ana", last_name: "Silva" }, { status: 500 });
+        return tokenResponse();
+      },
+    });
+    expect(failed.path).toContain("mp=connected");
+    const failedRow = await failedStore.findByBusinessId(businessId);
+    expect(failedRow?.status).toBe("connected");
+    expect(failedRow?.accountDisplayName).toBeNull();
+    expect(failedRow?.accountEmailMasked).toBeNull();
+    expect(failedStore.consentEvents).toContainEqual(expect.objectContaining({ kind: "account_profile_failed", detail: "http_500" }));
+    const dumped = JSON.stringify({ row: failedRow, events: failedStore.consentEvents });
+    expect(dumped).not.toContain(fullEmail);
+    expect(dumped).not.toContain("seller-access");
+  });
+
+  it("busca de novo o perfil no refresh enquanto nome e e-mail mascarado estão vazios", async () => {
+    const fullEmail = "ana.souza@gmail.com";
+    const store = createMemoryMpStore([connection({ expiresAt: new Date("2026-10-08T18:00:00.000Z") })]);
+    let profileCalls = 0;
+    const refreshed = await refreshMercadoPagoConnection(businessId, {
+      store,
+      env,
+      now,
+      fetchImpl: async (url) => {
+        if (url === MP_USERS_ME_URL) {
+          profileCalls += 1;
+          return Response.json({ first_name: "Ana", last_name: "Silva", email: fullEmail });
+        }
+        return tokenResponse("rotated-access", "rotated-refresh");
+      },
+    });
+    expect(refreshed.outcome).toBe("refreshed");
+    expect(profileCalls).toBe(1);
+    const row = await store.findByBusinessId(businessId);
+    expect(row?.accountDisplayName).toBe("Ana S.");
+    expect(row?.accountEmailMasked).toBe("an\u2022\u2022@gmail.com");
+    expect(JSON.stringify(row)).not.toContain(fullEmail);
+    expect(JSON.stringify(store.consentEvents)).not.toContain(fullEmail);
+    profileCalls = 0;
+    await refreshMercadoPagoConnection(businessId, {
+      store,
+      env,
+      now: new Date("2027-03-01T00:00:00.000Z"),
+      fetchImpl: async (url) => {
+        if (url === MP_USERS_ME_URL) profileCalls += 1;
+        return tokenResponse("again-access", "again-refresh");
+      },
+    });
+    expect(profileCalls).toBe(0);
+    expect((await store.findByBusinessId(businessId))?.accountDisplayName).toBe("Ana S.");
   });
 });

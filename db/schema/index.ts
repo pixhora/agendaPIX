@@ -248,6 +248,8 @@ export const mercadopagoConnections = pgTable("mercadopago_connections", {
   consentTextSha256: text("consent_text_sha256"),
   autoRefundAckAt: timestamp("auto_refund_ack_at", { withTimezone: true }),
   consentUserId: text("consent_user_id"),
+  accountDisplayName: text("account_display_name"),
+  accountEmailMasked: text("account_email_masked"),
   ...timestamps(),
 }, (table) => [
   uniqueIndex("mercadopago_connections_mp_user_connected_uq").on(table.mpUserId).where(sql`${table.status} = 'connected'`),
@@ -255,6 +257,8 @@ export const mercadopagoConnections = pgTable("mercadopago_connections", {
   check("mercadopago_connections_status_valid", sql`${table.status} IN ('connected', 'needs_reconnect', 'disconnected')`),
   check("mercadopago_connections_mp_user_not_empty", sql`length(trim(${table.mpUserId})) > 0`),
   check("mercadopago_connections_consent_hash", sql`${table.consentTextSha256} IS NULL OR ${table.consentTextSha256} ~ '^[0-9a-f]{64}$'`),
+  check("mercadopago_connections_account_display_name", sql`${table.accountDisplayName} IS NULL OR char_length(${table.accountDisplayName}) BETWEEN 1 AND 80`),
+  check("mercadopago_connections_account_email_masked", sql`${table.accountEmailMasked} IS NULL OR ${table.accountEmailMasked} ~ '^.{1,2}\u2022\u2022@.+$'`),
   check("mercadopago_connections_tokens_match_status", sql`(
     (${table.status} = 'connected' AND ${table.disconnectedAt} IS NULL AND ${table.accessTokenEnc} IS NOT NULL AND ${table.refreshTokenEnc} IS NOT NULL AND length(${table.accessTokenEnc}) > 0 AND length(${table.refreshTokenEnc}) > 0 AND ${table.expiresAt} IS NOT NULL)
     OR (${table.status} = 'needs_reconnect' AND ${table.accessTokenEnc} IS NULL AND ${table.refreshTokenEnc} IS NULL)
@@ -287,10 +291,12 @@ export const mpConnectionEvents = pgTable("mp_connection_events", {
   businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "restrict" }),
   kind: text("kind").notNull(),
   ip: text("ip"),
+  detail: text("detail"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
   index("mp_connection_events_business_idx").on(table.businessId, table.createdAt),
   check("mp_connection_events_kind_not_empty", sql`length(trim(${table.kind})) > 0`),
+  check("mp_connection_events_detail_safe", sql`${table.detail} IS NULL OR ${table.detail} ~ '^(timeout|unreachable|invalid_response|http_[1-5][0-9]{2})$'`),
 ]);
 
 /** Aviso do dono. Sem reserva, uma linha por negócio e tipo. Com reserva, uma linha por reserva e tipo. Não guarda a chave Pix. */
