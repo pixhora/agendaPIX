@@ -12,8 +12,8 @@ import { pixChargeSchema, type PaymentProvider, type PixCharge } from "../paymen
 import { callProvider, ProviderTimeoutError } from "../payments/timeout";
 import { loadBookingAccess } from "../billing/load";
 import { depositPolicySchema, POLICY_CHANGED_CODE, POLICY_CHANGED_MESSAGE } from "../policy/schema";
-import { policyHashFor, policyTextFor } from "../policy/hash";
-import { policySummary } from "../policy/text";
+import { policyHashFor } from "../policy/hash";
+import { clientPolicyText, policySummary } from "../policy/text";
 import { availableSlots, localDate } from "./availability";
 import { assertDepositBookable } from "./deposit-bookability";
 import { availabilitySchema, bookingInputSchema, requestKeySchema, slugSchema } from "./validation";
@@ -264,7 +264,7 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
     const expiresAt = service.depositCents > 0 ? new Date(Math.min(now.getTime() + config.BOOKING_HOLD_MINUTES * 60000, slot.startsAt.getTime())) : null;
     const [booking] = await transaction.insert(schema.bookings).values({ businessId: business.id, serviceId: service.id, customerId, requestKey, requestHash, clientHash, ...slot,
       priceCents: service.priceCents, depositCents: service.depositCents, status: expiresAt ? "pending_payment" : "confirmed", expiresAt, createdAt: now,
-      policySnapshot: policy, policyText: policy ? policyTextFor(policy, { businessName: business.name, depositCents: service.depositCents }) : null, policyHash: currentHash,
+      policySnapshot: policy, policyText: policy ? clientPolicyText(policy, { businessName: business.name, depositCents: service.depositCents, contactWhatsapp: business.contactWhatsapp, startsAt: slot.startsAt, now, timezone: business.timezone }) : null, policyHash: currentHash,
       refundDeadlineAt: policy ? deadlineAt(slot.startsAt, policy.refundUntilHours) : null,
       rescheduleDeadlineAt: policy ? deadlineAt(slot.startsAt, policy.rescheduleUntilHours) : null,
     }).returning();

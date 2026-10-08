@@ -76,8 +76,11 @@ describe("política do sinal, teste grátis e WhatsApp", () => {
     expect(listed.services[0]).toMatchObject({ depositPolicy: PADRAO_DEPOSIT_POLICY, policyHash: padraoPolicyHash("Studio Bella") });
 
     const created = await createBooking(slug, input(), randomUUID(), database, provider);
-    expect(created.data.policy?.text).toContain("Studio Bella");
+    expect(created.data.policy?.text).toContain("Studio Bella pode devolver o sinal até");
+    expect(created.data.policy?.text).not.toMatch(/painel|Devolver pelo AgendaPix|pelo AgendaPix/);
     expect(created.data.policy?.text?.toLowerCase()).not.toContain("repass");
+    const viewed = await getBookingPayment(slug, created.data.bookingId, `Bearer ${created.data.accessToken}`, database);
+    expect(viewed.policy?.text).toBe(created.data.policy?.text);
     expect(created.data.policy?.snapshot).toMatchObject(PADRAO_DEPOSIT_POLICY);
 
     await expect(createBooking(slug, input({ policyHash: "a".repeat(64) }), randomUUID(), database, provider)).rejects.toMatchObject({

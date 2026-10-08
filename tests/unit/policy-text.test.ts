@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { PADRAO_DEPOSIT_POLICY, type DepositPolicy } from "../../lib/policy/schema";
-import { ownerPreview, policyDetails, policyIcsText, policyListLabel, policySummary } from "../../lib/policy/text";
+import { clientPolicyText, ownerPreview, policyDetails, policyIcsText, policyListLabel, policySummary } from "../../lib/policy/text";
 
 const HOURS = [null, 2, 12, 24, 48] as const;
 const LATE = ["retain", "credit"] as const;
@@ -77,8 +77,11 @@ describe("texto da política do sinal", () => {
     );
 
     const creditLines = policyDetails(creditPolicy(), { ...context, contactWhatsapp: "+5511999999999" });
+    expect(policySummary(creditPolicy(), { depositCents: 2000, businessName: "Barbearia do Zé" })).toBe(
+      "Com 24 h de antecedência, Barbearia do Zé pode devolver o sinal. Mais perto da hora, o sinal vira crédito para outro horário, válido por 60 dias.",
+    );
     expect(creditLines[1]?.body).toBe("Se cancelar, o sinal vira crédito para outro horário em Barbearia do Zé, válido por 60 dias.");
-    expect(creditLines[2]?.body).toBe("O sinal vira crédito para outro horário em Barbearia do Zé, válido por 60 dias.");
+    expect(creditLines[2]?.body).toBe("O sinal vira crédito para outro horário, válido por 60 dias.");
 
     const noShowRefund = policyDetails(policy({ refundUntilHours: null, rescheduleUntilHours: null, lateCancel: "retain", noShow: "refund" }), {
       businessName: "Barbearia do Zé",
@@ -101,6 +104,39 @@ describe("texto da política do sinal", () => {
     }
     const receipt = policyIcsText(PADRAO_DEPOSIT_POLICY, { businessName: "Barbearia do Zé", depositCents: 2000, startsAt });
     expect(receipt).not.toMatch(/painel|AgendaPix/);
+  });
+
+  it("nenhuma saída do cliente cita o painel nem Devolver pelo AgendaPix", () => {
+    const startsAt = new Date("2026-10-08T14:30:00.000Z");
+    const now = new Date("2026-10-01T15:00:00.000Z");
+    const forbidden = /painel|Devolver pelo AgendaPix|pelo AgendaPix/;
+    for (const refundUntilHours of HOURS) {
+      for (const rescheduleUntilHours of HOURS) {
+        for (const lateCancel of LATE) {
+          for (const noShow of NO_SHOW) {
+            const current = policy({ refundUntilHours, rescheduleUntilHours, lateCancel, noShow });
+            for (const contactWhatsapp of ["+5511999999999", null]) {
+              const summary = policySummary(current, { depositCents: 2000, businessName: "Barbearia do Zé", startsAt, now });
+              const details = policyDetails(current, { businessName: "Barbearia do Zé", contactWhatsapp, startsAt, now, timezone: "America/Sao_Paulo" });
+              const ics = policyIcsText(current, { businessName: "Barbearia do Zé", depositCents: 2000, startsAt, timezone: "America/Sao_Paulo" });
+              const stored = clientPolicyText(current, { businessName: "Barbearia do Zé", depositCents: 2000, contactWhatsapp, startsAt, now, timezone: "America/Sao_Paulo" });
+              const blob = [summary, ics, stored, ...details.map((line) => `${line.title} ${line.body}`)].join("\n");
+              expect(blob).not.toMatch(forbidden);
+            }
+          }
+        }
+      }
+    }
+    const stored = clientPolicyText(PADRAO_DEPOSIT_POLICY, {
+      businessName: "Barbearia do Zé",
+      depositCents: 2000,
+      contactWhatsapp: "+5511999999999",
+      startsAt,
+      now,
+      timezone: "America/Sao_Paulo",
+    });
+    expect(stored.startsWith("Barbearia do Zé pode devolver o sinal até qua, 07 out, às 11:30.")).toBe(true);
+    expect(stored).not.toBe(ownerPreview(PADRAO_DEPOSIT_POLICY, { businessName: "Barbearia do Zé", depositCents: 2000 }));
   });
 });
 

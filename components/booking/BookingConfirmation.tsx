@@ -19,22 +19,31 @@ interface BookingConfirmationProps {
   onNewBooking: () => void;
 }
 
+function icsText(value: string) {
+  return value.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
+}
+
 function buildIcs({
   businessName,
   service,
   slot,
   customerName,
+  policyText,
 }: {
   businessName: string;
   service: PublicService;
   slot: AvailabilitySlot;
   customerName: string;
+  policyText?: string | null;
 }) {
   const stamp = (iso: string) =>
     new Date(iso).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
   const uid = `agendapix-${stamp(slot.startsAt)}@agendapix`;
   const summary = `${service.name} · ${businessName}`;
-  const description = `Agendamento de ${customerName} em ${businessName}. Sinal pago via Pix.`;
+  const description = [
+    `Agendamento de ${customerName} em ${businessName}. Sinal pago via Pix.`,
+    policyText ?? "",
+  ].filter((part) => part.length > 0).join(" ");
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
@@ -47,7 +56,7 @@ function buildIcs({
     `DTSTART:${stamp(slot.startsAt)}`,
     `DTEND:${stamp(slot.endsAt)}`,
     `SUMMARY:${summary}`,
-    `DESCRIPTION:${description}`,
+    `DESCRIPTION:${icsText(description)}`,
     "END:VEVENT",
     "END:VCALENDAR",
   ];
@@ -67,8 +76,8 @@ export function BookingConfirmation({
 }: BookingConfirmationProps) {
   const remainingCents = Math.max(0, service.priceCents - service.depositCents);
   const icsHref = useMemo(
-    () => buildIcs({ businessName, service, slot, customerName }),
-    [businessName, service, slot, customerName],
+    () => buildIcs({ businessName, service, slot, customerName, policyText }),
+    [businessName, service, slot, customerName, policyText],
   );
 
   const whatsappMessage = encodeURIComponent(

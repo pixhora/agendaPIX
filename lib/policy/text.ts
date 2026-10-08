@@ -203,7 +203,7 @@ export function policyDetails(policy: DepositPolicy, context: PolicyDetailsConte
       body: policy.noShow === "refund"
         ? `${context.businessName} pode devolver o sinal.`
         : policy.noShow === "credit"
-          ? `O sinal vira ${creditDetail(policy, context.businessName)}.`
+          ? `O sinal vira crédito para outro horário, válido por ${policy.creditValidityDays} dias.`
           : `O sinal fica com ${context.businessName}.`,
       tone: policy.noShow === "retain" ? "warn" : "ok",
     },
@@ -231,4 +231,16 @@ export function policyIcsText(policy: DepositPolicy, context: PolicyIcsContext):
   if (receipt) return receipt;
   if (policy.refundUntilHours !== null) return refundWindowSummary(policy, context.businessName);
   return [windowSentence(policy), outcomeSentence(policy, context.businessName)].filter(Boolean).join(" ");
+}
+
+export type ClientPolicyTextContext = PolicyDetailsContext & {
+  depositCents: number;
+};
+
+/** Texto gravado em `policy.text` e lido pelo cliente. A prévia do dono não entra aqui. */
+export function clientPolicyText(policy: DepositPolicy, context: ClientPolicyTextContext): string {
+  if (context.depositCents <= 0) return "";
+  const receipt = policy.refundUntilHours !== null && context.startsAt ? policyIcsText(policy, context) : "";
+  const details = policyDetails(policy, context).map((line) => line.body);
+  return [receipt, ...details].filter((part) => part.length > 0).join(" ");
 }
