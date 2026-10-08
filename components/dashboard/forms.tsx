@@ -64,8 +64,19 @@ export function ServiceForm({ businessId, service }: { businessId: string; servi
   </form>;
 }
 
-const timeInputClass = "border-0 bg-transparent shadow-none outline-none hover:border-transparent focus-visible:border-transparent focus-visible:outline-none aria-invalid:border-0";
-const shellClass = "control-shell block rounded-field border border-line-strong/60 bg-surface has-[[aria-invalid=true]]:border-danger";
+const timeInputClass = "border-0 bg-transparent text-transparent shadow-none outline-none hover:border-transparent focus-visible:border-transparent focus-visible:outline-none aria-invalid:border-0 [&::-webkit-datetime-edit]:opacity-0 [&::-webkit-datetime-edit-ampm-field]:hidden [&::-webkit-calendar-picker-indicator]:opacity-40";
+const shellClass = "control-shell relative block rounded-field border border-line-strong/60 bg-surface has-[[aria-invalid=true]]:border-danger";
+
+function TimeField({ id, label, value, onChange, disabled, invalid }: { id: string; label: string; value: string; onChange: (value: string) => void; disabled?: boolean; invalid?: boolean }) {
+  return (
+    <label className="grid min-w-0 gap-1 text-xs font-semibold text-muted" htmlFor={id}>{label}
+      <span className={shellClass}>
+        <Input className={cn("tabular-nums", timeInputClass)} id={id} lang="pt-BR" type="time" value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled} required={!disabled} aria-invalid={invalid || undefined} />
+        <span aria-hidden="true" className={cn("pointer-events-none absolute inset-y-0 left-3.5 z-10 flex items-center text-base tabular-nums", disabled ? "text-muted" : "text-ink")}>{value || "--:--"}</span>
+      </span>
+    </label>
+  );
+}
 
 export function HoursForm({ businessId, hours, multiInterval = MULTI_INTERVAL_HOURS }: { businessId: string; hours: HourRange[]; multiInterval?: boolean }) {
   const [state, action, pending] = useActionState(saveHours, {});
@@ -115,21 +126,13 @@ export function HoursForm({ businessId, hours, multiInterval = MULTI_INTERVAL_HO
             <span className={cn("ml-auto text-xs font-semibold", value.open ? "text-success" : "text-muted")}>{value.open ? "Aberto" : "Fechado"}</span>
           </div>
           <div className={cn("grid min-w-0 grid-cols-2 gap-3", !value.open && "dash-disabled")}>
-            <label className="grid min-w-0 gap-1 text-xs font-semibold text-muted" htmlFor={`start-${weekday}`}>Abre às
-              <span className={shellClass}><Input className={cn("tabular-nums", timeInputClass)} id={`start-${weekday}`} type="time" value={value.start} onChange={(event) => changeDay(weekday, { start: event.target.value })} disabled={!value.open || pending} required={value.open} aria-invalid={invalid || undefined} /></span>
-            </label>
-            <label className="grid min-w-0 gap-1 text-xs font-semibold text-muted" htmlFor={`end-${weekday}`}>Fecha às
-              <span className={shellClass}><Input className={cn("tabular-nums", timeInputClass)} id={`end-${weekday}`} type="time" value={value.end} onChange={(event) => changeDay(weekday, { end: event.target.value })} disabled={!value.open || pending} required={value.open} aria-invalid={invalid || undefined} /></span>
-            </label>
+            <TimeField id={`start-${weekday}`} label="Abre às" value={value.start} onChange={(start) => changeDay(weekday, { start })} disabled={!value.open || pending} invalid={invalid} />
+            <TimeField id={`end-${weekday}`} label="Fecha às" value={value.end} onChange={(end) => changeDay(weekday, { end })} disabled={!value.open || pending} invalid={invalid} />
           </div>
           {multiInterval && value.open && (value.pause ? <div className="grid min-w-0 gap-2">
             <div className="grid min-w-0 grid-cols-2 gap-3">
-              <label className="grid min-w-0 gap-1 text-xs font-semibold text-muted" htmlFor={`pause-start-${weekday}`}>Pausa das
-                <span className={shellClass}><Input className={cn("tabular-nums", timeInputClass)} id={`pause-start-${weekday}`} type="time" value={value.pause.start} onChange={(event) => changeDay(weekday, (current) => ({ ...current, pause: { start: event.target.value, end: current.pause?.end ?? "13:00" } }))} disabled={pending} aria-invalid={invalid || undefined} /></span>
-              </label>
-              <label className="grid min-w-0 gap-1 text-xs font-semibold text-muted" htmlFor={`pause-end-${weekday}`}>até
-                <span className={shellClass}><Input className={cn("tabular-nums", timeInputClass)} id={`pause-end-${weekday}`} type="time" value={value.pause.end} onChange={(event) => changeDay(weekday, (current) => ({ ...current, pause: { start: current.pause?.start ?? "12:00", end: event.target.value } }))} disabled={pending} aria-invalid={invalid || undefined} /></span>
-              </label>
+              <TimeField id={`pause-start-${weekday}`} label="Pausa das" value={value.pause.start} onChange={(start) => changeDay(weekday, (current) => ({ ...current, pause: { start, end: current.pause?.end ?? "13:00" } }))} disabled={pending} invalid={invalid} />
+              <TimeField id={`pause-end-${weekday}`} label="até" value={value.pause.end} onChange={(end) => changeDay(weekday, (current) => ({ ...current, pause: { start: current.pause?.start ?? "12:00", end } }))} disabled={pending} invalid={invalid} />
             </div>
             <button type="button" className="min-h-11 w-fit rounded-full px-2 text-sm font-semibold text-ink underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" onClick={() => changeDay(weekday, withoutPause(value))}>Tirar pausa</button>
           </div> : <button type="button" className="min-h-11 w-fit rounded-full px-2 text-sm font-semibold text-ink underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" onClick={() => changeDay(weekday, withPause(value))}>Adicionar pausa</button>)}
