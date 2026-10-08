@@ -8,7 +8,7 @@ import {
   depositPolicyPresets,
   type DepositPolicy,
 } from "@/lib/policy/schema";
-import { ownerPreview, policySummary } from "@/lib/policy/text";
+import { policyPreviewCopy } from "@/lib/dashboard/policy-preview";
 import { PRESET_CHOICES, isHarshPolicy, type PolicyFormState, type PresetChoice } from "@/lib/dashboard/policy-form";
 import { cn } from "@/lib/utils";
 
@@ -59,8 +59,7 @@ export function PolicyEditor({
   onPreset: (preset: PresetChoice) => void;
   onCustom: (patch: Partial<Pick<DepositPolicy, "refundUntilHours" | "rescheduleUntilHours" | "lateCancel" | "noShow">>) => void;
 }) {
-  const summary = policySummary(policy, { depositCents });
-  const preview = ownerPreview(policy, { businessName, depositCents });
+  const { summary, preview } = policyPreviewCopy(policy, businessName, depositCents);
   const harsh = isHarshPolicy(policy);
 
   return (
@@ -77,7 +76,7 @@ export function PolicyEditor({
               <input className="sr-only" type="radio" name={`${idPrefix}-preset`} value={preset} checked={selected} onChange={() => onPreset(preset)} />
               {preset === "padrao" && <span className="text-[11px] font-bold text-pix">Recomendada</span>}
               <span className="font-display text-[15px] font-bold">{PRESET_LABEL[preset]}</span>
-              <span className="line-clamp-2 text-xs leading-snug text-muted">{policySummary(depositPolicyPresets[preset], { depositCents })}</span>
+              <span className="line-clamp-2 text-xs leading-snug text-muted">{policyPreviewCopy(depositPolicyPresets[preset], businessName, depositCents).summary}</span>
             </label>
           );
         })}

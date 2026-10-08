@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { saveHours, saveService, saveWhatsapp } from "@/app/dashboard/(owner)/actions";
 import type { FormState } from "@/lib/dashboard/validation";
 import { depositPolicySchema, PADRAO_DEPOSIT_POLICY, type DepositPolicy } from "@/lib/policy/schema";
-import { ownerPreview } from "@/lib/policy/text";
+import { policyPreviewCopy } from "@/lib/dashboard/policy-preview";
 import {
   futureBookingsWarning,
   initialPolicyForm,
@@ -231,7 +231,7 @@ export function ServiceForm({ businessId, businessName, service, futureBookingsC
       policy={policyState.policy}
       onPreset={(preset: PresetChoice) => { setClientError(""); setPolicyState(selectPreset(policyState, preset)); }}
       onCustom={customize}
-    /> : <p aria-live="polite" className="rounded-card bg-pix-soft p-4 text-sm text-ink">{ownerPreview(policyState.policy, { businessName, depositCents: 0 })}</p>}
+    /> : <p aria-live="polite" className="rounded-card bg-pix-soft p-4 text-sm text-ink">{policyPreviewCopy(policyState.policy, businessName, 0).preview}</p>}
     {service && future.kind === "loading" && <PendingLine>Conferindo reservas futuras…</PendingLine>}
     {futureWarning && <p role="status" className="flex items-start gap-2 rounded-field border border-warning/30 bg-warning-soft p-3 text-sm text-ink"><AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-warning" />{futureWarning}</p>}
     {service && future.kind === "error" && <p role="alert" className="text-sm text-danger">Não foi possível conferir as reservas futuras. <button type="button" className="inline-flex min-h-11 items-center font-semibold underline" onClick={() => setAttempt((value) => value + 1)}>Tentar de novo</button></p>}
