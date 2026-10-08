@@ -12,7 +12,7 @@ export function LandingHero({ publicHost }: { publicHost: string }) {
   return (
     <section className="relative overflow-hidden">
       <div aria-hidden="true" className="bg-dots pointer-events-none absolute inset-x-0 top-0 h-[420px] opacity-40 [mask-image:linear-gradient(to_bottom,black,transparent)]" />
-      <div className="relative mx-auto grid w-full max-w-[1120px] items-center gap-10 px-5 pt-8 pb-16 lg:grid-cols-2 lg:gap-8 lg:pt-16 lg:pb-28">
+      <div className="relative mx-auto grid w-full max-w-[1120px] items-center gap-10 px-5 pt-8 pb-16 lg:grid-cols-2 lg:gap-8 lg:pt-16 lg:pb-28 xl:pb-40">
         <div>
           <p className="inline-flex min-h-8 items-center gap-2 rounded-full border border-line bg-surface px-3 text-[13px] font-semibold text-ink">
             <span aria-hidden="true" className="size-1.5 rounded-full bg-pix" />
@@ -65,7 +65,7 @@ export function LandingHero({ publicHost }: { publicHost: string }) {
           <ValueSlab
             aria-hidden="true"
             size="compact"
-            className="absolute right-0 bottom-6 hidden w-[220px] shadow-[var(--shadow-raised)] xl:block"
+            className="absolute top-[calc(100%-1rem)] right-0 z-10 hidden w-[220px] shadow-[var(--shadow-raised)] xl:block"
             label="Sinais de hoje"
             value="R$ 80,00"
             badge="4 reservas confirmadas"
