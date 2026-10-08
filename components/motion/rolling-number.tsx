@@ -2,6 +2,8 @@
  * Inspired by/adapted from Cult UI (https://github.com/nolly-studio/cult-ui), MIT License, Copyright (c) 2023 Jordan-Gilliam
  */
 
+import "@/app/motion.css";
+
 import { cn } from "@/lib/utils";
 import { formatRollingValue, splitRollingText, type RollingFormat } from "@/components/motion/rolling-format";
 import { RollingNumberMotion } from "@/components/motion/rolling-number-motion";
@@ -28,7 +30,7 @@ export function RollingNumber({ value, format = "integer", suffix = "", classNam
         {splitRollingText(text).map((part, index) => part.type === "digit" ? (
           <span key={index} className="roll-window">
             <span className="roll-strip" data-digit={part.digit}>
-              {DIGITS.map((digit) => <span key={digit}>{digit}</span>)}
+              {[0, 1].flatMap((cycle) => DIGITS.map((digit) => <span key={`${cycle}-${digit}`}>{digit}</span>))}
             </span>
           </span>
         ) : (

@@ -14,7 +14,8 @@ export default defineConfig({
   reporter: "list",
   use: { baseURL, locale: "pt-BR", timezoneId: "America/Sao_Paulo" },
   projects: [
-    { name: "mobile", use: { ...devices["iPhone 13"], browserName: "chromium", viewport: { width: 390, height: 844 } } },
+    { name: "mobile", use: { ...devices["iPhone 13"], browserName: "chromium", viewport: { width: 390, height: 844 }, permissions: ["clipboard-read", "clipboard-write"] } },
+    { name: "webkit", use: { ...devices["iPhone 13"], viewport: { width: 390, height: 844 } } },
   ],
   webServer: {
     command: `pnpm exec next dev --hostname 127.0.0.1 --port ${PORT}`,

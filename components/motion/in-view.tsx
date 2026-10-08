@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { nextInViewState } from "@/components/motion/in-view-policy";
+import { nextInViewState, shouldDisconnectObserver } from "@/components/motion/in-view-policy";
 
 type InViewProps = {
   children: ReactNode;
@@ -18,7 +18,7 @@ function paint(element: HTMLElement, reduced: boolean, visible: boolean) {
   element.toggleAttribute("data-inview", state.inview);
 }
 
-/** Liga a entrada quando o bloco entra na tela. Ouve se o movimento reduzido muda depois. */
+/** Liga a entrada na primeira vez que o bloco entra na tela. Ouve se o movimento reduzido muda depois. */
 export function InView({ children, className, role, id, "aria-label": ariaLabel, "data-testid": testId }: InViewProps) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -27,7 +27,6 @@ export function InView({ children, className, role, id, "aria-label": ariaLabel,
     if (!element) return;
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
     let observer: IntersectionObserver | null = null;
-    let visible = false;
 
     const connect = () => {
       observer?.disconnect();
@@ -37,8 +36,11 @@ export function InView({ children, className, role, id, "aria-label": ariaLabel,
         return;
       }
       observer = new IntersectionObserver((entries) => {
-        visible = entries.some((entry) => entry.isIntersecting);
-        paint(element, false, visible);
+        const isVisible = entries.some((entry) => entry.isIntersecting);
+        if (!shouldDisconnectObserver(media.matches, isVisible)) return;
+        paint(element, false, true);
+        observer?.disconnect();
+        observer = null;
       }, { threshold: 0.35 });
       observer.observe(element);
     };

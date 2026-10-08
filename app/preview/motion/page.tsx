@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { MERCADOPAGO_PIX_MIN_EXPIRATION_MS } from "@/lib/payments/mercadopago";
+import { PIX_WINDOW_MINUTES } from "@/lib/payments/pix-window";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { BookingIsland } from "@/components/motion/booking-island";
 import { CopyButton } from "@/components/motion/copy-button";
@@ -30,9 +30,7 @@ const durations = [
 const loaderSizes = [24, 32, 64] as const;
 
 function GradeLoaderStage({ tone, title }: { tone: "light" | "dark"; title: string }) {
-  const stageClass = tone === "light"
-    ? "bg-[#f6f5f2] text-[#0b0b0c] [--brand-tile-edge:transparent]"
-    : "bg-[#0f0f10] text-[#f6f5f2] [--brand-tile-edge:rgb(255_255_255_/_0.14)]";
+  const stageClass = tone === "light" ? "motion-canvas-light bg-paper text-ink" : "dark bg-paper text-ink";
 
   return (
     <div className={`space-y-5 rounded-card p-4 ${stageClass}`}>
@@ -61,7 +59,7 @@ function GradeLoaderStage({ tone, title }: { tone: "light" | "dark"; title: stri
 
 export default function MotionPreviewPage() {
   if (!isMotionPreviewOpen(process.env.NODE_ENV)) notFound();
-  const pixWindowMinutes = MERCADOPAGO_PIX_MIN_EXPIRATION_MS / 60_000;
+  const pixWindowSeconds = PIX_WINDOW_MINUTES * 60;
 
   return (
     <div className="min-h-screen bg-paper px-4 pt-16 pb-24 text-ink">
@@ -88,7 +86,7 @@ export default function MotionPreviewPage() {
             </article>
             <article className="rounded-card bg-surface p-4 shadow-card ring-1 ring-line">
               <p className="text-sm text-muted">Tempo para pagar o sinal</p>
-              <RollingNumber id="preview-hold" value={pixWindowMinutes} suffix=" minutos" className="mt-2 font-display text-[40px] font-bold" />
+              <RollingNumber id="preview-hold" value={PIX_WINDOW_MINUTES} suffix=" minutos" className="mt-2 font-display text-[40px] font-bold" />
             </article>
           </div>
         </section>
@@ -127,9 +125,9 @@ export default function MotionPreviewPage() {
         <section aria-labelledby="tempo-heading" className="space-y-4">
           <h2 id="tempo-heading" className="font-display text-xl font-bold">Tempo do sinal</h2>
           <div className="flex flex-wrap gap-8">
-            <CountdownRing secondsLeft={754} totalSeconds={900} tone="normal" label="Tempo para pagar" />
-            <CountdownRing secondsLeft={45} totalSeconds={900} tone="warn" label="Falta pouco" />
-            <CountdownRing secondsLeft={0} totalSeconds={900} tone="expired" label="Prazo encerrado" />
+            <CountdownRing secondsLeft={754} totalSeconds={pixWindowSeconds} tone="normal" label="Tempo para pagar" />
+            <CountdownRing secondsLeft={45} totalSeconds={pixWindowSeconds} tone="warn" label="Falta pouco" />
+            <CountdownRing secondsLeft={0} totalSeconds={pixWindowSeconds} tone="expired" label="Prazo encerrado" />
           </div>
         </section>
 

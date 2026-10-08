@@ -1,8 +1,19 @@
-import { expect } from "@playwright/test";
+import { expect, type Locator } from "@playwright/test";
 import { test, expectNoAxeViolations, expectNoHorizontalOverflow } from "./helpers";
 
+async function expectFocusRing(locator: Locator, color: string) {
+  const ring = await locator.evaluate((el) => {
+    const style = getComputedStyle(el);
+    return { style: style.outlineStyle, width: style.outlineWidth, offset: style.outlineOffset, color: style.outlineColor };
+  });
+  expect(ring).toEqual({ style: "solid", width: "2px", offset: "2px", color });
+}
+
 test.describe("preview de movimento", () => {
-  test.use({ permissions: ["clipboard-read", "clipboard-write"] });
+  test.beforeEach(async ({ context, browserName }) => {
+    if (browserName !== "chromium") return;
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  });
 
   test("sem violações, com rádio, cópia e estado parado quando o movimento reduz", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce", colorScheme: "light" });
@@ -28,8 +39,23 @@ test.describe("preview de movimento", () => {
 
     const duration = page.getByRole("radiogroup", { name: "Duração do serviço" });
     await duration.getByRole("radio", { name: "15 min" }).focus();
+    await expectFocusRing(duration, "rgb(11, 11, 12)");
     await page.keyboard.press("ArrowRight");
     await expect(duration.getByRole("radio", { name: "30 min" })).toBeChecked();
+    await page.keyboard.press("Shift+Tab");
+    const copyButton = page.getByRole("button", { name: "Copiar código" });
+    await expect(copyButton).toBeFocused();
+    const copyWrap = page.locator(".copy-control");
+    await expect(copyWrap).not.toHaveClass(/motion-focus/);
+    const rings = await page.evaluate(() => {
+      const button = document.activeElement;
+      const wrap = button?.closest(".copy-control");
+      return {
+        button: button ? getComputedStyle(button).outlineStyle : "",
+        wrap: wrap ? getComputedStyle(wrap).outlineStyle : "",
+      };
+    });
+    expect(rings).toEqual({ button: "solid", wrap: "none" });
     await duration.getByText("45 min", { exact: true }).click();
     await expect(duration.getByRole("radio", { name: "45 min" })).toBeChecked();
 
@@ -39,7 +65,7 @@ test.describe("preview de movimento", () => {
 
     await page.getByRole("button", { name: "Copiar código" }).click();
     await expect(page.getByRole("button", { name: "Copiado" })).toBeVisible();
-    await expect(page.locator(".motion-focus [aria-live='polite']")).toHaveText("Copiado");
+    await expect(page.locator(".copy-control [aria-live='polite']")).toHaveText("Copiado");
     await expect(page.getByRole("button", { name: "Copiar código" })).toBeVisible({ timeout: 4000 });
   });
 
@@ -49,6 +75,9 @@ test.describe("preview de movimento", () => {
     await expect(page.locator("html")).toHaveClass(/dark/);
     await expectNoHorizontalOverflow(page);
     await expectNoAxeViolations(page, "preview movimento escuro");
+    const duration = page.getByRole("radiogroup", { name: "Duração do serviço" });
+    await duration.getByRole("radio", { name: "15 min" }).focus();
+    await expectFocusRing(duration, "rgb(63, 208, 190)");
     await page.getByTestId("booking-island").scrollIntoViewIfNeeded();
     await expect(page.getByTestId("booking-island")).toHaveAttribute("data-inview", "");
     const loader = page.locator("[data-testid='grade-loader'].is-loop").first();

@@ -2,6 +2,8 @@
  * Inspired by/adapted from Cult UI (https://github.com/nolly-studio/cult-ui), MIT License, Copyright (c) 2023 Jordan-Gilliam
  */
 
+import "@/app/motion.css";
+
 import { cn } from "@/lib/utils";
 import { InView } from "@/components/motion/in-view";
 

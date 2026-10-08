@@ -13,17 +13,20 @@
   --aro-glow-3: #0a6e63;
 }
 
-.dark {
-  --aro-glow-1: #e6fffa;
-  --aro-glow-2: #8ff2e3;
-  --aro-glow-3: #0a6e63;
+/* Isola o fundo claro da vitrine quando a página está no escuro. Os valores são os de :root. */
+.motion-canvas-light {
+  --paper: #f6f5f2;
+  --ink: #0b0b0c;
+  --muted: #5b5b5f;
+  --brand-tile-edge: transparent;
 }
 
 @layer components {
   /* size:focus */
   .motion-focus:focus-visible,
   .motion-focus:has(:focus-visible) {
-    box-shadow: var(--shadow-focus);
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
   }
   /* /size:focus */
 
@@ -148,11 +151,15 @@
   }
 
   .grade-conic {
-    display: block;
-    width: 100%;
-    height: 100%;
-    background: conic-gradient(from 120deg, var(--aro-glow-1) 0deg, var(--aro-glow-2) 48deg, var(--pix-bright) 165deg, var(--aro-glow-3) 300deg, var(--aro-glow-3) 360deg);
+    transform-box: fill-box;
+    transform-origin: center;
   }
+
+  .grade-arc { fill: none; }
+  .grade-arc-base { stroke: var(--aro-glow-3); }
+  .grade-arc-mid { stroke: var(--aro-glow-2); }
+  .grade-arc-hot { stroke: var(--pix-bright); }
+  .grade-arc-tip { stroke: var(--aro-glow-1); }
 
   .grade-stem {
     transform-box: fill-box;
@@ -170,17 +177,17 @@
   @keyframes grade-aro-fade { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
 
   @media (prefers-reduced-motion: no-preference) {
-    .grade-loader:not(.is-loop) .grade-ring { animation: grade-aro-in 0.28s ease-out both; }
+    .grade-loader:not(.is-loop) .grade-ring { animation: grade-aro-in var(--dur-2) var(--ease-standard) both; }
     .grade-loader:not(.is-loop) .grade-stem {
-      animation: grade-aro-stem 0.42s cubic-bezier(0.16, 1, 0.3, 1) 0.12s both;
+      animation: grade-aro-stem var(--dur-3) var(--ease-standard) var(--dur-1) both;
     }
     .grade-loader:not(.is-loop) .grade-conic {
-      animation: grade-aro-sweep 1.1s cubic-bezier(0.65, 0, 0.35, 1) both;
+      animation: grade-aro-sweep var(--dur-3) var(--ease-standard) both;
     }
-    .grade-loader:not(.is-loop) .grade-sweep { animation: grade-aro-fade 1.1s linear both; }
+    .grade-loader:not(.is-loop) .grade-sweep { animation: grade-aro-fade var(--dur-3) linear both; }
     .grade-loader.is-loop .grade-ring { opacity: 0; }
     .grade-loader.is-loop .grade-sweep { opacity: 1; }
-    .grade-loader.is-loop .grade-conic { animation: grade-aro-sweep 1.1s linear infinite; }
+    .grade-loader.is-loop .grade-conic { animation: grade-aro-sweep var(--dur-3) linear infinite; }
   }
   /* /size:grade */
 

@@ -1,3 +1,5 @@
+import "server-only";
+
 import { createHmac, timingSafeEqual } from "node:crypto";
 import QRCode from "qrcode";
 import { z } from "zod";
@@ -12,6 +14,7 @@ import {
   type ProviderCallOptions,
   type ProviderCharge,
 } from "./provider";
+import { PIX_WINDOW_MINUTES } from "./pix-window";
 import { InMemoryChargeReferenceStore, type ChargeReferenceStore } from "./reference-store";
 
 /** Mesma URL para sandbox e produção; o access token (teste vs prod) define o ambiente. */
@@ -24,7 +27,7 @@ export type MercadoPagoFetch = (input: string, init?: RequestInit) => Promise<Re
  * O hold local (BOOKING_HOLD_MINUTES, tipicamente 10) continua mais curto: pagamento após o hold
  * deve seguir o fluxo de pagamento atrasado / estorno.
  */
-export const MERCADOPAGO_PIX_MIN_EXPIRATION_MS = 30 * 60 * 1000;
+export const MERCADOPAGO_PIX_MIN_EXPIRATION_MS = PIX_WINDOW_MINUTES * 60 * 1000;
 
 export type MercadoPagoPaymentProviderOptions = {
   accessToken: string;

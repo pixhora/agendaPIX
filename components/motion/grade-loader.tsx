@@ -1,4 +1,4 @@
-import { useId } from "react";
+import "@/app/motion.css";
 import { aroGlyph } from "@/lib/brand/mark";
 import { cn } from "@/lib/utils";
 
@@ -15,24 +15,34 @@ export type GradeLoaderProps = {
   className?: string;
 };
 
-function AroLoaderGlyph({ maskId }: { maskId: string }) {
+function arcDash(circumference: number, fraction: number) {
+  const drawn = (circumference * fraction).toFixed(2);
+  const gap = (circumference * (1 - fraction)).toFixed(2);
+  return `${drawn} ${gap}`;
+}
+
+function AroLoaderGlyph() {
   const { viewBox, ring, stem } = aroGlyph;
-  const outer = ring.r + ring.strokeWidth / 2;
-  const inner = ring.r - ring.strokeWidth / 2;
+  const circumference = 2 * Math.PI * ring.r;
+  const circle = {
+    cx: ring.cx,
+    cy: ring.cy,
+    r: ring.r,
+    fill: "none" as const,
+    strokeWidth: ring.strokeWidth,
+  };
 
   return (
     <svg viewBox={`0 0 ${viewBox} ${viewBox}`} className="grade-svg" aria-hidden="true" overflow="visible">
-      <defs>
-        <mask id={maskId} maskUnits="userSpaceOnUse">
-          <rect width={viewBox} height={viewBox} fill="black" />
-          <circle cx={ring.cx} cy={ring.cy} r={outer} fill="white" />
-          <circle cx={ring.cx} cy={ring.cy} r={inner} fill="black" />
-        </mask>
-      </defs>
-      <circle className="grade-ring" cx={ring.cx} cy={ring.cy} r={ring.r} fill="none" stroke="var(--pix-bright)" strokeWidth={ring.strokeWidth} />
-      <foreignObject className="grade-sweep" x="0" y="0" width={viewBox} height={viewBox} mask={`url(#${maskId})`}>
-        <div className="grade-conic" />
-      </foreignObject>
+      <circle className="grade-ring" {...circle} stroke="var(--pix-bright)" />
+      <g className="grade-sweep">
+        <g className="grade-conic">
+          <circle className="grade-arc grade-arc-base" {...circle} />
+          <circle className="grade-arc grade-arc-mid" {...circle} strokeDasharray={arcDash(circumference, 0.55)} />
+          <circle className="grade-arc grade-arc-hot" {...circle} strokeDasharray={arcDash(circumference, 0.34)} />
+          <circle className="grade-arc grade-arc-tip" {...circle} strokeDasharray={arcDash(circumference, 0.14)} />
+        </g>
+      </g>
       <rect className="grade-stem" x={stem.x} y={stem.y} width={stem.width} height={stem.height} rx={stem.rx} fill="currentColor" />
     </svg>
   );
@@ -43,8 +53,7 @@ function AroLoaderGlyph({ maskId }: { maskId: string }) {
  * Desenho original do AgendaPix; a marca estática fica no #26.
  */
 export function GradeLoader({ label, loop = true, size = 32, className }: GradeLoaderProps) {
-  const maskId = `aro${useId().replace(/:/g, "")}`;
-  const glyph = <AroLoaderGlyph maskId={maskId} />;
+  const glyph = <AroLoaderGlyph />;
   const classes = cn("grade-loader", loop && "is-loop", className);
 
   if (loop) {
@@ -56,14 +65,16 @@ export function GradeLoader({ label, loop = true, size = 32, className }: GradeL
     );
   }
 
+  if (!label) {
+    return (
+      <span data-testid="grade-loader" data-size={size} className={classes} aria-hidden="true">
+        {glyph}
+      </span>
+    );
+  }
+
   return (
-    <span
-      data-testid="grade-loader"
-      data-size={size}
-      className={classes}
-      aria-hidden={label ? undefined : true}
-      aria-label={label}
-    >
+    <span role="img" data-testid="grade-loader" data-size={size} className={classes} aria-label={label}>
       {glyph}
     </span>
   );

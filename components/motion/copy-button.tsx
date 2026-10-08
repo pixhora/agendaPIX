@@ -4,7 +4,9 @@
  * Inspired by/adapted from Cult UI (https://github.com/nolly-studio/cult-ui), MIT License, Copyright (c) 2023 Jordan-Gilliam
  */
 
+import "@/app/motion.css";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { flushSync } from "react-dom";
 import { COPY_ERROR, COPY_RESET_MS, copyValue } from "@/components/motion/motion-runtime";
 
 export type CopyButtonProps = {
@@ -33,7 +35,9 @@ export function CopyButton({ value, label = "Copiar código", copiedLabel = "Cop
   const errorId = useId();
   const [state, setState] = useState<CopyState>("idle");
   const [announcement, setAnnouncement] = useState("");
+  const [fallbackOpen, setFallbackOpen] = useState(false);
   const copied = state === "copied";
+  const exposeFallback = state === "error" || fallbackOpen;
 
   useEffect(() => () => {
     if (resetRef.current !== null) window.clearTimeout(resetRef.current);
@@ -45,15 +49,17 @@ export function CopyButton({ value, label = "Copiar código", copiedLabel = "Cop
       writeText: navigator.clipboard?.writeText?.bind(navigator.clipboard),
       execCommand: (command) => document.execCommand(command),
       select: () => {
-        if (!input) return;
-        input.removeAttribute("aria-hidden");
-        input.focus();
-        input.select();
-        input.setSelectionRange(0, value.length);
+        flushSync(() => setFallbackOpen(true));
+        const field = inputRef.current;
+        if (!field) return;
+        field.focus();
+        field.select();
+        field.setSelectionRange(0, value.length);
       },
     });
 
     if (result === "copied") {
+      setFallbackOpen(false);
       setState("copied");
       setAnnouncement(copiedLabel);
       if (resetRef.current !== null) window.clearTimeout(resetRef.current);
@@ -72,7 +78,7 @@ export function CopyButton({ value, label = "Copiar código", copiedLabel = "Cop
   }
 
   return (
-    <div className={`motion-focus relative inline-flex max-w-full flex-col gap-2 rounded-field ${className ?? ""}`}>
+    <div className={`copy-control relative inline-flex max-w-full flex-col gap-2 rounded-field ${className ?? ""}`}>
       <button
         type="button"
         onClick={onCopy}
@@ -96,7 +102,7 @@ export function CopyButton({ value, label = "Copiar código", copiedLabel = "Cop
         readOnly
         value={value}
         tabIndex={state === "error" ? 0 : -1}
-        aria-hidden={state === "error" ? undefined : true}
+        aria-hidden={exposeFallback ? undefined : true}
         aria-label="Código para copiar"
         onFocus={(event) => event.currentTarget.select()}
         className={state === "error"

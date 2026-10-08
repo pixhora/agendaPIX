@@ -10,12 +10,27 @@ import { GradeLoader } from "../../components/motion/grade-loader";
 import { RollingNumber } from "../../components/motion/rolling-number";
 import { formatRollingValue, splitRollingText, cssDurationMs } from "../../components/motion/rolling-format";
 import { SegmentedThumb } from "../../components/motion/segmented-thumb";
-import { SegmentedThumbControlled } from "../../components/motion/segmented-thumb-controlled";
 import { COPY_ERROR, COPY_RESET_MS, copyValue } from "../../components/motion/motion-runtime";
-import { nextInViewState, shouldStartInViewAnimation } from "../../components/motion/in-view-policy";
+import { PIX_WINDOW_MINUTES } from "../../lib/payments/pix-window";
+import { nextInViewState, shouldDisconnectObserver, shouldStartInViewAnimation } from "../../components/motion/in-view-policy";
 import { isMotionPreviewOpen } from "../../app/preview/motion/access";
 import robots from "../../app/robots";
 import sitemap from "../../app/sitemap";
+
+function channel(value: number) {
+  const srgb = value / 255;
+  return srgb <= 0.04045 ? srgb / 12.92 : ((srgb + 0.055) / 1.055) ** 2.4;
+}
+
+function contrast(foreground: string, background: string) {
+  const luminance = (hex: string) => {
+    const bits = Number.parseInt(hex.slice(1), 16);
+    return 0.2126 * channel((bits >> 16) & 255) + 0.7152 * channel((bits >> 8) & 255) + 0.0722 * channel(bits & 255);
+  };
+  const lighter = Math.max(luminance(foreground), luminance(background));
+  const darker = Math.min(luminance(foreground), luminance(background));
+  return (lighter + 0.05) / (darker + 0.05);
+}
 
 const durations = [
   { value: "15", label: "15 min" },
@@ -62,6 +77,9 @@ describe("movimento: acessibilidade e movimento reduzido", () => {
     expect(nextInViewState(true, true)).toEqual({ armed: false, inview: false });
     expect(nextInViewState(false, false)).toEqual({ armed: true, inview: false });
     expect(nextInViewState(false, true)).toEqual({ armed: true, inview: true });
+    expect(shouldDisconnectObserver(false, true)).toBe(true);
+    expect(shouldDisconnectObserver(false, false)).toBe(false);
+    expect(shouldDisconnectObserver(true, true)).toBe(false);
   });
 
   it("o CSS guarda o estado final parado e o foco só no teclado", () => {
@@ -74,23 +92,34 @@ describe("movimento: acessibilidade e movimento reduzido", () => {
     expect(css).toContain("--aro-glow-1:");
     expect(css).toContain("--aro-glow-2:");
     expect(css).toContain("--aro-glow-3:");
-    expect(css).toContain(".dark {");
+    expect(css.match(/--aro-glow-1:/g)).toHaveLength(1);
     expect(css).toContain("@media (prefers-reduced-motion: reduce)");
     expect(css).toContain(".island-detail { opacity: 1; }");
     expect(css).toContain(".booking-island[data-armed]:not([data-inview])");
-    expect(css).toContain("animation: grade-aro-sweep 1.1s linear infinite");
+    expect(css).toContain("animation: grade-aro-sweep var(--dur-3) linear infinite");
+    expect(css).toContain("var(--ease-standard)");
     expect(css).toContain("var(--aro-glow-1)");
     expect(css).toContain("var(--pix-bright)");
     expect(css).not.toContain("#e6fffa 0deg");
+    expect(css).not.toContain("1.1s");
+    expect(css).not.toContain("cubic-bezier(0.65, 0, 0.35, 1)");
     expect(css).not.toContain("--ap-offset");
     expect(css).not.toContain("focus-within");
     expect(css).not.toContain("outline: none");
     expect(css).toContain(".motion-focus:has(:focus-visible)");
+    expect(css).toContain("outline: 2px solid var(--ring)");
+    expect(css).toContain("outline-offset: 2px");
     expect(css).toContain(".grade-sweep { opacity: 0; }");
-    expect(css).toContain("box-shadow: var(--shadow-focus)");
+    expect(css).not.toContain("box-shadow: var(--shadow-focus)");
     expect(css).toContain("transform: translateX");
     const globals = readFileSync("app/globals.css", "utf8");
-    expect(globals.startsWith('@import "tailwindcss";\n@import "./motion.css";')).toBe(true);
+    expect(globals).not.toContain("motion.css");
+    expect(contrast("#0b0b0c", "#f6f5f2")).toBeGreaterThanOrEqual(3);
+    expect(contrast("#0b0b0c", "#efeeea")).toBeGreaterThanOrEqual(3);
+    expect(contrast("#0b0b0c", "#ffffff")).toBeGreaterThanOrEqual(3);
+    expect(contrast("#3fd0be", "#0f0f10")).toBeGreaterThanOrEqual(3);
+    expect(contrast("#3fd0be", "#19191b")).toBeGreaterThanOrEqual(3);
+    expect(contrast("#3fd0be", "#222225")).toBeGreaterThanOrEqual(3);
   });
 
   it("a ilha nasce com o texto da reserva e sem disparar a animação", () => {
@@ -146,6 +175,7 @@ describe("movimento: acessibilidade e movimento reduzido", () => {
     expect(html).toContain("is-loop");
     expect(html).toContain('data-size="32"');
     expect(html).not.toContain("style=");
+    expect(html).not.toContain("foreignObject");
     expect(html).toContain(`r="${aroGlyph.ring.r}"`);
     expect(html).toContain(`cx="${aroGlyph.ring.cx}"`);
     expect(html).toContain(`stroke-width="${aroGlyph.ring.strokeWidth}"`);
@@ -162,8 +192,10 @@ describe("movimento: acessibilidade e movimento reduzido", () => {
     expect(once).toContain('data-size="64"');
 
     const named = renderToStaticMarkup(createElement(GradeLoader, { loop: false, label: "Marca entrando" }));
+    expect(named).toContain('role="img"');
     expect(named).toContain('aria-label="Marca entrando"');
     expect(named).not.toContain('role="status"');
+    expect(named).not.toContain("<span aria-hidden");
 
     for (const size of [24, 96] as const) {
       expect(renderToStaticMarkup(createElement(GradeLoader, { size }))).toContain(`data-size="${size}"`);
@@ -181,7 +213,8 @@ describe("movimento: acessibilidade e movimento reduzido", () => {
     expect(html).toContain('type="button"');
     expect(html).toContain('readOnly=""');
     expect(html).toContain('value="codigo-pix"');
-    expect(html).toContain("motion-focus");
+    expect(html).toContain("copy-control");
+    expect(html).not.toContain("motion-focus");
     expect(html).not.toContain(COPY_ERROR);
     expect(COPY_RESET_MS).toBe(2000);
   });
@@ -230,9 +263,9 @@ describe("movimento: acessibilidade e movimento reduzido", () => {
     expect(uncontrolled).toContain('value="30"');
 
     expect(readFileSync("components/motion/segmented-thumb.tsx", "utf8")).not.toContain("use client");
-    expect(readFileSync("components/motion/segmented-thumb-controlled.tsx", "utf8")).toContain("use client");
+    expect(readFileSync("components/motion/segmented-thumb-view.tsx", "utf8")).not.toContain("use client");
 
-    const controlled = renderToStaticMarkup(createElement(SegmentedThumbControlled, {
+    const controlled = renderToStaticMarkup(SegmentedThumb({
       name: "appearance",
       label: "Aparência",
       options: [
@@ -259,6 +292,17 @@ describe("vitrine de movimento", () => {
     const blocked = Array.isArray(disallow) ? disallow : [disallow];
     expect(blocked).toContain("/preview");
     expect(sitemap().some((item) => item.url.includes("/preview"))).toBe(false);
+    const preview = readFileSync("app/preview/motion/page.tsx", "utf8");
+    expect(preview).not.toContain("mercadopago");
+    expect(preview).toContain("PIX_WINDOW_MINUTES");
+    expect(preview).toContain("PIX_WINDOW_MINUTES * 60");
+    expect(PIX_WINDOW_MINUTES * 60).toBe(1800);
+    expect(preview).not.toContain("#f6f5f2");
+    expect(preview).not.toContain("#0b0b0c");
+    const rolling = readFileSync("components/motion/rolling-number-motion.tsx", "utf8");
+    expect(rolling).not.toContain('transform: "translateY(0)"');
+    expect(readFileSync("components/motion/copy-button.tsx", "utf8")).not.toContain("removeAttribute");
+    expect(readFileSync("lib/payments/mercadopago.ts", "utf8")).toContain('import "server-only"');
   });
 
   it("marca a licença do Cult UI nos arquivos adaptados e não na Grade A", () => {
@@ -271,7 +315,6 @@ describe("vitrine de movimento", () => {
       "components/motion/motion-runtime.ts",
       "components/motion/segmented-thumb.tsx",
       "components/motion/segmented-thumb-view.tsx",
-      "components/motion/segmented-thumb-controlled.tsx",
       "components/motion/countdown-ring.tsx",
     ]) {
       expect(readFileSync(file, "utf8")).toContain(notice);

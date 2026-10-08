@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "./motion.css";
 
 /* Modo escuro manual: .dark no <html> (script inline em app/layout.tsx aplica antes da pintura). */
 @custom-variant dark (&:where(.dark, .dark *));

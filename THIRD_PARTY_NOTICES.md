@@ -11,7 +11,6 @@ Arquivos cobertos:
 - `components/motion/motion-runtime.ts` (função de cópia)
 - `components/motion/segmented-thumb.tsx`
 - `components/motion/segmented-thumb-view.tsx`
-- `components/motion/segmented-thumb-controlled.tsx`
 - `components/motion/countdown-ring.tsx`
 
 `components/motion/grade-loader.tsx` e o CSS da marca Aro em `app/motion.css` são originais do AgendaPix e não entram nesta lista. O desenho não deriva do Cult UI.

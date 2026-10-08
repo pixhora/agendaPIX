@@ -6,9 +6,7 @@ import { SegmentedThumbView, type SegmentedOption, type SegmentedThumbProps } fr
 
 export type { SegmentedOption, SegmentedThumbProps };
 
-type UncontrolledProps = Omit<SegmentedThumbProps, "value" | "onValueChange">;
-
-/** Grupo de rádio no servidor. O polegar é CSS. O caso controlado fica no wrapper cliente. */
-export function SegmentedThumb(props: UncontrolledProps) {
+/** Grupo de rádio. O polegar é CSS. Quem guarda o valor controlado já é cliente e importa este módulo. */
+export function SegmentedThumb(props: SegmentedThumbProps) {
   return <SegmentedThumbView {...props} />;
 }

@@ -8,3 +8,8 @@ export function nextInViewState(reducedMotion: boolean, visible: boolean): { arm
   if (reducedMotion) return { armed: false, inview: false };
   return { armed: true, inview: visible };
 }
+
+/** A entrada corre uma vez. Depois que o bloco aparece, o observer sai. */
+export function shouldDisconnectObserver(reducedMotion: boolean, visible: boolean): boolean {
+  return !reducedMotion && visible;
+}

@@ -34,7 +34,10 @@ export function RollingNumberMotion({ text, children }: { text: string; children
         const digit = Number(strip.dataset.digit);
         if (!Number.isFinite(digit) || digit <= 0) return;
         animations.push(strip.animate(
-          [{ transform: "translateY(0)" }, { transform: `translateY(calc(${digit} * -1em))` }],
+          [
+            { transform: `translateY(calc(${digit} * -1em))` },
+            { transform: `translateY(calc(${digit + 10} * -1em))` },
+          ],
           { duration, delay: index * 40, easing: ease, fill: "forwards" },
         ));
       });
