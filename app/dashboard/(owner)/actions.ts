@@ -29,10 +29,19 @@ export async function saveHours(_: FormState, form: FormData): Promise<FormState
   const owner = await requireOwner();
   try {
     const businessId = z.uuid().parse(form.get("businessId"));
-    const days = Array.from({ length: 7 }, (_, weekday) => weekday).filter((day) => form.get(`open-${day}`) === "on")
-      .map((weekday) => ({ weekday, opensAt: form.get(`start-${weekday}`), closesAt: form.get(`end-${weekday}`) }));
+    const rawHours = form.get("hoursJson");
+    const days = typeof rawHours === "string" && rawHours.length > 0
+      ? z.array(z.object({ weekday: z.number(), opensAt: z.string(), closesAt: z.string() }).strict()).parse(JSON.parse(rawHours))
+      : Array.from({ length: 7 }, (_, weekday) => weekday).filter((day) => form.get(`open-${day}`) === "on")
+        .map((weekday) => ({ weekday, opensAt: form.get(`start-${weekday}`), closesAt: form.get(`end-${weekday}`) }));
     await saveDashboardHours(owner.id, businessId, days);
     revalidatePath("/dashboard", "layout");
     return { success: "Horários de funcionamento salvos." };
-  } catch (error) { return { error: message(error) }; }
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      const known = error.issues.map((issue) => issue.message).find((text) => text === "Dia repetido." || text === "A abertura deve ser anterior ao fechamento.");
+      if (known) return { error: known };
+    }
+    return { error: message(error) };
+  }
 }
