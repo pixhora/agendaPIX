@@ -3,8 +3,10 @@
  */
 
 import { cn } from "@/lib/utils";
-import { formatRollingValue, type RollingFormat } from "@/components/motion/rolling-format";
+import { formatRollingValue, splitRollingText, type RollingFormat } from "@/components/motion/rolling-format";
 import { RollingNumberMotion } from "@/components/motion/rolling-number-motion";
+
+const DIGITS = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"] as const;
 
 export type RollingNumberProps = {
   /** Inteiro vindo do servidor. Em `currency`, são centavos. */
@@ -22,7 +24,17 @@ export function RollingNumber({ value, format = "integer", suffix = "", classNam
   return (
     <span className={cn("relative inline-flex items-baseline tabular-nums leading-none", className)}>
       <span id={id} className="sr-only">{text}</span>
-      <RollingNumberMotion text={text} />
+      <RollingNumberMotion text={text}>
+        {splitRollingText(text).map((part, index) => part.type === "digit" ? (
+          <span key={index} className="roll-window">
+            <span className="roll-strip" data-digit={part.digit}>
+              {DIGITS.map((digit) => <span key={digit}>{digit}</span>)}
+            </span>
+          </span>
+        ) : (
+          <span key={index} className="roll-mark">{part.char}</span>
+        ))}
+      </RollingNumberMotion>
     </span>
   );
 }

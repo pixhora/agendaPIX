@@ -43,7 +43,7 @@ function GradeLoaderStage({ tone, title }: { tone: "light" | "dark"; title: stri
           <figcaption className="text-sm">Loop</figcaption>
         </figure>
         <figure className="space-y-2">
-          <GradeLoader loop={false} label="Marca entrando" />
+          <GradeLoader loop={false} />
           <figcaption className="text-sm">Uma vez</figcaption>
         </figure>
       </div>

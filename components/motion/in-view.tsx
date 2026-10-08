@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { shouldStartInViewAnimation } from "@/components/motion/in-view-policy";
+import { nextInViewState } from "@/components/motion/in-view-policy";
 
 type InViewProps = {
   children: ReactNode;
@@ -12,7 +12,13 @@ type InViewProps = {
   "data-testid"?: string;
 };
 
-/** Liga `data-inview` quando o bloco entra na tela e o movimento é permitido. */
+function paint(element: HTMLElement, reduced: boolean, visible: boolean) {
+  const state = nextInViewState(reduced, visible);
+  element.toggleAttribute("data-armed", state.armed);
+  element.toggleAttribute("data-inview", state.inview);
+}
+
+/** Liga a entrada quando o bloco entra na tela. Ouve se o movimento reduzido muda depois. */
 export function InView({ children, className, role, id, "aria-label": ariaLabel, "data-testid": testId }: InViewProps) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -20,25 +26,28 @@ export function InView({ children, className, role, id, "aria-label": ariaLabel,
     const element = ref.current;
     if (!element) return;
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-    if (!shouldStartInViewAnimation(media.matches)) return;
+    let observer: IntersectionObserver | null = null;
+    let visible = false;
 
-    const observer = new IntersectionObserver((entries) => {
-      if (!entries.some((entry) => entry.isIntersecting)) return;
-      if (media.matches) return;
-      element.setAttribute("data-inview", "");
-      observer.disconnect();
-    }, { threshold: 0.35 });
-
-    observer.observe(element);
-    const onChange = () => {
-      if (!media.matches) return;
-      element.removeAttribute("data-inview");
-      observer.disconnect();
+    const connect = () => {
+      observer?.disconnect();
+      observer = null;
+      if (media.matches) {
+        paint(element, true, false);
+        return;
+      }
+      observer = new IntersectionObserver((entries) => {
+        visible = entries.some((entry) => entry.isIntersecting);
+        paint(element, false, visible);
+      }, { threshold: 0.35 });
+      observer.observe(element);
     };
-    media.addEventListener("change", onChange);
+
+    connect();
+    media.addEventListener("change", connect);
     return () => {
-      observer.disconnect();
-      media.removeEventListener("change", onChange);
+      observer?.disconnect();
+      media.removeEventListener("change", connect);
     };
   }, []);
 

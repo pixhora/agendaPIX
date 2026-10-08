@@ -1,60 +1,14 @@
-"use client";
-
 /**
  * Inspired by/adapted from Cult UI (https://github.com/nolly-studio/cult-ui), MIT License, Copyright (c) 2023 Jordan-Gilliam
  */
 
-export type SegmentedOption = {
-  value: string;
-  label: string;
-  disabled?: boolean;
-};
+import { SegmentedThumbView, type SegmentedOption, type SegmentedThumbProps } from "@/components/motion/segmented-thumb-view";
 
-export type SegmentedThumbProps = {
-  name: string;
-  label: string;
-  options: SegmentedOption[];
-  /** Controlado. Omita para usar `defaultValue`. */
-  value?: string;
-  defaultValue?: string;
-  onValueChange?: (value: string) => void;
-  className?: string;
-};
+export type { SegmentedOption, SegmentedThumbProps };
 
-/** Grupo de rádio com polegar deslizante. O nome e o valor entram no formulário. */
-export function SegmentedThumb({ name, label, options, value, defaultValue, onValueChange, className }: SegmentedThumbProps) {
-  const count = Math.min(Math.max(options.length, 1), 8);
-  const initial = defaultValue ?? options[0]?.value;
+type UncontrolledProps = Omit<SegmentedThumbProps, "value" | "onValueChange">;
 
-  return (
-    <div
-      role="radiogroup"
-      aria-label={label}
-      data-count={count}
-      className={`seg-track motion-focus ${className ?? ""}`}
-    >
-      <div className="seg-thumb" aria-hidden="true" />
-      <div className="seg-options">
-        {options.map((option) => {
-          const inputProps = value !== undefined
-            ? { checked: option.value === value }
-            : { defaultChecked: option.value === initial };
-          return (
-            <label key={option.value}>
-              <input
-                type="radio"
-                name={name}
-                value={option.value}
-                disabled={option.disabled}
-                className="sr-only"
-                onChange={() => onValueChange?.(option.value)}
-                {...inputProps}
-              />
-              {option.label}
-            </label>
-          );
-        })}
-      </div>
-    </div>
-  );
+/** Grupo de rádio no servidor. O polegar é CSS. O caso controlado fica no wrapper cliente. */
+export function SegmentedThumb(props: UncontrolledProps) {
+  return <SegmentedThumbView {...props} />;
 }

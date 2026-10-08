@@ -5,12 +5,14 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { BookingIsland } from "../../components/motion/booking-island";
 import { CopyButton } from "../../components/motion/copy-button";
 import { CountdownRing, formatClock, ringGeometry } from "../../components/motion/countdown-ring";
+import { aroGlyph } from "../../lib/brand/mark";
 import { GradeLoader } from "../../components/motion/grade-loader";
 import { RollingNumber } from "../../components/motion/rolling-number";
 import { formatRollingValue, splitRollingText, cssDurationMs } from "../../components/motion/rolling-format";
 import { SegmentedThumb } from "../../components/motion/segmented-thumb";
+import { SegmentedThumbControlled } from "../../components/motion/segmented-thumb-controlled";
 import { COPY_ERROR, COPY_RESET_MS, copyValue } from "../../components/motion/motion-runtime";
-import { shouldStartInViewAnimation } from "../../components/motion/in-view-policy";
+import { nextInViewState, shouldStartInViewAnimation } from "../../components/motion/in-view-policy";
 import { isMotionPreviewOpen } from "../../app/preview/motion/access";
 import robots from "../../app/robots";
 import sitemap from "../../app/sitemap";
@@ -57,26 +59,34 @@ describe("movimento: acessibilidade e movimento reduzido", () => {
   it("não anima quando o sistema pede menos movimento", () => {
     expect(shouldStartInViewAnimation(true)).toBe(false);
     expect(shouldStartInViewAnimation(false)).toBe(true);
+    expect(nextInViewState(true, true)).toEqual({ armed: false, inview: false });
+    expect(nextInViewState(false, false)).toEqual({ armed: true, inview: false });
+    expect(nextInViewState(false, true)).toEqual({ armed: true, inview: true });
   });
 
-  it("o CSS guarda o estado final parado e o foco só no invólucro", () => {
+  it("o CSS guarda o estado final parado e o foco só no teclado", () => {
     const css = readFileSync("app/motion.css", "utf8");
-    expect(css).toContain("@theme");
+    expect(css).toContain("@layer components");
     expect(css).toContain("--ease-out-quint:");
-    expect(css).toContain("--dur-1:");
+    expect(css).toContain("--dur-1: var(--duration-opening, 180ms)");
     expect(css).toContain("--dur-2:");
     expect(css).toContain("--dur-3:");
+    expect(css).toContain("--aro-glow-1:");
+    expect(css).toContain("--aro-glow-2:");
+    expect(css).toContain("--aro-glow-3:");
+    expect(css).toContain(".dark {");
     expect(css).toContain("@media (prefers-reduced-motion: reduce)");
     expect(css).toContain(".island-detail { opacity: 1; }");
-    expect(css).toContain(".grade-loader.is-loop .grade-ring::before");
+    expect(css).toContain(".booking-island[data-armed]:not([data-inview])");
     expect(css).toContain("animation: grade-aro-sweep 1.1s linear infinite");
-    expect(css).toContain("var(--pix-bright, #3fd0be)");
-    expect(css).toContain("var(--brand-tile, #0b0b0c)");
-    expect(css).toContain("var(--brand-tile-foreground, #f6f5f2)");
-    expect(css).toContain("var(--brand-tile-edge, transparent)");
+    expect(css).toContain("var(--aro-glow-1)");
+    expect(css).toContain("var(--pix-bright)");
+    expect(css).not.toContain("#e6fffa 0deg");
     expect(css).not.toContain("--ap-offset");
-    expect(css).not.toContain("grade-cell");
-    expect(css).toContain(".grade-loader .grade-ring,\n  .grade-loader .grade-stem {\n    opacity: 1;");
+    expect(css).not.toContain("focus-within");
+    expect(css).not.toContain("outline: none");
+    expect(css).toContain(".motion-focus:has(:focus-visible)");
+    expect(css).toContain(".grade-sweep { opacity: 0; }");
     expect(css).toContain("box-shadow: var(--shadow-focus)");
     expect(css).toContain("transform: translateX");
     const globals = readFileSync("app/globals.css", "utf8");
@@ -98,6 +108,7 @@ describe("movimento: acessibilidade e movimento reduzido", () => {
     expect(html).toContain("Confirmado · sinal pago");
     expect(html).toContain('aria-hidden="true"');
     expect(html).not.toContain("data-inview");
+    expect(html).not.toContain("data-armed");
   });
 
   it("o anel mostra mm:ss, o tom e não depende de um relógio interno", () => {
@@ -123,30 +134,44 @@ describe("movimento: acessibilidade e movimento reduzido", () => {
     expect(expired).toContain("text-danger");
   });
 
-  it("a marca Aro anuncia o rótulo e esconde o glifo", () => {
-    const html = renderToStaticMarkup(GradeLoader({}));
+  it("a marca Aro anuncia o rótulo e usa o glifo compartilhado", () => {
+    const html = renderToStaticMarkup(createElement(GradeLoader));
     expect(html).toContain('role="status"');
-    expect(html).toContain('aria-label="Carregando"');
-    expect(html).toContain('class="grade-glyph" aria-hidden="true"');
+    expect(html).toContain("sr-only");
+    expect(html).toContain("Carregando");
+    expect(html).not.toContain('aria-label="Carregando"');
+    expect(html).toContain('aria-hidden="true"');
     expect(html).toContain("grade-ring");
     expect(html).toContain("grade-stem");
     expect(html).toContain("is-loop");
-    expect(html).toContain("--grade-size:32px");
-    expect(html).not.toContain("<svg");
+    expect(html).toContain('data-size="32"');
+    expect(html).not.toContain("style=");
+    expect(html).toContain(`r="${aroGlyph.ring.r}"`);
+    expect(html).toContain(`cx="${aroGlyph.ring.cx}"`);
+    expect(html).toContain(`stroke-width="${aroGlyph.ring.strokeWidth}"`);
+    expect(html).toContain(`x="${aroGlyph.stem.x}"`);
+    expect(html).toContain(`width="${aroGlyph.stem.width}"`);
+    expect(html).toContain('stroke="var(--pix-bright)"');
     expect(html).not.toContain("data-inview");
     expect(html).not.toContain("Jordan-Gilliam");
 
-    const once = renderToStaticMarkup(GradeLoader({ loop: false, size: 64, label: "Marca entrando" }));
+    const once = renderToStaticMarkup(createElement(GradeLoader, { loop: false, size: 64 }));
     expect(once).not.toContain("is-loop");
-    expect(once).toContain("--grade-size:64px");
-    expect(once).toContain('aria-label="Marca entrando"');
+    expect(once).not.toContain('role="status"');
+    expect(once).toContain('aria-hidden="true"');
+    expect(once).toContain('data-size="64"');
 
-    for (const size of [24, 32, 96]) {
-      expect(renderToStaticMarkup(GradeLoader({ size }))).toContain(`--grade-size:${size}px`);
+    const named = renderToStaticMarkup(createElement(GradeLoader, { loop: false, label: "Marca entrando" }));
+    expect(named).toContain('aria-label="Marca entrando"');
+    expect(named).not.toContain('role="status"');
+
+    for (const size of [24, 96] as const) {
+      expect(renderToStaticMarkup(createElement(GradeLoader, { size }))).toContain(`data-size="${size}"`);
     }
 
-    const custom = renderToStaticMarkup(GradeLoader({ label: "Verificando pagamento…" }));
-    expect(custom).toContain('aria-label="Verificando pagamento…"');
+    const custom = renderToStaticMarkup(createElement(GradeLoader, { label: "Verificando pagamento…" }));
+    expect(custom).toContain("Verificando pagamento…");
+    expect(custom).toContain('role="status"');
   });
 
   it("o botão de copiar tem rótulo, região ao vivo e campo de fallback", () => {
@@ -204,7 +229,10 @@ describe("movimento: acessibilidade e movimento reduzido", () => {
     expect(uncontrolled.match(/checked=""/g)?.length).toBe(1);
     expect(uncontrolled).toContain('value="30"');
 
-    const controlled = renderToStaticMarkup(SegmentedThumb({
+    expect(readFileSync("components/motion/segmented-thumb.tsx", "utf8")).not.toContain("use client");
+    expect(readFileSync("components/motion/segmented-thumb-controlled.tsx", "utf8")).toContain("use client");
+
+    const controlled = renderToStaticMarkup(createElement(SegmentedThumbControlled, {
       name: "appearance",
       label: "Aparência",
       options: [
@@ -242,6 +270,8 @@ describe("vitrine de movimento", () => {
       "components/motion/copy-button.tsx",
       "components/motion/motion-runtime.ts",
       "components/motion/segmented-thumb.tsx",
+      "components/motion/segmented-thumb-view.tsx",
+      "components/motion/segmented-thumb-controlled.tsx",
       "components/motion/countdown-ring.tsx",
     ]) {
       expect(readFileSync(file, "utf8")).toContain(notice);

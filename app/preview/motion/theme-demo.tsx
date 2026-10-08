@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { SegmentedThumb } from "@/components/motion/segmented-thumb";
+import { SegmentedThumbControlled as SegmentedThumb } from "@/components/motion/segmented-thumb-controlled";
 
 const options = [
   { value: "light", label: "Claro" },
