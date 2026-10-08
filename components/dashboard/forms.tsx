@@ -50,7 +50,7 @@ function centsFromInput(value: string) {
   return Number(whole) * 100 + Number(decimal.padEnd(2, "0"));
 }
 
-export function ServiceForm({ businessId, businessName, service }: { businessId: string; businessName: string; service?: Service }) {
+export function ServiceForm({ businessId, service }: { businessId: string; service?: Service }) {
   const [state, action, pending] = useActionState(saveService, {});
   const [showSuccess, setShowSuccess] = useState(true);
   const prefix = service?.id ?? "new";
@@ -87,7 +87,7 @@ export function ServiceForm({ businessId, businessName, service }: { businessId:
         ))}
         {policy.preset === "personalizada" && <p className="inline-flex min-h-11 items-center text-sm font-semibold">Personalizada</p>}
       </div>
-      <p aria-live="polite" className="max-w-[65ch] text-sm text-muted">{ownerPreview(policy, { businessName, depositCents: centsFromInput(values.deposit) })}</p>
+      <p aria-live="polite" className="max-w-[65ch] text-sm text-muted">{ownerPreview(policy, { depositCents: centsFromInput(values.deposit) })}</p>
       <p className="text-sm text-muted">A devolução não é automática. Você confirma em Devolver pelo AgendaPix, e o valor sai da sua conta Mercado Pago. Mudanças valem para novas reservas.</p>
     </fieldset>
     <label className="flex min-h-11 items-center gap-3 text-sm font-semibold"><Switch name="active" checked={values.active} onChange={(event) => setValues({ ...values, active: event.target.checked })} />Disponível para agendamento</label>

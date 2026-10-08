@@ -12,21 +12,56 @@ function policy(partial: Pick<DepositPolicy, "refundUntilHours" | "rescheduleUnt
 }
 
 describe("texto da política do sinal", () => {
-  it("mantém a prévia do dono em até 320 caracteres em todas as combinações", () => {
+  it("a prévia do dono fala com você, sem o nome do negócio", () => {
+    const businessName = "Barbearia do Zé";
+    expect(ownerPreview(PADRAO_DEPOSIT_POLICY, { depositCents: 2000 })).toBe(
+      "O cliente paga R$ 20,00 de sinal no Pix para reservar. Pode cancelar ou remarcar até 24 h antes. Depois disso, ou se faltar, o sinal fica com você. Quando o cliente cancelar no prazo, você devolve pelo AgendaPix, depois de confirmar o cancelamento.",
+    );
+    expect(ownerPreview(PADRAO_DEPOSIT_POLICY, { depositCents: 0 })).toBe("Sem sinal: a reserva confirma na hora, sem Pix.");
+
     for (const refundUntilHours of HOURS) {
       for (const rescheduleUntilHours of HOURS) {
         for (const lateCancel of LATE) {
           for (const noShow of NO_SHOW) {
-            const text = ownerPreview(policy({ refundUntilHours, rescheduleUntilHours, lateCancel, noShow }), {
-              businessName: "Studio Bella",
-              depositCents: 2000,
-            });
-            expect(text.length).toBeLessThanOrEqual(320);
+            const text = ownerPreview(policy({ refundUntilHours, rescheduleUntilHours, lateCancel, noShow }), { depositCents: 2000 });
             expect(text.toLowerCase()).not.toContain("repass");
             expect(text).not.toMatch(/\b(a|da|na|pela) AgendaPix\b/);
-            if (refundUntilHours !== null || noShow === "refund") {
-              expect(text).toContain("devolve pelo AgendaPix, conforme a política, se confirmar no painel");
-              expect(text).not.toMatch(/receba o sinal|sinal devolvido/i);
+            expect(text).not.toContain(businessName);
+            expect(text).not.toContain("Studio Bella");
+            expect(text.startsWith("O cliente paga R$ 20,00 de sinal no Pix para reservar.")).toBe(true);
+
+            if (refundUntilHours !== null && rescheduleUntilHours !== null && refundUntilHours === rescheduleUntilHours) {
+              expect(text).toContain(`Pode cancelar ou remarcar até ${refundUntilHours} h antes.`);
+            } else if (refundUntilHours !== null && rescheduleUntilHours !== null) {
+              expect(text).toContain(`Pode cancelar até ${refundUntilHours} h antes ou remarcar até ${rescheduleUntilHours} h antes.`);
+            } else if (refundUntilHours !== null) {
+              expect(text).toContain(`Pode cancelar até ${refundUntilHours} h antes.`);
+            } else if (rescheduleUntilHours !== null) {
+              expect(text).toContain(`Pode remarcar até ${rescheduleUntilHours} h antes, usando o sinal (1 vez).`);
+            }
+
+            if (lateCancel === noShow) {
+              expect(text).toContain(lateCancel === "credit"
+                ? `Depois disso, ou se faltar, o sinal vira ${CREDIT_PHRASE}.`
+                : "Depois disso, ou se faltar, o sinal fica com você.");
+            } else {
+              expect(text).toContain(lateCancel === "credit"
+                ? `Depois disso, o sinal vira ${CREDIT_PHRASE}.`
+                : "Depois disso, o sinal fica com você.");
+              expect(text).toContain(noShow === "credit"
+                ? `Se faltar, o sinal vira ${CREDIT_PHRASE}.`
+                : noShow === "refund"
+                  ? "Se faltar, você devolve o sinal."
+                  : "Se faltar, o sinal fica com você.");
+            }
+
+            if (noShow === "refund") {
+              expect(text).toContain("Quando houver devolução, você faz pelo AgendaPix, depois de confirmar com o cliente.");
+              expect(text).not.toContain("Quando o cliente cancelar no prazo");
+            } else if (refundUntilHours !== null) {
+              expect(text).toContain("Quando o cliente cancelar no prazo, você devolve pelo AgendaPix, depois de confirmar o cancelamento.");
+            } else {
+              expect(text).not.toContain("pelo AgendaPix");
             }
           }
         }
@@ -134,7 +169,7 @@ describe("texto da política do sinal", () => {
       timezone: "America/Sao_Paulo",
     });
     expect(stored.startsWith("Barbearia do Zé pode devolver o sinal até qua, 07 out, às 11:30.")).toBe(true);
-    expect(stored).not.toBe(ownerPreview(PADRAO_DEPOSIT_POLICY, { businessName: "Barbearia do Zé", depositCents: 2000 }));
+    expect(stored).not.toBe(ownerPreview(PADRAO_DEPOSIT_POLICY, { depositCents: 2000 }));
   });
 
   it("reserva dentro e fora do prazo de devolução", () => {
