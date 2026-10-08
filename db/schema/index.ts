@@ -252,6 +252,8 @@ export const paymentAudit = pgTable("payment_audit", {
   check("payment_audit_action_not_empty", sql`length(trim(${table.action})) > 0`),
 ]);
 
+export const subscriptionProviderIds = ["manual", "pix_platform"] as const;
+
 export const subscriptions = pgTable("subscriptions", {
   id: uuid("id").defaultRandom().primaryKey(),
   businessId: uuid("business_id").notNull().unique().references(() => businesses.id, { onDelete: "restrict" }),
@@ -260,7 +262,24 @@ export const subscriptions = pgTable("subscriptions", {
   externalId: text("external_id"),
   currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
   ...timestamps(),
-});
+}, (table) => [
+  check("subscriptions_provider_valid", sql`${table.provider} IS NULL OR ${table.provider} IN ('manual', 'pix_platform')`),
+]);
+
+/** Pedido de ativação manual. No máximo um aberto (handled_at nulo) por negócio. */
+export const subscriptionRequests = pgTable("subscription_requests", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "restrict" }),
+  provider: text("provider").notNull(),
+  requestedAt: timestamp("requested_at", { withTimezone: true }).defaultNow().notNull(),
+  handledAt: timestamp("handled_at", { withTimezone: true }),
+  handledBy: text("handled_by"),
+}, (table) => [
+  uniqueIndex("subscription_requests_one_open_per_business_idx").on(table.businessId).where(sql`${table.handledAt} IS NULL`),
+  check("subscription_requests_provider_valid", sql`${table.provider} IN ('manual', 'pix_platform')`),
+  check("subscription_requests_handled_pair", sql`(${table.handledAt} IS NULL) = (${table.handledBy} IS NULL)`),
+  check("subscription_requests_handled_by_not_blank", sql`${table.handledBy} IS NULL OR length(trim(${table.handledBy})) > 0`),
+]);
 
 export const mpConnectionStatuses = ["connected", "needs_reconnect", "disconnected"] as const;
 
