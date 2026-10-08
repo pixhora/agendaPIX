@@ -24,6 +24,11 @@ export async function verifyEmailTransport() {
   finally { transporter.close(); }
 }
 
+export const magicLinkEmail = {
+  subject: "Seu link para acessar o AgendaPix",
+  text: (url: string) => `Acesse o AgendaPix pelo link abaixo. O link vale por 5 minutos e pode ser usado uma vez.\n\n${url}\n\nSe você não pediu este acesso, ignore esta mensagem.`,
+};
+
 export async function sendMagicLinkEmail(email: string, url: string) {
   const capture = process.env.MAGIC_LINK_CAPTURE_FILE;
   if (capture) {
@@ -35,7 +40,7 @@ export async function sendMagicLinkEmail(email: string, url: string) {
   await transporter.sendMail({
     from: env.SMTP_FROM,
     to: email,
-    subject: "Seu link para acessar a Agenda",
-    text: `Acesse sua conta pelo link abaixo. O link vale por 5 minutos e pode ser usado uma vez.\n\n${url}\n\nSe você não pediu este acesso, ignore esta mensagem.`,
+    subject: magicLinkEmail.subject,
+    text: magicLinkEmail.text(url),
   });
 }

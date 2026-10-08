@@ -263,6 +263,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
         phone: normalizePhoneToE164(customerPhone),
         cpfCnpj: cpfDigitsOnly(customerCpf),
       },
+      ...(selectedService.depositCents > 0 && selectedService.policyHash ? { policyHash: selectedService.policyHash } : {}),
     };
 
     try {
@@ -278,6 +279,17 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
       const data = await res.json();
 
       if (!res.ok) {
+        if (data?.error?.code === "policy_changed") {
+          setSelectedService((current) => current ? {
+            ...current,
+            depositPolicy: data.error.depositPolicy,
+            policySummary: data.error.policySummary,
+            policyHash: data.error.policyHash,
+          } : current);
+        }
+        if (data?.error?.code === "bookings_paused") {
+          setBusiness((current) => current ? { ...current, bookingsPaused: true } : current);
+        }
         const errorMsg =
           data?.error?.message ||
           (res.status === 409
@@ -397,7 +409,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
       <div className="flex items-center gap-3">
         <ThemeToggle className="sm:hidden" />
         <Link href="/" className="inline-flex min-h-11 items-center gap-2 font-semibold text-ink">
-          <BrandMark className="size-6 rounded-md text-[10px]" /> Feito com Agenda
+          <BrandMark className="size-6 rounded-md text-[10px]" /> Feito com o AgendaPix
         </Link>
       </div>
     </footer>
@@ -455,10 +467,34 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
             timezone={business.timezone}
             customerName={customerName}
             customerPhone={customerPhone}
+            policyText={bookingResponse?.policy?.text}
+            contactWhatsapp={business.contactWhatsapp}
             onNewBooking={handleRestart}
           />
         </main>
         {pageFooter}
+      </div>
+    );
+  }
+
+  if (business.bookingsPaused && !bookingResponse) {
+    const whatsapp = business.contactWhatsapp?.replace(/^\+/, "");
+    return (
+      <div className="min-h-dvh bg-paper">
+        {pageHeader}
+        <main id="content" className="mx-auto max-w-md px-4 py-16">
+          <div className="space-y-4 rounded-card border border-line bg-surface p-6 text-center shadow-[var(--shadow-card)]">
+            <h1 className="font-display text-xl font-bold text-ink">Agendamento online pausado</h1>
+            <p className="text-sm text-muted">
+              {whatsapp ? `Fale com ${business.name} pelo WhatsApp para marcar um horário.` : `Fale com ${business.name} para marcar um horário.`}
+            </p>
+            {whatsapp && (
+              <Button asChild className="w-full">
+                <a href={`https://wa.me/${whatsapp}`} target="_blank" rel="noopener noreferrer">Falar no WhatsApp</a>
+              </Button>
+            )}
+          </div>
+        </main>
       </div>
     );
   }

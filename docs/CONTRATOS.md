@@ -262,4 +262,24 @@ Migration aditiva cria apenas contadores, preservando schema/dados existentes. A
 
 ## Readiness
 
-`GET /api/health` permanece liveness200. `GET /api/ready` (novo):200 `{status:"ready"}` se SELECT1 PostgreSQL e autenticação/conexão SMTP passam;503 `{status:"unavailable"}` em qualquer falha. Sem autenticação, no-store, sem nomes de servidores, credenciais, erros brutos ou PII. Não envia e-mail, não cria cobrança, não testa domínio/remetente ou entrega do destinatário; pagamento bancário continua gate separado.
+`GET /api/health` permanece liveness200. `GET /api/ready` (novo):200 `{status:"ready"}` se SELECT1 PostgreSQL e autenticação/conexão SMTP passam;503 `{status:"unavailable"}` em qualquer falha. Sem autenticação, no-store, sem nomes de servidores, credenciais, erros brutos ou PII. Não envia e-mail, não cria cobrança, não testa domínio/remetente ou entrega do destinatário; pagamento bancário continua gate anterior.
+
+## Política do sinal, teste grátis e WhatsApp
+
+Erros deste fluxo usam `{ error: { code, message, ... } }`. `409 policy_changed` inclui `depositPolicy`, `policySummary` e `policyHash` dentro de `error`. `403 bookings_paused` traz só `code` e `message`.
+
+`services.deposit_policy` é jsonb obrigatório, padrão Padrão (janela de 24 h para devolução e remarcação; atraso e falta ficam com o negócio). A devolução não é automática: o negócio confirma no painel, em Devolver pelo AgendaPix, e o valor sai da conta Mercado Pago dele. A reserva com sinal guarda `policy_snapshot`, `policy_text`, `policy_hash`, `refund_deadline_at` e `reschedule_deadline_at` na mesma transação. Sinal zero deixa esses campos nulos. `POST /api/public/[slug]/bookings` exige `policyHash` quando o sinal é maior que zero. Hash diferente do texto atual responde `409 policy_changed`.
+
+`GET /api/public/[slug]/services` devolve `address`, `phone` e `logoUrl` (hoje `null`), `contactWhatsapp`, `bookingsPaused`, `requiresPayerCpf: true`, `pixRecipientDisplayName` (nome do negócio) e, em cada serviço com sinal, `depositPolicy`, `policySummary` e `policyHash`. Sem sinal, esses três campos são `null`.
+
+`GET /api/public/[slug]/availability` inclui `bookingsPaused`. Com a agenda pausada, `slots` vem vazio. A consulta da reserva e a criação respondem `policy: { text, snapshot, refundDeadlineAt, rescheduleDeadlineAt }` ou `null`.
+
+`businesses.trial_ends_at` é obrigatório. Negócio novo termina às 23:59:59 do 7º dia local. Negócio já existente recebe `now() + interval '7 days'` na migration `0011`. `subscriptions` guarda status `trialing | active | past_due | canceled`. `GET /api/businesses/{businessId}/billing` exige sessão do dono e responde `{ state, trialEndsAt, daysLeft, bookingsPaused, plan: { name: "AgendaPix", priceCents: 4900 }, subscription }`. `state` é `trial`, `trial_ending`, `trial_last_day`, `paused` ou `active`.
+
+Agenda pausada: `createBooking` responde `403 bookings_paused` antes do limite de tentativas. Replay da mesma `Idempotency-Key` não é bloqueado. Pix já gerado ainda confirma. Disponibilidade pública fica vazia com `bookingsPaused: true`.
+
+`getDepositBookability` em `lib/bookings/deposit-bookability.ts` é o único ponto da regra “serviço com sinal só é reservável se o negócio estiver apto”. Hoje retorna sempre ok. Não há checagem de chave Pix nem erro `mp_account_not_connected`.
+
+A listagem do dono (`dashboardServices`) inclui em cada serviço `bookable` e `blockedReason`. Hoje: `bookable: true` e `blockedReason: null`, ou `bookable: false` e `blockedReason: "bookings_paused"` quando o teste acabou sem assinatura ativa. Serviço sem sinal não herda um bloqueio futuro de conta Mercado Pago. `GET /api/businesses/{businessId}/services/{serviceId}/future-bookings-count` responde `{ count }` de reservas confirmadas com início futuro.
+
+`businesses.contact_whatsapp` é opcional, E.164. Entra no onboarding, em Ajustes e em `contactWhatsapp` no payload público.

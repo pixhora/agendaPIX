@@ -1,5 +1,5 @@
 import { DashboardShell, Empty, SectionCard } from "@/components/dashboard/shell";
-import { HoursForm } from "@/components/dashboard/forms";
+import { HoursForm, WhatsappForm } from "@/components/dashboard/forms";
 import { PixKeyForm } from "@/components/dashboard/pix-key-form";
 import { PublicLink } from "@/components/dashboard/public-link";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
@@ -21,6 +21,9 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <HoursForm key={business.id} businessId={business.id} hours={hours} />
         </SectionCard>
         <PixKeyForm key={`pix-${business.id}`} businessId={business.id} />
+        <SectionCard title="WhatsApp do negócio" headingId="whatsapp-title" icon={<Icon icon={ACTION_ICONS.link} size="md" />} description="Opcional. Aparece para o cliente quando ele precisar falar com você.">
+          <WhatsappForm key={`wa-${business.id}`} businessId={business.id} contactWhatsapp={business.contactWhatsapp} />
+        </SectionCard>
       </div>
       <div className="grid min-w-0 gap-6 lg:sticky lg:top-8">
         <SectionCard title="Sua página pública" headingId="public-link-title" icon={<Icon icon={ACTION_ICONS.link} size="md" />} description="Compartilhe este link para receber reservas com sinal via Pix.">

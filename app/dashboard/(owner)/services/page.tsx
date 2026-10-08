@@ -7,6 +7,7 @@ import { ServiceForm } from "@/components/dashboard/forms";
 import { buttonVariants } from "@/components/ui/button";
 import { ownerContext } from "@/lib/dashboard/session";
 import { dashboardServices } from "@/lib/dashboard/data";
+import { policyListLabel } from "@/lib/policy/text";
 import { cn } from "@/lib/utils";
 
 export default async function ServicesPage({ searchParams }: { searchParams: Promise<{ businessId?: string }> }) {
@@ -47,19 +48,22 @@ export default async function ServicesPage({ searchParams }: { searchParams: Pro
               <div className="text-right tabular-nums">
                 <p className="font-display text-xl font-extrabold">{money.format(service.priceCents / 100)}</p>
                 <p className="text-sm font-semibold text-pix">{service.depositCents > 0 ? `Sinal Pix ${money.format(service.depositCents / 100)}` : "Sem sinal"}</p>
+                <p className="text-sm text-muted">{policyListLabel(service.depositPolicy, service.depositCents)}</p>
               </div>
             </div>
+            {service.blockedReason === "bookings_paused" && <p className="mt-3 text-sm font-medium text-warning">Novos agendamentos estão pausados.</p>}
+            {service.blockedReason && service.blockedReason !== "bookings_paused" && <p className="mt-3 text-sm font-medium text-warning">Este serviço com sinal ainda não pode ser reservado.</p>}
             <details className="group mt-3 border-t border-line pt-1">
               <summary className="flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-field text-sm font-semibold text-ink hover:text-pix focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden"><Pencil aria-hidden="true" className="size-4" />Editar serviço<span className="sr-only"> {service.name}</span></summary>
               <div className="mt-2 rounded-field bg-subtle/60 p-3 sm:p-4">
-                <ServiceForm key={service.id} businessId={business.id} service={service} />
+                <ServiceForm key={service.id} businessId={business.id} businessName={business.name} service={service} />
               </div>
             </details>
           </li>)}
         </ul>}
       </section>
       <SectionCard id="new-service" title="Cadastrar serviço" description="Aparece na sua página pública assim que estiver disponível." className="scroll-mt-24 lg:sticky lg:top-8">
-        <ServiceForm businessId={business.id} />
+        <ServiceForm businessId={business.id} businessName={business.name} />
       </SectionCard>
     </div>}
   </DashboardShell>;

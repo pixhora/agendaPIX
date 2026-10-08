@@ -1,7 +1,13 @@
 import { z } from "zod";
 
 export class HttpError extends Error {
-  constructor(public status: number, public code: string, message: string, public retryAfterSeconds?: number) { super(message); }
+  constructor(
+    public status: number,
+    public code: string,
+    message: string,
+    public retryAfterSeconds?: number,
+    public details?: Record<string, unknown>,
+  ) { super(message); }
 }
 
 export function json(value: unknown, status = 200) {
@@ -12,7 +18,7 @@ export async function handleHttp(run: () => Promise<Response>) {
   try { return await run(); }
   catch (error) {
     if (error instanceof HttpError) {
-      const response = json({ error: { code: error.code, message: error.message } }, error.status);
+      const response = json({ error: { code: error.code, message: error.message, ...error.details } }, error.status);
       if (error.retryAfterSeconds) response.headers.set("Retry-After", String(Math.max(1, Math.ceil(error.retryAfterSeconds))));
       return response;
     }

@@ -2,18 +2,21 @@ import React from "react";
 import { Input } from "@/components/ui/input";
 import { FieldError, FieldHint } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
+import { CONTACT_WHATSAPP_PATTERN, normalizeContactWhatsapp } from "@/lib/validation/whatsapp";
 import { slugify } from "./slug";
 import { StepActions, StepHeader, usePublicHost } from "./parts";
 
 interface StepBusinessProps {
   businessName: string;
   slug: string;
+  contactWhatsapp: string;
   onChangeBusinessName: (name: string) => void;
   onChangeSlug: (slug: string) => void;
+  onChangeContactWhatsapp: (value: string) => void;
   onNext: () => void;
 }
 
-export function StepBusiness({ businessName, slug, onChangeBusinessName, onChangeSlug, onNext }: StepBusinessProps) {
+export function StepBusiness({ businessName, slug, contactWhatsapp, onChangeBusinessName, onChangeSlug, onChangeContactWhatsapp, onNext }: StepBusinessProps) {
   const host = usePublicHost();
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -35,7 +38,9 @@ export function StepBusiness({ businessName, slug, onChangeBusinessName, onChang
   const isSlugValid = slug.length >= 2 && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug);
   const showSlugError = isSlugStarted && !isSlugValid;
 
-  const isValid = isNameValid && isSlugValid;
+  const normalizedWhatsapp = normalizeContactWhatsapp(contactWhatsapp);
+  const isWhatsappValid = normalizedWhatsapp === null || CONTACT_WHATSAPP_PATTERN.test(normalizedWhatsapp);
+  const isValid = isNameValid && isSlugValid && isWhatsappValid;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,6 +99,23 @@ export function StepBusiness({ businessName, slug, onChangeBusinessName, onChang
         ) : (
           <FieldHint id="business-slug-hint">Letras minúsculas, números e hífens. Dá para mudar depois.</FieldHint>
         )}
+      </div>
+
+      <div className="space-y-2">
+        <label htmlFor="business-whatsapp" className="text-sm font-semibold">WhatsApp do negócio</label>
+        <Input
+          id="business-whatsapp"
+          type="tel"
+          inputMode="tel"
+          autoComplete="tel"
+          placeholder="+55 11 99999-9999"
+          value={contactWhatsapp}
+          onChange={(event) => onChangeContactWhatsapp(event.target.value)}
+          aria-invalid={!isWhatsappValid ? "true" : undefined}
+          aria-describedby="business-whatsapp-hint"
+        />
+        <FieldHint id="business-whatsapp-hint">Opcional. Seus clientes usam esse número para falar com você.</FieldHint>
+        {!isWhatsappValid && <FieldError>Informe o WhatsApp com DDD. Exemplo: +5511999999999.</FieldError>}
       </div>
 
       <StepActions submitLabel="Continuar" disabled={!isValid} />

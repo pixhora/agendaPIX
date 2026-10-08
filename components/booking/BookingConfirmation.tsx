@@ -14,6 +14,8 @@ interface BookingConfirmationProps {
   timezone: string;
   customerName: string;
   customerPhone: string;
+  policyText?: string | null;
+  contactWhatsapp?: string | null;
   onNewBooking: () => void;
 }
 
@@ -59,6 +61,8 @@ export function BookingConfirmation({
   timezone,
   customerName,
   customerPhone,
+  policyText,
+  contactWhatsapp,
   onNewBooking,
 }: BookingConfirmationProps) {
   const remainingCents = Math.max(0, service.priceCents - service.depositCents);
@@ -121,13 +125,13 @@ export function BookingConfirmation({
         </div>
       </article>
 
-      <p className="rounded-card border border-line bg-surface p-4 text-sm text-muted">
-        <strong className="font-semibold text-ink">Vai se atrasar ou precisa remarcar?</strong> Avise o estabelecimento pelo WhatsApp o quanto antes.
-      </p>
+      {policyText && (
+        <p className="rounded-card border border-line bg-surface p-4 text-sm text-muted">{policyText}</p>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <Button asChild size="lg">
-          <a href={`https://wa.me/?text=${whatsappMessage}`} target="_blank" rel="noopener noreferrer">
+          <a href={`https://wa.me/${contactWhatsapp ? contactWhatsapp.replace(/^\+/, "") : ""}?text=${whatsappMessage}`} target="_blank" rel="noopener noreferrer">
             <Icon icon={CONFIRMATION_ICONS.whatsapp} size="md" /> Enviar no WhatsApp
           </a>
         </Button>

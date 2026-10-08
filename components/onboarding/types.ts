@@ -10,4 +10,5 @@ export interface OnboardingData {
   opensAt: string;    // "09:00"
   closesAt: string;   // "19:00"
   email: string;
+  contactWhatsapp?: string;
 }

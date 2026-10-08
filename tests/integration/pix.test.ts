@@ -9,6 +9,7 @@ import { databaseEnvSchema } from "../../lib/env";
 import { FakePaymentProvider, signFakeWebhook } from "../../lib/payments/fake";
 import { processWebhook } from "../../lib/payments/webhook";
 import { simulateDevFakePayment } from "../../lib/payments/simulate-dev";
+import { padraoPolicyHash } from "../helpers/deposit-policy";
 
 const pool = new Pool({ connectionString: databaseEnvSchema.parse(process.env).DATABASE_URL, max: 10, connectionTimeoutMillis: 5000 });
 const database = drizzle(pool, { schema });
@@ -19,7 +20,7 @@ let businessIds: string[];
 let slugs: string[];
 let serviceIds: string[];
 let bodyHashes: string[];
-const input = () => ({ serviceId: serviceIds[0], startsAt: "2030-01-01T12:00:00Z", customer: { name: "Cliente de teste", phone: "+5511999999999" , cpfCnpj: "52998224725" } });
+const input = () => ({ serviceId: serviceIds[0], startsAt: "2030-01-01T12:00:00Z", customer: { name: "Cliente de teste", phone: "+5511999999999" , cpfCnpj: "52998224725" }, policyHash: padraoPolicyHash("Negócio de teste") });
 
 function webhook(externalId: string, overrides: Record<string, unknown> = {}, signed = true) {
   const body = JSON.stringify({ eventId: randomUUID(), type: "payment.paid", externalId, amountCents: 1000, paidAt: new Date().toISOString(), ...overrides });

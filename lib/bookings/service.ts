@@ -10,7 +10,12 @@ import { paymentsConfig } from "../payments/config";
 import { getPaymentProvider } from "../payments";
 import { pixChargeSchema, type PaymentProvider, type PixCharge } from "../payments/provider";
 import { callProvider, ProviderTimeoutError } from "../payments/timeout";
+import { loadBookingAccess } from "../billing/load";
+import { depositPolicySchema, POLICY_CHANGED_CODE, POLICY_CHANGED_MESSAGE } from "../policy/schema";
+import { policyHashFor, policyTextFor } from "../policy/hash";
+import { policySummary } from "../policy/text";
 import { availableSlots, localDate } from "./availability";
+import { assertDepositBookable } from "./deposit-bookability";
 import { availabilitySchema, bookingInputSchema, requestKeySchema, slugSchema } from "./validation";
 import { bookingConfig, type BookingConfig } from "./config";
 import { consumeBookingRateLimit, tenantScopedHash } from "./rate-limit";
@@ -50,10 +55,52 @@ async function serviceById(businessId: string, serviceId: string, database: Data
   if (!service) throw new HttpError(404, "service_not_found", "Serviço não encontrado.");
   return service;
 }
+const BOOKINGS_PAUSED_MESSAGE = "Este estabelecimento não está aceitando novos agendamentos no momento.";
+
+function publicPolicy(service: { depositCents: number; depositPolicy: unknown }, businessName: string) {
+  if (service.depositCents <= 0) return { depositPolicy: null, policySummary: null, policyHash: null };
+  const policy = depositPolicySchema.parse(service.depositPolicy);
+  return {
+    depositPolicy: policy,
+    policySummary: policySummary(policy, { depositCents: service.depositCents }),
+    policyHash: policyHashFor(policy, { businessName, depositCents: service.depositCents }),
+  };
+}
+
+function deadlineAt(startsAt: Date, hours: number | null) {
+  return hours === null ? null : new Date(startsAt.getTime() - hours * 3_600_000);
+}
+
 export async function listPublicServices(slug: string, database: Database = getDb()) {
   const business = await businessBySlug(slug, database);
-  const services = await database.select({ id: schema.services.id, name: schema.services.name, durationMinutes: schema.services.durationMinutes, priceCents: schema.services.priceCents, depositCents: schema.services.depositCents }).from(schema.services).where(and(eq(schema.services.businessId, business.id), eq(schema.services.active, true)));
-  return { name: business.name, timezone: business.timezone, services };
+  const access = await loadBookingAccess(business, database);
+  const rows = await database.select({
+    id: schema.services.id,
+    name: schema.services.name,
+    durationMinutes: schema.services.durationMinutes,
+    priceCents: schema.services.priceCents,
+    depositCents: schema.services.depositCents,
+    depositPolicy: schema.services.depositPolicy,
+  }).from(schema.services).where(and(eq(schema.services.businessId, business.id), eq(schema.services.active, true)));
+  return {
+    name: business.name,
+    timezone: business.timezone,
+    address: null,
+    phone: null,
+    logoUrl: null,
+    contactWhatsapp: business.contactWhatsapp,
+    bookingsPaused: access.bookingsPaused,
+    requiresPayerCpf: true,
+    pixRecipientDisplayName: business.name,
+    services: rows.map((service) => ({
+      id: service.id,
+      name: service.name,
+      durationMinutes: service.durationMinutes,
+      priceCents: service.priceCents,
+      depositCents: service.depositCents,
+      ...publicPolicy(service, business.name),
+    })),
+  };
 }
 async function slotsFor(business: typeof schema.businesses.$inferSelect, service: typeof schema.services.$inferSelect, date: string, now: Date, database: Database) {
   const weekday = new Date(`${date}T12:00:00Z`).getUTCDay();
@@ -68,8 +115,10 @@ async function slotsFor(business: typeof schema.businesses.$inferSelect, service
 export async function getAvailability(slug: string, query: unknown, database: Database = getDb()) {
   const input = availabilitySchema.parse(query);
   const business = await businessBySlug(slug, database);
+  const access = await loadBookingAccess(business, database);
+  if (access.bookingsPaused) return { timezone: business.timezone, slots: [], bookingsPaused: true as const };
   const service = await serviceById(business.id, input.serviceId, database);
-  return { timezone: business.timezone, slots: await slotsFor(business, service, input.date, new Date(), database) };
+  return { timezone: business.timezone, slots: await slotsFor(business, service, input.date, new Date(), database), bookingsPaused: false as const };
 }
 function paymentView(payment: typeof schema.payments.$inferSelect | undefined, now: Date) {
   if (!payment) return null;
@@ -125,7 +174,10 @@ async function finalizeCreatingPayment(
 }
 async function bookingView(booking: typeof schema.bookings.$inferSelect, database: Database, now: Date) {
   const [payment] = await database.select().from(schema.payments).where(and(eq(schema.payments.businessId, booking.businessId), eq(schema.payments.bookingId, booking.id))).limit(1);
-  return { bookingId: booking.id, status: booking.status, startsAt: booking.startsAt, endsAt: booking.endsAt, expiresAt: booking.expiresAt, payment: paymentView(payment, now) };
+  const policy = booking.policyText
+    ? { text: booking.policyText, snapshot: booking.policySnapshot, refundDeadlineAt: booking.refundDeadlineAt, rescheduleDeadlineAt: booking.rescheduleDeadlineAt }
+    : null;
+  return { bookingId: booking.id, status: booking.status, startsAt: booking.startsAt, endsAt: booking.endsAt, expiresAt: booking.expiresAt, payment: paymentView(payment, now), policy };
 }
 
 function retryAfter(next: string | Date | null, now: Date) {
@@ -163,6 +215,11 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
   const requestKey = requestKeySchema.parse(key);
   const requestHash = hash(JSON.stringify(input));
   const business = await businessBySlug(slug, database);
+  const [prior] = await database.select({ id: schema.bookings.id }).from(schema.bookings).where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.requestKey, requestKey))).limit(1);
+  if (!prior) {
+    const access = await loadBookingAccess(business, database);
+    if (access.bookingsPaused) throw new HttpError(403, "bookings_paused", BOOKINGS_PAUSED_MESSAGE);
+  }
   await consumeBookingRateLimit(database, business.id, clientIdentity, config);
   const clientHash = clientIdentity ? tenantScopedHash("booking-client:v1", business.id, clientIdentity) : null;
   const paymentProvider = provider ?? (undefined as PaymentProvider | undefined);
@@ -180,7 +237,20 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
       const [payment] = await transaction.select().from(schema.payments).where(and(eq(schema.payments.businessId, business.id), eq(schema.payments.bookingId, existing.id))).limit(1);
       return { kind: "existing" as const, booking: existing, payment, token: accessToken(business.id, existing.id), now };
     }
+    const access = await loadBookingAccess(business, transaction);
+    if (access.bookingsPaused) throw new HttpError(403, "bookings_paused", BOOKINGS_PAUSED_MESSAGE);
     const service = await serviceById(business.id, input.serviceId, transaction);
+    if (service.depositCents > 0) assertDepositBookable(business);
+    const policy = service.depositCents > 0 ? depositPolicySchema.parse(service.depositPolicy) : null;
+    const currentHash = policy ? policyHashFor(policy, { businessName: business.name, depositCents: service.depositCents }) : null;
+    if (service.depositCents > 0 && !input.policyHash) throw new HttpError(400, "invalid_input", "Confira a política do sinal antes de agendar.");
+    if (policy && currentHash && input.policyHash !== currentHash) {
+      throw new HttpError(409, POLICY_CHANGED_CODE, POLICY_CHANGED_MESSAGE, undefined, {
+        depositPolicy: policy,
+        policySummary: policySummary(policy, { depositCents: service.depositCents }),
+        policyHash: currentHash,
+      });
+    }
     const date = localDate(new Date(input.startsAt), business.timezone);
     const slots = await slotsFor(business, service, date, now, transaction);
     const slot = slots.find((candidate) => candidate.startsAt.toISOString() === input.startsAt);
@@ -193,7 +263,11 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
     const customerId = (insertedCustomer ?? existingCustomer).id;
     const expiresAt = service.depositCents > 0 ? new Date(Math.min(now.getTime() + config.BOOKING_HOLD_MINUTES * 60000, slot.startsAt.getTime())) : null;
     const [booking] = await transaction.insert(schema.bookings).values({ businessId: business.id, serviceId: service.id, customerId, requestKey, requestHash, clientHash, ...slot,
-      priceCents: service.priceCents, depositCents: service.depositCents, status: expiresAt ? "pending_payment" : "confirmed", expiresAt, createdAt: now }).returning();
+      priceCents: service.priceCents, depositCents: service.depositCents, status: expiresAt ? "pending_payment" : "confirmed", expiresAt, createdAt: now,
+      policySnapshot: policy, policyText: policy ? policyTextFor(policy, { businessName: business.name, depositCents: service.depositCents }) : null, policyHash: currentHash,
+      refundDeadlineAt: policy ? deadlineAt(slot.startsAt, policy.refundUntilHours) : null,
+      rescheduleDeadlineAt: policy ? deadlineAt(slot.startsAt, policy.rescheduleUntilHours) : null,
+    }).returning();
     const token = accessToken(business.id, booking.id);
     await transaction.update(schema.bookings).set({ accessTokenHash: hash(token) }).where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.id, booking.id)));
     let payment: typeof schema.payments.$inferSelect | undefined;

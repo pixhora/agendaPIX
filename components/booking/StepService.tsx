@@ -83,6 +83,7 @@ export function StepService({ services, selectedServiceId, onSelectService, onNe
                   ) : (
                     <span className="text-xs font-semibold">Sem sinal</span>
                   )}
+                  {service.policySummary && <span className="basis-full text-sm text-muted">{service.policySummary}</span>}
                 </span>
               </span>
               <span className="shrink-0 text-right">

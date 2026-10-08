@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireOwner } from "@/lib/dashboard/session";
-import { saveDashboardHours, saveDashboardService } from "@/lib/dashboard/data";
+import { saveContactWhatsapp, saveDashboardHours, saveDashboardService } from "@/lib/dashboard/data";
 import { parseMoney, type FormState } from "@/lib/dashboard/validation";
 import { HttpError } from "@/lib/http";
 
@@ -20,9 +20,20 @@ export async function saveService(_: FormState, form: FormData): Promise<FormSta
       name: form.get("name"), durationMinutes: form.get("durationMinutes"),
       priceCents: parseMoney(form.get("price")), depositCents: parseMoney(form.get("deposit")),
       active: form.get("active") === "on",
+      ...(typeof form.get("depositPolicy") === "string" && form.get("depositPolicy")
+        ? { depositPolicy: JSON.parse(String(form.get("depositPolicy"))) }
+        : {}),
     });
     revalidatePath("/dashboard", "layout");
     return { success: "Serviço salvo." };
+  } catch (error) { return { error: message(error) }; }
+}
+export async function saveWhatsapp(_: FormState, form: FormData): Promise<FormState> {
+  const owner = await requireOwner();
+  try {
+    await saveContactWhatsapp(owner.id, String(form.get("businessId")), String(form.get("contactWhatsapp") ?? ""));
+    revalidatePath("/dashboard", "layout");
+    return { success: "WhatsApp salvo." };
   } catch (error) { return { error: message(error) }; }
 }
 export async function saveHours(_: FormState, form: FormData): Promise<FormState> {
