@@ -29,7 +29,7 @@ import { Button } from "@/components/ui/button";
 import { BusinessAvatar } from "@/components/ui/business-avatar";
 import { PREVIEW_PIX_COPY_PASTE, PREVIEW_PIX_QR } from "@/lib/preview/sample-pix-qr";
 import { PIX_HOLD_MS, previewOpeningSlot, previewPayDeadline } from "@/lib/preview/preview-schedule";
-import { formatPolicyWindowTitle, policyHowToChange, policyNoShowRefund, policyOneLiner, policyWindowBody } from "@/components/booking/policy-copy";
+import { formatPolicyWindowTitle, policyHowToChange, policyLateCancelDetail, policyNoShowRefund, policyOneLiner, policyWindowBody } from "@/components/booking/policy-copy";
 
 function previewStep(scene: PreviewScene): 1 | 2 | 3 | 4 {
   if (scene === "dados" || scene === "politica" || scene === "politica-mudou") return 3;
@@ -63,7 +63,6 @@ function previewBooking(scene: PreviewScene, service: PublicService, slot: Avail
 function previewPolicy(slot: AvailabilitySlot): BookingPolicyView {
   const deadline = new Date(new Date(slot.startsAt).getTime() - 24 * 60 * 60 * 1000).toISOString();
   return {
-    text: MOCK_SERVICES[0]?.policySummary ?? null,
     refundDeadlineAt: deadline,
     rescheduleDeadlineAt: deadline,
   };
@@ -80,7 +79,7 @@ export function PreviewBookingFlow({ scene = "fluxo" }: { scene?: PreviewScene }
       policySummary: policyOneLiner(name, 24, "keep"),
       policyDetails: [
         { title: formatPolicyWindowTitle(deadline), body: policyWindowBody(name), tone: "ok" as const },
-        { title: "Perto do horário", body: `Mais perto da hora, o sinal fica com ${name}.`, tone: "warn" as const },
+        { title: "Depois disso", body: policyLateCancelDetail(name, "keep"), tone: "warn" as const },
         { title: "Se faltar", body: policyNoShowRefund(name), tone: "ok" as const },
         { title: "Como cancelar ou remarcar", body: policyHowToChange(name, true), tone: "ok" as const },
       ],

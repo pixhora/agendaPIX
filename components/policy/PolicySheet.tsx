@@ -13,7 +13,7 @@ interface PolicySheetProps {
   serviceName: string;
   depositLabel: string;
   lines?: PolicyDetailLine[] | null;
-  /** Texto único quando o servidor não mandou as linhas (`policySummary` ou `policy.text`). */
+  /** Texto único quando o servidor não mandou as linhas. É o `policySummary`, não o preview do dono. */
   text?: string | null;
   notice?: string | null;
   onClose: () => void;

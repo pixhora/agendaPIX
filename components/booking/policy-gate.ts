@@ -62,7 +62,7 @@ export function readPolicyChangedUpdate(body: unknown): PolicyChangedUpdate | nu
   const nested = error?.policy && typeof error.policy === "object" ? (error.policy as Record<string, unknown>) : null;
   const source = error ?? {};
   return {
-    policySummary: readString(source.policySummary) ?? readString(nested?.text) ?? readString(nested?.policySummary),
+    policySummary: readString(source.policySummary) ?? readString(nested?.policySummary),
     policyHash: readString(source.policyHash) ?? readString(nested?.policyHash),
     depositPolicy: readDepositPolicy(source.depositPolicy) ?? readDepositPolicy(nested?.snapshot) ?? readDepositPolicy(nested?.depositPolicy),
     policyDetails: readDetails(source.policyDetails) ?? readDetails(nested?.details) ?? readDetails(nested?.policyDetails),

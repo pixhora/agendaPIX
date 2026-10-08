@@ -32,6 +32,14 @@ export function policyWindowBody(businessName: string): string {
   return `Cancele e ${businessName} pode devolver o sinal, ou remarque usando o sinal (1 vez).`;
 }
 
+/** Linha "Depois disso" da folha. Espelha `policyDetails` do backend. */
+export function policyLateCancelDetail(businessName: string, late: "keep" | "credit" = "keep"): string {
+  if (late === "credit") {
+    return `Se cancelar, o sinal vira crédito para outro horário em ${businessName}, válido por 60 dias.`;
+  }
+  return `Se cancelar, o sinal fica com ${businessName}.`;
+}
+
 export function policyNoShowRefund(businessName: string): string {
   return `${businessName} pode devolver o sinal.`;
 }

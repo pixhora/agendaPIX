@@ -40,7 +40,7 @@ export const MOCK_SERVICES: PublicService[] = [
     depositPolicy: { refundUntilHours: 24, rescheduleUntilHours: 24 },
     policyDetails: [
       { title: "Até qua, 07 out, 11:30", body: "Cancele e Studio Bella pode devolver o sinal, ou remarque usando o sinal (1 vez).", tone: "ok" },
-      { title: "Perto do horário", body: "Mais perto da hora, o sinal fica com Studio Bella.", tone: "warn" },
+      { title: "Depois disso", body: "Se cancelar, o sinal fica com Studio Bella.", tone: "warn" },
       { title: "Se faltar", body: "Studio Bella pode devolver o sinal.", tone: "ok" },
       { title: "Como cancelar ou remarcar", body: "Fale com Studio Bella pelo WhatsApp. A devolução não é automática: quem devolve é Studio Bella, da conta Mercado Pago do negócio, depois de confirmar o cancelamento.", tone: "ok" },
     ],

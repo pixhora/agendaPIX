@@ -1,15 +1,19 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import {
   formatPolicyWindowTitle,
   policyHowToChange,
+  policyLateCancelDetail,
   policyNoShowRefund,
   policyOneLiner,
   policyReceiptRefund,
   policyWindowBody,
 } from "../../components/booking/policy-copy";
+import { readPolicyChangedUpdate } from "../../components/booking/policy-gate";
 import { serviceCardAside, serviceCardMeta } from "../../components/booking/service-card";
 import { isPreviewBadgeEnabled } from "../../components/preview/preview-badge-gate";
 import { previewOpeningSlot, previewPayDeadline } from "../../lib/preview/preview-schedule";
+import { MOCK_SERVICES } from "../../lib/preview/mock-data";
 
 const business = "Barbearia do Zé";
 
@@ -25,11 +29,13 @@ describe("texto da política para o cliente", () => {
       policyReceiptRefund(business, "quarta-feira, 07 de outubro", "11:30"),
     ];
     expect(lines[0]).toBe("Com 24 h de antecedência, Barbearia do Zé pode devolver o sinal. Mais perto da hora, o sinal fica com Barbearia do Zé.");
-    expect(lines[1]).toContain("o sinal vira crédito para outro horário, válido por 60 dias.");
+    expect(lines[1]).toContain("Mais perto da hora, o sinal vira crédito para outro horário, válido por 60 dias.");
+    expect(policyLateCancelDetail(business, "keep")).toBe("Se cancelar, o sinal fica com Barbearia do Zé.");
+    expect(policyLateCancelDetail(business, "credit")).toBe("Se cancelar, o sinal vira crédito para outro horário em Barbearia do Zé, válido por 60 dias.");
     expect(lines[2]).toBe("Cancele e Barbearia do Zé pode devolver o sinal, ou remarque usando o sinal (1 vez).");
     expect(lines[3]).toBe("Barbearia do Zé pode devolver o sinal.");
-    expect(lines[4]).toMatch(/^Fale com Barbearia do Zé pelo WhatsApp\. A devolução não é automática: quem devolve é Barbearia do Zé, da conta Mercado Pago do negócio/);
-    expect(lines[5]).toMatch(/^Fale com Barbearia do Zé pelos canais de sempre\./);
+    expect(lines[4]).toBe("Fale com Barbearia do Zé pelo WhatsApp. A devolução não é automática: quem devolve é Barbearia do Zé, da conta Mercado Pago do negócio, depois de confirmar o cancelamento.");
+    expect(lines[5]).toMatch(/^Fale com Barbearia do Zé pelos canais de sempre\. A devolução não é automática:/);
     expect(lines[6]).toBe("Barbearia do Zé pode devolver o sinal até quarta-feira, 07 de outubro, às 11:30.");
     for (const line of lines) {
       expect(line).not.toMatch(/\b[Oo] Barbearia|\bcom o Barbearia|\bpainel\b|Devolver pelo AgendaPix/);
@@ -38,6 +44,61 @@ describe("texto da política para o cliente", () => {
 
   it("formata o título curto da janela", () => {
     expect(formatPolicyWindowTitle(new Date("2026-10-07T14:30:00.000Z"))).toBe("Até qua, 07 out, 11:30");
+  });
+});
+
+const OWNER_POLICY_TEXT = "O dono confirma no painel, em Devolver pelo AgendaPix.";
+
+const CUSTOMER_SCREEN_FILES = [
+  "components/booking/BookingConfirmation.tsx",
+  "components/booking/BookingFlow.tsx",
+  "components/booking/PausedState.tsx",
+  "components/booking/StepCustomer.tsx",
+  "components/booking/StepPayment.tsx",
+  "components/booking/StepService.tsx",
+  "components/booking/UnbookableNotice.tsx",
+  "components/policy/PolicySheet.tsx",
+  "components/policy/PolicySummaryLine.tsx",
+];
+
+describe("telas do cliente", () => {
+  it("não renderizam policy.text nem citam painel ou Devolver pelo AgendaPix", () => {
+    const customerLines = [
+      policyOneLiner(business, 24, "keep"),
+      policyOneLiner(business, 24, "credit"),
+      policyWindowBody(business),
+      policyLateCancelDetail(business, "keep"),
+      policyLateCancelDetail(business, "credit"),
+      policyNoShowRefund(business),
+      policyHowToChange(business, true),
+      policyHowToChange(business, false),
+      policyReceiptRefund(business, "sexta-feira, 09 de outubro", "11:30"),
+      MOCK_SERVICES[0]?.policySummary ?? "",
+      ...(MOCK_SERVICES[0]?.policyDetails ?? []).map((line) => `${line.title} ${line.body}`),
+    ];
+    for (const line of customerLines) {
+      expect(line).not.toMatch(/\bpainel\b|Devolver pelo AgendaPix/);
+      expect(line).not.toContain(OWNER_POLICY_TEXT);
+    }
+
+    for (const file of CUSTOMER_SCREEN_FILES) {
+      const source = readFileSync(file, "utf8");
+      expect(source, file).not.toMatch(/policy\.text/);
+      expect(source, file).not.toMatch(/\bpolicyText\b/);
+      expect(source, file).not.toMatch(/\bpainel\b|Devolver pelo AgendaPix/);
+    }
+  });
+
+  it("não promove policy.text do payload para o resumo do cliente", () => {
+    const update = readPolicyChangedUpdate({
+      error: {
+        code: "policy_changed",
+        policy: { text: OWNER_POLICY_TEXT, policyHash: "hash-novo" },
+      },
+    });
+    expect(update?.policySummary).toBeNull();
+    expect(update?.policyHash).toBe("hash-novo");
+    expect(`${update?.policySummary ?? ""}`).not.toMatch(/\bpainel\b|Devolver pelo AgendaPix/);
   });
 });
 
