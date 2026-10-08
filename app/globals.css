@@ -26,6 +26,10 @@
   --pix-foreground: #ffffff;
   --pix-soft: #e8f6f3;
   --pix-bright: #3fd0be;
+  /* O azulejo da marca fica escuro nos dois temas, igual ao favicon. */
+  --brand-tile: #0b0b0c;
+  --brand-tile-foreground: #f6f5f2;
+  --brand-tile-edge: transparent;
 
   --success: #156b3a;
   --success-soft: #e6f4ea;
@@ -63,6 +67,9 @@
   --pix-foreground: #0b0b0c;
   --pix-soft: #10302c;
   --pix-bright: #3fd0be;
+  --brand-tile: #0b0b0c;
+  --brand-tile-foreground: #f6f5f2;
+  --brand-tile-edge: rgb(255 255 255 / 0.14);
 
   --success: #6fd49a;
   --success-soft: #133222;
@@ -94,6 +101,10 @@
     --pix-hover: #5fdccc;
     --pix-foreground: #0b0b0c;
     --pix-soft: #10302c;
+    --pix-bright: #3fd0be;
+    --brand-tile: #0b0b0c;
+    --brand-tile-foreground: #f6f5f2;
+    --brand-tile-edge: rgb(255 255 255 / 0.14);
     --success: #6fd49a;
     --success-soft: #133222;
     --warning: #f2b25a;
@@ -123,6 +134,8 @@
   --color-pix-foreground: var(--pix-foreground);
   --color-pix-soft: var(--pix-soft);
   --color-pix-bright: var(--pix-bright);
+  --color-brand-tile: var(--brand-tile);
+  --color-brand-tile-foreground: var(--brand-tile-foreground);
   --color-success: var(--success);
   --color-success-soft: var(--success-soft);
   --color-warning: var(--warning);

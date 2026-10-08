@@ -20,6 +20,7 @@ import { commitOnboardingDraft, createOnboardingDraft, patchOnboardingDraft } fr
 import { sendSignInOtp, signInWithEmailOtp } from "@/lib/onboarding/auth-otp";
 import { mapOtpError, RESEND_WAIT_SECONDS, wrongCodeMessage } from "@/lib/onboarding/otp";
 import { normalizeSlug } from "@/lib/slug";
+import { BrandLink } from "@/components/ui/brand";
 import type { OnboardingData, OnboardingStep } from "./types";
 import { StepBusiness } from "./StepBusiness";
 import { StepService } from "./StepService";
@@ -418,6 +419,9 @@ export function OnboardingFlow({ legalPagesPublished = false }: { legalPagesPubl
     <div className="min-h-dvh bg-paper">
       <div className="mx-auto grid w-full max-w-5xl lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-10 lg:px-6 lg:py-10">
         <div className="mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-paper md:min-h-[40rem] md:rounded-frame md:border md:border-line md:bg-surface md:shadow-[var(--shadow-card)]">
+          <div className="flex h-14 items-center px-4">
+            <BrandLink href="/onboarding" />
+          </div>
           <OnboardingTopBar
             saving={saving}
             savedOnServer={Boolean(draftId)}

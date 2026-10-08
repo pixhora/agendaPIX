@@ -11,8 +11,15 @@ import { AUTO_REFUND_ACK_ERROR, gateConnectSubmit, mpConnectAction, type MpRetur
 const fieldReset = "outline-none focus:outline-none focus-visible:outline-none";
 
 function revealAck(node: HTMLInputElement | null) {
-  node?.scrollIntoView({ block: "center", behavior: "auto" });
-  node?.focus();
+  if (!node) return;
+  const scroller = node.closest("[data-mp-scroll]");
+  if (scroller instanceof HTMLElement) {
+    const top = node.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
+    scroller.scrollTop = Math.max(0, top - (scroller.clientHeight - node.offsetHeight) / 2);
+  } else {
+    node.scrollIntoView({ block: "center", behavior: "auto" });
+  }
+  node.focus({ preventScroll: true });
 }
 
 function AckCopy() {
@@ -170,7 +177,7 @@ export function MpConnectForm({
       <input type="hidden" name="consentVersion" value={MP_CONNECT_CONSENT_VERSION} />
       {requireAck ? null : <input type="hidden" name="autoRefundAck" value="on" />}
       {pinActions ? (
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-2 max-md:pb-4 md:overflow-visible">
+        <div data-mp-scroll="" className="min-h-0 flex-1 overflow-y-auto px-5 pt-2 max-md:pb-4 md:overflow-visible">
           {lead}
           {ack}
           {children}

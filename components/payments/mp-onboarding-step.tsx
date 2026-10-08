@@ -110,10 +110,10 @@ export function MpOnboardingStep({
   }, [errorView]);
 
   return (
-    <div className="min-h-dvh bg-paper md:py-10" style={{ scrollPaddingBottom: "calc(var(--sticky-cta-height) + 16px)" }}>
-      <div className="mx-auto flex w-full max-w-[480px] flex-col bg-paper max-md:h-dvh max-md:max-h-dvh md:min-h-0 md:rounded-frame md:border md:border-line md:bg-surface md:shadow-[var(--shadow-card)]">
+    <div className="bg-paper max-md:fixed max-md:inset-0 max-md:overflow-hidden md:static md:min-h-dvh md:py-10" style={{ scrollPaddingBottom: "calc(var(--sticky-cta-height) + 16px)" }}>
+      <div className="mx-auto flex w-full max-w-[480px] flex-col bg-paper max-md:h-full max-md:overflow-hidden md:min-h-0 md:rounded-frame md:border md:border-line md:bg-surface md:shadow-[var(--shadow-card)]">
         <header className="flex h-14 shrink-0 items-center justify-between px-4">
-          <BrandLink href="/onboarding" label="AgendaPix" />
+          <BrandLink href="/onboarding" />
           <p className="text-xs text-muted">Quase lá · recomendado</p>
         </header>
         {connected ? (
@@ -226,14 +226,14 @@ function ConnectedBody({
         <p className="mt-2 text-[15px] text-muted">Os Pix de sinal vão cair em:</p>
         <div className="mt-4 rounded-card border border-line bg-paper p-4">
           <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-            <div className="min-w-0 flex-1">
+            <div className="max-w-full">
               <p className="font-semibold">{account.title}</p>
               {account.detail ? <p className="mt-0.5 text-[13px] text-muted">{account.detail}</p> : null}
               {since ? <p className="mt-1 text-[13px] text-muted">Conectado desde {since}</p> : null}
             </div>
             {onDismissAccount ? (
               <button type="button" onClick={onDismissAccount} className="inline-flex min-h-11 shrink-0 items-center text-sm font-semibold text-ink underline-offset-4 outline-none hover:underline focus-visible:shadow-[var(--shadow-focus)] focus-visible:outline-none">
-                Não é essa conta? Desconectar e trocar
+                Não é essa conta?
               </button>
             ) : null}
           </div>

@@ -414,7 +414,7 @@ export function BookingFlow({ slug, initialBookingId, previewBusiness }: Booking
       <div className="flex items-center gap-3">
         <ThemeToggle className="sm:hidden" />
         <Link href="/" className="inline-flex min-h-11 items-center gap-2 font-semibold text-ink">
-          <BrandMark className="size-6 rounded-md text-[10px]" /> Feito com Agenda
+          <BrandMark className="size-6 rounded-[7.5px]" /> Feito com AgendaPix
         </Link>
       </div>
     </footer>

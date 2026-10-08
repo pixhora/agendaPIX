@@ -22,6 +22,8 @@ const scenes = [
   { name: "disconnect-dialog", scene: "disconnect" },
   { name: "banner-reauth", scene: "banner" },
   { name: "public-deposit-unavailable", scene: "public" },
+  { name: "cadastro", path: "/onboarding", widths: [390] },
+  { name: "rodape-aro", scene: "public", footer: true, widths: [390] },
 ];
 
 const viewports = [
@@ -35,6 +37,7 @@ await mkdir(outDir, { recursive: true });
 
 for (const scene of scenes) {
   for (const viewport of viewports) {
+    if (scene.widths && !scene.widths.includes(viewport.width)) continue;
     const context = await browser.newContext({
       locale: "pt-BR",
       timezoneId: "America/Sao_Paulo",
@@ -46,7 +49,8 @@ for (const scene of scenes) {
       localStorage.setItem("agenda-theme", theme);
     }, viewport.theme);
     const page = await context.newPage();
-    await page.goto(`${base}/dev/mp-fixtures?scene=${scene.scene}`, { waitUntil: "networkidle" });
+    const path = scene.path ?? `/dev/mp-fixtures?scene=${scene.scene}`;
+    await page.goto(`${base}${path}`, { waitUntil: "networkidle" });
     await page.addStyleTag({
       content: `nextjs-portal,[data-nextjs-dev-tools-button],[data-next-badge],[data-nextjs-toast],[aria-label="Controles do Modo Preview"]{display:none!important}`,
     });
@@ -54,10 +58,20 @@ for (const scene of scenes) {
       await page.getByRole("button", { name: scene.click }).click();
       await page.getByText("Marque a autorização da devolução automática para continuar.").waitFor();
     }
+    if (scene.footer) {
+      await page.locator("footer").scrollIntoViewIfNeeded();
+    }
     const file = `${outDir}/${scene.name}-${viewport.label}.png`;
     await page.screenshot({ path: file });
-    if (viewport.width === 390) {
-      await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    if (viewport.width === 390 && !scene.footer) {
+      await page.evaluate(() => {
+        const nodes = [...document.querySelectorAll(".overflow-y-auto")];
+        if (nodes.length > 0) {
+          for (const node of nodes) node.scrollTop = node.scrollHeight;
+          return;
+        }
+        window.scrollTo(0, document.documentElement.scrollHeight);
+      });
       await page.screenshot({ path: `${outDir}/${scene.name}-${viewport.label}-bottom.png` });
     }
     await context.close();
