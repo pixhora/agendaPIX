@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { documentSecurityHeaders, shouldUpgradeInsecureRequests } from "@/lib/security/headers";
+import { documentSecurityHeaders, shouldSendStrictTransportSecurity, shouldUpgradeInsecureRequests } from "@/lib/security/headers";
 
 /**
  * Per-request nonce CSP plus the other security headers.
@@ -13,6 +13,7 @@ export function proxy(request: NextRequest) {
     nonce,
     isDev,
     upgradeInsecureRequests: shouldUpgradeInsecureRequests(request.nextUrl.hostname, isDev),
+    strictTransportSecurity: shouldSendStrictTransportSecurity(request.nextUrl.hostname, isDev),
   });
   const csp = headers.find((header) => header.key === "Content-Security-Policy")?.value;
   if (!csp) throw new Error("Missing Content-Security-Policy.");

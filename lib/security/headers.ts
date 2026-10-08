@@ -16,8 +16,15 @@
  *   same-origin file (`'self'`). Script nonces stay strict.
  * - style-src-attr `'unsafe-inline'` — Sonner and Radix set style attributes.
  * - script-src `'unsafe-eval'` in development — React uses eval for debug stacks.
- * - `upgrade-insecure-requests` only off localhost, so `next dev` / `next start`
- *   on http://127.0.0.1 keep working. Production hostnames always send it.
+ * - `upgrade-insecure-requests` and `Strict-Transport-Security` only off localhost
+ *   and never in development, so `next dev` / `next start` on http://127.0.0.1
+ *   keep working. Production hostnames always send both.
+ * - HSTS is `max-age=63072000` with no `includeSubDomains` or `preload`.
+ *   Vercel already sends that value on custom domains
+ *   (https://vercel.com/docs/cdn-security/encryption). The stronger pair would
+ *   pin every subdomain to HTTPS for two years and can break an HTTP sibling
+ *   (mail, staging, Coolify). `*.vercel.app` already sends the stronger header
+ *   and is preloaded by the platform.
  *
  * Fonts are self-hosted by `next/font` (`font-src 'self'`). No Google Fonts or
  * analytics origin is allowlisted.
@@ -26,6 +33,16 @@
 export type SecurityHeader = { key: string; value: string };
 
 export const REFERRER_POLICY = "strict-origin-when-cross-origin";
+
+/**
+ * Two years, the value Vercel already sets on custom domains.
+ * No `includeSubDomains` and no `preload`: those apply to every subdomain and
+ * preload is hard to undo. See vercel.com/docs/cdn-security/encryption.
+ */
+export const HSTS_VALUE = "max-age=63072000";
+
+/** Host patterns for next.config `missing` (Next anchors the regex itself). */
+export const LOCAL_HOST_HEADER_PATTERNS = ["localhost", "127\\.0\\.0\\.1", "::1"] as const;
 
 export const PERMISSIONS_POLICY = [
   "camera=()",
@@ -43,6 +60,11 @@ export type ContentSecurityPolicyOptions = {
   upgradeInsecureRequests: boolean;
 };
 
+export type DocumentSecurityHeaderOptions = ContentSecurityPolicyOptions & {
+  /** Production hosts other than localhost, 127.0.0.1 and ::1. */
+  strictTransportSecurity: boolean;
+};
+
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 
 export function isLocalHostname(hostname: string): boolean {
@@ -52,6 +74,10 @@ export function isLocalHostname(hostname: string): boolean {
 
 export function shouldUpgradeInsecureRequests(hostname: string, isDev: boolean): boolean {
   return !isDev && !isLocalHostname(hostname);
+}
+
+export function shouldSendStrictTransportSecurity(hostname: string, isDev: boolean): boolean {
+  return shouldUpgradeInsecureRequests(hostname, isDev);
 }
 
 export function buildContentSecurityPolicy({ nonce, isDev, upgradeInsecureRequests }: ContentSecurityPolicyOptions): string {
@@ -95,11 +121,37 @@ export function baselineSecurityHeaders(): SecurityHeader[] {
   ];
 }
 
-export function documentSecurityHeaders(options: ContentSecurityPolicyOptions): SecurityHeader[] {
-  return [
+export function documentSecurityHeaders(options: DocumentSecurityHeaderOptions): SecurityHeader[] {
+  const headers: SecurityHeader[] = [
     { key: "Content-Security-Policy", value: buildContentSecurityPolicy(options) },
     ...baselineSecurityHeaders(),
   ];
+  if (options.strictTransportSecurity) {
+    headers.push({ key: "Strict-Transport-Security", value: HSTS_VALUE });
+  }
+  return headers;
+}
+
+export type StaticAssetHeaderRule = {
+  source: string;
+  headers: SecurityHeader[];
+  missing?: { type: "host"; value: string }[];
+};
+
+/** Security headers for files the proxy skips. HSTS only in production, and not for local hosts. */
+export function staticAssetHeaderRules(isDev: boolean): StaticAssetHeaderRule[] {
+  const base = staticAssetSecurityHeaders();
+  const rules: StaticAssetHeaderRule[] = STATIC_ASSET_HEADER_SOURCES.map((source) => ({ source, headers: base }));
+  if (isDev) return rules;
+  const hsts: SecurityHeader[] = [{ key: "Strict-Transport-Security", value: HSTS_VALUE }];
+  for (const source of STATIC_ASSET_HEADER_SOURCES) {
+    rules.push({
+      source,
+      missing: LOCAL_HOST_HEADER_PATTERNS.map((value) => ({ type: "host", value })),
+      headers: hsts,
+    });
+  }
+  return rules;
 }
 
 /** Direct visits to files the proxy skips. Not applied to HTML documents. */

@@ -1,11 +1,13 @@
 import { NextRequest } from "next/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  HSTS_VALUE,
   PERMISSIONS_POLICY,
   REFERRER_POLICY,
   STATIC_ASSET_HEADER_SOURCES,
   buildContentSecurityPolicy,
   documentSecurityHeaders,
+  staticAssetHeaderRules,
   staticAssetSecurityHeaders,
 } from "../../lib/security/headers";
 import { proxy } from "../../proxy";
@@ -18,7 +20,7 @@ function headerMap(headers: { key: string; value: string }[]) {
 
 describe("document security headers", () => {
   it("sends CSP, frame, referrer, permissions and nosniff", () => {
-    const headers = headerMap(documentSecurityHeaders({ nonce: NONCE, isDev: false, upgradeInsecureRequests: true }));
+    const headers = headerMap(documentSecurityHeaders({ nonce: NONCE, isDev: false, upgradeInsecureRequests: true, strictTransportSecurity: true }));
     const csp = headers.get("content-security-policy") ?? "";
     expect(csp).toContain(`'nonce-${NONCE}'`);
     expect(csp).toContain("script-src 'self'");
@@ -44,9 +46,16 @@ describe("document security headers", () => {
     expect(headers.get("referrer-policy")).toBe(REFERRER_POLICY);
     expect(headers.get("permissions-policy")).toBe(PERMISSIONS_POLICY);
     expect(headers.get("x-content-type-options")).toBe("nosniff");
+    expect(headers.get("strict-transport-security")).toBe(HSTS_VALUE);
+    expect(HSTS_VALUE).not.toMatch(/includeSubDomains|preload/i);
     for (const feature of ["camera=()", "microphone=()", "geolocation=()", "payment=()"]) {
       expect(headers.get("permissions-policy")).toContain(feature);
     }
+  });
+
+  it("omits HSTS when the flag is off", () => {
+    const headers = headerMap(documentSecurityHeaders({ nonce: NONCE, isDev: true, upgradeInsecureRequests: false, strictTransportSecurity: false }));
+    expect(headers.has("strict-transport-security")).toBe(false);
   });
 
   it("allows self-hosted fonts, same-origin fetches and Pix QR data images", () => {
@@ -80,6 +89,20 @@ describe("static asset headers", () => {
     expect(headers.get("referrer-policy")).toBe(REFERRER_POLICY);
     expect(headers.get("permissions-policy")).toContain("camera=()");
     expect(headers.get("x-content-type-options")).toBe("nosniff");
+    expect(headers.has("strict-transport-security")).toBe(false);
+  });
+
+  it("adds HSTS in production except on local hosts", () => {
+    const devRules = staticAssetHeaderRules(true);
+    expect(devRules.every((rule) => rule.headers.every((header) => header.key !== "Strict-Transport-Security"))).toBe(true);
+
+    const prodRules = staticAssetHeaderRules(false);
+    const hstsRules = prodRules.filter((rule) => rule.headers.some((header) => header.key === "Strict-Transport-Security"));
+    expect(hstsRules).toHaveLength(STATIC_ASSET_HEADER_SOURCES.length);
+    for (const rule of hstsRules) {
+      expect(rule.headers).toEqual([{ key: "Strict-Transport-Security", value: HSTS_VALUE }]);
+      expect(rule.missing?.map((item) => item.value)).toEqual(["localhost", "127\\.0\\.0\\.1", "::1"]);
+    }
   });
 });
 
@@ -98,6 +121,7 @@ describe("security proxy", () => {
     expect(response.headers.get("referrer-policy")).toBe(REFERRER_POLICY);
     expect(response.headers.get("permissions-policy")).toContain("microphone=()");
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(response.headers.get("strict-transport-security")).toBe(HSTS_VALUE);
     expect(response.headers.get("x-nonce")).toBeNull();
     const nonce = csp.match(/'nonce-([^']+)'/)?.[1];
     expect(nonce).toBeTruthy();
@@ -110,6 +134,10 @@ describe("security proxy", () => {
     const second = proxy(new NextRequest("http://127.0.0.1:3000/api/health"));
     expect(first.headers.get("content-security-policy")).not.toBe(second.headers.get("content-security-policy"));
     expect(first.headers.get("content-security-policy")).not.toContain("upgrade-insecure-requests");
+    expect(first.headers.get("strict-transport-security")).toBeNull();
+    expect(second.headers.get("strict-transport-security")).toBeNull();
+    expect(proxy(new NextRequest("http://[::1]:3000/api/health")).headers.get("strict-transport-security")).toBeNull();
+    expect(proxy(new NextRequest("http://agenda.example/api/health")).headers.get("strict-transport-security")).toBe(HSTS_VALUE);
     expect(second.headers.get("x-content-type-options")).toBe("nosniff");
   });
 
@@ -120,5 +148,8 @@ describe("security proxy", () => {
     expect(csp).toContain("'unsafe-eval'");
     expect(csp).toContain("style-src 'self' 'unsafe-inline'");
     expect(csp).not.toContain("upgrade-insecure-requests");
+    expect(response.headers.get("strict-transport-security")).toBeNull();
+    vi.stubEnv("NODE_ENV", "production");
+    expect(proxy(new NextRequest("https://agenda.example/")).headers.get("strict-transport-security")).toBe(HSTS_VALUE);
   });
 });
