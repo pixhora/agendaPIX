@@ -78,7 +78,7 @@ export function TrialBanner({ billing, timeZone, publicHref }: { billing: Billin
             ) : (
               <Button type="button" onClick={open} className="w-full bg-pix-bright text-[#0b0b0c] hover:bg-pix-bright sm:w-auto">{subscribeCtaLabel(billing.plan.priceCents)}</Button>
             )}
-            <button type="button" onClick={open} className="text-sm font-semibold leading-relaxed text-pix-bright underline decoration-1 underline-offset-2">O que muda?</button>
+            <button type="button" onClick={open} className="inline-flex min-h-11 items-center text-sm font-semibold text-pix-bright underline decoration-1 underline-offset-2">O que muda?</button>
           </div>
         </section>
       )}
