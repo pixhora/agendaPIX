@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { isPublicSlug, normalizeSlug } from "@/lib/slug";
 import {
   SlugAvailabilityClient,
@@ -15,6 +15,17 @@ export type SlugSnapshot = {
   suggestion?: string;
   rememberAvailable: (slug: string) => void;
 };
+
+const availabilityClient = new SlugAvailabilityClient();
+
+function subscribeOnline(onChange: () => void) {
+  window.addEventListener("online", onChange);
+  window.addEventListener("offline", onChange);
+  return () => {
+    window.removeEventListener("online", onChange);
+    window.removeEventListener("offline", onChange);
+  };
+}
 
 function fromAvailability(slug: string, availability: SlugAvailability): Omit<SlugSnapshot, "rememberAvailable"> {
   const suggestion = availability.suggestions[0];
@@ -33,63 +44,40 @@ function fromAvailability(slug: string, availability: SlugAvailability): Omit<Sl
   return { slug, status: "available", suggestions: [] };
 }
 
+function localView(slug: string, online: boolean): Omit<SlugSnapshot, "rememberAvailable"> | null {
+  if (!slug) return { slug: "", status: "idle", suggestions: [] };
+  if (!isPublicSlug(slug)) return { slug, status: slug.length < 3 ? "short" : "invalid", suggestions: [] };
+  if (!online) return { slug, status: "offline", suggestions: [] };
+  return null;
+}
+
 export function useSlugAvailability(value: string): SlugSnapshot {
-  const clientRef = useRef<SlugAvailabilityClient | null>(null);
-  if (!clientRef.current) clientRef.current = new SlugAvailabilityClient();
-  const [online, setOnline] = useState(true);
-  const [snapshot, setSnapshot] = useState<Omit<SlugSnapshot, "rememberAvailable">>({ slug: "", status: "idle", suggestions: [] });
+  const online = useSyncExternalStore(subscribeOnline, () => navigator.onLine, () => true);
+  const finalSlug = normalizeSlug(value, { final: true });
+  const local = localView(finalSlug, online);
+  const cached = local ? null : availabilityClient.peek(finalSlug);
+  const cachedView = cached ? fromAvailability(finalSlug, cached) : null;
+  const [remote, setRemote] = useState<Omit<SlugSnapshot, "rememberAvailable"> | null>(null);
+  const currentRemote = remote?.slug === finalSlug ? remote : null;
+  const snapshot = local ?? cachedView ?? currentRemote ?? { slug: finalSlug, status: "pending" as const, suggestions: [] };
 
   useEffect(() => {
-    const sync = () => setOnline(navigator.onLine);
-    sync();
-    window.addEventListener("online", sync);
-    window.addEventListener("offline", sync);
-    return () => {
-      window.removeEventListener("online", sync);
-      window.removeEventListener("offline", sync);
-    };
-  }, []);
-
-  useEffect(() => {
-    const client = clientRef.current;
-    if (!client) return;
-    const finalSlug = normalizeSlug(value, { final: true });
-    if (!finalSlug) {
-      setSnapshot({ slug: "", status: "idle", suggestions: [] });
-      return;
-    }
-    if (!isPublicSlug(finalSlug)) {
-      setSnapshot({ slug: finalSlug, status: finalSlug.length < 3 ? "short" : "invalid", suggestions: [] });
-      return;
-    }
-    if (!online) {
-      setSnapshot({ slug: finalSlug, status: "offline", suggestions: [] });
-      return;
-    }
-    const cached = client.peek(finalSlug);
-    if (cached) {
-      setSnapshot(fromAvailability(finalSlug, cached));
-      return;
-    }
-
-    setSnapshot({ slug: finalSlug, status: "pending", suggestions: [] });
+    if (localView(finalSlug, online) || availabilityClient.peek(finalSlug)) return;
     let cancelled = false;
     let slowTimer = 0;
     const debounceTimer = window.setTimeout(() => {
       slowTimer = window.setTimeout(() => {
-        if (!cancelled) {
-          setSnapshot((current) => current.slug === finalSlug ? { ...current, status: "checking" } : current);
-        }
+        if (!cancelled) setRemote({ slug: finalSlug, status: "checking", suggestions: [] });
       }, 300);
-      void client.check(finalSlug).then((result) => {
+      void availabilityClient.check(finalSlug).then((result) => {
         window.clearTimeout(slowTimer);
         if (cancelled || result.ignored) return;
         if (!result.result.ok) {
           const offlineNow = result.result.kind === "network" && !navigator.onLine;
-          setSnapshot({ slug: finalSlug, status: offlineNow ? "offline" : "error", suggestions: [] });
+          setRemote({ slug: finalSlug, status: offlineNow ? "offline" : "error", suggestions: [] });
           return;
         }
-        setSnapshot(fromAvailability(finalSlug, result.result.availability));
+        setRemote(fromAvailability(finalSlug, result.result.availability));
       });
     }, 400);
 
@@ -97,14 +85,14 @@ export function useSlugAvailability(value: string): SlugSnapshot {
       cancelled = true;
       window.clearTimeout(debounceTimer);
       window.clearTimeout(slowTimer);
-      client.invalidate();
+      availabilityClient.invalidate();
     };
-  }, [online, value]);
+  }, [finalSlug, online]);
 
   return {
     ...snapshot,
     rememberAvailable(slug: string) {
-      clientRef.current?.remember(slug, {
+      availabilityClient.remember(slug, {
         input: slug,
         normalized: slug,
         valid: true,

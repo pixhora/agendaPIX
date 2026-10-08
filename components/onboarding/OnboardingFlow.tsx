@@ -252,7 +252,7 @@ export function OnboardingFlow({ legalPagesPublished = false }: { legalPagesPubl
       { create: createOnboardingDraft, patch: patchOnboardingDraft, sendOtp: sendSignInOtp },
     );
     setEmailPending(false);
-    if (outcome.draftId) {
+    if ("draftId" in outcome && outcome.draftId) {
       setDraftId(outcome.draftId);
       writeDraftId(outcome.draftId);
     }
