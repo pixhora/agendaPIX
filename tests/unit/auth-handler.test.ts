@@ -3,7 +3,7 @@ import { APIError } from "better-auth/api";
 import { getAuth } from "../../lib/auth";
 import { sendMagicLinkEmail } from "../../lib/email";
 
-vi.mock("../../lib/email", () => ({ sendMagicLinkEmail: vi.fn() }));
+vi.mock("../../lib/email", () => ({ sendMagicLinkEmail: vi.fn(), sendSignInCodeEmail: vi.fn() }));
 
 beforeEach(() => {
   vi.stubEnv("DATABASE_URL", "postgresql://local:example@localhost/agenda");

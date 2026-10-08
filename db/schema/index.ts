@@ -228,3 +228,39 @@ export const onboardingRequests = pgTable("onboarding_requests", {
   result: jsonb("result").$type<{ businessId: string; slug: string; publicPath: string; serviceId: string }>(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [primaryKey({ columns: [table.ownerId, table.requestKey] })]);
+
+export type OnboardingDraftData = {
+  business: { name: string; slug: string; timezone: string };
+  service: { name: string; durationMinutes: number; priceCents: number; depositCents: number };
+  hours: { weekday: number; opensAt: string; closesAt: string }[];
+};
+
+/** Rascunho do cadastro antes da conta existir. O e-mail sai na limpeza dos vencidos (LGPD). */
+export const onboardingDrafts = pgTable("onboarding_drafts", {
+  id: uuid("id").primaryKey(),
+  email: text("email").notNull(),
+  segment: text("segment"),
+  plan: text("plan"),
+  data: jsonb("data").$type<OnboardingDraftData>().notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  consumedAt: timestamp("consumed_at", { withTimezone: true }),
+  businessId: uuid("business_id").references(() => businesses.id, { onDelete: "set null" }),
+  ...timestamps(),
+}, (table) => [
+  index("onboarding_drafts_email_idx").on(table.email),
+  index("onboarding_drafts_expires_idx").on(table.expiresAt),
+  check("onboarding_drafts_email_not_empty", sql`length(trim(${table.email})) > 0`),
+  check("onboarding_drafts_expires_after_create", sql`${table.expiresAt} > ${table.createdAt}`),
+]);
+
+/** Contadores de abuso sem guardar IP ou e-mail em claro (HMAC). */
+export const abuseRateLimits = pgTable("abuse_rate_limits", {
+  scope: text("scope").notNull(),
+  clientHash: text("client_hash").notNull(),
+  windowStartedAt: timestamp("window_started_at", { withTimezone: true }).defaultNow().notNull(),
+  attempts: integer("attempts").notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.scope, table.clientHash] }),
+  check("abuse_rate_attempts_valid", sql`${table.attempts} >= 1`),
+  check("abuse_rate_scope_not_empty", sql`length(trim(${table.scope})) > 0 AND length(trim(${table.clientHash})) > 0`),
+]);

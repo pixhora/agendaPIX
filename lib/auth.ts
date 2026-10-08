@@ -1,13 +1,15 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
-import { magicLink } from "better-auth/plugins";
-import { APIError, isAPIError } from "better-auth/api";
+import { emailOTP, magicLink } from "better-auth/plugins";
+import { APIError, createAuthMiddleware, isAPIError } from "better-auth/api";
 import { getDb } from "../db";
 import * as schema from "../db/schema/auth";
-import { sendMagicLinkEmail } from "./email";
+import { consumeEmailOtpSendQuota } from "./abuse-rate-limit";
+import { sendMagicLinkEmail, sendSignInCodeEmail } from "./email";
 import { authEnvSchema } from "./env";
 import { logAuthEvent } from "./auth-logger";
 import { HttpError } from "./http";
+import { buildLoginConfirmUrl } from "./magic-link-confirm";
 import { trustedAppOrigins } from "./origins";
 
 const authErrorBody = {
@@ -33,7 +35,46 @@ function createAuth() {
     advanced: { disableOriginCheck: false, crossSubDomainCookies: { enabled: false } },
     database: drizzleAdapter(getDb(), { provider: "pg", schema }),
     plugins: [
-      magicLink({ storeToken: "hashed", sendMagicLink: async ({ email, url }) => sendMagicLinkEmail(email, url) }),
+      magicLink({
+        storeToken: "hashed",
+        expiresIn: 1800,
+        sendMagicLink: async ({ email, url }) => sendMagicLinkEmail(email, buildLoginConfirmUrl(url)),
+      }),
+      emailOTP({
+        otpLength: 6,
+        expiresIn: 1800,
+        allowedAttempts: 3,
+        storeOTP: "hashed",
+        resendStrategy: "rotate",
+        // Teto de rajada. O limite de 5/hora por e-mail e 20/hora por IP fica na tabela abuse_rate_limits:
+        // este rateLimit vale para todos os caminhos do plugin, inclusive a conferência do código.
+        rateLimit: { window: 60, max: 30 },
+        sendVerificationOTP: async ({ email, otp, type }) => {
+          if (type !== "sign-in") return;
+          await sendSignInCodeEmail(email, otp);
+        },
+      }),
+      {
+        id: "otp-send-quota",
+        hooks: {
+          before: [{
+            matcher: (ctx: { path?: string }) => ctx.path === "/email-otp/send-verification-otp",
+            handler: createAuthMiddleware(async (ctx) => {
+              const email = typeof ctx.body?.email === "string" ? ctx.body.email : "";
+              if (ctx.body?.type !== "sign-in" || !email) return;
+              try {
+                await consumeEmailOtpSendQuota(email, ctx.request instanceof Request ? ctx.request : undefined);
+              } catch (error) {
+                if (error instanceof HttpError && error.status === 429) {
+                  throw new APIError("TOO_MANY_REQUESTS", { message: error.message, code: "RATE_LIMITED" });
+                }
+                if (error instanceof HttpError) throw new APIError("SERVICE_UNAVAILABLE", { message: error.message, code: error.code });
+                throw error;
+              }
+            }),
+          }],
+        },
+      },
       {
         id: "safe-auth-errors",
         onResponse: async (response) => {
