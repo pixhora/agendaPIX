@@ -5,7 +5,10 @@ process.env.LANG = "pt_BR.UTF-8";
 process.env.LC_ALL = "pt_BR.UTF-8";
 
 const base = process.env.MP_CAPTURE_URL ?? "http://127.0.0.1:3399";
-const outDir = "/opt/cursor/artifacts/mp-v2";
+const outDir = process.env.MP_CAPTURE_DIR ?? "/opt/cursor/artifacts/mp-v2";
+const only = new Set((process.env.MP_CAPTURE_ONLY ?? "").split(",").map((name) => name.trim()).filter(Boolean));
+const shots = new Set((process.env.MP_CAPTURE_SHOTS ?? "").split(",").map((name) => name.trim()).filter(Boolean));
+const captureDismiss = process.env.MP_CAPTURE_DISMISS === "1";
 
 const scenes = [
   { name: "onboarding-unchecked", scene: "onboarding", long: true },
@@ -39,8 +42,10 @@ const browser = await chromium.launch({ args: ["--lang=pt-BR"] });
 await mkdir(outDir, { recursive: true });
 
 for (const scene of scenes) {
+  if (only.size > 0 && !only.has(scene.name)) continue;
   for (const viewport of viewports) {
     if (scene.widths && !scene.widths.includes(viewport.width)) continue;
+    if (shots.size > 0 && !shots.has(`${scene.name}:${viewport.label}`)) continue;
     const context = await browser.newContext({
       locale: "pt-BR",
       timezoneId: "America/Sao_Paulo",
@@ -66,7 +71,13 @@ for (const scene of scenes) {
     }
     const file = `${outDir}/${scene.name}-${viewport.label}.png`;
     await page.screenshot({ path: file });
-    if (viewport.width === 390 && !scene.footer) {
+    if (captureDismiss && scene.name === "settings-legacy" && viewport.label === "390-light") {
+      await page.route("**/notices/pix_key_retired/dismiss", (route) => route.fulfill({ status: 204, body: "" }));
+      await page.getByRole("button", { name: "Entendi" }).click();
+      await page.getByText("A chave Pix que você cadastrou antes não é mais usada.").waitFor({ state: "hidden" });
+      await page.screenshot({ path: `${outDir}/${scene.name}-${viewport.label}-dismissed.png` });
+    }
+    if (viewport.width === 390 && !scene.footer && only.size === 0 && shots.size === 0) {
       await page.evaluate(() => {
         const nodes = [...document.querySelectorAll(".overflow-y-auto")];
         if (nodes.length > 0) {

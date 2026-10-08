@@ -160,7 +160,7 @@ export function MpOnboardingStep({
                 >
                   {errorView.tone === "danger" ? <CircleX aria-hidden="true" className="size-5 shrink-0 text-danger" /> : <TriangleAlert aria-hidden="true" className="size-5 shrink-0 text-warning" />}
                   <div>
-                    <h2 ref={errorTitle} tabIndex={-1} className="font-display text-base font-bold outline-none focus-visible:shadow-[var(--shadow-focus)]">Não deu para conectar</h2>
+                    <h2 ref={errorTitle} tabIndex={-1} className="font-display text-base font-bold outline-none">Não deu para conectar</h2>
                     <p className="mt-1 text-sm leading-relaxed text-ink">{errorView.message}</p>
                   </div>
                 </div>

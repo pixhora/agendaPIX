@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
@@ -275,8 +277,32 @@ describe("legacy Pix notice", () => {
       onStatus: () => undefined,
     }));
     expect(notice).toContain(LEGACY_PIX_NOTICE);
+    expect(notice).toContain(">Entendi<");
     expect(notice).toContain("não é mais usada");
     expect(notice).not.toContain("chave ativa");
+    expect(notice).not.toContain("localStorage");
+    expect(quiet).not.toContain(">Entendi<");
+  });
+
+  it("keeps the retired Pix notice in the first HTML only when the GET flag is true", () => {
+    const source = readFileSync(resolve(process.cwd(), "components/payments/mp-settings-card.tsx"), "utf8");
+    expect(source).not.toContain("localStorage");
+    expect(source).toContain("legacyPixDismissUrl");
+    const shown = renderToStaticMarkup(createElement(MpSettingsCard, {
+      businessId: "biz",
+      status: MP_STATUS_FIXTURES.legacy,
+      timezone: "America/Sao_Paulo",
+      onStatus: () => undefined,
+    }));
+    const hidden = renderToStaticMarkup(createElement(MpSettingsCard, {
+      businessId: "biz",
+      status: { ...MP_STATUS_FIXTURES.legacy, hadLegacyPixKey: false },
+      timezone: "America/Sao_Paulo",
+      onStatus: () => undefined,
+    }));
+    expect(shown).toContain(LEGACY_PIX_NOTICE);
+    expect(hidden).not.toContain(LEGACY_PIX_NOTICE);
+    expect(legacyPixDismissUrl("biz")).toBe("/api/businesses/biz/notices/pix_key_retired/dismiss");
   });
 
   it("reads the connected account fields and clears them when not connected", () => {
@@ -367,9 +393,13 @@ describe("Mercado Pago status mapping", () => {
       },
     }));
     expect(html).toContain("Agendamento online indisponível no momento");
+    expect(html).toContain('tabindex="-1"');
     expect(html).toContain("Feito com AgendaPix");
     expect(html).not.toContain("Passo 1 de 4");
     expect(html).not.toContain("O sinal garante o horário");
+    expect(html).not.toContain("Agendamento online · sinal por Pix");
+    const css = readFileSync(resolve(process.cwd(), "app/globals.css"), "utf8");
+    expect(css).toMatch(/:is\(h1, h2, h3, h4, h5, h6, p, main\)\[tabindex="-1"\]:focus\s*\{[^}]*outline:\s*none/);
   });
 
   it("picks banners from connection status only", () => {

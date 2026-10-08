@@ -198,6 +198,11 @@ h1, h2, h3, h4, h5, h6, .font-display {
   outline-offset: 2px;
 }
 
+/* Foco programático em título, aviso ou região. O anel fica só em controle interativo. */
+:is(h1, h2, h3, h4, h5, h6, p, main)[tabindex="-1"]:focus {
+  outline: none;
+}
+
 @keyframes stepIn {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }

@@ -377,10 +377,12 @@ export function BookingFlow({ slug, initialBookingId, previewBusiness }: Booking
               {business?.name ?? <span aria-hidden="true" className="inline-block h-5 w-40 animate-pulse rounded bg-subtle motion-reduce:animate-none" />}
             </h1>
             <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-muted sm:text-sm">
-              <span className="inline-flex items-center gap-1.5">
-                <Icon icon={BUSINESS_HEADER_ICONS.secure} className="text-pix" />
-                Agendamento online · sinal por Pix
-              </span>
+              {noBookingFlow ? null : (
+                <span className="inline-flex items-center gap-1.5">
+                  <Icon icon={BUSINESS_HEADER_ICONS.secure} className="text-pix" />
+                  Agendamento online · sinal por Pix
+                </span>
+              )}
               {business?.address ? (
                 <span className="inline-flex items-center gap-1">
                   <Icon icon={BUSINESS_HEADER_ICONS.location} />
