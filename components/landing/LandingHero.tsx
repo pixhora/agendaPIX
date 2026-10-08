@@ -60,7 +60,7 @@ export function LandingHero({ publicHost }: { publicHost: string }) {
             <PhoneStage publicHost={publicHost} />
             <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-paper to-transparent lg:hidden" />
           </div>
-          <div aria-hidden="true" className="pointer-events-none absolute top-[68%] left-0 z-10 hidden w-[210px] max-w-[calc(100%-1.5rem)] -translate-y-1/2 rounded-card border border-line bg-surface p-3 shadow-[var(--shadow-raised)] xl:block">
+          <div aria-hidden="true" className="pointer-events-none absolute top-full left-0 z-10 mt-3 hidden w-[210px] max-w-[calc(100%-14.5rem)] rounded-card border border-line bg-surface p-3 shadow-[var(--shadow-raised)] xl:block">
             <p className="text-[13px] font-semibold text-ink">Nova reserva · Ana</p>
             <p className="mt-1 text-[13px] text-muted">Design de sobrancelha · Qui 15, 15:30</p>
             <p className="mt-2 inline-flex items-center gap-1 text-[13px] font-semibold text-success">

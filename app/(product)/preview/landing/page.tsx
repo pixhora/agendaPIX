@@ -10,11 +10,11 @@ import { LandingSteps } from "@/components/landing/LandingSteps";
 import { MoneyFlow } from "@/components/landing/MoneyFlow";
 import { Roadmap } from "@/components/landing/Roadmap";
 import { getPublicBookingFacts } from "@/lib/marketing/facts";
-import { siteOrigin } from "@/lib/site";
+import { publicSiteHost } from "@/lib/site";
 
 export default async function PreviewLandingPage() {
   const facts = await getPublicBookingFacts();
-  const publicHost = siteOrigin().host;
+  const publicHost = publicSiteHost();
 
   return (
     <div className="flex min-h-dvh w-full max-w-full flex-col overflow-x-clip bg-paper text-ink">

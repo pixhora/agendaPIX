@@ -13,7 +13,7 @@ import { Roadmap } from "@/components/landing/Roadmap";
 import { StickyCta } from "@/components/landing/StickyCta";
 import { landingBootScript } from "@/components/landing/landing-boot-script";
 import { getPublicBookingFacts } from "@/lib/marketing/facts";
-import { siteOpenGraph, siteOrigin } from "@/lib/site";
+import { publicSiteHost, siteOpenGraph } from "@/lib/site";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
 
 export default async function Home() {
   const facts = await getPublicBookingFacts();
-  const publicHost = siteOrigin().host;
+  const publicHost = publicSiteHost();
 
   return (
     <div className="relative flex min-h-dvh w-full max-w-full flex-col overflow-x-clip bg-paper font-display">

@@ -1,7 +1,8 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { demoSteps, faqItems, moneyLead } from "../../lib/marketing/landing-copy";
+import { bookingConfig } from "../../lib/bookings/config";
+import { demoSteps, faqItems, holdAnswer, moneyLead } from "../../lib/marketing/landing-copy";
 import { formatMinutes, getPublicBookingFacts, type PublicBookingFacts } from "../../lib/marketing/facts";
 
 const feminineBrand = /(?:^|[^\p{L}])(?:a|da|pela|na)\s+AgendaPix/iu;
@@ -33,11 +34,11 @@ describe("getPublicBookingFacts", () => {
     else process.env.MP_REQUIRES_PAYER_CPF = previousCpf;
   });
 
-  it("follows bookingConfig when the env is unset: hold 10, no CPF, null recipient", async () => {
+  it("follows bookingConfig when the env is unset: hold 30, no CPF, null recipient", async () => {
     delete process.env.BOOKING_HOLD_MINUTES;
     delete process.env.MP_REQUIRES_PAYER_CPF;
     await expect(getPublicBookingFacts()).resolves.toEqual({
-      holdMinutes: 10,
+      holdMinutes: 30,
       pixRecipientDisplayName: null,
       requiresPayerCpf: false,
     });
@@ -62,7 +63,7 @@ describe("getPublicBookingFacts", () => {
     delete process.env.BOOKING_HOLD_MINUTES;
     const facts = await getPublicBookingFacts("studio-bella");
     expect(facts.pixRecipientDisplayName).toBeNull();
-    expect(facts.holdMinutes).toBe(10);
+    expect(facts.holdMinutes).toBe(30);
   });
 });
 
@@ -144,6 +145,19 @@ describe("landing copy", () => {
       expect(readFileSync(file, "utf8"), file).toMatch(/conta Mercado Pago/);
     }
     expect(readFileSync("components/landing/LandingFooter.tsx", "utf8")).toContain("O AgendaPix");
+  });
+
+  it("renders the landing hold from facts.ts", async () => {
+    delete process.env.BOOKING_HOLD_MINUTES;
+    const facts = await getPublicBookingFacts();
+    expect(facts.holdMinutes).toBe(bookingConfig({}).BOOKING_HOLD_MINUTES);
+    const answer = faqItems(facts).find((item) => item.id === "hold_time")?.answer;
+    expect(answer).toBe(holdAnswer(facts.holdMinutes));
+    expect(answer).toBe(`${formatMinutes(facts.holdMinutes)} depois de escolher o horário. Se o Pix não for pago nesse tempo, o código vence e o horário volta a ficar livre para outra pessoa.`);
+    expect(answer).not.toMatch(/10 minutos/);
+    const files = [...sourceFiles("components/landing"), ...sourceFiles("lib/marketing"), "app/page.tsx"];
+    const offenders = files.flatMap((file) => (/10 min/i.test(readFileSync(file, "utf8")) ? [file] : []));
+    expect(offenders).toEqual([]);
   });
 
   it("does not hardcode a payment deadline in the landing components", () => {

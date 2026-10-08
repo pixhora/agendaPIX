@@ -71,8 +71,12 @@ test.describe("cartão do hero", () => {
         continue;
       }
       const floating = await box(card);
+      const selected = await box(page.locator("span").filter({ hasText: "15:30" }).filter({ hasText: "Selecionado" }));
+      const textColumn = await box(paragraph.locator("xpath=.."));
       expect(overlaps(floating, copy), `parágrafo em ${width}`).toBe(false);
       expect(overlaps(floating, link), `botão de exemplo em ${width}`).toBe(false);
+      expect(overlaps(floating, selected), `horário selecionado em ${width}`).toBe(false);
+      expect(floating.x - (textColumn.x + textColumn.width), `vão da coluna de texto em ${width}`).toBeGreaterThanOrEqual(16);
       expect(floating.x, `borda esquerda em ${width}`).toBeGreaterThanOrEqual(column!.x - 1);
       expect(floating.x + floating.width, `borda direita em ${width}`).toBeLessThanOrEqual(column!.x + column!.width + 1);
     }
