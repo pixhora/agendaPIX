@@ -31,7 +31,9 @@ function useFrameState(businesses: FrameBusiness[]) {
 function NavLinks({ businesses, variant }: { businesses: FrameBusiness[]; variant: "sidebar" | "tabs" }) {
   const { pathname, suffix } = useFrameState(businesses);
   return routes.map(({ href, label, Icon: NavIcon }) => {
-    const current = pathname === href;
+    const current = href === "/dashboard"
+      ? pathname === "/dashboard" || pathname.startsWith("/dashboard/agenda")
+      : pathname === href;
     return (
       <Link
         key={href}
