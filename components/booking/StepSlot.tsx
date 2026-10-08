@@ -308,7 +308,7 @@ export function StepSlot({
                 >
                   <span className={cn("text-xs font-semibold uppercase tracking-wide", isCurrent ? "text-paper/80" : "text-muted")}>{day.dayLabel}</span>
                   <span className="font-display text-xl font-bold tabular-nums leading-none">{dd}</span>
-                  <span aria-hidden="true" className={cn("mt-1 h-1.5 w-1.5 rounded-full", count == null ? "bg-line" : isZero ? "bg-transparent ring-1 ring-line-strong" : isCurrent ? "bg-pix-bright" : "bg-pix")} />
+                  <span aria-hidden="true" className={cn("mt-1 h-1.5 w-1.5 rounded-full", count == null ? "bg-line" : isZero ? "bg-transparent ring-1 ring-line-strong" : isCurrent ? "bg-pix-bright text-pix-bright-foreground" : "bg-pix")} />
                 </button>
               );
             })}

@@ -16,6 +16,22 @@ export const RESERVED_BUSINESS_SLUGS = [
   "_next",
   "static",
   "favicon.ico",
+  "robots.txt",
+  "sitemap.xml",
+  "icon",
+  "apple-icon",
+  "opengraph-image",
+  "twitter-image",
+  "manifest.webmanifest",
+  "termos",
+  "privacidade",
+  "contato",
+  "exemplo",
+  "entrar",
+  "precos",
+  "ajuda",
+  "suporte",
+  "blog",
 ] as const;
 
 const reservedSlugSet = new Set<string>(RESERVED_BUSINESS_SLUGS.map((slug) => slug.toLowerCase()));

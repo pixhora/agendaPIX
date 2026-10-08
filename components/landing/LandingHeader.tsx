@@ -13,7 +13,7 @@ const links = [
 export function LandingHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-line/70 bg-paper/85 backdrop-blur-md">
-      <div className="mx-auto flex min-h-16 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
+      <div className="mx-auto flex min-h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
         <BrandLink />
         <nav aria-label="Seções da página" className="hidden items-center gap-1 md:flex">
           {links.map((link) => (

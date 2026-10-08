@@ -26,6 +26,10 @@
   --pix-foreground: #ffffff;
   --pix-soft: #e8f6f3;
   --pix-bright: #3fd0be;
+  /* Texto sobre a faixa. Fixo nos dois modos: no escuro --ink fica claro e falha o contraste. */
+  --pix-bright-foreground: #0b0b0c;
+  --pix-deep: #064a43;
+  --pix-deep-muted: #b9e4dd;
 
   --success: #156b3a;
   --success-soft: #e6f4ea;
@@ -61,6 +65,9 @@
   --pix-foreground: #0b0b0c;
   --pix-soft: #10302c;
   --pix-bright: #3fd0be;
+  --pix-bright-foreground: #0b0b0c;
+  --pix-deep: #0b2f2b;
+  --pix-deep-muted: #9fd9d0;
 
   --success: #6fd49a;
   --success-soft: #133222;
@@ -91,6 +98,10 @@
     --pix-hover: #5fdccc;
     --pix-foreground: #0b0b0c;
     --pix-soft: #10302c;
+    --pix-bright: #3fd0be;
+    --pix-bright-foreground: #0b0b0c;
+    --pix-deep: #0b2f2b;
+    --pix-deep-muted: #9fd9d0;
     --success: #6fd49a;
     --success-soft: #133222;
     --warning: #f2b25a;
@@ -119,6 +130,9 @@
   --color-pix-foreground: var(--pix-foreground);
   --color-pix-soft: var(--pix-soft);
   --color-pix-bright: var(--pix-bright);
+  --color-pix-bright-foreground: var(--pix-bright-foreground);
+  --color-pix-deep: var(--pix-deep);
+  --color-pix-deep-muted: var(--pix-deep-muted);
   --color-success: var(--success);
   --color-success-soft: var(--success-soft);
   --color-warning: var(--warning);

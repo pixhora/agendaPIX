@@ -24,7 +24,10 @@
 | `--slab` / `--slab-foreground` / `--slab-muted` | `#0B0B0C` / `#FFF` / `#C9C9CC` | `#000` / `#FFF` / `#B8B8BD` | Placa de Valor e faixas escuras |
 | `--pix` / `--pix-hover` / `--pix-foreground` | `#0A6E63` / `#085A52` / `#FFF` | `#3FD0BE` / `#5FDCCC` / `#0B0B0C` | Acento único: Pix, dinheiro, estado ativo |
 | `--pix-soft` | `#E8F6F3` | `#10302C` | Fundo de destaque Pix (aviso, próximo atendimento) |
-| `--pix-bright` | `#3FD0BE` | `#3FD0BE` | Ponto "ao vivo" sobre a placa escura |
+| `--pix-bright` | `#3FD0BE` | `#3FD0BE` | Faixa do horário reservado, botão sobre a placa, detalhe de marca. Nunca é cor de texto sobre `--paper` |
+| `--pix-bright-foreground` | `#0B0B0C` | `#0B0B0C` | Texto sobre `--pix-bright`. Fixo nos dois modos (`text-ink` no escuro fica claro e falha) |
+| `--pix-deep` | `#064A43` | `#0B2F2B` | Bloco do CTA final e selo "Exemplo". Uma vez por página |
+| `--pix-deep-muted` | `#B9E4DD` | `#9FD9D0` | Texto secundário sobre `--pix-deep` |
 | `--success` / `--success-soft` | `#156B3A` / `#E6F4EA` | `#6FD49A` / `#133222` | Confirmado, salvo |
 | `--warning` / `--warning-soft` | `#8A5300` / `#FDF1DC` | `#F2B25A` / `#33250F` | Aguardando sinal, avisos |
 | `--danger` / `--danger-soft` | `#B3261E` / `#FBE9E7` | `#FF8A80` / `#3A1714` | Erros e ações destrutivas |
