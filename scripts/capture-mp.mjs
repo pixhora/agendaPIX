@@ -13,6 +13,7 @@ const scenes = [
   { name: "settings-legacy", scene: "settings-legacy" },
   { name: "settings-not-connected", scene: "settings-not-connected", long: true },
   { name: "settings-needs-reconnect", scene: "settings-needs-reconnect", long: true },
+  { name: "settings-reconnect-ack", scene: "settings-reconnect-ack", long: true },
   { name: "settings-test-mode", scene: "settings-test" },
   { name: "disconnect-dialog", scene: "disconnect" },
   { name: "banner-reauth", scene: "banner" },
@@ -44,7 +45,7 @@ for (const scene of scenes) {
     await page.goto(`${base}/dev/mp-fixtures?scene=${scene.scene}`, { waitUntil: "networkidle" });
     if (scene.click) {
       await page.getByRole("button", { name: scene.click }).click();
-      await page.getByRole("alert").waitFor();
+      await page.getByText("Marque a autorização da devolução automática para continuar.").waitFor();
     }
     const file = `${outDir}/${scene.name}-${viewport.label}.png`;
     await page.screenshot({ path: file });

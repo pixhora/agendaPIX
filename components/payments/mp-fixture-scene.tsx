@@ -86,6 +86,7 @@ export function MpFixtureScene({ scene }: { scene: string }) {
   if (scene === "settings-legacy") return <SettingsScene fixture="legacy" />;
   if (scene === "settings-not-connected") return <SettingsScene fixture="not_connected" />;
   if (scene === "settings-needs-reconnect") return <SettingsScene fixture="needs_reconnect" />;
+  if (scene === "settings-reconnect-ack") return <SettingsScene fixture="needs_reconnect_stale" />;
   if (scene === "settings-test") return <SettingsScene fixture="test_mode" />;
   if (scene === "disconnect") return <SettingsScene fixture="connected" disconnect />;
   if (scene === "banner") {

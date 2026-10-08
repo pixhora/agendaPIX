@@ -16,6 +16,7 @@ const SCENES = [
   "settings-legacy",
   "settings-not-connected",
   "settings-needs-reconnect",
+  "settings-reconnect-ack",
   "settings-test",
   "disconnect",
   "banner",

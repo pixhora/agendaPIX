@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { MpConnectForm } from "../../components/payments/mp-connect-form";
-import { MP_CONNECT_CONSENT_VERSION } from "../../lib/mercadopago/consent";
+import { isAutoRefundAck, MP_CONNECT_CONSENT_VERSION } from "../../lib/mercadopago/consent";
+import { MP_STATUS_FIXTURES } from "../../lib/mercadopago/dev-fixtures";
 import {
   AUTO_REFUND_ACK_ERROR,
   bannerDismissUntil,
@@ -50,11 +51,15 @@ describe("Mercado Pago connect consent", () => {
     expect(html).toContain('name="returnTo" value="/onboarding"');
     expect(html).toContain(`name="consentVersion" value="${MP_CONNECT_CONSENT_VERSION}"`);
     expect(html).toContain('type="checkbox"');
-    expect(html).toContain('name="autoRefundAck"');
-    expect(html).toContain("Entendi e autorizo");
+    expect(html).toContain('name="autoRefundAck" value="on"');
+    expect(html).toContain("required");
+    expect(html).toContain("Entendi e autorizo:");
+    expect(html).toContain("7 dias corridos");
     expect(html).not.toMatch(/checked=/);
     expect(html).not.toMatch(/<button\b[^>]*\sdisabled[\s=>]/);
     expect(html).not.toContain('href="/api/');
+    expect(html).not.toContain("noreferrer");
+    expect(html).not.toContain("referrerpolicy");
   });
 
   it("omits the checkbox when the current consent is already accepted", () => {
@@ -68,10 +73,22 @@ describe("Mercado Pago connect consent", () => {
       submitLabel: "Reconectar",
       onBlocked: () => undefined,
     }));
-    expect(html).toContain('type="hidden" name="autoRefundAck" value="true"');
+    expect(html).toContain('type="hidden" name="autoRefundAck" value="on"');
     expect(html).toContain('name="returnTo" value="/dashboard"');
     expect(html).not.toContain("Entendi e autorizo");
     expect(html).not.toContain('type="checkbox"');
+    expect(html).not.toContain("noreferrer");
+    expect(html).not.toContain("referrerpolicy");
+  });
+
+  it("accepts the checkbox value on and the current consent mocks", () => {
+    expect(isAutoRefundAck("on")).toBe(true);
+    expect(isAutoRefundAck(undefined)).toBe(false);
+    expect(reconnectRequiresAck(MP_STATUS_FIXTURES.needs_reconnect.consentVersion)).toBe(false);
+    expect(reconnectRequiresAck(MP_STATUS_FIXTURES.stale_consent.consentVersion)).toBe(true);
+    expect(reconnectRequiresAck(MP_STATUS_FIXTURES.needs_reconnect_stale.consentVersion)).toBe(true);
+    expect(MP_STATUS_FIXTURES.legacy.hadLegacyPixKey).toBe(true);
+    expect(MP_STATUS_FIXTURES.connected.hadLegacyPixKey).toBe(false);
   });
 });
 

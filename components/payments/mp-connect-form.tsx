@@ -4,21 +4,36 @@ import { useEffect, useRef, type ReactNode, type RefObject } from "react";
 import { ExternalLink, Loader2 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { MP_CONNECT_CONSENT_VERSION } from "@/lib/mercadopago/consent";
+import { MP_CONNECT_CONSENT_TEXT, MP_CONNECT_CONSENT_VERSION } from "@/lib/mercadopago/consent";
 import { AUTO_REFUND_ACK_ERROR, gateConnectSubmit, mpConnectAction, type MpReturnTo } from "@/lib/mercadopago/contract";
 
 const fieldReset = "outline-none focus:outline-none focus-visible:outline-none";
+const ACK_LEAD = "Entendi e autorizo:";
+
+function AckCopy() {
+  if (!MP_CONNECT_CONSENT_TEXT.startsWith(ACK_LEAD)) {
+    return <span className="text-sm leading-snug text-ink">{MP_CONNECT_CONSENT_TEXT}</span>;
+  }
+  return (
+    <span className="text-sm leading-snug text-ink">
+      <strong className="font-semibold">{ACK_LEAD}</strong>
+      {MP_CONNECT_CONSENT_TEXT.slice(ACK_LEAD.length)}
+    </span>
+  );
+}
 
 export function AutoRefundAck({
   checked,
   onChange,
   invalid,
   inputRef,
+  onInvalid,
 }: {
   checked: boolean;
   onChange: (checked: boolean) => void;
   invalid: boolean;
   inputRef?: RefObject<HTMLInputElement | null>;
+  onInvalid?: () => void;
 }) {
   const hintId = "mp-auto-refund-hint";
   const errorId = "mp-auto-refund-error";
@@ -29,9 +44,13 @@ export function AutoRefundAck({
           ref={inputRef}
           type="checkbox"
           name="autoRefundAck"
-          value="true"
+          value="on"
           checked={checked}
           onChange={(event) => onChange(event.target.checked)}
+          onInvalid={(event) => {
+            event.preventDefault();
+            onInvalid?.();
+          }}
           required
           aria-invalid={invalid || undefined}
           aria-describedby={invalid ? `${hintId} ${errorId}` : hintId}
@@ -50,9 +69,7 @@ export function AutoRefundAck({
             </svg>
           ) : null}
         </span>
-        <span className="text-sm leading-snug text-ink">
-          <strong className="font-semibold">Entendi e autorizo:</strong> quando um Pix chegar depois do prazo e o horário já estiver ocupado, o AgendaPix devolve sozinho o valor inteiro, do saldo da minha conta Mercado Pago, e me avisa por e-mail.
-        </span>
+        <AckCopy />
       </label>
       <p id={hintId} className="mt-2 pl-[34px] text-xs leading-relaxed text-muted">
         Obrigatório para conectar. Essa devolução é regra do AgendaPix para proteger seus clientes e não pode ser desligada.
@@ -121,9 +138,18 @@ export function MpConnectForm({
     >
       <input type="hidden" name="returnTo" value={returnTo} />
       <input type="hidden" name="consentVersion" value={MP_CONNECT_CONSENT_VERSION} />
-      {requireAck ? null : <input type="hidden" name="autoRefundAck" value="true" />}
+      {requireAck ? null : <input type="hidden" name="autoRefundAck" value="on" />}
       {requireAck ? (
-        <AutoRefundAck checked={acknowledged} onChange={onAcknowledgedChange} invalid={ackInvalid} inputRef={ackRef} />
+        <AutoRefundAck
+          checked={acknowledged}
+          onChange={onAcknowledgedChange}
+          invalid={ackInvalid}
+          inputRef={ackRef}
+          onInvalid={() => {
+            onBlocked();
+            ackRef.current?.focus();
+          }}
+        />
       ) : null}
       {children}
       <div className={cn("mt-3", beside && "grid gap-2 min-[360px]:grid-cols-2")}>

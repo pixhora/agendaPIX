@@ -29,9 +29,18 @@ export const MP_STATUS_FIXTURES = {
     hadLegacyPixKey: false,
     consentVersion: null,
   },
+  /** Mesma versão aceita: reconectar sem a caixa. */
   needs_reconnect: { ...base, status: "needs_reconnect", canReceiveDeposits: false },
   test_mode: { ...base, status: "connected", liveMode: false },
+  /** Versão diferente: a caixa volta no reconectar. */
   stale_consent: { ...base, status: "connected", consentVersion: "2026-09-01.v1" },
+  /** Desconectado e sem aceite desta versão: a caixa volta. */
+  needs_reconnect_stale: {
+    ...base,
+    status: "needs_reconnect",
+    canReceiveDeposits: false,
+    consentVersion: null,
+  },
 } as const satisfies Record<string, MpOwnerStatus>;
 
 export type MpFixtureName = keyof typeof MP_STATUS_FIXTURES;
