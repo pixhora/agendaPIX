@@ -209,12 +209,7 @@ export function formatConnectedSince(iso: string | null, timeZone = "America/Sao
   if (!iso) return null;
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return null;
-  const parts = new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "short", year: "numeric", timeZone }).formatToParts(date);
-  const day = parts.find((part) => part.type === "day")?.value;
-  const month = parts.find((part) => part.type === "month")?.value?.replace(".", "");
-  const year = parts.find((part) => part.type === "year")?.value;
-  if (!day || !month || !year) return null;
-  return `${day} ${month} ${year}`;
+  return new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "long", year: "numeric", timeZone }).format(date);
 }
 
 export function openPixDisconnectNote(count: number): string | null {

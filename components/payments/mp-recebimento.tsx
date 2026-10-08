@@ -3,15 +3,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { toast } from "sonner";
 import { buttonVariants } from "@/components/ui/button";
 import { readCommitResult } from "@/components/onboarding/storage";
 import {
-  DISCONNECTED_TOAST,
   mpConnectionUrl,
   parseMpOwnerStatus,
   presentMpCallback,
   type MpCallbackView,
+  type MpOwnerStatus,
 } from "@/lib/mercadopago/contract";
 import { MpOnboardingStep } from "./mp-onboarding-step";
 import { takeMpCallback } from "./mp-callback";
@@ -20,10 +19,7 @@ export function MpRecebimento({ legalPagesPublished }: { legalPagesPublished: bo
   const searchParams = useSearchParams();
   const [businessId, setBusinessId] = useState<string | null | undefined>(undefined);
   const [callback, setCallback] = useState<MpCallbackView | null>(null);
-  const [connectedAt, setConnectedAt] = useState<string | null>(null);
-  const [accountName, setAccountName] = useState<string | null>(null);
-  const [accountEmailMasked, setAccountEmailMasked] = useState<string | null>(null);
-  const [accountIdLast4, setAccountIdLast4] = useState<string | null>(null);
+  const [ownerStatus, setOwnerStatus] = useState<MpOwnerStatus | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -47,11 +43,7 @@ export function MpRecebimento({ legalPagesPublished }: { legalPagesPublished: bo
       .then((response) => (response.ok ? response.json() : null))
       .then((payload) => {
         const parsed = parseMpOwnerStatus(payload);
-        if (!parsed) return;
-        if (parsed.connectedAt) setConnectedAt(parsed.connectedAt);
-        setAccountName(parsed.accountName);
-        setAccountEmailMasked(parsed.accountEmailMasked);
-        setAccountIdLast4(parsed.accountIdLast4);
+        if (parsed) setOwnerStatus(parsed);
       })
       .catch(() => undefined);
     return () => controller.abort();
@@ -81,28 +73,11 @@ export function MpRecebimento({ legalPagesPublished }: { legalPagesPublished: bo
       businessId={businessId}
       legalPagesPublished={legalPagesPublished}
       callback={callback}
-      connectedAt={connectedAt}
-      accountName={accountName}
-      accountEmailMasked={accountEmailMasked}
-      accountIdLast4={accountIdLast4}
-      onDismissAccount={callback?.mp === "connected" ? () => {
-        void fetch(mpConnectionUrl(businessId), { method: "DELETE" })
-          .then((response) => {
-            if (response.status !== 204) {
-              toast("Não conseguimos desconectar agora. Tente de novo.");
-              return;
-            }
-            toast(DISCONNECTED_TOAST);
-            setCallback(null);
-            setConnectedAt(null);
-            setAccountName(null);
-            setAccountEmailMasked(null);
-            setAccountIdLast4(null);
-          })
-          .catch(() => {
-            toast("Sem internet. Tente de novo quando a conexão voltar.");
-          });
-      } : undefined}
+      ownerStatus={ownerStatus}
+      onDisconnected={() => {
+        setCallback(null);
+        setOwnerStatus(null);
+      }}
     />
   );
 }

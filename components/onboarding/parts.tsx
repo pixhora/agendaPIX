@@ -1,13 +1,6 @@
 "use client";
 
-import { useSyncExternalStore, type ReactNode } from "react";
-
-const subscribeNoop = () => () => {};
-
-/** Domínio exibido antes do link: o host real no navegador; no servidor, um texto neutro. */
-export function usePublicHost() {
-  return useSyncExternalStore(subscribeNoop, () => window.location.host, () => "seu-site");
-}
+import type { ReactNode } from "react";
 
 export function StepHeader({ title, description }: { title: string; description: ReactNode }) {
   return (

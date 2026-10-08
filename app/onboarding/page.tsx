@@ -2,6 +2,7 @@ import React, { Suspense } from "react";
 import type { Metadata } from "next";
 import { OnboardingFlow } from "@/components/onboarding/OnboardingFlow";
 import { Skeleton } from "@/components/ui/skeleton";
+import { publicLinkHost } from "@/lib/origins";
 
 export const metadata: Metadata = {
   title: "Começar teste grátis de 7 dias · Agenda",
@@ -17,7 +18,7 @@ export default function OnboardingPage() {
         </div>
       }
     >
-      <OnboardingFlow legalPagesPublished={process.env.LEGAL_PAGES_PUBLISHED === "true"} />
+      <OnboardingFlow legalPagesPublished={process.env.LEGAL_PAGES_PUBLISHED === "true"} publicHost={publicLinkHost()} />
     </Suspense>
   );
 }

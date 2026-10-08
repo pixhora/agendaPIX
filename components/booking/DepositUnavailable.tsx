@@ -28,8 +28,8 @@ export function DepositUnavailableCard({
       <h2 ref={titleRef} tabIndex={-1} className="mx-auto mt-4 max-w-[20ch] font-display text-2xl font-extrabold tracking-tight outline-none">
         Agendamento online indisponível no momento
       </h2>
-      <p className="mx-auto mt-2 max-w-[34ch] text-[15px] leading-relaxed text-muted">
-        Este estabelecimento está com os agendamentos com sinal temporariamente indisponíveis. Tente mais tarde ou fale direto com {businessName}.
+      <p className="mt-2 text-[15px] leading-relaxed text-muted">
+        {businessName} não está recebendo agendamentos online agora. Fale direto pelo WhatsApp.
       </p>
       {href ? (
         <a href={href} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({ size: "lg" }), "mt-5 w-full")}>

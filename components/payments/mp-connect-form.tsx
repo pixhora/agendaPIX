@@ -190,15 +190,12 @@ export function MpConnectForm({
       )}
       <div
         className={cn(
-          "mt-3",
-          beside && buttonVariant !== "link" && "grid gap-2 min-[360px]:grid-cols-2",
-          buttonVariant === "link" && "flex flex-col items-stretch gap-1",
+          "mt-3 flex flex-col items-stretch gap-2",
           pinActions &&
             "shrink-0 max-md:sticky max-md:bottom-0 max-md:z-20 max-md:mt-0 max-md:border-t max-md:border-line max-md:bg-paper/95 max-md:px-5 max-md:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:pt-3 max-md:backdrop-blur-md md:static md:px-5 md:pb-6",
         )}
         data-mp-sticky={pinActions ? "" : undefined}
       >
-        {buttonVariant === "link" ? beside : null}
         <button
           type="submit"
           aria-busy={pending || undefined}
@@ -212,7 +209,7 @@ export function MpConnectForm({
           {pending ? "Abrindo o Mercado Pago…" : submitLabel}
           {pending || buttonVariant === "outline" || buttonVariant === "link" ? null : <ExternalLink aria-hidden="true" />}
         </button>
-        {buttonVariant === "link" ? null : beside}
+        {beside}
         {footer}
       </div>
     </form>

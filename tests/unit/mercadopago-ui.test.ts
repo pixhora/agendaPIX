@@ -168,16 +168,34 @@ describe("Mercado Pago connect consent", () => {
       accountName: "Ana S.",
       accountEmailMasked: "an••@gmail.com",
       accountIdLast4: "7766",
-      onDismissAccount: () => undefined,
     }));
     const nameAt = named.indexOf("Ana S.");
     const emailAt = named.indexOf("an••@gmail.com");
-    const switchAt = named.indexOf("Não é essa conta?");
+    const sinceAt = named.indexOf("Conectado desde 2 de outubro de 2026");
+    const depositAt = named.indexOf("O sinal dos clientes cai direto nesta conta.");
+    const feesAt = named.indexOf("Ver tarifas no Mercado Pago");
+    const refundsAt = named.indexOf("Devoluções:");
+    const reconnectAt = named.indexOf("Reconectar");
+    const disconnectAt = named.indexOf(">Desconectar<");
     expect(nameAt).toBeGreaterThan(-1);
     expect(emailAt).toBeGreaterThan(nameAt);
-    expect(switchAt).toBeGreaterThan(nameAt);
-    expect(named).toContain("Conectado desde 2 out 2026");
+    expect(sinceAt).toBeGreaterThan(emailAt);
+    expect(depositAt).toBeGreaterThan(sinceAt);
+    expect(feesAt).toBeGreaterThan(depositAt);
+    expect(refundsAt).toBeGreaterThan(feesAt);
+    expect(reconnectAt).toBeGreaterThan(refundsAt);
+    expect(disconnectAt).toBeGreaterThan(reconnectAt);
+    expect(named).toContain("Continuar");
+    expect(named).not.toContain("Não é essa conta?");
     expect(named).not.toContain("••••7766");
+    const reconnectButton = named.slice(named.lastIndexOf("<button", reconnectAt), reconnectAt);
+    expect(reconnectButton).toContain("border");
+    expect(reconnectButton).not.toContain("bg-pix ");
+    const disconnectLink = named.slice(disconnectAt - 400, disconnectAt);
+    expect(disconnectLink).toContain("text-base");
+    expect(disconnectLink).toContain("text-danger");
+    expect(disconnectLink).toContain("self-start");
+    expect(disconnectLink).not.toContain("bg-danger");
 
     const emailOnly = renderToStaticMarkup(createElement(MpSettingsCard, {
       businessId: "biz",
@@ -207,14 +225,32 @@ describe("Mercado Pago connect consent", () => {
     }));
     expect(settings).toContain("Ana S.");
     expect(settings).toContain("an••@gmail.com");
-    expect(settings).toContain("Conectado desde 2 out 2026");
+    expect(settings).toContain("Conectado desde 2 de outubro de 2026");
     expect(settings).toContain('rel="noopener"');
     expect(settings).toContain("Ver tarifas no Mercado Pago");
     expect(settings).toContain("(abre em nova aba)");
     expect(settings).not.toContain("noreferrer");
-    expect(settings).toContain("underline");
     expect(settings).toContain("Reconectar");
     expect(settings).not.toContain(LEGACY_PIX_NOTICE);
+    expect(settings).not.toContain("hover:bg-danger-soft");
+    const settingsReconnect = settings.indexOf("Reconectar");
+    const settingsDisconnect = settings.indexOf(">Desconectar<");
+    const settingsRefunds = settings.indexOf("Devoluções:");
+    expect(settingsRefunds).toBeLessThan(settingsReconnect);
+    expect(settingsReconnect).toBeLessThan(settingsDisconnect);
+    const settingsButton = settings.slice(settings.lastIndexOf("<button", settingsReconnect), settingsReconnect);
+    expect(settingsButton).toContain("border");
+    expect(settingsButton).not.toContain("bg-pix ");
+
+    const paused = renderToStaticMarkup(createElement(MpSettingsCard, {
+      businessId: "biz",
+      status: MP_STATUS_FIXTURES.needs_reconnect,
+      timezone: "America/Sao_Paulo",
+      onStatus: () => undefined,
+    }));
+    const pausedReconnect = paused.indexOf("Reconectar");
+    expect(paused.slice(paused.lastIndexOf("<button", pausedReconnect), pausedReconnect)).toContain("bg-pix ");
+    expect(paused).toContain("O Mercado Pago encerrou a conexão.");
   });
 
   it("centers the disconnect dialog and links the Mercado Pago apps help", () => {
@@ -276,6 +312,12 @@ describe("legacy Pix notice", () => {
       timezone: "America/Sao_Paulo",
       onStatus: () => undefined,
     }));
+    const legacyAt = notice.indexOf(LEGACY_PIX_NOTICE);
+    const sinceAt = notice.indexOf("Conectado desde");
+    const depositAt = notice.indexOf("O sinal dos clientes cai direto nesta conta.");
+    expect(sinceAt).toBeGreaterThan(-1);
+    expect(legacyAt).toBeGreaterThan(sinceAt);
+    expect(depositAt).toBeGreaterThan(legacyAt);
     expect(notice).toContain(LEGACY_PIX_NOTICE);
     expect(notice).toContain(">Entendi<");
     expect(notice).toContain("não é mais usada");
@@ -365,9 +407,9 @@ describe("Mercado Pago status mapping", () => {
 
   it("formats the 2026 mock Fridays in São Paulo", () => {
     const weekday = (iso: string) => new Intl.DateTimeFormat("pt-BR", { weekday: "long", timeZone: "America/Sao_Paulo" }).format(new Date(iso));
-    expect(formatConnectedSince(MP_MOCK_FRIDAY_2)).toBe("2 out 2026");
+    expect(formatConnectedSince(MP_MOCK_FRIDAY_2)).toBe("2 de outubro de 2026");
     expect(weekday(MP_MOCK_FRIDAY_2)).toBe("sexta-feira");
-    expect(formatConnectedSince(MP_MOCK_FRIDAY_25)).toBe("25 set 2026");
+    expect(formatConnectedSince(MP_MOCK_FRIDAY_25)).toBe("25 de setembro de 2026");
     expect(weekday(MP_MOCK_FRIDAY_25)).toBe("sexta-feira");
     expect(MP_STATUS_FIXTURES.connected.connectedAt).toBe(MP_MOCK_FRIDAY_2);
   });
@@ -393,6 +435,10 @@ describe("Mercado Pago status mapping", () => {
       },
     }));
     expect(html).toContain("Agendamento online indisponível no momento");
+    expect(html).toContain("Studio Ana não está recebendo agendamentos online agora. Fale direto pelo WhatsApp.");
+    expect(html).not.toContain("temporariamente indisponíveis");
+    expect(html).not.toContain("max-w-[34ch]");
+    expect(html).not.toContain("Feito com o AgendaPix");
     expect(html).toContain('tabindex="-1"');
     expect(html).toContain("Feito com AgendaPix");
     expect(html).not.toContain("Passo 1 de 4");

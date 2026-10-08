@@ -4,7 +4,6 @@ import { Clock3, Eye, Lock } from "lucide-react";
 import { BusinessAvatar } from "@/components/ui/business-avatar";
 import type { OnboardingData } from "./types";
 import { formatCurrency, formatDuration } from "@/components/booking/formatters";
-import { usePublicHost } from "./parts";
 
 const DAY_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
@@ -15,8 +14,8 @@ function describeDays(days: number[]) {
 }
 
 /** Prévia ao vivo da página pública enquanto o dono preenche o cadastro (só no desktop). */
-export function OnboardingPreview({ data }: { data: OnboardingData }) {
-  const host = usePublicHost();
+export function OnboardingPreview({ data, publicHost }: { data: OnboardingData; publicHost: string }) {
+  const host = publicHost;
   const name = data.businessName.trim() || "Seu negócio";
   return (
     <aside aria-label="Prévia da sua página" className="hidden lg:sticky lg:top-10 lg:block">

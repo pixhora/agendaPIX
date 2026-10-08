@@ -5,7 +5,7 @@ import { FieldError } from "@/components/ui/field";
 import { SlugInput, type SlugVisualStatus } from "@/components/ui/slug-input";
 import { isPublicSlug, normalizeSlug } from "@/lib/slug";
 import { StepActions } from "./chrome";
-import { StepHeader, usePublicHost } from "./parts";
+import { StepHeader } from "./parts";
 import { useSlugAvailability } from "./use-slug-availability";
 
 const FORMAT_HINT = "Use letras, números e hífen. Acentos e espaços a gente ajusta.";
@@ -34,6 +34,7 @@ export function StepBusiness({
   conflict,
   notice,
   pending,
+  publicHost,
 }: {
   businessName: string;
   slug: string;
@@ -46,8 +47,9 @@ export function StepBusiness({
   conflict?: { slug: string; message: string; suggestions: string[] } | null;
   notice?: string | null;
   pending?: boolean;
+  publicHost: string;
 }) {
-  const host = usePublicHost();
+  const host = publicHost;
   const check = useSlugAvailability(slug);
   const [nameBlurred, setNameBlurred] = useState(false);
   const [slugBlurred, setSlugBlurred] = useState(false);

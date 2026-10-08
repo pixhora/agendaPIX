@@ -9,6 +9,18 @@ const outDir = process.env.MP_CAPTURE_DIR ?? "/opt/cursor/artifacts/mp-v2";
 const only = new Set((process.env.MP_CAPTURE_ONLY ?? "").split(",").map((name) => name.trim()).filter(Boolean));
 const shots = new Set((process.env.MP_CAPTURE_SHOTS ?? "").split(",").map((name) => name.trim()).filter(Boolean));
 const captureDismiss = process.env.MP_CAPTURE_DISMISS === "1";
+const captureBottoms = process.env.MP_CAPTURE_BOTTOMS === "1";
+
+async function scrollEdge(page, edge) {
+  await page.evaluate((which) => {
+    const nodes = [...document.querySelectorAll(".overflow-y-auto")].filter((node) => node.tagName !== "DIALOG" && !node.closest("dialog"));
+    if (nodes.length > 0) {
+      for (const node of nodes) node.scrollTop = which === "bottom" ? node.scrollHeight : 0;
+      return;
+    }
+    window.scrollTo(0, which === "bottom" ? document.documentElement.scrollHeight : 0);
+  }, edge);
+}
 
 const scenes = [
   { name: "onboarding-unchecked", scene: "onboarding", long: true },
@@ -71,22 +83,26 @@ for (const scene of scenes) {
     }
     const file = `${outDir}/${scene.name}-${viewport.label}.png`;
     await page.screenshot({ path: file });
-    if (captureDismiss && scene.name === "settings-legacy" && viewport.label === "390-light") {
+    const wantBottom = viewport.width === 390 && (captureBottoms || (only.size === 0 && shots.size === 0));
+    if (wantBottom && !(captureDismiss && scene.name === "settings-legacy")) {
+      await scrollEdge(page, "bottom");
+      await page.screenshot({ path: `${outDir}/${scene.name}-${viewport.label}-bottom.png` });
+    }
+    if (captureDismiss && scene.name === "settings-legacy" && viewport.width === 390) {
+      if (wantBottom) {
+        await scrollEdge(page, "bottom");
+        await page.screenshot({ path: `${outDir}/${scene.name}-${viewport.label}-bottom.png` });
+      }
+      await scrollEdge(page, "top");
+      if (scene.footer) await page.locator("footer").scrollIntoViewIfNeeded();
       await page.route("**/notices/pix_key_retired/dismiss", (route) => route.fulfill({ status: 204, body: "" }));
       await page.getByRole("button", { name: "Entendi" }).click();
       await page.getByText("A chave Pix que você cadastrou antes não é mais usada.").waitFor({ state: "hidden" });
       await page.screenshot({ path: `${outDir}/${scene.name}-${viewport.label}-dismissed.png` });
-    }
-    if (viewport.width === 390 && !scene.footer && only.size === 0 && shots.size === 0) {
-      await page.evaluate(() => {
-        const nodes = [...document.querySelectorAll(".overflow-y-auto")];
-        if (nodes.length > 0) {
-          for (const node of nodes) node.scrollTop = node.scrollHeight;
-          return;
-        }
-        window.scrollTo(0, document.documentElement.scrollHeight);
-      });
-      await page.screenshot({ path: `${outDir}/${scene.name}-${viewport.label}-bottom.png` });
+      if (wantBottom) {
+        await scrollEdge(page, "bottom");
+        await page.screenshot({ path: `${outDir}/${scene.name}-${viewport.label}-dismissed-bottom.png` });
+      }
     }
     await context.close();
   }

@@ -61,7 +61,7 @@ function onlineNow() {
   return typeof navigator === "undefined" ? true : navigator.onLine;
 }
 
-export function OnboardingFlow({ legalPagesPublished = false }: { legalPagesPublished?: boolean }) {
+export function OnboardingFlow({ legalPagesPublished = false, publicHost }: { legalPagesPublished?: boolean; publicHost: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialPlan = searchParams.get("plano") === "base" ? "base" : "completo";
@@ -437,6 +437,7 @@ export function OnboardingFlow({ legalPagesPublished = false }: { legalPagesPubl
                 conflict={linkConflict}
                 notice={businessNotice}
                 pending={businessPending}
+                publicHost={publicHost}
                 onChangeBusinessName={(businessName) => update({ businessName })}
                 onChangeSlug={(slug) => update({ slug })}
                 onSlugTouched={(slugTouched) => update({ slugTouched })}
@@ -535,7 +536,7 @@ export function OnboardingFlow({ legalPagesPublished = false }: { legalPagesPubl
             </p>
           )}
         </div>
-        <OnboardingPreview data={data} />
+        <OnboardingPreview data={data} publicHost={publicHost} />
       </div>
     </div>
   );

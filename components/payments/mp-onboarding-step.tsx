@@ -6,9 +6,11 @@ import { ArrowRight, Check, CircleCheck, CircleX, Info, Percent, TriangleAlert, 
 import { BrandLink } from "@/components/ui/brand";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { PERMISSIONS, callbackFocusesAck, formatConnectedSince, mpAccountIdentity, presentMpCallback, type MpCallbackView } from "@/lib/mercadopago/contract";
+import { MP_CONNECT_CONSENT_VERSION } from "@/lib/mercadopago/consent";
+import { PERMISSIONS, callbackFocusesAck, presentMpCallback, type MpCallbackView, type MpOwnerStatus } from "@/lib/mercadopago/contract";
 import { MP_GOOD_TO_KNOW } from "@/lib/mercadopago/connect-copy";
 import { MpConnectForm } from "./mp-connect-form";
+import { MpConnectionCard } from "./mp-settings-card";
 
 const KNOW_ICONS = [Percent, Undo2, Info, Wallet, Unplug] as const;
 
@@ -85,7 +87,8 @@ export function MpOnboardingStep({
   accountName = null,
   accountEmailMasked = null,
   accountIdLast4 = null,
-  onDismissAccount,
+  ownerStatus = null,
+  onDisconnected,
 }: {
   businessId: string;
   legalPagesPublished?: boolean;
@@ -94,15 +97,21 @@ export function MpOnboardingStep({
   accountName?: string | null;
   accountEmailMasked?: string | null;
   accountIdLast4?: string | null;
-  onDismissAccount?: () => void;
+  ownerStatus?: MpOwnerStatus | null;
+  onDisconnected?: () => void;
 }) {
   const [acknowledged, setAcknowledged] = useState(false);
   const [ackBlocked, setAckBlocked] = useState(false);
   const ackInvalid = !acknowledged && (ackBlocked || callbackFocusesAck(callback ?? null));
   const errorTitle = useRef<HTMLHeadingElement>(null);
-  const connected = callback?.mp === "connected";
+  const viewStatus = ownerStatus ?? (callback?.mp === "connected" ? connectedOwnerStatus({
+    connectedAt,
+    accountName,
+    accountEmailMasked,
+    accountIdLast4,
+  }) : null);
+  const connected = callback?.mp === "connected" && viewStatus?.status === "connected";
   const errorView = callback?.mp === "error" && !callbackFocusesAck(callback) ? callback : null;
-  const since = formatConnectedSince(connectedAt);
 
   useEffect(() => {
     if (errorView) errorTitle.current?.focus();
@@ -116,7 +125,13 @@ export function MpOnboardingStep({
           <p className="text-xs text-muted">Quase lá · recomendado</p>
         </header>
         {connected ? (
-          <ConnectedBody since={since} accountName={accountName} accountEmailMasked={accountEmailMasked} accountIdLast4={accountIdLast4} onDismissAccount={onDismissAccount} />
+          <ConnectedBody
+            businessId={businessId}
+            status={viewStatus}
+            onStatus={(next) => {
+              if (next.status === "not_connected") onDisconnected?.();
+            }}
+          />
         ) : (
           <MpConnectForm
             businessId={businessId}
@@ -206,42 +221,46 @@ export function MpOnboardingStep({
   );
 }
 
-function ConnectedBody({
-  since,
-  accountName,
-  accountEmailMasked,
-  accountIdLast4,
-  onDismissAccount,
-}: {
-  since: string | null;
+function connectedOwnerStatus(input: {
+  connectedAt: string | null;
   accountName: string | null;
   accountEmailMasked: string | null;
   accountIdLast4: string | null;
-  onDismissAccount?: () => void;
+}): MpOwnerStatus {
+  return {
+    status: "connected",
+    connectedAt: input.connectedAt,
+    expiresAt: null,
+    liveMode: true,
+    canReceiveDeposits: true,
+    hadLegacyPixKey: false,
+    consentVersion: MP_CONNECT_CONSENT_VERSION,
+    accountName: input.accountName,
+    accountEmailMasked: input.accountEmailMasked,
+    accountIdLast4: input.accountIdLast4,
+  };
+}
+
+function ConnectedBody({
+  businessId,
+  status,
+  onStatus,
+}: {
+  businessId: string;
+  status: MpOwnerStatus | null;
+  onStatus: (status: MpOwnerStatus) => void;
 }) {
-  const account = mpAccountIdentity({ accountName, accountEmailMasked, accountIdLast4 });
+  if (!status) return null;
   return (
     <>
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-4 max-md:pb-4 md:overflow-visible" role="status">
-        <span aria-hidden="true" className="grid size-14 place-items-center rounded-2xl bg-pix-soft text-pix">
-          <Check className="size-7" strokeWidth={2.5} />
-        </span>
-        <h1 tabIndex={-1} className="mt-4 font-display text-2xl font-extrabold tracking-tight outline-none">Conta Mercado Pago conectada</h1>
-        <p className="mt-2 text-[15px] text-muted">Os Pix de sinal vão cair em:</p>
-        <div className="mt-4 rounded-card border border-line bg-paper p-4">
-          <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-            <div className="max-w-full">
-              {account ? <p className="font-semibold">{account.title}</p> : null}
-              {account?.detail ? <p className="mt-0.5 text-sm text-muted">{account.detail}</p> : null}
-              {since ? <p className="mt-1 text-[13px] text-muted">Conectado desde {since}</p> : null}
-            </div>
-            {onDismissAccount ? (
-              <button type="button" onClick={onDismissAccount} className="inline-flex min-h-11 shrink-0 items-center text-sm font-semibold text-ink underline-offset-4 outline-none hover:underline focus-visible:shadow-[var(--shadow-focus)] focus-visible:outline-none">
-                Não é essa conta?
-              </button>
-            ) : null}
-          </div>
-        </div>
+      <div data-mp-scroll="" className="min-h-0 flex-1 overflow-y-auto px-5 pt-4 max-md:pb-4 md:overflow-visible" role="status">
+        <MpConnectionCard
+          businessId={businessId}
+          status={status}
+          timezone="America/Sao_Paulo"
+          onStatus={onStatus}
+          returnTo="/onboarding"
+        />
       </div>
       <ActionBar>
         <Link href="/onboarding/concluir" className={cn(buttonVariants({ size: "lg" }), "w-full")}>Continuar</Link>

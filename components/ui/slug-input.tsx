@@ -56,10 +56,8 @@ export function SlugInput({
         )}
         data-slug-status={status}
       >
-        <span className="flex max-w-[45%] shrink-0 items-center border-r border-line bg-subtle px-3 text-sm text-muted">
-          <span dir="rtl" className="truncate">
-            <span dir="ltr">{host}/</span>
-          </span>
+        <span className="flex shrink-0 items-center border-r border-line bg-subtle px-3 text-sm text-muted">
+          <span className="whitespace-nowrap">{host}/</span>
         </span>
         <input
           ref={inputRef}

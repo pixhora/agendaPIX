@@ -69,11 +69,7 @@ function ConnectedOnboarding({ fixture }: { fixture: MpFixtureName }) {
     <MpOnboardingStep
       businessId={MP_FIXTURE_BUSINESS_ID}
       callback={presentMpCallback("connected", null)}
-      connectedAt={status.connectedAt}
-      accountName={status.accountName}
-      accountEmailMasked={status.accountEmailMasked}
-      accountIdLast4={status.accountIdLast4}
-      onDismissAccount={() => undefined}
+      ownerStatus={status}
     />
   );
 }

@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { ExternalLink, Info, Loader2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
-import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   DISCONNECTED_TOAST,
@@ -16,6 +15,7 @@ import {
   mpAccountIdentity,
   mpConnectionUrl,
   reconnectRequiresAck,
+  type MpReturnTo,
   showsTestMode,
   statusBadge,
   type MpOwnerStatus,
@@ -74,13 +74,26 @@ function LegacyNotice({ businessId, onDismissed }: { businessId: string; onDismi
   );
 }
 
-export function MpSettingsCard({
+function DisconnectLink({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex min-h-11 items-center self-start text-base font-normal text-danger underline decoration-danger/40 underline-offset-4 outline-none hover:decoration-danger focus-visible:shadow-[var(--shadow-focus)] focus-visible:outline-none"
+    >
+      Desconectar
+    </button>
+  );
+}
+
+export function MpConnectionCard({
   businessId,
   status,
   timezone,
   pendingPixCount = 0,
   onStatus,
   initialDisconnectOpen = false,
+  returnTo = "/dashboard",
 }: {
   businessId: string;
   status: MpOwnerStatus;
@@ -88,6 +101,7 @@ export function MpSettingsCard({
   pendingPixCount?: number;
   onStatus: (status: MpOwnerStatus) => void;
   initialDisconnectOpen?: boolean;
+  returnTo?: MpReturnTo;
 }) {
   const [acknowledged, setAcknowledged] = useState(false);
   const [ackInvalid, setAckInvalid] = useState(false);
@@ -130,10 +144,12 @@ export function MpSettingsCard({
     }
   }
 
+  const showAccount = Boolean(account || since);
+  const showActions = connected || reconnect;
+
   return (
-    <section id="recebimento" aria-labelledby="recebimento-title" className="scroll-mt-24">
-      <h2 id="recebimento-title" className="font-display text-lg font-bold">Recebimento</h2>
-      <div className="mt-3 rounded-card border border-line bg-surface p-4 sm:p-5">
+    <>
+      <div className="rounded-card border border-line bg-surface p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="font-display text-base font-bold">Mercado Pago</h3>
           <span className="flex flex-wrap items-center gap-2">
@@ -144,12 +160,23 @@ export function MpSettingsCard({
           </span>
         </div>
 
-        {connected ? (
+        {showAccount ? (
           <div className="mt-4">
             {account ? <p className="font-semibold">{account.title}</p> : null}
             {account?.detail ? <p className="mt-0.5 text-sm text-muted">{account.detail}</p> : null}
             {since ? <p className="mt-1 text-[13px] text-muted">Conectado desde {since}</p> : null}
-            <p className="mt-3 text-sm leading-relaxed text-ink">
+          </div>
+        ) : null}
+
+        {showNotice ? (
+          <div className="mt-3">
+            <LegacyNotice businessId={businessId} onDismissed={() => setDismissedNotice(true)} />
+          </div>
+        ) : null}
+
+        {connected ? (
+          <div className="mt-3">
+            <p className="text-sm leading-relaxed text-ink">
               O sinal dos clientes cai direto nesta conta. O Mercado Pago desconta a tarifa dele; o AgendaPix não cobra nada sobre o sinal.
             </p>
             <a href={MP_TARIFF_URL} target="_blank" rel="noopener" className="mt-3 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-ink underline underline-offset-4 outline-none focus-visible:shadow-[var(--shadow-focus)] focus-visible:outline-none">
@@ -168,28 +195,6 @@ export function MpSettingsCard({
           <p className="mt-4 text-sm leading-relaxed text-ink">Conecte para aceitar reservas com sinal. Serviços sem sinal funcionam normalmente.</p>
         ) : null}
 
-        <div className="mt-4">
-          <MpConnectForm
-            businessId={businessId}
-            returnTo="/dashboard"
-            requireAck={requireAck}
-            acknowledged={acknowledged}
-            onAcknowledgedChange={(value) => {
-              setAcknowledged(value);
-              if (value) setAckInvalid(false);
-            }}
-            ackInvalid={ackInvalid}
-            submitLabel={status.status === "not_connected" ? "Conectar Mercado Pago" : "Reconectar"}
-            buttonVariant={connected ? "link" : "pix"}
-            onBlocked={() => setAckInvalid(true)}
-            beside={connected ? (
-              <button type="button" onClick={() => setDialogOpen(true)} className={cn(buttonVariants({ variant: "ghost", size: "lg" }), "w-full text-danger hover:bg-danger-soft hover:text-danger")}>
-                Desconectar
-              </button>
-            ) : null}
-          />
-        </div>
-
         {connected || reconnect ? (
           <p className="mt-4 flex items-start gap-2 text-sm leading-relaxed text-ink">
             <Undo2 aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted" />
@@ -199,11 +204,23 @@ export function MpSettingsCard({
           </p>
         ) : null}
 
-        {showNotice ? (
-          <div className="mt-3">
-            <LegacyNotice businessId={businessId} onDismissed={() => setDismissedNotice(true)} />
-          </div>
-        ) : null}
+        <div className="mt-4">
+          <MpConnectForm
+            businessId={businessId}
+            returnTo={returnTo}
+            requireAck={requireAck}
+            acknowledged={acknowledged}
+            onAcknowledgedChange={(value) => {
+              setAcknowledged(value);
+              if (value) setAckInvalid(false);
+            }}
+            ackInvalid={ackInvalid}
+            submitLabel={status.status === "not_connected" ? "Conectar Mercado Pago" : "Reconectar"}
+            buttonVariant={reconnect ? "pix" : connected ? "outline" : "pix"}
+            onBlocked={() => setAckInvalid(true)}
+            beside={showActions ? <DisconnectLink onClick={() => setDialogOpen(true)} /> : null}
+          />
+        </div>
       </div>
       <MpDisconnectDialog
         open={dialogOpen}
@@ -214,6 +231,25 @@ export function MpSettingsCard({
         }}
         onConfirm={() => void disconnect()}
       />
+    </>
+  );
+}
+
+export function MpSettingsCard(props: {
+  businessId: string;
+  status: MpOwnerStatus;
+  timezone: string;
+  pendingPixCount?: number;
+  onStatus: (status: MpOwnerStatus) => void;
+  initialDisconnectOpen?: boolean;
+  returnTo?: MpReturnTo;
+}) {
+  return (
+    <section id="recebimento" aria-labelledby="recebimento-title" className="scroll-mt-24">
+      <h2 id="recebimento-title" className="font-display text-lg font-bold">Recebimento</h2>
+      <div className="mt-3">
+        <MpConnectionCard {...props} />
+      </div>
     </section>
   );
 }
