@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { appPreflight, publicLinkHost, requireAppOrigin, trustedAppOrigins, withAppCors } from "../../lib/origins";
+import { appPreflight, requireAppOrigin, trustedAppOrigins, withAppCors } from "../../lib/origins";
 
 beforeEach(() => {
   vi.stubEnv("NODE_ENV", "development");
@@ -50,16 +50,6 @@ it.each([
 ])("rejects unsupported preflight", async (extra) => {
   const request = new Request("http://localhost:3000/api/pix", { method: "OPTIONS", headers: { origin: "http://localhost:3000", ...extra } });
   expect((await appPreflight(request, ["GET", "PUT", "DELETE"])).status).toBe(403);
-});
-
-it("strips the protocol from the canonical public URL", () => {
-  expect(publicLinkHost("https://agendapix.dev.br")).toBe("agendapix.dev.br");
-  expect(publicLinkHost("https://agendapix.dev.br/")).toBe("agendapix.dev.br");
-  expect(publicLinkHost("http://localhost:3000")).toBe("localhost:3000");
-  expect(publicLinkHost("https://agenda.example/auth")).toBe("agenda.example");
-  expect(publicLinkHost()).toBe("localhost:3000");
-  expect(publicLinkHost("")).toBe("seu-site");
-  expect(publicLinkHost("não é url")).toBe("seu-site");
 });
 
 it("uses only the canonical app origin in production and rejects other origins before writes", async () => {

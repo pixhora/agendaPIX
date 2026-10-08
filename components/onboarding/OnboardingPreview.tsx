@@ -23,7 +23,7 @@ export function OnboardingPreview({ data, publicHost }: { data: OnboardingData; 
       <div className="overflow-hidden rounded-frame border border-line bg-surface shadow-[var(--shadow-raised)]">
         <div className="flex items-center gap-2 border-b border-line bg-subtle/70 px-4 py-2.5 text-xs text-muted">
           <Lock aria-hidden="true" className="size-3" />
-          <span className="truncate">{host}/<strong className="text-ink">{data.slug || "seu-negocio"}</strong></span>
+          <span className="truncate">{host ? `${host}/` : ""}<strong className="text-ink">{data.slug || "seu-negocio"}</strong></span>
         </div>
         <div className="space-y-4 p-5">
           <div className="flex items-center gap-3">

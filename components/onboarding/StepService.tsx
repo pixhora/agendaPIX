@@ -2,19 +2,16 @@
 
 import { useState, type ReactNode } from "react";
 import { FieldError } from "@/components/ui/field";
-import { MoneyInput, MoneyReadout } from "@/components/ui/money-input";
+import { MoneyInput } from "@/components/ui/money-input";
+import { DEPOSIT_NOW_LABEL, REMAINDER_LABEL } from "@/lib/copy/booking-summary";
 import { formatCents, depositFromPercent } from "@/lib/money";
+import { EMPTY_SERVICE_PREVIEW_HOLD, projectServicePreview, SERVICE_DURATION_PRESETS, serviceDurationLabel } from "@/lib/onboarding/service-preview";
 import { cn } from "@/lib/utils";
 import { StepActions } from "./chrome";
-import { StepHeader } from "./parts";
+import { StepHeader, stepBodyClass } from "./parts";
 import type { DepositMode } from "./types";
 
-const PRESETS = [
-  { minutes: 30, label: "30 min" },
-  { minutes: 45, label: "45 min" },
-  { minutes: 60, label: "1 h" },
-  { minutes: 90, label: "1h30" },
-] as const;
+const PRESETS = SERVICE_DURATION_PRESETS;
 
 const PERCENTS = [20, 30, 50] as const;
 const NO_DEPOSIT = "Sem sinal: a reserva confirma na hora, sem Pix.";
@@ -26,11 +23,7 @@ const DURATION_ERROR = "Informe a duração em minutos, entre 5 e 720.";
 const DEPOSIT_ERROR = "O sinal não pode ser maior que o preço.";
 
 function durationLabel(minutes: number) {
-  return PRESETS.find((item) => item.minutes === minutes)?.label ?? `${minutes} min`;
-}
-
-function moneyLabel(cents: number) {
-  return cents > 0 ? `R$ ${formatCents(cents)}` : "R$ —";
+  return serviceDurationLabel(minutes);
 }
 
 export function StepService({
@@ -77,7 +70,23 @@ export function StepService({
   const showPolicy = !noDeposit && depositCents > 0 && policy != null;
   const canContinue = nameOk && durationOk && priceOk && depositOk;
   const priced = priceOk;
-  const summaryNoDeposit = noDeposit || (priced && depositCents === 0);
+  const [previewHold, setPreviewHold] = useState(EMPTY_SERVICE_PREVIEW_HOLD);
+  const preview = projectServicePreview(previewHold, {
+    durationMinutes,
+    customDuration: customOpen,
+    priceCents,
+    depositCents,
+    depositMode,
+  });
+  if (
+    preview.hold.durationMinutes !== previewHold.durationMinutes ||
+    preview.hold.priceCents !== previewHold.priceCents ||
+    preview.hold.depositCents !== previewHold.depositCents
+  ) {
+    setPreviewHold(preview.hold);
+  }
+  const shownDuration = preview.view.durationMinutes;
+  const summaryNoDeposit = preview.view.noDeposit && preview.view.priceCents != null;
 
   function setMode(mode: DepositMode) {
     onChangeDepositMode(mode);
@@ -128,7 +137,7 @@ export function StepService({
         onNext();
       }}
     >
-      <div className="flex-1 space-y-5 px-5 pt-6 pb-4">
+      <div className={stepBodyClass}>
         <StepHeader title="Seu primeiro serviço" description="É o que o cliente vai ver na sua página. Depois você cadastra os outros." />
 
         <div className="grid gap-1.5">
@@ -141,7 +150,7 @@ export function StepService({
             aria-invalid={attempted && !nameOk ? true : undefined}
             aria-describedby={attempted && !nameOk ? "service-name-error" : undefined}
             onChange={(event) => onChangeServiceName(event.target.value)}
-            className="min-h-12 w-full rounded-field border border-line-strong/60 bg-surface px-3.5 text-base text-ink outline-none focus-visible:border-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring aria-invalid:border-danger"
+            className="onb-control min-h-12 w-full rounded-field border border-line-strong/60 bg-surface px-3.5 text-base text-ink aria-invalid:border-danger"
           />
           <FieldError id="service-name-error">{attempted && !nameOk ? NAME_ERROR : null}</FieldError>
         </div>
@@ -181,18 +190,21 @@ export function StepService({
             </button>
           </div>
           {customOpen ? (
-            <input
-              id="service-duration-custom"
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              aria-label="Duração em minutos"
-              aria-invalid={attempted && !durationOk ? true : undefined}
-              aria-describedby={attempted && !durationOk ? "duration-error" : undefined}
-              value={durationMinutes > 0 ? String(durationMinutes) : ""}
-              onChange={(event) => onChangeDuration(Number(event.target.value.replace(/\D/g, "").slice(0, 3)) || 0)}
-              className="min-h-12 w-full rounded-field border border-line-strong/60 bg-surface px-3.5 text-base tabular-nums text-ink outline-none aria-invalid:border-danger"
-            />
+            <div className={cn("onb-control-wrap flex min-h-12 items-center rounded-field border bg-surface px-3.5 focus-within:border-ring focus-within:shadow-focus", attempted && !durationOk ? "border-danger" : "border-line-strong/60")}>
+              <input
+                id="service-duration-custom"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                aria-label="Duração em minutos"
+                aria-invalid={attempted && !durationOk ? true : undefined}
+                aria-describedby={attempted && !durationOk ? "duration-error" : undefined}
+                value={durationMinutes > 0 ? String(durationMinutes) : ""}
+                onChange={(event) => onChangeDuration(Number(event.target.value.replace(/\D/g, "").slice(0, 3)) || 0)}
+                className="min-w-0 flex-1 bg-transparent py-3 text-base tabular-nums text-ink outline-none"
+              />
+              <span aria-hidden="true" className="shrink-0 pl-2 text-sm font-semibold text-muted">min</span>
+            </div>
           ) : null}
           <FieldError id="duration-error">{attempted && !durationOk ? DURATION_ERROR : null}</FieldError>
         </div>
@@ -235,7 +247,11 @@ export function StepService({
               error={!depositOk ? DEPOSIT_ERROR : null}
             />
           ) : null}
-          {!noDeposit && depositMode !== "custom" ? <MoneyReadout cents={priced ? depositCents : null} label="Valor do sinal" /> : null}
+          {!noDeposit && depositMode !== "custom" ? (
+            <p className="text-sm font-semibold">
+              Sinal: <span className="tabular-nums">{priced ? `R$ ${formatCents(depositCents)}` : "R$ —"}</span>
+            </p>
+          ) : null}
           {!noDeposit ? <p className="text-sm text-muted">{DEPOSIT_HINT}</p> : null}
           <FieldError>{depositMode !== "custom" && !depositOk ? DEPOSIT_ERROR : null}</FieldError>
         </div>
@@ -246,20 +262,20 @@ export function StepService({
         <section className="overflow-hidden rounded-card border border-line bg-surface" aria-label="Como aparece para o seu cliente">
           <h2 className="border-b border-line bg-subtle px-4 py-3 text-xs text-muted">Como aparece para o seu cliente</h2>
           <div className="flex items-start justify-between gap-3 px-4 py-2.5 text-sm">
-            <span className="min-w-0">{serviceName.trim() || "Serviço"} · {durationLabel(durationMinutes || 0)}</span>
-            <b className="shrink-0 tabular-nums">{moneyLabel(priceCents)}</b>
+            <span className="min-w-0">{serviceName.trim() || "Serviço"}{shownDuration != null ? ` · ${durationLabel(shownDuration)}` : ""}</span>
+            <b className="shrink-0 tabular-nums">{preview.view.priceLabel}</b>
           </div>
-          {summaryNoDeposit && priced ? (
+          {summaryNoDeposit ? (
             <p className="border-t border-line px-4 py-2.5 text-sm">{NO_DEPOSIT}</p>
           ) : (
             <div className="flex items-center justify-between gap-3 border-t border-line px-4 py-2.5 text-sm">
-              <span>Sinal no Pix agora</span>
-              <b className="tabular-nums text-pix">{priced ? moneyLabel(depositCents) : "R$ —"}</b>
+              <span>{DEPOSIT_NOW_LABEL}</span>
+              <b className="tabular-nums text-pix">{preview.view.depositLabel}</b>
             </div>
           )}
           <div className="flex items-center justify-between gap-3 border-t border-line px-4 py-2.5 text-sm text-muted">
-            <span>No dia do atendimento</span>
-            <b className="tabular-nums">{priced ? moneyLabel(Math.max(0, priceCents - depositCents)) : "R$ —"}</b>
+            <span>{REMAINDER_LABEL}</span>
+            <b className="tabular-nums">{preview.view.remainderLabel}</b>
           </div>
         </section>
       </div>

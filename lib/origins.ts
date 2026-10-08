@@ -1,16 +1,6 @@
 import { authEnvSchema } from "./env";
 import { handleHttp, HttpError } from "./http";
 
-/** Host público sem protocolo. Usa a mesma origem canônica de `BETTER_AUTH_URL`. */
-export function publicLinkHost(raw: string | undefined = process.env.BETTER_AUTH_URL): string {
-  if (!raw) return "seu-site";
-  try {
-    return new URL(raw).host;
-  } catch {
-    return "seu-site";
-  }
-}
-
 export function trustedAppOrigins() {
   const env = authEnvSchema.safeParse(process.env);
   if (!env.success) throw new HttpError(503, "auth_unavailable", "O acesso está indisponível. Tente novamente mais tarde.");

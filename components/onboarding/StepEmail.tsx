@@ -6,7 +6,7 @@ import { FieldError } from "@/components/ui/field";
 import { applyEmailDomain, INVALID_EMAIL_MESSAGE, isValidEmail, suggestEmailDomain } from "@/lib/onboarding/email-hint";
 import { waitMinutesMessage } from "@/lib/onboarding/flow";
 import { StepActions } from "./chrome";
-import { StepHeader } from "./parts";
+import { StepHeader, stepBodyClass } from "./parts";
 
 export type EmailAlert =
   | { kind: "invalid" }
@@ -66,7 +66,7 @@ export function StepEmail({
         onSubmit();
       }}
     >
-      <div className="flex-1 space-y-5 px-5 pt-6 pb-4">
+      <div className={stepBodyClass}>
         <StepHeader title="Para onde mandamos seu código?" description="Você usa esse e-mail para entrar no painel. Sem senha." />
         <div className="grid gap-1.5">
           <label htmlFor="onboarding-email" className="text-sm font-semibold">E-mail</label>
@@ -84,7 +84,7 @@ export function StepEmail({
             aria-describedby={invalid ? "onboarding-email-error" : undefined}
             onBlur={() => setBlurred(true)}
             onChange={(event) => onChangeEmail(event.target.value)}
-            className="min-h-12 w-full rounded-field border border-line-strong/60 bg-surface px-3.5 text-base text-ink outline-none focus-visible:border-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring aria-invalid:border-danger"
+            className="onb-control min-h-12 w-full rounded-field border border-line-strong/60 bg-surface px-3.5 text-base text-ink aria-invalid:border-danger"
           />
           <FieldError id="onboarding-email-error">{invalid ? INVALID_EMAIL_MESSAGE : null}</FieldError>
           {replacesPreviousCode ? (

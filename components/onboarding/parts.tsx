@@ -11,4 +11,6 @@ export function StepHeader({ title, description }: { title: string; description:
   );
 }
 
+export const stepBodyClass = "flex-1 space-y-5 px-5 pt-6 max-md:pb-[calc(var(--sticky-cta-height)+1rem)] md:pb-4";
+
 export { StepActions } from "./chrome";

@@ -88,8 +88,8 @@ export function MoneyInput({
       <div
         ref={boxRef}
         className={cn(
-          "flex min-h-[52px] items-center rounded-field border bg-surface px-3.5",
-          shownError ? "border-danger" : "border-line-strong/60 focus-within:border-2 focus-within:border-ink",
+          "onb-control-wrap flex min-h-[52px] items-center rounded-field border bg-surface px-3.5 focus-within:shadow-focus",
+          shownError ? "border-danger" : "border-line-strong/60 focus-within:border-ring",
           readOnly && "bg-subtle",
         )}
       >

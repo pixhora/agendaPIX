@@ -3,7 +3,7 @@ import { Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { FieldError, FieldHint } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
-import { StepActions, StepHeader } from "./parts";
+import { StepActions, StepHeader, stepBodyClass } from "./parts";
 
 interface StepHoursProps {
   openDays: number[];
@@ -46,7 +46,7 @@ export function StepHours({ openDays, opensAt, closesAt, onChangeOpenDays, onCha
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-1 flex-col">
-      <div className="flex-1 space-y-6 px-5 pt-6 pb-4">
+      <div className={cn(stepBodyClass, "space-y-6")}>
       <StepHeader title="Quando você atende?" description="Seus clientes só veem horários livres dentro do seu expediente." />
 
       <fieldset className="grid gap-2">
@@ -79,14 +79,15 @@ export function StepHours({ openDays, opensAt, closesAt, onChangeOpenDays, onCha
       <div className="grid grid-cols-2 gap-3">
         <div className="grid gap-1.5">
           <label htmlFor="hours-opens" className="text-sm font-semibold">Abre às</label>
-          <Input id="hours-opens" type="time" required className="tabular-nums" aria-invalid={!isTimeOrderValid ? "true" : undefined} aria-describedby={!isTimeOrderValid ? "hours-error" : undefined} value={opensAt} onChange={(e) => onChangeOpensAt(e.target.value)} />
+          <Input id="hours-opens" type="time" step={900} required className="onb-control tabular-nums" aria-invalid={!isTimeOrderValid ? "true" : undefined} aria-describedby={!isTimeOrderValid ? "hours-error" : undefined} value={opensAt} onChange={(e) => onChangeOpensAt(e.target.value)} />
         </div>
         <div className="grid gap-1.5">
           <label htmlFor="hours-closes" className="text-sm font-semibold">Fecha às</label>
-          <Input id="hours-closes" type="time" required className="tabular-nums" aria-invalid={!isTimeOrderValid ? "true" : undefined} aria-describedby={!isTimeOrderValid ? "hours-error" : undefined} value={closesAt} onChange={(e) => onChangeClosesAt(e.target.value)} />
+          <Input id="hours-closes" type="time" step={900} required className="onb-control tabular-nums" aria-invalid={!isTimeOrderValid ? "true" : undefined} aria-describedby={!isTimeOrderValid ? "hours-error" : undefined} value={closesAt} onChange={(e) => onChangeClosesAt(e.target.value)} />
         </div>
       </div>
-      <FieldError id="hours-error">{!isTimeOrderValid ? "O fechamento deve ser depois da abertura." : null}</FieldError>
+      <p className="text-sm text-muted">Fuso: Brasília (São Paulo).</p>
+      <FieldError id="hours-error">{!isTimeOrderValid ? "O fim precisa ser depois do início." : null}</FieldError>
       </div>
 
       <StepActions
