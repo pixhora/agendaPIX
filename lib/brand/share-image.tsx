@@ -12,8 +12,9 @@ function toArrayBuffer(data: Buffer): ArrayBuffer {
 
 /** Cartão 1200×630: papel, lockup Grade A, promessa da landing e a faixa do horário reservado. */
 export async function renderShareImage() {
-  const [font, icon] = await Promise.all([
-    readFile(join(process.cwd(), "assets/fonts/PlusJakartaSans.ttf")),
+  const [fontBold, fontExtraBold, icon] = await Promise.all([
+    readFile(join(process.cwd(), "assets/fonts/PlusJakartaSans-700.ttf")),
+    readFile(join(process.cwd(), "assets/fonts/PlusJakartaSans-800.ttf")),
     readFile(join(process.cwd(), "public/icon-512.png")),
   ]);
   const iconSrc = `data:image/png;base64,${icon.toString("base64")}`;
@@ -33,6 +34,8 @@ export async function renderShareImage() {
         }}
       >
         <div style={{ display: "flex", alignItems: "center" }}>
+          {/* Satori (next/og) só desenha <img>; next/image não entra nesse runtime. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={iconSrc} width={72} height={72} alt="" style={{ borderRadius: 22 }} />
           <div style={{ display: "flex", marginLeft: 20, fontSize: 42, letterSpacing: -0.84 }}>
             <span style={{ fontWeight: 700, color: "#0B0B0C" }}>Agenda</span>
@@ -74,8 +77,8 @@ export async function renderShareImage() {
     {
       ...shareImageSize,
       fonts: [
-        { name: "Plus Jakarta Sans", data: toArrayBuffer(font), style: "normal", weight: 700 },
-        { name: "Plus Jakarta Sans", data: toArrayBuffer(font), style: "normal", weight: 800 },
+        { name: "Plus Jakarta Sans", data: toArrayBuffer(fontBold), style: "normal", weight: 700 },
+        { name: "Plus Jakarta Sans", data: toArrayBuffer(fontExtraBold), style: "normal", weight: 800 },
       ],
     },
   );
