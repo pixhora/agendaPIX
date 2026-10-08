@@ -1,0 +1,20 @@
+@layer components {
+  .copy-glyphs {
+    display: inline-grid;
+    width: 1rem;
+    height: 1rem;
+    flex: none;
+  }
+
+  .copy-glyphs > svg {
+    grid-area: 1 / 1;
+    width: 1rem;
+    height: 1rem;
+    transition-property: opacity, transform;
+    transition-duration: var(--dur-1);
+    transition-timing-function: var(--ease-out-quint);
+  }
+
+  .copy-glyphs > svg[data-show="false"] { opacity: 0; transform: scale(0.6); }
+  .copy-glyphs > svg[data-show="true"] { opacity: 1; transform: scale(1); }
+}

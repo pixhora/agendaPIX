@@ -1,0 +1,44 @@
+/*
+ * Base dos primitivos: tokens, foco e movimento reduzido.
+ * Cada primitivo importa este arquivo e o CSS dele.
+ */
+:root {
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-standard: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-1: var(--duration-opening, 180ms);
+  --dur-2: 320ms;
+  --dur-3: 560ms;
+  --aro-glow-1: #e6fffa;
+  --aro-glow-2: #8ff2e3;
+  --aro-glow-3: #0a6e63;
+}
+
+@layer components {
+  .motion-focus:focus-visible,
+  .motion-focus:has(:focus-visible) {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .seg-thumb,
+    .copy-glyphs > svg,
+    .island-body,
+    .island-compact,
+    .island-detail,
+    .grade-ring,
+    .grade-stem,
+    .grade-sweep,
+    .grade-conic {
+      animation: none;
+      transition: none;
+    }
+
+    .island-body { transform: none; }
+    .island-compact { opacity: 0; }
+    .island-detail { opacity: 1; }
+    .grade-ring,
+    .grade-stem { opacity: 1; transform: none; }
+    .grade-sweep { opacity: 0; }
+  }
+}

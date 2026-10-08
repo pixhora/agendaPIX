@@ -10,6 +10,7 @@ import { GradeLoader } from "@/components/motion/grade-loader";
 import { RollingNumber } from "@/components/motion/rolling-number";
 import { SegmentedThumb } from "@/components/motion/segmented-thumb";
 import { isMotionPreviewOpen } from "@/app/preview/motion/access";
+import "./stage.css";
 import { ThemeAppearanceDemo } from "@/app/preview/motion/theme-demo";
 
 export const metadata: Metadata = {
@@ -126,8 +127,8 @@ export default function MotionPreviewPage() {
           <h2 id="tempo-heading" className="font-display text-xl font-bold">Tempo do sinal</h2>
           <div className="flex flex-wrap gap-8">
             <CountdownRing secondsLeft={754} totalSeconds={pixWindowSeconds} tone="normal" label="Tempo para pagar" />
-            <CountdownRing secondsLeft={45} totalSeconds={pixWindowSeconds} tone="warn" label="Falta pouco" />
-            <CountdownRing secondsLeft={0} totalSeconds={pixWindowSeconds} tone="expired" label="Prazo encerrado" />
+            <CountdownRing secondsLeft={45} totalSeconds={pixWindowSeconds} tone="warn" />
+            <CountdownRing secondsLeft={0} totalSeconds={pixWindowSeconds} tone="expired" />
           </div>
         </section>
 

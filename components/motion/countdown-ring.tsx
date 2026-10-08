@@ -26,6 +26,14 @@ export function formatClock(secondsLeft: number): string {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
+/** Tom de alerta e prazo encerrado não ficam só na cor. Sem label, o texto padrão entra. */
+export function countdownCaption(tone: CountdownTone, label?: string): string | undefined {
+  if (label) return label;
+  if (tone === "warn") return "Falta pouco";
+  if (tone === "expired") return "Prazo encerrado";
+  return undefined;
+}
+
 export function ringGeometry(secondsLeft: number, totalSeconds: number, radius = RADIUS) {
   const circumference = 2 * Math.PI * radius;
   const safeTotal = Number.isFinite(totalSeconds) && totalSeconds > 0 ? totalSeconds : 0;
@@ -43,6 +51,7 @@ const toneClass: Record<CountdownTone, string> = {
 /** Anel estático. Quem chama informa os segundos; aqui não há relógio interno. */
 export function CountdownRing({ secondsLeft, totalSeconds, tone, label, className }: CountdownRingProps) {
   const clock = formatClock(secondsLeft);
+  const caption = countdownCaption(tone, label);
   const { circumference, dash } = ringGeometry(secondsLeft, totalSeconds);
   return (
     <div className={cn("inline-flex flex-col items-center gap-2", className)} data-tone={tone}>
@@ -69,7 +78,7 @@ export function CountdownRing({ secondsLeft, totalSeconds, tone, label, classNam
         </svg>
         <p className="absolute inset-0 flex items-center justify-center font-display text-xl font-bold tabular-nums text-ink">{clock}</p>
       </div>
-      {label ? <p className="max-w-40 text-center text-sm text-muted">{label}</p> : null}
+      {caption ? <p className="max-w-40 text-center text-sm text-muted">{caption}</p> : null}
     </div>
   );
 }

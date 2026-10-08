@@ -2,7 +2,8 @@
  * Inspired by/adapted from Cult UI (https://github.com/nolly-studio/cult-ui), MIT License, Copyright (c) 2023 Jordan-Gilliam
  */
 
-import "@/app/motion.css";
+import "@/app/motion-base.css";
+import "@/app/motion/segmented.css";
 
 export type SegmentedOption = {
   value: string;

@@ -1,4 +1,4 @@
-import { expect, type Locator } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 import { test, expectNoAxeViolations, expectNoHorizontalOverflow } from "./helpers";
 
 async function expectFocusRing(locator: Locator, color: string) {
@@ -9,7 +9,21 @@ async function expectFocusRing(locator: Locator, color: string) {
   expect(ring).toEqual({ style: "solid", width: "2px", offset: "2px", color });
 }
 
+async function settleFiniteAnimations(page: Page) {
+  await page.evaluate(async () => {
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    });
+    const pending = document.getAnimations().filter((animation) => {
+      const iterations = animation.effect?.getComputedTiming().iterations;
+      return iterations !== Infinity;
+    });
+    await Promise.all(pending.map((animation) => animation.finished));
+  });
+}
+
 test.describe("preview de movimento", () => {
+  test.describe.configure({ retries: 0 });
   test.beforeEach(async ({ context, browserName }) => {
     if (browserName !== "chromium") return;
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
@@ -21,6 +35,7 @@ test.describe("preview de movimento", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Movimento" })).toBeVisible();
     await page.waitForTimeout(400);
     await expectNoHorizontalOverflow(page);
+    await settleFiniteAnimations(page);
     await expectNoAxeViolations(page, "preview movimento");
 
     await expect(page.locator("#preview-hold")).toHaveText("30 minutos");
@@ -74,12 +89,14 @@ test.describe("preview de movimento", () => {
     await page.goto("/preview/motion");
     await expect(page.locator("html")).toHaveClass(/dark/);
     await expectNoHorizontalOverflow(page);
+    const island = page.getByTestId("booking-island");
+    await island.scrollIntoViewIfNeeded();
+    await expect(island).toHaveAttribute("data-inview", "");
+    await settleFiniteAnimations(page);
     await expectNoAxeViolations(page, "preview movimento escuro");
     const duration = page.getByRole("radiogroup", { name: "Duração do serviço" });
     await duration.getByRole("radio", { name: "15 min" }).focus();
     await expectFocusRing(duration, "rgb(63, 208, 190)");
-    await page.getByTestId("booking-island").scrollIntoViewIfNeeded();
-    await expect(page.getByTestId("booking-island")).toHaveAttribute("data-inview", "");
     const loader = page.locator("[data-testid='grade-loader'].is-loop").first();
     await loader.scrollIntoViewIfNeeded();
     await expect(loader).toHaveClass(/is-loop/);

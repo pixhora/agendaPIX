@@ -4,7 +4,8 @@
  * Inspired by/adapted from Cult UI (https://github.com/nolly-studio/cult-ui), MIT License, Copyright (c) 2023 Jordan-Gilliam
  */
 
-import "@/app/motion.css";
+import "@/app/motion-base.css";
+import "@/app/motion/copy.css";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { COPY_ERROR, COPY_RESET_MS, copyValue } from "@/components/motion/motion-runtime";

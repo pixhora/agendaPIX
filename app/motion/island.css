@@ -1,0 +1,57 @@
+@layer components {
+  .phone-speaker {
+    background: color-mix(in srgb, var(--brand-tile-foreground) 28%, transparent);
+  }
+
+  .island-shell { position: relative; }
+
+  .island-body { transform-origin: top center; }
+
+  .island-compact {
+    position: absolute;
+    inset: 0 0 auto 0;
+    display: flex;
+    height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+  }
+
+  .island-detail { opacity: 1; }
+
+  @keyframes island-grow {
+    from { transform: scale(0.92, 0.48); }
+    to { transform: scale(1, 1); }
+  }
+
+  @keyframes island-fade-out {
+    0%, 30% { opacity: 1; }
+    60%, 100% { opacity: 0; }
+  }
+
+  @keyframes island-fade-in {
+    0%, 35% { opacity: 0; }
+    100% { opacity: 1; }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .booking-island[data-armed]:not([data-inview]) .island-body {
+      transform: scale(0.92, 0.48);
+    }
+
+    .booking-island[data-armed]:not([data-inview]) .island-compact { opacity: 1; }
+    .booking-island[data-armed]:not([data-inview]) .island-detail { opacity: 0; }
+
+    .booking-island[data-inview] .island-body {
+      animation: island-grow var(--dur-3) var(--ease-out-quint) both;
+    }
+
+    .booking-island[data-inview] .island-compact {
+      animation: island-fade-out var(--dur-3) var(--ease-out-quint) both;
+    }
+
+    .booking-island[data-inview] .island-detail {
+      animation: island-fade-in var(--dur-3) var(--ease-out-quint) both;
+    }
+  }
+}

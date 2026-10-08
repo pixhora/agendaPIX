@@ -2,7 +2,8 @@
  * Inspired by/adapted from Cult UI (https://github.com/nolly-studio/cult-ui), MIT License, Copyright (c) 2023 Jordan-Gilliam
  */
 
-import "@/app/motion.css";
+import "@/app/motion-base.css";
+import "@/app/motion/rolling.css";
 
 import { cn } from "@/lib/utils";
 import { formatRollingValue, splitRollingText, type RollingFormat } from "@/components/motion/rolling-format";

@@ -1,4 +1,5 @@
-import "@/app/motion.css";
+import "@/app/motion-base.css";
+import "@/app/motion/grade.css";
 import { aroGlyph } from "@/lib/brand/mark";
 import { cn } from "@/lib/utils";
 
@@ -58,7 +59,7 @@ export function GradeLoader({ label, loop = true, size = 32, className }: GradeL
 
   if (loop) {
     return (
-      <span role="status" data-testid="grade-loader" data-size={size} className={classes}>
+      <span role="status" aria-label={label ?? "Carregando"} data-testid="grade-loader" data-size={size} className={classes}>
         <span className="sr-only">{label ?? "Carregando"}</span>
         {glyph}
       </span>

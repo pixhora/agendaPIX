@@ -1,10 +1,10 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { createElement } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { BookingIsland } from "../../components/motion/booking-island";
 import { CopyButton } from "../../components/motion/copy-button";
-import { CountdownRing, formatClock, ringGeometry } from "../../components/motion/countdown-ring";
+import { CountdownRing, countdownCaption, formatClock, ringGeometry } from "../../components/motion/countdown-ring";
 import { aroGlyph } from "../../lib/brand/mark";
 import { GradeLoader } from "../../components/motion/grade-loader";
 import { RollingNumber } from "../../components/motion/rolling-number";
@@ -83,7 +83,10 @@ describe("movimento: acessibilidade e movimento reduzido", () => {
   });
 
   it("o CSS guarda o estado final parado e o foco só no teclado", () => {
-    const css = readFileSync("app/motion.css", "utf8");
+    const css = [
+      readFileSync("app/motion-base.css", "utf8"),
+      ...readdirSync("app/motion").filter((name) => name.endsWith(".css")).map((name) => readFileSync(`app/motion/${name}`, "utf8")),
+    ].join("\n");
     expect(css).toContain("@layer components");
     expect(css).toContain("--ease-out-quint:");
     expect(css).toContain("--dur-1: var(--duration-opening, 180ms)");
@@ -149,7 +152,12 @@ describe("movimento: acessibilidade e movimento reduzido", () => {
     expect(half.dash).toBeCloseTo(half.circumference / 2);
     expect(ringGeometry(10, 0).ratio).toBe(0);
 
-    const html = renderToStaticMarkup(CountdownRing({ secondsLeft: 45, totalSeconds: 900, tone: "warn", label: "Falta pouco" }));
+    expect(countdownCaption("warn")).toBe("Falta pouco");
+    expect(countdownCaption("expired")).toBe("Prazo encerrado");
+    expect(countdownCaption("normal")).toBeUndefined();
+    expect(countdownCaption("warn", "Quase no fim")).toBe("Quase no fim");
+
+    const html = renderToStaticMarkup(CountdownRing({ secondsLeft: 45, totalSeconds: 900, tone: "warn" }));
     expect(html).toContain("00:45");
     expect(html).toContain('data-tone="warn"');
     expect(html).toContain("text-warning");
@@ -157,10 +165,20 @@ describe("movimento: acessibilidade e movimento reduzido", () => {
     expect(html).toContain('aria-hidden="true"');
     expect(html).not.toContain("setInterval");
 
-    const expired = renderToStaticMarkup(CountdownRing({ secondsLeft: 0, totalSeconds: 900, tone: "expired", label: "Prazo encerrado" }));
+    const named = renderToStaticMarkup(CountdownRing({ secondsLeft: 45, totalSeconds: 900, tone: "warn", label: "Quase no fim" }));
+    expect(named).toContain("Quase no fim");
+    expect(named).not.toContain("Falta pouco");
+
+    const plain = renderToStaticMarkup(CountdownRing({ secondsLeft: 90, totalSeconds: 900, tone: "normal" }));
+    expect(plain).toContain("01:30");
+    expect(plain).not.toContain("Falta pouco");
+    expect(plain).not.toContain("Prazo encerrado");
+
+    const expired = renderToStaticMarkup(CountdownRing({ secondsLeft: 0, totalSeconds: 900, tone: "expired" }));
     expect(expired).toContain("00:00");
     expect(expired).toContain('data-tone="expired"');
     expect(expired).toContain("text-danger");
+    expect(expired).toContain("Prazo encerrado");
   });
 
   it("a marca Aro anuncia o rótulo e usa o glifo compartilhado", () => {
@@ -168,7 +186,7 @@ describe("movimento: acessibilidade e movimento reduzido", () => {
     expect(html).toContain('role="status"');
     expect(html).toContain("sr-only");
     expect(html).toContain("Carregando");
-    expect(html).not.toContain('aria-label="Carregando"');
+    expect(html).toContain('aria-label="Carregando"');
     expect(html).toContain('aria-hidden="true"');
     expect(html).toContain("grade-ring");
     expect(html).toContain("grade-stem");

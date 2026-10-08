@@ -13,7 +13,7 @@ Arquivos cobertos:
 - `components/motion/segmented-thumb-view.tsx`
 - `components/motion/countdown-ring.tsx`
 
-`components/motion/grade-loader.tsx` e o CSS da marca Aro em `app/motion.css` são originais do AgendaPix e não entram nesta lista. O desenho não deriva do Cult UI.
+`components/motion/grade-loader.tsx` e o CSS da marca Aro em `app/motion/grade.css` são originais do AgendaPix e não entram nesta lista. O desenho não deriva do Cult UI.
 
 ## MIT License
 

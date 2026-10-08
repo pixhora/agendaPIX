@@ -1,0 +1,67 @@
+@layer components {
+  .seg-track {
+    --seg-i: 0;
+    --seg-n: 2;
+    position: relative;
+    padding: 4px;
+    border-radius: 999px;
+    background: var(--subtle);
+  }
+
+  .seg-track[data-count="1"] { --seg-n: 1; }
+  .seg-track[data-count="2"] { --seg-n: 2; }
+  .seg-track[data-count="3"] { --seg-n: 3; }
+  .seg-track[data-count="4"] { --seg-n: 4; }
+  .seg-track[data-count="5"] { --seg-n: 5; }
+  .seg-track[data-count="6"] { --seg-n: 6; }
+  .seg-track[data-count="7"] { --seg-n: 7; }
+  .seg-track[data-count="8"] { --seg-n: 8; }
+
+  .seg-track:has(.seg-options > label:nth-child(1) :checked) { --seg-i: 0; }
+  .seg-track:has(.seg-options > label:nth-child(2) :checked) { --seg-i: 1; }
+  .seg-track:has(.seg-options > label:nth-child(3) :checked) { --seg-i: 2; }
+  .seg-track:has(.seg-options > label:nth-child(4) :checked) { --seg-i: 3; }
+  .seg-track:has(.seg-options > label:nth-child(5) :checked) { --seg-i: 4; }
+  .seg-track:has(.seg-options > label:nth-child(6) :checked) { --seg-i: 5; }
+  .seg-track:has(.seg-options > label:nth-child(7) :checked) { --seg-i: 6; }
+  .seg-track:has(.seg-options > label:nth-child(8) :checked) { --seg-i: 7; }
+
+  .seg-thumb {
+    position: absolute;
+    top: 4px;
+    bottom: 4px;
+    left: 4px;
+    z-index: 0;
+    width: calc((100% - 8px) / var(--seg-n));
+    border-radius: 999px;
+    background: var(--ink);
+    pointer-events: none;
+    transform: translateX(calc(var(--seg-i) * 100%));
+    transition: transform var(--dur-2) var(--ease-out-quint);
+  }
+
+  .seg-options {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+  }
+
+  .seg-options > label {
+    display: flex;
+    min-height: 2.75rem;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    padding-inline: 0.75rem;
+    color: var(--muted);
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.2;
+    text-align: center;
+  }
+
+  .seg-options > label:has(:checked) { color: var(--paper); }
+  .seg-options > label:has(:disabled) { cursor: not-allowed; opacity: 0.45; }
+}
