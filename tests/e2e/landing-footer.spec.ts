@@ -2,7 +2,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 
 async function expectFooterVisible(page: Page) {
   const footer = page.locator("#rodape");
-  await footer.scrollIntoViewIfNeeded();
+  await footer.evaluate((element) => element.scrollIntoView({ block: "end", inline: "nearest" }));
   await expect(footer.getByRole("link", { name: "AgendaPix, página inicial" })).toBeVisible();
   await expect(footer.getByRole("link", { name: "Como funciona" })).toBeVisible();
   await expect(footer.getByRole("link", { name: "Página de exemplo" })).toBeVisible();
@@ -50,15 +50,18 @@ async function box(locator: Locator) {
 test.describe("cartão do hero", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test("fica na coluna do celular em 1024, 1280 e 1440", async ({ page }) => {
+  test("fica na coluna do celular em 1024, 1280 e 1440", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "desktop", "a largura é definida no próprio teste");
     await page.goto("/");
     const card = page.locator("[aria-hidden='true']").filter({ hasText: "Nova reserva · Ana" });
-    const paragraph = page.getByText("o valor cai direto na sua conta Mercado Pago");
+    const paragraph = page.getByRole("heading", { level: 1 }).locator("xpath=following-sibling::p[1]");
     const example = page.getByRole("link", { name: "Ver uma página de exemplo" });
-    const phoneColumn = page.locator("section").first().locator(":scope > div > div").nth(1);
+    const phoneColumn = card.locator("xpath=..");
 
     for (const width of [1024, 1280, 1440]) {
       await page.setViewportSize({ width, height: 900 });
+      await expect(paragraph).toBeVisible();
+      await expect(example).toBeVisible();
       const copy = await box(paragraph);
       const link = await box(example);
       const column = await phoneColumn.boundingBox();
