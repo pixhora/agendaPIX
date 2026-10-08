@@ -61,10 +61,21 @@ export function formatPlanReais(priceCents: number) {
   return fraction === 0 ? `${sign}R$ ${whole}` : `${sign}R$ ${whole},${String(fraction).padStart(2, "0")}`;
 }
 
+const WEEKDAY_LABEL = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"] as const;
+const MONTH_LABEL = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"] as const;
+const WEEKDAY_INDEX = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 } as const;
+
+/** Data curta sem ponto de abreviação, para não virar "out.." quando a frase termina. */
 export function formatTrialEnd(isoDate: string, timeZone: string) {
   const date = new Date(isoDate);
   if (Number.isNaN(date.getTime())) return "";
-  return new Intl.DateTimeFormat("pt-BR", { timeZone, weekday: "short", day: "numeric", month: "short" }).format(date);
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short", day: "numeric", month: "numeric" }).formatToParts(date);
+  const read = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? "";
+  const weekday = WEEKDAY_INDEX[read("weekday") as keyof typeof WEEKDAY_INDEX];
+  const day = Number(read("day"));
+  const month = Number(read("month"));
+  if (weekday === undefined || !Number.isInteger(day) || day < 1 || !Number.isInteger(month) || month < 1 || month > 12) return "";
+  return `${WEEKDAY_LABEL[weekday]}, ${day} ${MONTH_LABEL[month - 1]}`;
 }
 
 export function trialCopy(billing: Pick<BillingView, "state" | "daysLeft" | "bookingsPaused">, endLabel: string) {

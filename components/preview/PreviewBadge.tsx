@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
 const PREVIEW_LINKS = [
   { href: "/preview", label: "Hub" },
@@ -16,6 +16,7 @@ const PREVIEW_LINKS = [
 
 export function PreviewBadge() {
   const pathname = usePathname();
+  const capture = useSearchParams().get("capture") === "1";
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = React.useRef<HTMLElement>(null);
 
@@ -39,6 +40,8 @@ export function PreviewBadge() {
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [isOpen]);
+
+  if (!pathname.startsWith("/preview") || capture) return null;
 
   return (
     <>

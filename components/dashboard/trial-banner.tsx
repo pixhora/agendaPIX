@@ -30,9 +30,9 @@ export function TrialBanner({ billing, timeZone, publicHref }: { billing: Billin
   return (
     <>
       {tone === "discreet" && (
-        <div role="region" aria-label="Aviso da assinatura" className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-full border border-line bg-surface px-4 py-2">
+        <div role="region" aria-label="Aviso da assinatura" className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-card border border-line bg-surface px-4 py-3">
           <p className="min-w-0 text-sm"><span className="font-semibold">{copy.title}</span> <span className="text-muted">· {copy.body}</span></p>
-          <button type="button" onClick={open} className="inline-flex min-h-11 items-center rounded-full px-3 text-sm font-semibold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">O que muda?</button>
+          <Button type="button" variant="outline" onClick={open} className="shrink-0">O que muda?</Button>
         </div>
       )}
       {tone === "strong" && (
