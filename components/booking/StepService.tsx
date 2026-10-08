@@ -9,6 +9,7 @@ import { formatCurrency, formatDuration } from "./formatters";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { SOME_SERVICES_UNAVAILABLE_MESSAGE, depositServiceUnbookable } from "./booking-error";
+import { serviceCardAside, serviceCardMeta } from "./service-card";
 import { UnbookableNotice } from "./UnbookableNotice";
 
 interface StepServiceProps {
@@ -65,7 +66,7 @@ export function StepService({ services, selectedServiceId, onSelectService, onNe
             return (
               <div key={service.id} aria-disabled="true" className="cursor-default rounded-card border border-line bg-surface p-4">
                 <span className="block font-semibold text-ink">{service.name}</span>
-                <span className="mt-1 block text-sm text-muted">{formatDuration(service.durationMinutes)} · {formatCurrency(service.priceCents)}</span>
+                <span className="mt-1 block text-sm text-muted">{service.priceCents > 0 ? `${formatDuration(service.durationMinutes)} · ${formatCurrency(service.priceCents)}` : formatDuration(service.durationMinutes)}</span>
                 <p className="mt-2 text-sm text-muted">Indisponível no momento</p>
               </div>
             );
@@ -98,19 +99,21 @@ export function StepService({ services, selectedServiceId, onSelectService, onNe
               <span className="min-w-0 flex-1">
                 <span className="block font-semibold text-ink">{service.name}</span>
                 <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
-                  <span className="inline-flex items-center gap-1"><Icon icon={SUMMARY_ICONS.duration} className="size-3.5" />{formatDuration(service.durationMinutes)}</span>
+                  <span className="inline-flex items-center gap-1"><Icon icon={SUMMARY_ICONS.duration} className="size-3.5" />{serviceCardMeta(service)}</span>
                   {service.depositCents > 0 ? (
                     <span className="inline-flex items-center rounded-full bg-pix-soft px-2 py-0.5 text-xs font-semibold text-pix">Sinal {formatCurrency(service.depositCents)} no Pix</span>
-                  ) : (
-                    <span className="text-xs font-semibold">Sem sinal</span>
-                  )}
+                  ) : null}
                 </span>
               </span>
               <span className="shrink-0 text-right">
-                <span className="inline-flex items-center justify-end gap-1 font-display text-lg font-bold tabular-nums text-ink">
-                  <Icon icon={SUMMARY_ICONS.price} className="size-3.5 text-muted" />
-                  {formatCurrency(service.priceCents)}
-                </span>
+                {service.depositCents > 0 && serviceCardAside(service) ? (
+                  <span className="inline-flex items-center justify-end gap-1 font-display text-lg font-bold tabular-nums text-ink">
+                    <Icon icon={SUMMARY_ICONS.price} className="size-3.5 text-muted" />
+                    {serviceCardAside(service)}
+                  </span>
+                ) : (
+                  <span className="text-sm font-semibold text-ink">Sem sinal</span>
+                )}
               </span>
             </button>
           );

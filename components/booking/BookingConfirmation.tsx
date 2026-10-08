@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { CONFIRMATION_ICONS } from "@/lib/icons/registry";
 import { ReservedTimeBand } from "./ReservedTimeBand";
+import { policyReceiptRefund } from "./policy-copy";
 
 interface BookingConfirmationProps {
   businessName: string;
@@ -125,15 +126,14 @@ export function BookingConfirmation({
             <div className="flex justify-between border-t border-line pt-2 font-bold text-ink"><dt>Restante no local</dt><dd className="tabular-nums">{formatCurrency(remainingCents)}</dd></div>
           </dl>
         </div>
-        {policy?.text || policy?.refundDeadlineAt || policy?.rescheduleDeadlineAt ? (
+        {policy?.refundDeadlineAt || policy?.rescheduleDeadlineAt ? (
           <div className="border-t border-line p-5" data-testid="policy-snapshot">
             <p className="text-sm font-semibold text-ink">Política do sinal</p>
-            {policy.text?.trim() ? <p className="mt-1 text-sm leading-relaxed text-ink">{policy.text.trim()}</p> : null}
             {policy.refundDeadlineAt ? (
-              <p className="mt-2 text-sm text-muted">O {businessName} pode devolver o sinal até {formatDateFull(policy.refundDeadlineAt, timezone).replace(/^./, (letter) => letter.toLowerCase())}, às {formatTimeSlot(policy.refundDeadlineAt, timezone)}.</p>
+              <p className="mt-2 text-sm text-muted">{policyReceiptRefund(businessName, formatDateFull(policy.refundDeadlineAt, timezone).replace(/^./, (letter) => letter.toLowerCase()), formatTimeSlot(policy.refundDeadlineAt, timezone))}</p>
             ) : null}
             {policy.rescheduleDeadlineAt ? (
-              <p className="mt-1 text-sm text-muted">Remarcação até {formatDateFull(policy.rescheduleDeadlineAt, timezone)} às {formatTimeSlot(policy.rescheduleDeadlineAt, timezone)}.</p>
+              <p className="mt-1 text-sm text-muted">Remarcação até {formatDateFull(policy.rescheduleDeadlineAt, timezone).replace(/^./, (letter) => letter.toLowerCase())}, às {formatTimeSlot(policy.rescheduleDeadlineAt, timezone)}.</p>
             ) : null}
           </div>
         ) : null}

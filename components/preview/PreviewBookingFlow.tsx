@@ -28,6 +28,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { BusinessAvatar } from "@/components/ui/business-avatar";
 import { PREVIEW_PIX_COPY_PASTE, PREVIEW_PIX_QR } from "@/lib/preview/sample-pix-qr";
+import { PIX_HOLD_MS, previewOpeningSlot, previewPayDeadline } from "@/lib/preview/preview-schedule";
+import { formatPolicyWindowTitle, policyHowToChange, policyNoShowRefund, policyOneLiner, policyWindowBody } from "@/components/booking/policy-copy";
 
 function previewStep(scene: PreviewScene): 1 | 2 | 3 | 4 {
   if (scene === "dados" || scene === "politica" || scene === "politica-mudou") return 3;
@@ -36,8 +38,7 @@ function previewStep(scene: PreviewScene): 1 | 2 | 3 | 4 {
 }
 
 function previewBooking(scene: PreviewScene, service: PublicService, slot: AvailabilitySlot): BookingResponse {
-  const offset = scene === "pix-perto" ? 4 * 60 * 1000 : scene === "pix-expirado" ? -60 * 1000 : 12 * 60 * 1000;
-  const expiresAt = new Date(Date.now() + offset).toISOString();
+  const expiresAt = previewPayDeadline(scene === "pix-perto" || scene === "pix-expirado" ? scene : "pix").toISOString();
   const expired = scene === "pix-expirado";
   return {
     bookingId: "bk-preview-pix",
@@ -69,18 +70,30 @@ function previewPolicy(slot: AvailabilitySlot): BookingPolicyView {
 }
 
 export function PreviewBookingFlow({ scene = "fluxo" }: { scene?: PreviewScene }) {
+  const openingSlot = previewOpeningSlot();
+  const previewServices = MOCK_SERVICES.map((service, index) => {
+    if (index !== 0 || !openingSlot) return service;
+    const deadline = new Date(new Date(openingSlot.startsAt).getTime() - 24 * 60 * 60 * 1000);
+    const name = MOCK_PUBLIC_BUSINESS.name;
+    return {
+      ...service,
+      policySummary: policyOneLiner(name, 24, "keep"),
+      policyDetails: [
+        { title: formatPolicyWindowTitle(deadline), body: policyWindowBody(name), tone: "ok" as const },
+        { title: "Perto do horário", body: `Mais perto da hora, o sinal fica com ${name}.`, tone: "warn" as const },
+        { title: "Se faltar", body: policyNoShowRefund(name), tone: "ok" as const },
+        { title: "Como cancelar ou remarcar", body: policyHowToChange(name, true), tone: "ok" as const },
+      ],
+    };
+  });
   const services = scene === "indisponivel"
     ? [
-        ...MOCK_SERVICES.map((service) => (service.depositCents > 0 ? { ...service, bookable: false } : service)),
-        { id: "srv-sem-sinal", name: "Ajuste de franja", durationMinutes: 20, priceCents: 0, depositCents: 0, bookable: false },
+        ...previewServices.map((service) => (service.depositCents > 0 ? { ...service, bookable: false } : service)),
+        { id: "srv-sem-sinal", name: "Ajuste de franja", durationMinutes: 20, priceCents: 3000, depositCents: 0, bookable: false },
       ]
-    : MOCK_SERVICES;
+    : previewServices;
   const contactWhatsapp = scene === "indisponivel" || scene === "pausada" ? "5511987654321" : null;
   const openingService = services.find((service) => service.bookable !== false) ?? services[0];
-  const openingSlot = (() => {
-    const today = new Date().toISOString().slice(0, 10);
-    return getMockAvailabilitySlots(today)[0] ?? null;
-  })();
   const [step, setStep] = useState<1 | 2 | 3 | 4>(() => previewStep(scene));
   const [isCompleted, setIsCompleted] = useState(scene === "comprovante");
 
@@ -114,7 +127,7 @@ export function PreviewBookingFlow({ scene = "fluxo" }: { scene?: PreviewScene }
     await new Promise((resolve) => setTimeout(resolve, 400));
 
     const mockBookingId = `bk-preview-${Date.now()}`;
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    const expiresAt = new Date(Date.now() + PIX_HOLD_MS).toISOString();
 
     const mockResponse: BookingResponse = {
       bookingId: mockBookingId,

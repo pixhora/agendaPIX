@@ -358,10 +358,12 @@ export function StepPayment({
             </StatusChip>
           ) : undefined
         }
-        sublabel={summary ? summary.service.name : "O horário é confirmado assim que o Pix cair."}
+        sublabel={summary
+          ? pixRecipientDisplayName
+            ? `${summary.service.name} · para ${pixRecipientDisplayName}`
+            : summary.service.name
+          : "O horário é confirmado assim que o Pix cair."}
       />
-
-      {pixRecipientDisplayName ? <p className="text-sm text-muted">Pix para {pixRecipientDisplayName}</p> : null}
       {summary?.service.policySummary && onOpenPolicy ? (
         <PolicySummaryLine summary={summary.service.policySummary} compact onDetails={onOpenPolicy} />
       ) : null}

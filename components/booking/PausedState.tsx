@@ -38,7 +38,7 @@ export function PausedState({ businessName, contactWhatsapp, services, autoFocus
           Agendamento online pausado
         </h2>
         <p className="mx-auto mt-3 max-w-[34ch] text-[15px] leading-relaxed text-muted">
-          O {businessName} não está recebendo novos agendamentos por aqui no momento. Quem já agendou continua com o horário garantido.
+          {businessName} não está recebendo novos agendamentos por aqui no momento. Quem já agendou continua com o horário garantido.
         </p>
         {href ? (
           <Button asChild size="lg" className="mt-6 min-h-[52px] w-full">
@@ -48,7 +48,7 @@ export function PausedState({ businessName, contactWhatsapp, services, autoFocus
             </a>
           </Button>
         ) : (
-          <p className="mt-6 text-sm text-muted">Fale com o {businessName} pelos canais de sempre.</p>
+          <p className="mt-6 text-sm text-muted">Fale com {businessName} pelos canais de sempre.</p>
         )}
         <p className="mt-4 text-[13px] text-muted">Já agendou? Seu comprovante continua valendo.</p>
       </section>

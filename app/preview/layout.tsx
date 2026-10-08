@@ -1,6 +1,7 @@
 import React from "react";
 import type { Metadata } from "next";
 import { PreviewBadge } from "@/components/preview/PreviewBadge";
+import { isPreviewBadgeEnabled } from "@/components/preview/preview-badge-gate";
 
 export const metadata: Metadata = {
   title: "Modo Preview · Agenda Micro-SaaS",
@@ -11,7 +12,7 @@ export default function PreviewLayout({ children }: { children: React.ReactNode 
   return (
     <div className="relative min-h-screen">
       {children}
-      <PreviewBadge />
+      {isPreviewBadgeEnabled() ? <PreviewBadge /> : null}
     </div>
   );
 }
