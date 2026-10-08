@@ -1,17 +1,11 @@
-import { z } from "zod";
 import { getAuth } from "@/lib/auth";
 import { getDb } from "@/db";
 import { HttpError, json, readBody } from "@/lib/http";
 import { appPreflight, requireAppOrigin, withAppCors } from "@/lib/origins";
 import { getPaymentProvider } from "@/lib/payments";
-import { drizzleRefundPorts, executeOwnerRefund, previewOwnerRefund } from "@/lib/payments/refund-flow";
+import { drizzleRefundPorts, executeOwnerRefund, parseOwnerRefundBody, previewOwnerRefund } from "@/lib/payments/refund-flow";
 
 export const runtime = "nodejs";
-
-const bodySchema = z.object({
-  confirm: z.literal(true),
-  expectedAmountCents: z.number().int().positive(),
-}).strict();
 
 async function requireOwner(request: Request) {
   const session = await getAuth().api.getSession({ headers: request.headers });
@@ -32,9 +26,9 @@ export async function POST(request: Request, context: RouteContext<"/api/busines
     requireAppOrigin(request);
     const ownerId = await requireOwner(request);
     const { businessId, bookingId } = await context.params;
-    const input = bodySchema.parse(JSON.parse(await readBody(request)));
+    const input = parseOwnerRefundBody(JSON.parse(await readBody(request)));
     return json(await executeOwnerRefund(drizzleRefundPorts(getDb()), getPaymentProvider(), {
-      businessId, bookingId, ownerId, expectedAmountCents: input.expectedAmountCents,
+      businessId, bookingId, ownerId, expectedAmountCents: input.expectedAmountCents, requestedOn: input.requestedOn,
     }));
   });
 }

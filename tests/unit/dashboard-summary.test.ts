@@ -15,6 +15,9 @@ const booking = (overrides: Partial<DashboardBooking>): DashboardBooking => ({
   customerPhone: "+5511999990000",
   refundStatus: null,
   refundedAt: null,
+  manualRefundDueAt: null,
+  manualRefundOverdue: false,
+  manualRefundDueTomorrow: false,
   ...overrides,
 });
 

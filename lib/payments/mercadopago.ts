@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import QRCode from "qrcode";
 import { z } from "zod";
-import { PIX_EXPIRATION_MIN_MINUTES } from "../bookings/config";
+import { PIX_EXPIRATION_MARGIN_MINUTES, PIX_EXPIRATION_MIN_MINUTES } from "../bookings/config";
 import { payerCpfRequired } from "../marketing/facts";
 import { HttpError } from "../http";
 import { MpAccountNotConnectedError, resolveMpAccessToken, type MpAccessTokenQuery } from "./seller-account";
@@ -38,7 +38,7 @@ export const MERCADOPAGO_WEBHOOK_FRESHNESS_MS = 5 * 60 * 1000;
  * no limite. O hold da reserva (e o `expiresAt` público) continua sendo só
  * `BOOKING_HOLD_MINUTES`; pagamento depois disso cai no fluxo atrasado.
  */
-export const MERCADOPAGO_PIX_EXPIRATION_MARGIN_MINUTES = 2;
+export const MERCADOPAGO_PIX_EXPIRATION_MARGIN_MINUTES = PIX_EXPIRATION_MARGIN_MINUTES;
 export const MERCADOPAGO_PIX_MIN_EXPIRATION_MS = PIX_EXPIRATION_MIN_MINUTES * 60_000;
 
 const NO_CONFIRM_DETAILS = new Set(["refunded", "partially_refunded", "charged_back"]);

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, check, foreignKey, index, integer, jsonb, pgEnum, pgTable, primaryKey, text, time, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, date, foreignKey, index, integer, jsonb, pgEnum, pgTable, primaryKey, text, time, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 
 export * from "./auth";
@@ -143,6 +143,12 @@ export const payments = pgTable("payments", {
   /** Devolução do sinal, separada do status da reserva e de `refund_pending`. */
   refundStatus: text("refund_status", { enum: ["in_process", "refunded", "failed"] }),
   refundedAt: timestamp("refunded_at", { withTimezone: true }),
+  /** Fim do 7º dia local para o dono devolver na mão. Vencer não move dinheiro nem status. */
+  manualRefundDueAt: timestamp("manual_refund_due_at", { withTimezone: true }),
+  /** Trava do e-mail da véspera. Volta a null se o envio falhar. */
+  manualRefundReminderSentAt: timestamp("manual_refund_reminder_sent_at", { withTimezone: true }),
+  /** Dia local em que o cliente pediu o cancelamento, informado pelo dono. */
+  policyRefundRequestedOn: date("policy_refund_requested_on"),
   ...timestamps(),
 }, (table) => [
   unique("payments_business_id_unique").on(table.businessId, table.id),
@@ -224,6 +230,60 @@ export const paymentAudit = pgTable("payment_audit", {
   index("payment_audit_business_created_idx").on(table.businessId, table.createdAt),
   index("payment_audit_payment_idx").on(table.paymentId),
   check("payment_audit_action_not_empty", sql`length(trim(${table.action})) > 0`),
+]);
+
+/**
+ * Avisos ao dono, uma linha por reserva e tipo.
+ * O PR de OAuth pode criar `owner_notices` com unique `(business_id, kind)`.
+ * Aqui a chave é `(business_id, booking_id, kind)`, porque o E5 é por reserva.
+ */
+export const ownerNotices = pgTable("owner_notices", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "restrict" }),
+  bookingId: uuid("booking_id").notNull(),
+  paymentId: uuid("payment_id"),
+  kind: text("kind").notNull(),
+  emailSentAt: timestamp("email_sent_at", { withTimezone: true }),
+  reminderCount: integer("reminder_count").default(0).notNull(),
+  lastRemindedOn: date("last_reminded_on"),
+  dismissedAt: timestamp("dismissed_at", { withTimezone: true }),
+  resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  unique("owner_notices_business_booking_kind_unique").on(table.businessId, table.bookingId, table.kind),
+  index("owner_notices_business_kind_idx").on(table.businessId, table.kind),
+  check("owner_notices_kind_not_empty", sql`length(trim(${table.kind})) > 0`),
+]);
+
+/**
+ * Uma tentativa de devolução. No máximo uma ativa por pagamento
+ * (`requested`, `processing` ou `refunded`). `failed` libera a próxima.
+ * A chave `{paymentId}:{n}` nasce aqui e vai ao Mercado Pago; o cliente não a envia.
+ */
+export const paymentRefunds = pgTable("payment_refunds", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "restrict" }),
+  paymentId: uuid("payment_id").notNull(),
+  bookingId: uuid("booking_id").notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  kind: text("kind", { enum: ["owner_api", "auto_late", "owner_manual_mark"] }).notNull(),
+  status: text("status", { enum: ["requested", "processing", "refunded", "rejected", "failed"] }).notNull(),
+  mpRefundId: text("mp_refund_id"),
+  errorCode: text("error_code"),
+  requestedByUserId: text("requested_by_user_id").references(() => user.id, { onDelete: "restrict" }),
+  idempotencyKey: text("idempotency_key").notNull(),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  unique("payment_refunds_idempotency_key_unique").on(table.idempotencyKey),
+  uniqueIndex("payment_refunds_one_active_per_payment").on(table.paymentId).where(sql`${table.status} in ('requested', 'processing', 'refunded')`),
+  foreignKey({ name: "payment_refunds_payment_tenant_fk", columns: [table.businessId, table.paymentId], foreignColumns: [payments.businessId, payments.id] }),
+  foreignKey({ name: "payment_refunds_booking_tenant_fk", columns: [table.businessId, table.bookingId], foreignColumns: [bookings.businessId, bookings.id] }),
+  index("payment_refunds_payment_idx").on(table.paymentId),
+  check("payment_refunds_amount_positive", sql`${table.amountCents} > 0`),
+  check("payment_refunds_idempotency_key_not_empty", sql`length(trim(${table.idempotencyKey})) > 0`),
+  check("payment_refunds_kind_valid", sql`${table.kind} in ('owner_api', 'auto_late', 'owner_manual_mark')`),
+  check("payment_refunds_status_valid", sql`${table.status} in ('requested', 'processing', 'refunded', 'rejected', 'failed')`),
 ]);
 
 export const onboardingRequests = pgTable("onboarding_requests", {

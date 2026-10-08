@@ -17,6 +17,17 @@ describe("fatos públicos do agendamento", () => {
       requiresPayerCpf: true,
     });
     expect(payerCpfRequired({})).toBe(false);
+    expect(payerCpfRequired({ MP_REQUIRES_PAYER_CPF: "false" })).toBe(false);
+  });
+
+  it("sem env o hold padrão é 30 e o CPF não é obrigatório", async () => {
+    vi.stubEnv("BOOKING_HOLD_MINUTES", "");
+    vi.stubEnv("MP_REQUIRES_PAYER_CPF", "");
+    await expect(getPublicBookingFacts()).resolves.toEqual({
+      holdMinutes: 30,
+      pixRecipientDisplayName: null,
+      requiresPayerCpf: false,
+    });
   });
 
   it("com negócio usa o nome do dono e cai no nome do negócio", () => {

@@ -1,14 +1,15 @@
 import { z } from "zod";
 
-/** Conta do dono no Mercado Pago, do ponto de vista do AgendaPix. */
-export type SellerLinkState = "connected" | "disconnected" | "unlinked";
+/** Token do dono no Mercado Pago, no formato que o PR de OAuth devolve. */
+export type SellerAccess = { accessToken: string; mpUserId: string };
 
 /**
- * O PR de OAuth implementa isto. Devolve o token retido para liquidar um Pix já criado,
- * mesmo depois que o dono desconectou a conta. `null` significa que o Mercado Pago desvinculou o token.
+ * O PR de OAuth implementa estas funções. Aqui elas só entram por gancho.
+ * `null` significa conta desconectada, sem token, ou token que o Mercado Pago desvinculou.
  */
-export type GetSellerAccessTokenForSettlement = (businessId: string) => Promise<string | null>;
-export type GetSellerLinkState = (businessId: string) => Promise<SellerLinkState>;
+export type GetSellerAccessToken = (businessId: string) => Promise<SellerAccess | null>;
+export type GetSellerAccessTokenForSettlement = (businessId: string) => Promise<SellerAccess | null>;
+export type FindBusinessIdByMpUserId = (mpUserId: string) => Promise<string | null>;
 
 export class MpAccountNotConnectedError extends Error {
   readonly code = "mp_account_not_connected";
@@ -19,8 +20,9 @@ export class MpAccountNotConnectedError extends Error {
 }
 
 type SellerHooks = {
+  getSellerAccessToken?: GetSellerAccessToken;
   getSellerAccessTokenForSettlement?: GetSellerAccessTokenForSettlement;
-  getSellerLinkState?: GetSellerLinkState;
+  findBusinessIdByMpUserId?: FindBusinessIdByMpUserId;
 };
 
 let hooks: SellerHooks = {};
@@ -34,17 +36,7 @@ export function resetSellerAccountHooks() {
 }
 
 export function sellerHooksActive() {
-  return Boolean(hooks.getSellerAccessTokenForSettlement || hooks.getSellerLinkState);
-}
-
-export async function getSellerLinkState(businessId: string): Promise<SellerLinkState> {
-  if (!hooks.getSellerLinkState) return "connected";
-  return hooks.getSellerLinkState(businessId);
-}
-
-export async function getSellerAccessTokenForSettlement(businessId: string): Promise<string | null> {
-  if (!hooks.getSellerAccessTokenForSettlement) return null;
-  return hooks.getSellerAccessTokenForSettlement(businessId);
+  return Boolean(hooks.getSellerAccessToken || hooks.getSellerAccessTokenForSettlement || hooks.findBusinessIdByMpUserId);
 }
 
 export type MpAccessPurpose = "charge" | "settlement";
@@ -55,35 +47,49 @@ export type MpAccessTokenQuery = {
   purpose?: MpAccessPurpose;
 };
 
+function platformToken(env: Readonly<Record<string, string | undefined>>) {
+  return z.string().min(1).refine((value) => !value.startsWith("replace-this-")).parse(env.MERCADOPAGO_ACCESS_TOKEN);
+}
+
 /**
- * Hoje, sem o gancho de OAuth, as duas finalidades devolvem o token da plataforma.
- * `charge` falha se o dono estiver desconectado. `settlement` pode usar o token retido.
+ * Único ponto que o código de pagamento usa para obter o token.
+ * Sem gancho, as duas finalidades devolvem o token da plataforma e ignoram a consulta.
+ * Com gancho, `charge` usa `getSellerAccessToken` e `settlement` usa `getSellerAccessTokenForSettlement`.
+ * Se só houver `mpUserId`, `findBusinessIdByMpUserId` acha o negócio. Gancho que devolve null não cai no token da plataforma.
  */
 export async function resolveMpAccessToken(
   query: MpAccessTokenQuery,
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): Promise<string> {
+  if (!sellerHooksActive()) return platformToken(env);
+
+  const businessId = query.businessId
+    ?? (query.mpUserId && hooks.findBusinessIdByMpUserId ? await hooks.findBusinessIdByMpUserId(query.mpUserId) : null);
+  if (!businessId) throw new MpAccountNotConnectedError();
+
   const purpose = query.purpose ?? "charge";
-  const platform = () => z.string().min(1).refine((value) => !value.startsWith("replace-this-")).parse(env.MERCADOPAGO_ACCESS_TOKEN);
-  const state = query.businessId ? await getSellerLinkState(query.businessId) : "connected";
+  const hook = purpose === "charge" ? hooks.getSellerAccessToken : hooks.getSellerAccessTokenForSettlement;
+  const seller = hook ? await hook(businessId) : null;
+  if (!seller?.accessToken) throw new MpAccountNotConnectedError();
+  return seller.accessToken;
+}
 
-  if (purpose === "charge") {
-    if (state !== "connected") throw new MpAccountNotConnectedError();
-    return platform();
+/** Dono desconectado, mas ainda com token retido para liquidar. Sem gancho, não avisa. */
+export async function isSellerDisconnected(businessId: string, env: Readonly<Record<string, string | undefined>> = process.env) {
+  if (!sellerHooksActive()) return false;
+  try {
+    await resolveMpAccessToken({ businessId, purpose: "charge" }, env);
+    return false;
+  } catch (error) {
+    if (!(error instanceof MpAccountNotConnectedError)) throw error;
   }
-
-  if (state === "unlinked") throw new MpAccountNotConnectedError();
-  if (state === "disconnected") {
-    if (!query.businessId) throw new MpAccountNotConnectedError();
-    const retained = await getSellerAccessTokenForSettlement(query.businessId);
-    if (!retained) throw new MpAccountNotConnectedError();
-    return retained;
+  try {
+    await resolveMpAccessToken({ businessId, purpose: "settlement" }, env);
+    return true;
+  } catch (error) {
+    if (error instanceof MpAccountNotConnectedError) return false;
+    throw error;
   }
-  if (query.businessId && hooks.getSellerAccessTokenForSettlement) {
-    const token = await getSellerAccessTokenForSettlement(query.businessId);
-    if (token) return token;
-  }
-  return platform();
 }
 
 /** Sem gancho de OAuth o provedor usa o próprio token. Com gancho, `false` bloqueia o estorno. */

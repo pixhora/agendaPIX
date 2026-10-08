@@ -25,23 +25,26 @@ export function lateRefundedNotice(input: { customerName: string; serviceName: s
   };
 }
 
-export function lateRefundFailedNotice(input: { customerName: string; serviceName: string; when: string }): OwnerNotice {
+const manualRefundLine = (deadlineLabel: string) =>
+  `Devolva até ${deadlineLabel} (7 dias depois deste aviso) pelo AgendaPix, no botão Devolver pelo AgendaPix, ou pelo app do Mercado Pago.`;
+
+export function lateRefundFailedNotice(input: { customerName: string; serviceName: string; when: string; deadlineLabel: string }): OwnerNotice {
   return {
     subject: "Devolva um sinal pelo AgendaPix",
-    text: `O cliente ${input.customerName} pagou o sinal de ${input.serviceName} (${input.when}) fora do prazo e não havia horário livre. Não foi possível devolver o valor automaticamente. Devolva pelo AgendaPix, no botão Devolver pelo AgendaPix, ou pelo app do Mercado Pago.`,
+    text: `O cliente ${input.customerName} pagou o sinal de ${input.serviceName} (${input.when}) fora do prazo e não havia horário livre. Não foi possível devolver o valor automaticamente. ${manualRefundLine(input.deadlineLabel)}`,
   };
 }
 
-export function lateRefundNoTokenNotice(input: { customerName: string; serviceName: string; when: string }): OwnerNotice {
+export function lateRefundNoTokenNotice(input: { customerName: string; serviceName: string; when: string; deadlineLabel: string }): OwnerNotice {
   return {
     subject: "Confira um sinal no Mercado Pago",
-    text: `O cliente ${input.customerName} pagou o sinal de ${input.serviceName} (${input.when}) fora do prazo e não havia horário livre. O AgendaPix não conseguiu devolver o valor porque a conta Mercado Pago está desvinculada. Confira no app do Mercado Pago ou reconecte e use o botão Devolver pelo AgendaPix.`,
+    text: `O cliente ${input.customerName} pagou o sinal de ${input.serviceName} (${input.when}) fora do prazo e não havia horário livre. O AgendaPix não conseguiu devolver o valor porque a conta Mercado Pago está desvinculada. ${manualRefundLine(input.deadlineLabel)}`,
   };
 }
 
-export function unverifiableSellerNotice(): OwnerNotice {
+export function unverifiableSellerNotice(input: { deadlineLabel: string }): OwnerNotice {
   return {
     subject: "Confira um Pix no Mercado Pago",
-    text: "O AgendaPix recebeu um aviso de pagamento, mas a conta Mercado Pago está desvinculada e não dá para confirmar o Pix. Confira no app do Mercado Pago e confirme o horário ou devolva o valor manualmente.",
+    text: `O AgendaPix recebeu um aviso de pagamento, mas a conta Mercado Pago está desvinculada e não dá para confirmar o Pix. Confira no app do Mercado Pago e confirme o horário ou devolva o valor. ${manualRefundLine(input.deadlineLabel)}`,
   };
 }

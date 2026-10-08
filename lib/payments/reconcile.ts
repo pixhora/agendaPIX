@@ -7,6 +7,7 @@ import { paymentsConfig, type PaymentsConfig } from "./config";
 import { applyPaidEvent } from "./apply-paid";
 import { getPaymentProvider } from "./index";
 import { polledPaidEvent, type PaymentProvider } from "./provider";
+import { createDrizzleReminderPorts, runManualRefundReminders } from "./manual-refund-reminders";
 import { drizzleRefundPorts, observeInProcessRefunds, retryAutomaticLateRefunds } from "./refund-flow";
 import { callProvider } from "./timeout";
 
@@ -79,6 +80,7 @@ export async function reconcileOnce(
     try {
       if (!activeProvider) {
         await expireLocalHolds(scoped, now, config.RECONCILE_BATCH_SIZE, report);
+        await sendManualRefundReminders(scoped, now);
         return report;
       }
       report.stuckRetried += await retryStuckCreating(scoped, activeProvider, config, now, report);
@@ -87,6 +89,7 @@ export async function reconcileOnce(
       const ports = drizzleRefundPorts(scoped);
       report.refundsSettled += await retryAutomaticLateRefunds(ports, activeProvider, config.RECONCILE_BATCH_SIZE);
       await observeInProcessRefunds(ports, activeProvider, config.RECONCILE_BATCH_SIZE, now);
+      await sendManualRefundReminders(scoped, now);
     } finally {
       await client.query("SELECT pg_advisory_unlock($1)", [RECONCILE_LOCK_KEY]);
     }
@@ -94,6 +97,15 @@ export async function reconcileOnce(
     client.release();
   }
   return report;
+}
+
+/** Só e-mail. Falha aqui não estorna e não derruba o resto da reconciliação. */
+async function sendManualRefundReminders(database: Database, now: Date) {
+  try {
+    await runManualRefundReminders(createDrizzleReminderPorts(database), now);
+  } catch {
+    // O próximo ciclo tenta de novo. Nada de dinheiro se move neste passo.
+  }
 }
 
 async function retryStuckCreating(database: Database, provider: PaymentProvider, config: PaymentsConfig, now: Date, report: ReconcileReport) {

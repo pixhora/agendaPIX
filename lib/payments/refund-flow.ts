@@ -4,6 +4,9 @@ import * as schema from "../../db/schema";
 import { HttpError } from "../http";
 import { sendOwnerEmail, type OwnerMailer } from "../email";
 import type { PaymentProvider } from "./provider";
+import { z } from "zod";
+import { assessPolicyRequestedOn, formatBusinessDay, localDate, manualRefundDueAtFromNotice } from "./manual-refund-calendar";
+import { INSUFFICIENT_BALANCE_MESSAGE, insufficientBalance } from "./refund-copy";
 import { assessRefund, refundBlockMessage, type RefundBlockReason, type RefundStatus } from "./refund-eligibility";
 import {
   disconnectedConfirmedNotice,
@@ -14,7 +17,7 @@ import {
   maskEmail,
   unverifiableSellerNotice,
 } from "./notices";
-import { getSellerLinkState, settlementAvailable } from "./seller-account";
+import { isSellerDisconnected, settlementAvailable } from "./seller-account";
 
 type Database = NodePgDatabase<typeof schema>;
 
@@ -29,6 +32,8 @@ export type RefundView = {
   paymentStatus: string;
   refundStatus: RefundStatus | null;
   refundedAt: Date | null;
+  manualRefundDueAt: Date | null;
+  policyRefundRequestedOn: string | null;
   paidAt: Date | null;
   customerName: string;
   customerEmail: string | null;
@@ -40,11 +45,45 @@ export type RefundView = {
   policyRefundDeadlineAt: string | null;
 };
 
+export type RefundPatch = {
+  refundStatus?: RefundStatus;
+  refundedAt?: Date | null;
+  paymentStatus?: string;
+  /** `undefined` deixa a coluna como está. O prazo gravado não é apagado. */
+  manualRefundDueAt?: Date | null;
+  policyRefundRequestedOn?: string | null;
+};
+
+export type RefundAttemptStatus = "requested" | "processing" | "refunded" | "rejected" | "failed";
+export type RefundAttemptKind = "owner_api" | "auto_late" | "owner_manual_mark";
+
+export type RefundAttempt = {
+  id: string;
+  status: RefundAttemptStatus;
+  kind: RefundAttemptKind;
+  idempotencyKey: string;
+  mpRefundId: string | null;
+  amountCents: number;
+  requestedByUserId: string | null;
+};
+
 export type RefundWriter = {
-  setRefund(patch: { refundStatus: RefundStatus; refundedAt: Date | null; paymentStatus?: string }): Promise<void>;
+  setRefund(patch: RefundPatch): Promise<void>;
   audit(action: string, detail: Record<string, unknown>): Promise<void>;
   hasAudit(action: string): Promise<boolean>;
+  listAttempts(): Promise<RefundAttempt[]>;
+  beginAttempt(input: { kind: RefundAttemptKind; idempotencyKey: string; amountCents: number; requestedByUserId: string | null }): Promise<RefundAttempt>;
+  finishAttempt(id: string, patch: { status: RefundAttemptStatus; mpRefundId: string | null; errorCode: string | null }): Promise<void>;
 };
+
+/** Chave de uma tentativa do dono. `n` conta as tentativas já gravadas, inclusive as que falharam. */
+export function ownerRefundIdempotencyKey(paymentId: string, attemptNumber: number) {
+  return `${paymentId}:${attemptNumber}`;
+}
+
+export function automaticRefundIdempotencyKey(paymentId: string) {
+  return `auto_late:${paymentId}`;
+}
 
 export type RefundPorts = {
   loadOwned(businessId: string, bookingId: string, ownerId: string): Promise<RefundView | null>;
@@ -62,11 +101,15 @@ export type RefundPreview = {
   customer: { name: string; emailMasked: string };
   policy: { text: string | null; refundDeadlineAt: string | null };
   paidAt: string | null;
+  requestedOn: string | null;
+  todayLocal: string;
+  paidOnLocal: string | null;
+  manualRefundDueAt: string | null;
 };
 
 const REFUND_FAILED = "Não foi possível devolver o sinal pelo AgendaPix. Tente de novo.";
 
-function previewOf(view: RefundView, decision: { eligible: boolean; reason: RefundBlockReason | null }): RefundPreview {
+function previewOf(view: RefundView, decision: { eligible: boolean; reason: RefundBlockReason | null }, now: Date): RefundPreview {
   return {
     eligible: decision.eligible,
     reason: decision.reason,
@@ -74,6 +117,10 @@ function previewOf(view: RefundView, decision: { eligible: boolean; reason: Refu
     customer: { name: view.customerName, emailMasked: maskEmail(view.customerEmail) },
     policy: { text: view.policyText, refundDeadlineAt: view.policyRefundDeadlineAt },
     paidAt: view.paidAt ? view.paidAt.toISOString() : null,
+    requestedOn: view.policyRefundRequestedOn,
+    todayLocal: localDate(now, view.timezone),
+    paidOnLocal: view.paidAt ? localDate(view.paidAt, view.timezone) : null,
+    manualRefundDueAt: view.manualRefundDueAt ? view.manualRefundDueAt.toISOString() : null,
   };
 }
 
@@ -86,6 +133,15 @@ function decisionFor(view: RefundView, now: Date, available: boolean) {
     settlementAvailable: available,
     policyDeadlineAt: view.policyRefundDeadlineAt ? new Date(view.policyRefundDeadlineAt) : null,
   });
+}
+
+function keepDeadline(current: RefundView, now: Date) {
+  return current.manualRefundDueAt ?? manualRefundDueAtFromNotice(now, current.timezone);
+}
+
+function deadlineLabel(view: RefundView) {
+  if (!view.manualRefundDueAt) return "";
+  return formatBusinessDay(view.manualRefundDueAt, view.timezone, true);
 }
 
 function auditDetail(view: RefundView, input: { actor: string; status: string | null; mpRefundId: string | null; failureCause: string | null; reason: string }) {
@@ -113,18 +169,60 @@ export async function previewOwnerRefund(ports: RefundPorts, businessId: string,
   const view = await ports.loadOwned(businessId, bookingId, ownerId);
   if (!view) throw new HttpError(404, "booking_not_found", "Agendamento não encontrado.");
   const available = await settlementAvailable(view.businessId);
-  return previewOf(view, decisionFor(view, now, available));
+  return previewOf(view, decisionFor(view, now, available), now);
+}
+
+const REQUESTED_ON_MESSAGE: Record<string, string> = {
+  refund_requested_on_invalid: "Informe a data do pedido no formato AAAA-MM-DD.",
+  refund_requested_on_in_future: "A data do pedido não pode ser futura.",
+  refund_requested_on_before_payment: "A data do pedido é anterior ao dia do pagamento do sinal.",
+};
+
+const ownerRefundBodySchema = z.object({
+  confirm: z.literal(true),
+  expectedAmountCents: z.number().int().positive(),
+  requestedOn: z.string().optional(),
+}).strict();
+
+export function parseOwnerRefundBody(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new HttpError(400, "invalid_input", "Confira os dados enviados.");
+  }
+  const body = value as Record<string, unknown>;
+  if ("requestedOn" in body && body.requestedOn !== undefined && typeof body.requestedOn !== "string") {
+    throw new HttpError(422, "refund_requested_on_invalid", REQUESTED_ON_MESSAGE.refund_requested_on_invalid ?? "Informe a data do pedido.");
+  }
+  return ownerRefundBodySchema.parse(body);
+}
+
+const ACTIVE_ATTEMPT = new Set<RefundAttemptStatus>(["requested", "processing", "refunded"]);
+
+async function currentRefund(current: RefundView, writer: RefundWriter) {
+  const active = (await writer.listAttempts()).find((row) => ACTIVE_ATTEMPT.has(row.status));
+  if (active) {
+    return {
+      status: active.status === "refunded" ? "refunded" as const : "in_process" as const,
+      refundId: active.mpRefundId,
+    };
+  }
+  if (current.refundStatus === "refunded" || current.paymentStatus === "refunded") {
+    return { status: "refunded" as const, refundId: null };
+  }
+  if (current.refundStatus === "in_process") return { status: "in_process" as const, refundId: null };
+  return null;
 }
 
 export async function executeOwnerRefund(
   ports: RefundPorts,
   provider: Pick<PaymentProvider, "refundCharge">,
-  input: { businessId: string; bookingId: string; ownerId: string; expectedAmountCents: number; now?: Date },
+  input: { businessId: string; bookingId: string; ownerId: string; expectedAmountCents: number; requestedOn?: string; now?: Date },
 ) {
   const now = input.now ?? new Date();
   const view = await ports.loadOwned(input.businessId, input.bookingId, input.ownerId);
   if (!view) throw new HttpError(404, "booking_not_found", "Agendamento não encontrado.");
   const outcome = await ports.withPaymentLock(view.paymentId, async (current, writer) => {
+    const replay = await currentRefund(current, writer);
+    if (replay) return { type: "ok" as const, status: replay.status, refundId: replay.refundId };
     if (input.expectedAmountCents !== current.amountCents) {
       return { type: "reject" as const, code: "refund_amount_changed" as const };
     }
@@ -132,39 +230,71 @@ export async function executeOwnerRefund(
     const decision = decisionFor(current, now, available);
     if (!decision.eligible && decision.reason) return { type: "reject" as const, code: decision.reason };
     if (!current.externalId) return { type: "reject" as const, code: "not_paid" as const };
+    if (!current.policyRefundRequestedOn) {
+      const assessed = assessPolicyRequestedOn({
+        requestedOn: input.requestedOn,
+        todayLocal: localDate(now, current.timezone),
+        paidOnLocal: current.paidAt ? localDate(current.paidAt, current.timezone) : null,
+        timeZone: current.timezone,
+      });
+      if (!assessed.ok) return { type: "date" as const, code: assessed.code };
+      await writer.setRefund({
+        policyRefundRequestedOn: assessed.requestedOn,
+        ...(current.manualRefundDueAt ? {} : { manualRefundDueAt: assessed.dueAt }),
+      });
+      current.policyRefundRequestedOn = assessed.requestedOn;
+      current.manualRefundDueAt = current.manualRefundDueAt ?? assessed.dueAt;
+    }
+    const attempts = await writer.listAttempts();
+    const attempt = await writer.beginAttempt({
+      kind: "owner_api",
+      idempotencyKey: ownerRefundIdempotencyKey(current.paymentId, attempts.length + 1),
+      amountCents: current.amountCents,
+      requestedByUserId: input.ownerId,
+    });
     try {
-      const result = await provider.refundCharge(current.externalId, { idempotencyKey: current.paymentId }, {
+      const result = await provider.refundCharge(current.externalId, { idempotencyKey: attempt.idempotencyKey }, {
         businessId: current.businessId,
         purpose: "settlement",
       });
       if (!result) throw new Error("Estorno sem resposta.");
-      const refundedAt = result.status === "refunded" ? now : null;
+      await writer.finishAttempt(attempt.id, {
+        status: result.status === "refunded" ? "refunded" : "processing",
+        mpRefundId: result.refundId,
+        errorCode: null,
+      });
       await writer.setRefund({
         refundStatus: result.status,
-        refundedAt,
+        refundedAt: result.status === "refunded" ? now : null,
         paymentStatus: result.status === "refunded" ? "refunded" : undefined,
       });
-      await writer.audit("owner_refund", auditDetail(current, {
+      await writer.audit("owner_refund", { ...auditDetail(current, {
         actor: input.ownerId,
         status: result.status,
         mpRefundId: result.refundId,
         failureCause: null,
         reason: "owner_refund",
-      }));
+      }), requestedOn: current.policyRefundRequestedOn });
       return { type: "ok" as const, status: result.status, refundId: result.refundId };
     } catch (error) {
       const cause = error instanceof Error ? error.message : "erro";
+      await writer.finishAttempt(attempt.id, {
+        status: "failed",
+        mpRefundId: null,
+        errorCode: insufficientBalance(cause) ? "insufficient_balance" : "refund_failed",
+      });
       await writer.setRefund({ refundStatus: "failed", refundedAt: null });
-      await writer.audit("owner_refund", auditDetail(current, {
+      await writer.audit("owner_refund", { ...auditDetail(current, {
         actor: input.ownerId,
         status: "failed",
         mpRefundId: null,
         failureCause: cause,
         reason: "owner_refund",
-      }));
-      return { type: "provider_failed" as const };
+      }), requestedOn: current.policyRefundRequestedOn });
+      return { type: "provider_failed" as const, insufficient: insufficientBalance(cause) };
     }
   });
+  if (outcome.type === "date") throw new HttpError(422, outcome.code, REQUESTED_ON_MESSAGE[outcome.code] ?? "Informe a data do pedido.");
   if (outcome.type === "reject") {
     const code = outcome.code;
     const message = code === "refund_amount_changed"
@@ -172,7 +302,9 @@ export async function executeOwnerRefund(
       : refundBlockMessage(code);
     throw new HttpError(409, code, message);
   }
-  if (outcome.type === "provider_failed") throw new HttpError(502, "refund_failed", REFUND_FAILED);
+  if (outcome.type === "provider_failed") {
+    throw new HttpError(502, "refund_failed", outcome.insufficient ? INSUFFICIENT_BALANCE_MESSAGE : REFUND_FAILED);
+  }
   return { status: outcome.status, refundId: outcome.refundId };
 }
 
@@ -190,26 +322,41 @@ export async function settleAutomaticLateRefund(
     if (current.refundStatus === "failed") return { type: "failed_already" as const, view: current };
     if (await writer.hasAudit("late_no_slot_no_token")) return { type: "no_token_already" as const, view: current };
     if (!current.externalId) {
+      const deadline = keepDeadline(current, now);
+      if (!current.manualRefundDueAt) await writer.setRefund({ manualRefundDueAt: deadline });
       await writer.audit("late_no_slot_no_token", auditDetail(current, {
         actor: "system", status: null, mpRefundId: null, failureCause: "sem cobrança", reason: "late_no_slot",
       }));
-      return { type: "no_token" as const, view: current };
+      return { type: "no_token" as const, view: { ...current, manualRefundDueAt: deadline } };
     }
     if (!await settlementAvailable(current.businessId)) {
+      const deadline = keepDeadline(current, now);
+      if (!current.manualRefundDueAt) await writer.setRefund({ manualRefundDueAt: deadline });
       await writer.audit("late_no_slot_no_token", auditDetail(current, {
         actor: "system", status: null, mpRefundId: null, failureCause: "sem token de liquidação", reason: "late_no_slot",
       }));
       await writer.audit("unverifiable_seller_disconnected", auditDetail(current, {
         actor: "system", status: null, mpRefundId: null, failureCause: "sem token de liquidação", reason: "late_no_slot",
       }));
-      return { type: "no_token" as const, view: current };
+      return { type: "no_token" as const, view: { ...current, manualRefundDueAt: deadline } };
     }
+    const attempt = await writer.beginAttempt({
+      kind: "auto_late",
+      idempotencyKey: automaticRefundIdempotencyKey(current.paymentId),
+      amountCents: current.amountCents,
+      requestedByUserId: null,
+    });
     try {
-      const result = await provider.refundCharge(current.externalId, { idempotencyKey: current.paymentId }, {
+      const result = await provider.refundCharge(current.externalId, { idempotencyKey: attempt.idempotencyKey }, {
         businessId: current.businessId,
         purpose: "settlement",
       });
       if (!result) throw new Error("Estorno sem resposta.");
+      await writer.finishAttempt(attempt.id, {
+        status: result.status === "refunded" ? "refunded" : "processing",
+        mpRefundId: result.refundId,
+        errorCode: null,
+      });
       await writer.setRefund({
         refundStatus: result.status,
         refundedAt: result.status === "refunded" ? now : null,
@@ -222,14 +369,23 @@ export async function settleAutomaticLateRefund(
         failureCause: null,
         reason: "late_no_slot",
       }));
-      return { type: "submitted" as const, view: { ...current, refundStatus: result.status } };
+      return {
+        type: "submitted" as const,
+        view: {
+          ...current,
+          refundStatus: result.status,
+          manualRefundDueAt: current.manualRefundDueAt,
+        },
+      };
     } catch (error) {
       const cause = error instanceof Error ? error.message : "erro";
-      await writer.setRefund({ refundStatus: "failed", refundedAt: null });
+      const deadline = keepDeadline(current, now);
+      await writer.finishAttempt(attempt.id, { status: "failed", mpRefundId: null, errorCode: "refund_failed" });
+      await writer.setRefund({ refundStatus: "failed", refundedAt: null, manualRefundDueAt: deadline });
       await writer.audit("automatic_refund", auditDetail(current, {
         actor: "system", status: "failed", mpRefundId: null, failureCause: cause, reason: "late_no_slot",
       }));
-      return { type: "failed_now" as const, view: { ...current, refundStatus: "failed" as const } };
+      return { type: "failed_now" as const, view: { ...current, refundStatus: "failed" as const, manualRefundDueAt: deadline } };
     }
   });
 
@@ -238,30 +394,34 @@ export async function settleAutomaticLateRefund(
   if (outcome.type === "submitted" || outcome.type === "done") {
     await notifyOnce(ports, outcome.view, "notice_late_refunded", mailer, lateRefundedNotice(names));
   } else if (outcome.type === "failed_now" || outcome.type === "failed_already") {
-    await notifyOnce(ports, outcome.view, "notice_late_refund_failed", mailer, lateRefundFailedNotice(names));
+    await notifyOnce(ports, outcome.view, "notice_late_refund_failed", mailer, lateRefundFailedNotice({ ...names, deadlineLabel: deadlineLabel(outcome.view) }));
   } else if (outcome.type === "no_token") {
-    await notifyOnce(ports, outcome.view, "notice_late_no_token", mailer, lateRefundNoTokenNotice(names));
+    await notifyOnce(ports, outcome.view, "notice_late_no_token", mailer, lateRefundNoTokenNotice({ ...names, deadlineLabel: deadlineLabel(outcome.view) }));
   }
   return outcome.type;
 }
 
-export async function recordUnverifiableSellerPayment(ports: RefundPorts, externalId: string, mailer: OwnerMailer = sendOwnerEmail) {
+export async function recordUnverifiableSellerPayment(ports: RefundPorts, externalId: string, mailer: OwnerMailer = sendOwnerEmail, now = new Date()) {
   const view = await ports.loadByExternalId(externalId);
   if (!view) return false;
-  await ports.withPaymentLock(view.paymentId, async (current, writer) => {
-    if (await writer.hasAudit("unverifiable_seller_disconnected")) return;
-    await writer.audit("unverifiable_seller_disconnected", auditDetail(current, {
-      actor: "system", status: null, mpRefundId: null, failureCause: "sem token para consultar o pagamento", reason: "unverifiable_seller_disconnected",
-    }));
+  const recorded = await ports.withPaymentLock(view.paymentId, async (current, writer) => {
+    const deadline = keepDeadline(current, now);
+    if (!(await writer.hasAudit("unverifiable_seller_disconnected"))) {
+      if (!current.manualRefundDueAt) await writer.setRefund({ manualRefundDueAt: deadline });
+      await writer.audit("unverifiable_seller_disconnected", auditDetail(current, {
+        actor: "system", status: null, mpRefundId: null, failureCause: "sem token para consultar o pagamento", reason: "unverifiable_seller_disconnected",
+      }));
+    }
+    return { ...current, manualRefundDueAt: current.manualRefundDueAt ?? deadline };
   });
-  await notifyOnce(ports, view, "notice_unverifiable_seller", mailer, unverifiableSellerNotice());
+  await notifyOnce(ports, recorded, "notice_unverifiable_seller", mailer, unverifiableSellerNotice({ deadlineLabel: deadlineLabel(recorded) }));
   return true;
 }
 
 export async function notifyDisconnectedConfirmation(ports: RefundPorts, paymentId: string, mailer: OwnerMailer = sendOwnerEmail) {
   const view = await ports.loadByPaymentId(paymentId);
   if (!view) return;
-  if (await getSellerLinkState(view.businessId) !== "disconnected") return;
+  if (!await isSellerDisconnected(view.businessId)) return;
   const notice = disconnectedConfirmedNotice({
     customerName: view.customerName,
     serviceName: view.serviceName,
@@ -331,7 +491,8 @@ async function readPolicy(database: Database, businessId: string, bookingId: str
 function toView(row: {
   paymentId: string; businessId: string; bookingId: string; ownerId: string; ownerEmail: string;
   externalId: string | null; amountCents: number; paymentStatus: string;
-  refundStatus: RefundStatus | null; refundedAt: Date | null; paidAt: Date | null;
+  refundStatus: RefundStatus | null; refundedAt: Date | null; manualRefundDueAt: Date | null;
+  policyRefundRequestedOn: string | null; paidAt: Date | null;
   customerName: string; customerEmail: string | null; serviceName: string; startsAt: Date; timezone: string;
 }, policy: PolicySnapshot): RefundView {
   return { ...row, policyText: policy.text, policyHash: policy.hash, policyRefundDeadlineAt: policy.refundDeadlineAt };
@@ -348,6 +509,8 @@ const refundColumns = {
   paymentStatus: schema.payments.status,
   refundStatus: schema.payments.refundStatus,
   refundedAt: schema.payments.refundedAt,
+  manualRefundDueAt: schema.payments.manualRefundDueAt,
+  policyRefundRequestedOn: schema.payments.policyRefundRequestedOn,
   paidAt: schema.payments.paidAt,
   customerName: schema.customers.name,
   customerEmail: schema.customers.email,
@@ -389,20 +552,25 @@ export function createDrizzleRefundPorts(database: Database): RefundPorts {
     },
     async withPaymentLock(paymentId, run) {
       return database.transaction(async (tx) => {
-        await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${paymentId}))`);
+        const locked = await tx.execute(sql`select id from payments where id = ${paymentId} for update`);
+        if (locked.rows.length === 0) throw new HttpError(404, "booking_not_found", "Agendamento não encontrado.");
         const [row] = await refundQuery(tx).where(eq(schema.payments.id, paymentId)).limit(1);
         if (!row) throw new HttpError(404, "booking_not_found", "Agendamento não encontrado.");
         const view = await toView(row, await readPolicy(tx, row.businessId, row.bookingId));
         const writer: RefundWriter = {
           async setRefund(patch) {
             await tx.update(schema.payments).set({
-              refundStatus: patch.refundStatus,
-              refundedAt: patch.refundedAt,
+              ...(patch.refundStatus !== undefined ? { refundStatus: patch.refundStatus } : {}),
+              ...(patch.refundedAt !== undefined ? { refundedAt: patch.refundedAt } : {}),
               ...(patch.paymentStatus ? { status: patch.paymentStatus as typeof schema.payments.$inferSelect.status } : {}),
+              ...(patch.manualRefundDueAt !== undefined ? { manualRefundDueAt: patch.manualRefundDueAt } : {}),
+              ...(patch.policyRefundRequestedOn !== undefined ? { policyRefundRequestedOn: patch.policyRefundRequestedOn } : {}),
             }).where(and(eq(schema.payments.id, paymentId), eq(schema.payments.businessId, view.businessId)));
-            view.refundStatus = patch.refundStatus;
-            view.refundedAt = patch.refundedAt;
+            if (patch.refundStatus !== undefined) view.refundStatus = patch.refundStatus;
+            if (patch.refundedAt !== undefined) view.refundedAt = patch.refundedAt;
             if (patch.paymentStatus) view.paymentStatus = patch.paymentStatus;
+            if (patch.manualRefundDueAt !== undefined) view.manualRefundDueAt = patch.manualRefundDueAt;
+            if (patch.policyRefundRequestedOn !== undefined) view.policyRefundRequestedOn = patch.policyRefundRequestedOn;
           },
           async audit(action, detail) {
             await tx.insert(schema.paymentAudit).values({
@@ -415,6 +583,53 @@ export function createDrizzleRefundPorts(database: Database): RefundPorts {
               eq(schema.paymentAudit.action, action),
             )).limit(1);
             return Boolean(found);
+          },
+          async listAttempts() {
+            return tx.select({
+              id: schema.paymentRefunds.id,
+              status: schema.paymentRefunds.status,
+              kind: schema.paymentRefunds.kind,
+              idempotencyKey: schema.paymentRefunds.idempotencyKey,
+              mpRefundId: schema.paymentRefunds.mpRefundId,
+              amountCents: schema.paymentRefunds.amountCents,
+              requestedByUserId: schema.paymentRefunds.requestedByUserId,
+            }).from(schema.paymentRefunds).where(and(
+              eq(schema.paymentRefunds.paymentId, paymentId),
+              eq(schema.paymentRefunds.businessId, view.businessId),
+            ));
+          },
+          async beginAttempt(input) {
+            const [created] = await tx.insert(schema.paymentRefunds).values({
+              businessId: view.businessId,
+              paymentId,
+              bookingId: view.bookingId,
+              amountCents: input.amountCents,
+              kind: input.kind,
+              status: "requested",
+              requestedByUserId: input.requestedByUserId,
+              idempotencyKey: input.idempotencyKey,
+            }).returning({
+              id: schema.paymentRefunds.id,
+              status: schema.paymentRefunds.status,
+              kind: schema.paymentRefunds.kind,
+              idempotencyKey: schema.paymentRefunds.idempotencyKey,
+              mpRefundId: schema.paymentRefunds.mpRefundId,
+              amountCents: schema.paymentRefunds.amountCents,
+              requestedByUserId: schema.paymentRefunds.requestedByUserId,
+            });
+            if (!created) throw new Error("Tentativa de devolução não gravada.");
+            return created;
+          },
+          async finishAttempt(id, patch) {
+            await tx.update(schema.paymentRefunds).set({
+              status: patch.status,
+              mpRefundId: patch.mpRefundId,
+              errorCode: patch.errorCode,
+              finishedAt: patch.status === "requested" ? null : new Date(),
+            }).where(and(
+              eq(schema.paymentRefunds.id, id),
+              eq(schema.paymentRefunds.businessId, view.businessId),
+            ));
           },
         };
         return run(view, writer);
