@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
+import { BASE_PLAN } from "../../lib/billing/status";
 import { serviceBlockCopy } from "../../lib/dashboard/service-block";
 import {
   CHECKOUT_AVAILABLE,
   COMPLETE_PLAN,
   LAST_DAYS_THRESHOLD,
+  PLAN_CHECKOUT_HREF,
   formatPlanReais,
   formatTrialEnd,
+  formatTrialEndLong,
+  subscribeCtaLabel,
   trialCopy,
   trialTone,
   toBillingView,
@@ -45,20 +49,31 @@ describe("aviso de teste no painel", () => {
   });
 
   it("pausa quando o teste acabou e some com assinatura ativa", () => {
-    const paused = billing({ state: "paused", daysLeft: -1, bookingsPaused: true });
+    const paused = billing({ state: "paused", daysLeft: -1, bookingsPaused: true, trialEndsAt: "2026-10-03T02:59:59.000Z" });
+    const when = formatTrialEndLong(paused.trialEndsAt, "America/Sao_Paulo");
     expect(trialTone(paused)).toBe("paused");
-    expect(trialCopy(paused, "sex, 23 out")?.body).toContain("em sex, 23 out");
-    expect(trialCopy(paused, "sex, 23 out")?.body).toContain("página pública avisa");
-    expect(trialCopy(paused, "sex, 23 out")?.body).toContain("Reservas já feitas continuam valendo");
+    expect(when).toBe("na sexta, 2 de outubro");
+    expect(trialCopy(paused, when)?.body).toBe("O teste grátis acabou na sexta, 2 de outubro, e não há assinatura ativa.");
     expect(trialTone(billing({ state: "active", daysLeft: -3, bookingsPaused: false }))).toBe("none");
     expect(trialCopy(billing({ state: "active" }), "")).toBeNull();
     expect(trialTone(billing({ state: "trial", daysLeft: 5, bookingsPaused: true }))).toBe("paused");
+  });
+
+  it("escreve o fim do teste por extenso em pt-BR, sem zero à esquerda", () => {
+    expect(formatTrialEndLong("2026-10-03T02:59:59.000Z", "America/Sao_Paulo")).toBe("na sexta, 2 de outubro");
+    expect(formatTrialEndLong("2026-10-06T02:59:59.000Z", "America/Sao_Paulo")).toBe("na segunda, 5 de outubro");
+    expect(formatTrialEndLong("2026-10-04T02:59:59.000Z", "America/Sao_Paulo")).toBe("no sábado, 3 de outubro");
+    expect(formatTrialEndLong("2026-10-05T02:59:59.000Z", "America/Sao_Paulo")).toBe("no domingo, 4 de outubro");
+    expect(formatTrialEndLong("2026-10-11T02:59:59.000Z", "America/Sao_Paulo")).toBe("no sábado, 10 de outubro");
+    expect(formatTrialEndLong("invalid", "America/Sao_Paulo")).toBe("");
   });
 
   it("mostra só o plano de R$ 49 e deixa Completo fora de venda", () => {
     expect(formatPlanReais(4900)).toBe("R$ 49");
     expect(formatPlanReais(4950)).toBe("R$ 49,50");
     expect(CHECKOUT_AVAILABLE).toBe(false);
+    expect(PLAN_CHECKOUT_HREF).toBeNull();
+    expect(subscribeCtaLabel(BASE_PLAN.priceCents)).toBe("Assinar por R$ 49/mês");
     expect(COMPLETE_PLAN).toEqual({ name: "Completo", available: false, label: "Em breve" });
     expect(formatTrialEnd("2026-10-16T15:00:00.000Z", "America/Sao_Paulo")).toBe("sex, 16 out");
     expect(formatTrialEnd("2026-10-20T02:59:59.000Z", "America/Sao_Paulo")).toBe("seg, 19 out");
@@ -85,7 +100,7 @@ describe("aviso de teste no painel", () => {
   it("não promete devolução automática nem trata a marca no feminino", () => {
     const texts = [
       trialCopy(billing({ daysLeft: 1 }), "amanhã")?.body,
-      trialCopy(billing({ state: "paused", bookingsPaused: true, daysLeft: -1 }), "sex, 23 out")?.body,
+      trialCopy(billing({ state: "paused", bookingsPaused: true, daysLeft: -1 }), "na sexta, 2 de outubro")?.body,
     ].join(" ");
     expect(texts).not.toMatch(/automática/i);
     expect(texts).not.toMatch(/\ba AgendaPix\b/);

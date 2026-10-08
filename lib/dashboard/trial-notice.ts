@@ -1,6 +1,11 @@
 export const LAST_DAYS_THRESHOLD = 2;
-/** Não existe rota de contratação. O aviso mostra o preço e não finge um botão de assinar. */
+/**
+ * Não existe rota de contratação da assinatura (só `GET /api/businesses/{id}/billing`, que devolve o status).
+ * O teste pausado mostra o preço do plano e não aponta para um endereço inventado.
+ */
 export const CHECKOUT_AVAILABLE = false;
+/** Destino do botão de assinar. Fica nulo até existir uma rota real de checkout do plano. */
+export const PLAN_CHECKOUT_HREF: string | null = null;
 export const COMPLETE_PLAN = { name: "Completo", available: false, label: "Em breve" } as const;
 
 export type BillingView = {
@@ -65,6 +70,30 @@ const WEEKDAY_LABEL = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"] as cons
 const MONTH_LABEL = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"] as const;
 const WEEKDAY_INDEX = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 } as const;
 
+/** Data por extenso: "na sexta, 2 de outubro". Dia sem zero à esquerda, fuso informado. */
+export function formatTrialEndLong(isoDate: string, timeZone: string) {
+  const date = new Date(isoDate);
+  if (Number.isNaN(date.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("pt-BR", {
+    timeZone,
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).formatToParts(date);
+  const read = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? "";
+  const weekdayLong = read("weekday").toLocaleLowerCase("pt-BR");
+  const day = read("day");
+  const month = read("month").toLocaleLowerCase("pt-BR");
+  if (!weekdayLong || !/^[1-9]\d?$/.test(day) || !month) return "";
+  const weekday = weekdayLong.replace(/-feira$/u, "");
+  const article = weekdayLong.endsWith("-feira") ? "na" : "no";
+  return `${article} ${weekday}, ${day} de ${month}`;
+}
+
+export function subscribeCtaLabel(priceCents: number) {
+  return `Assinar por ${formatPlanReais(priceCents)}/mês`;
+}
+
 /** Data curta sem ponto de abreviação, para não virar "out.." quando a frase termina. */
 export function formatTrialEnd(isoDate: string, timeZone: string) {
   const date = new Date(isoDate);
@@ -82,11 +111,11 @@ export function trialCopy(billing: Pick<BillingView, "state" | "daysLeft" | "boo
   const tone = trialTone(billing);
   if (tone === "none") return null;
   if (tone === "paused") {
-    const when = endLabel ? ` em ${endLabel}` : "";
+    const when = endLabel ? ` ${endLabel}` : "";
     return {
       tone,
       title: "Novos agendamentos pausados",
-      body: `O teste grátis acabou${when} sem assinatura ativa. Clientes não marcam horários novos, e a página pública avisa que o agendamento online está pausado. Reservas já feitas continuam valendo.`,
+      body: `O teste grátis acabou${when}, e não há assinatura ativa.`,
     };
   }
   if (tone === "strong") {

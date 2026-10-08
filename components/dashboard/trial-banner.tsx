@@ -2,12 +2,15 @@
 
 import { useId, useRef } from "react";
 import { Check, Clock, Pause, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   CHECKOUT_AVAILABLE,
   COMPLETE_PLAN,
+  PLAN_CHECKOUT_HREF,
   formatPlanReais,
   formatTrialEnd,
+  formatTrialEndLong,
+  subscribeCtaLabel,
   trialCopy,
   trialTone,
   type BillingView,
@@ -20,7 +23,8 @@ const KEEPS = [
 
 export function TrialBanner({ billing, timeZone, publicHref }: { billing: BillingView; timeZone: string; publicHref?: string }) {
   const tone = trialTone(billing);
-  const copy = trialCopy(billing, formatTrialEnd(billing.trialEndsAt, timeZone));
+  const endLabel = tone === "paused" ? formatTrialEndLong(billing.trialEndsAt, timeZone) : formatTrialEnd(billing.trialEndsAt, timeZone);
+  const copy = trialCopy(billing, endLabel);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   if (!copy || tone === "none") return null;
@@ -62,11 +66,20 @@ export function TrialBanner({ billing, timeZone, publicHref }: { billing: Billin
             {KEEPS.map((item) => <li key={item} className="flex items-start gap-2"><Check aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-pix-bright" />{item}</li>)}
             <li className="flex items-start gap-2"><X aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-pix-bright" />Clientes não marcam horários novos</li>
           </ul>
-          <p className="mt-4 text-sm text-slab-muted">
+          <p className="mt-4 max-w-[62ch] text-sm leading-relaxed text-slab-muted">
             Sua página mostra que o agendamento online está pausado.
-            {publicHref && <> <a href={publicHref} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center font-semibold text-pix-bright underline underline-offset-4">Ver como fica<span className="sr-only"> (abre em nova aba)</span></a></>}
+            {publicHref && <> <a href={publicHref} target="_blank" rel="noopener noreferrer" className="font-semibold leading-[inherit] text-pix-bright underline decoration-1 underline-offset-2">Ver como fica<span className="sr-only"> (abre em nova aba)</span></a></>}
           </p>
-          <Button type="button" onClick={open} className="mt-3 w-full bg-pix-bright text-[#0b0b0c] hover:bg-pix-bright sm:w-auto">O que muda?</Button>
+          <div className="mt-4 flex flex-col items-start gap-2">
+            {PLAN_CHECKOUT_HREF ? (
+              <a href={PLAN_CHECKOUT_HREF} className={buttonVariants({ className: "w-full bg-pix-bright text-[#0b0b0c] hover:bg-pix-bright sm:w-auto" })}>
+                {subscribeCtaLabel(billing.plan.priceCents)}
+              </a>
+            ) : (
+              <Button type="button" onClick={open} className="w-full bg-pix-bright text-[#0b0b0c] hover:bg-pix-bright sm:w-auto">{subscribeCtaLabel(billing.plan.priceCents)}</Button>
+            )}
+            <button type="button" onClick={open} className="text-sm font-semibold leading-relaxed text-pix-bright underline decoration-1 underline-offset-2">O que muda?</button>
+          </div>
         </section>
       )}
       <dialog ref={dialogRef} aria-labelledby={titleId} className="m-auto w-[min(calc(100%-2rem),28rem)] max-h-[85vh] overflow-auto rounded-card border border-line bg-surface p-0 text-ink backdrop:bg-ink/50">

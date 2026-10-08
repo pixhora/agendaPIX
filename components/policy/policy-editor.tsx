@@ -5,11 +5,10 @@ import {
   LATE_CANCEL_OUTCOMES,
   NO_SHOW_OUTCOMES,
   POLICY_HOUR_VALUES,
-  depositPolicyPresets,
   type DepositPolicy,
 } from "@/lib/policy/schema";
 import { policyPreviewCopy } from "@/lib/dashboard/policy-preview";
-import { PRESET_CHOICES, isHarshPolicy, type PolicyFormState, type PresetChoice } from "@/lib/dashboard/policy-form";
+import { CUSTOM_CARD_SUMMARY, PRESET_CHOICES, isHarshPolicy, presetCardSummary, type PolicyFormState, type PresetChoice } from "@/lib/dashboard/policy-form";
 import { cn } from "@/lib/utils";
 
 const PRESET_LABEL: Record<PresetChoice, string> = {
@@ -78,7 +77,7 @@ export function PolicyEditor({
               <input className="sr-only" type="radio" name={`${idPrefix}-preset`} value={preset} checked={selected} onChange={() => onPreset(preset)} />
               {preset === "padrao" && <span className="text-[11px] font-bold text-pix">Recomendada</span>}
               <span className="font-display text-[15px] font-bold">{PRESET_LABEL[preset]}</span>
-              <span className="line-clamp-2 text-xs leading-snug text-muted">{policyPreviewCopy(depositPolicyPresets[preset], businessName, depositCents, contactWhatsapp).summary}</span>
+              <span className="text-xs leading-snug text-muted">{presetCardSummary(preset)}</span>
             </label>
           );
         })}
@@ -88,7 +87,7 @@ export function PolicyEditor({
         )}>
           <input className="sr-only" type="radio" name={`${idPrefix}-preset`} value="personalizada" checked={policy.preset === "personalizada"} onChange={() => onCustom({})} />
           <span className="font-display text-[15px] font-bold">Personalizada</span>
-          <span className="text-xs text-muted">Suas regras abaixo</span>
+          <span className="text-xs leading-snug text-muted">{CUSTOM_CARD_SUMMARY}</span>
         </label>
       </div>
 

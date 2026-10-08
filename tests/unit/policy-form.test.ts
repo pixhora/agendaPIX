@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { depositPolicyPresets, depositPolicySchema, PADRAO_DEPOSIT_POLICY, POLICY_HOUR_VALUES } from "../../lib/policy/schema";
 import {
+  CUSTOM_CARD_SUMMARY,
   futureBookingsWarning,
   initialPolicyForm,
   isHarshPolicy,
   patchPolicy,
   policiesMatch,
+  presetCardSummary,
   selectCustom,
   selectPreset,
   setChargeDeposit,
@@ -73,6 +75,15 @@ describe("estado do formulário da política", () => {
     const off = setChargeDeposit(start, false);
     expect(off.chargeDeposit).toBe(false);
     expect(off.policy).toEqual(start.policy);
+  });
+
+  it("resumo do card usa as horas do preset e não corta a frase", () => {
+    expect(presetCardSummary("flexivel")).toBe(`Devolve até ${depositPolicyPresets.flexivel.refundUntilHours} h antes`);
+    expect(presetCardSummary("padrao")).toBe(`Devolve até ${depositPolicyPresets.padrao.refundUntilHours} h antes`);
+    expect(depositPolicyPresets.rigida.refundUntilHours).toBeNull();
+    expect(presetCardSummary("rigida")).toBe("Sinal não é devolvido");
+    expect(CUSTOM_CARD_SUMMARY).toBe("Suas regras abaixo");
+    expect(presetCardSummary("flexivel")).not.toMatch(/…|\.\.\./);
   });
 
   it("aviso de reservas futuras usa o singular só para uma", () => {

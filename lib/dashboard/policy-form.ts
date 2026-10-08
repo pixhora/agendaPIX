@@ -8,6 +8,14 @@ import {
 export const PRESET_CHOICES = ["flexivel", "padrao", "rigida"] as const;
 export type PresetChoice = (typeof PRESET_CHOICES)[number];
 
+/** Resumo curto do card. As horas vêm do preset; personalizada não entra aqui. */
+export function presetCardSummary(preset: PresetChoice) {
+  const hours = depositPolicyPresets[preset].refundUntilHours;
+  return hours == null ? "Sinal não é devolvido" : `Devolve até ${hours} h antes`;
+}
+
+export const CUSTOM_CARD_SUMMARY = "Suas regras abaixo";
+
 export type PolicyFormState = {
   chargeDeposit: boolean;
   policy: DepositPolicy;
