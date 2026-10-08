@@ -1,12 +1,13 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
-import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { saveHours, saveService } from "@/app/dashboard/(owner)/actions";
+import { dayError, draftsFromHours, hoursError, hoursPayload, MULTI_INTERVAL_HOURS, withPause, withoutPause, type DayDraft, type HourRange } from "@/lib/dashboard/hours-form";
 import type { FormState } from "@/lib/dashboard/validation";
 import { cn } from "@/lib/utils";
 
@@ -63,34 +64,82 @@ export function ServiceForm({ businessId, service }: { businessId: string; servi
   </form>;
 }
 
-export function HoursForm({ businessId, hours }: { businessId: string; hours: { weekday: number; opensAt: string; closesAt: string }[] }) {
+const timeInputClass = "border-0 bg-transparent shadow-none outline-none hover:border-transparent focus-visible:border-transparent focus-visible:outline-none aria-invalid:border-0";
+const shellClass = "control-shell block rounded-field border border-line-strong/60 bg-surface has-[[aria-invalid=true]]:border-danger";
+
+export function HoursForm({ businessId, hours, multiInterval = MULTI_INTERVAL_HOURS }: { businessId: string; hours: HourRange[]; multiInterval?: boolean }) {
   const [state, action, pending] = useActionState(saveHours, {});
   const [showSuccess, setShowSuccess] = useState(true);
-  const [days, setDays] = useState(weekdays.map((_, weekday) => { const value = hours.find((hour) => hour.weekday === weekday); return { open: !!value, start: value?.opensAt.slice(0, 5) ?? "09:00", end: value?.closesAt.slice(0, 5) ?? "18:00" }; }));
-  function changeDay(weekday: number, value: Partial<(typeof days)[number]>) { setDays(days.map((day, index) => index === weekday ? { ...day, ...value } : day)); }
-  // Exibe de segunda a domingo (como a agenda semanal), mantendo os índices 0–6 do contrato.
+  const [clientError, setClientError] = useState("");
+  const [days, setDays] = useState<DayDraft[]>(() => draftsFromHours(hours, multiInterval));
+  function changeDay(weekday: number, value: Partial<DayDraft> | ((day: DayDraft) => DayDraft)) {
+    setDays(days.map((day, index) => index === weekday ? (typeof value === "function" ? value(day) : { ...day, ...value }) : day));
+    setClientError("");
+    setShowSuccess(false);
+  }
+  function submit(event: FormEvent<HTMLFormElement>) {
+    const error = hoursError(days, multiInterval);
+    if (error) {
+      event.preventDefault();
+      setClientError(error);
+      setShowSuccess(false);
+      return;
+    }
+    setClientError("");
+    setShowSuccess(true);
+  }
+  const payload = hoursPayload(days, multiInterval);
   const order = [1, 2, 3, 4, 5, 6, 0];
-  return <form action={action} onChange={() => setShowSuccess(false)} onSubmit={() => setShowSuccess(true)} className="grid gap-4" aria-busy={pending} aria-label="Horários de funcionamento">
+  const feedback = clientError ? { error: clientError } : state;
+  return <form action={action} onSubmit={submit} className="grid gap-4 pb-24 md:pb-0" aria-busy={pending} aria-label="Horários de funcionamento">
     <input type="hidden" name="businessId" value={businessId} />
+    {multiInterval ? <input type="hidden" name="hoursJson" value={JSON.stringify(payload)} /> : order.map((weekday) => {
+      const value = days[weekday];
+      return value?.open ? <span key={weekday}>
+        <input type="hidden" name={`open-${weekday}`} value="on" />
+        <input type="hidden" name={`start-${weekday}`} value={value.start} />
+        <input type="hidden" name={`end-${weekday}`} value={value.end} />
+      </span> : null;
+    })}
     <div className="divide-y divide-line rounded-field border border-line">
       {order.map((weekday) => {
         const day = weekdays[weekday];
         const value = days[weekday];
-        return <fieldset key={day} className="grid min-w-0 grid-cols-2 items-center gap-x-3 gap-y-2 px-3 py-3 sm:grid-cols-[minmax(10rem,1fr)_minmax(8rem,10rem)_minmax(8rem,10rem)] sm:gap-4 sm:px-4">
+        const invalid = clientError !== "" && dayError(value, multiInterval) === clientError;
+        return <fieldset key={day} className="grid min-w-0 gap-3 px-3 py-3 sm:px-4">
           <legend className="sr-only">{day}</legend>
-          <label className="col-span-2 flex min-h-11 items-center gap-3 sm:col-span-1">
-            <Switch name={`open-${weekday}`} checked={value.open} onChange={(event) => changeDay(weekday, { open: event.target.checked })} aria-label={`${day}: aberto`} />
+          <div className="flex min-h-11 min-w-0 items-center gap-3">
+            <Switch name={`open-visible-${weekday}`} checked={value.open} onChange={(event) => changeDay(weekday, { open: event.target.checked })} aria-label={`${day}: aberto`} disabled={pending} />
             <span className="font-semibold">{day}</span>
-            <span className={cn("ml-auto text-xs font-semibold sm:hidden", value.open ? "text-success" : "text-muted")}>{value.open ? "Aberto" : "Fechado"}</span>
-          </label>
-          <label className="grid gap-1 text-xs font-semibold text-muted" htmlFor={`start-${weekday}`}>Abre às<Input className="tabular-nums" id={`start-${weekday}`} name={`start-${weekday}`} type="time" value={value.start} onChange={(event) => changeDay(weekday, { start: event.target.value })} disabled={!value.open} required /></label>
-          <label className="grid gap-1 text-xs font-semibold text-muted" htmlFor={`end-${weekday}`}>Fecha às<Input className="tabular-nums" id={`end-${weekday}`} name={`end-${weekday}`} type="time" value={value.end} onChange={(event) => changeDay(weekday, { end: event.target.value })} disabled={!value.open} required /></label>
+            <span className={cn("ml-auto text-xs font-semibold", value.open ? "text-success" : "text-muted")}>{value.open ? "Aberto" : "Fechado"}</span>
+          </div>
+          <div className={cn("grid min-w-0 grid-cols-2 gap-3", !value.open && "dash-disabled")}>
+            <label className="grid min-w-0 gap-1 text-xs font-semibold text-muted" htmlFor={`start-${weekday}`}>Abre às
+              <span className={shellClass}><Input className={cn("tabular-nums", timeInputClass)} id={`start-${weekday}`} type="time" value={value.start} onChange={(event) => changeDay(weekday, { start: event.target.value })} disabled={!value.open || pending} required={value.open} aria-invalid={invalid || undefined} /></span>
+            </label>
+            <label className="grid min-w-0 gap-1 text-xs font-semibold text-muted" htmlFor={`end-${weekday}`}>Fecha às
+              <span className={shellClass}><Input className={cn("tabular-nums", timeInputClass)} id={`end-${weekday}`} type="time" value={value.end} onChange={(event) => changeDay(weekday, { end: event.target.value })} disabled={!value.open || pending} required={value.open} aria-invalid={invalid || undefined} /></span>
+            </label>
+          </div>
+          {multiInterval && value.open && (value.pause ? <div className="grid min-w-0 gap-2">
+            <div className="grid min-w-0 grid-cols-2 gap-3">
+              <label className="grid min-w-0 gap-1 text-xs font-semibold text-muted" htmlFor={`pause-start-${weekday}`}>Pausa das
+                <span className={shellClass}><Input className={cn("tabular-nums", timeInputClass)} id={`pause-start-${weekday}`} type="time" value={value.pause.start} onChange={(event) => changeDay(weekday, (current) => ({ ...current, pause: { start: event.target.value, end: current.pause?.end ?? "13:00" } }))} disabled={pending} aria-invalid={invalid || undefined} /></span>
+              </label>
+              <label className="grid min-w-0 gap-1 text-xs font-semibold text-muted" htmlFor={`pause-end-${weekday}`}>até
+                <span className={shellClass}><Input className={cn("tabular-nums", timeInputClass)} id={`pause-end-${weekday}`} type="time" value={value.pause.end} onChange={(event) => changeDay(weekday, (current) => ({ ...current, pause: { start: current.pause?.start ?? "12:00", end: event.target.value } }))} disabled={pending} aria-invalid={invalid || undefined} /></span>
+              </label>
+            </div>
+            <button type="button" className="min-h-11 w-fit rounded-full px-2 text-sm font-semibold text-ink underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" onClick={() => changeDay(weekday, withoutPause(value))}>Tirar pausa</button>
+          </div> : <button type="button" className="min-h-11 w-fit rounded-full px-2 text-sm font-semibold text-ink underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" onClick={() => changeDay(weekday, withPause(value))}>Adicionar pausa</button>)}
         </fieldset>;
       })}
     </div>
-    <p className="text-sm text-muted">Desligue os dias sem atendimento. Cada dia aceita um intervalo.</p>
+    <p className="text-sm text-muted">{multiInterval ? "Desligue os dias sem atendimento. Cada dia aceita uma pausa." : "Desligue os dias sem atendimento. Cada dia aceita um intervalo."}</p>
     {!days.some((day) => day.open) && <p role="status" className="rounded-field border border-warning/30 bg-warning-soft p-3 text-sm text-warning">Nenhum dia selecionado. Ao salvar, sua agenda ficará fechada para novos agendamentos.</p>}
-    <div aria-live="polite" className="empty:hidden">{pending ? <p role="status" className="text-sm text-muted">Salvando alterações…</p> : <Feedback state={state} showSuccess={showSuccess} />}</div>
-    <Button type="submit" disabled={pending} className="w-full sm:w-auto sm:justify-self-start">{pending ? "Salvando horários…" : "Salvar horários de funcionamento"}</Button>
+    <div aria-live="polite" className="empty:hidden">{pending ? <p role="status" className="flex items-center gap-2 text-sm text-muted"><Loader2 aria-hidden="true" className="size-4 motion-safe:animate-spin" />Salvando…</p> : <Feedback state={feedback} showSuccess={showSuccess} />}</div>
+    <div className="form-cta">
+      <Button type="submit" disabled={pending} className="w-full md:w-auto" aria-label={pending ? "Salvando horários de funcionamento" : undefined}>{pending ? <><Loader2 aria-hidden="true" className="size-4 motion-safe:animate-spin" />…</> : "Salvar horários de funcionamento"}</Button>
+    </div>
   </form>;
 }

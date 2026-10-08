@@ -35,6 +35,7 @@
   --danger-soft: #fbe9e7;
 
   --ring: #0b0b0c;
+  --shadow-focus: 0 0 0 4px color-mix(in srgb, var(--ring) 18%, transparent);
 
   --duration-feedback: 120ms;
   --duration-opening: 180ms;
@@ -70,6 +71,7 @@
   --danger-soft: #3a1714;
 
   --ring: #3fd0be;
+  --shadow-focus: 0 0 0 4px color-mix(in srgb, var(--ring) 18%, transparent);
   color-scheme: dark;
 }
 
@@ -237,6 +239,34 @@ h1, h2, h3, h4, h5, h6, .font-display {
   .bg-dots {
     background-image: radial-gradient(var(--line) 1px, transparent 1px);
     background-size: 18px 18px;
+  }
+  .control-shell:focus-within {
+    border-color: var(--ring);
+    box-shadow: var(--shadow-focus);
+  }
+  .dash-disabled {
+    opacity: 0.55;
+  }
+}
+
+.form-cta {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  margin-inline: -1rem;
+  border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--paper) 92%, transparent);
+  padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 768px) {
+  .form-cta {
+    position: static;
+    z-index: auto;
+    margin-inline: 0;
+    border-top: 0;
+    background: transparent;
+    padding: 0;
   }
 }
 
