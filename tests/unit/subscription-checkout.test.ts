@@ -3,6 +3,7 @@ import { BASE_PLAN } from "../../lib/billing/status";
 import { renewCtaLabel, subscribeCtaLabel } from "../../lib/dashboard/trial-notice";
 import {
   SUBSCRIPTION_ACTIVE_TOAST,
+  SUBSCRIPTION_MANUAL_ACTIVATION_HOURS,
   SUBSCRIPTION_ALREADY_ACTIVE_CODE,
   SUBSCRIPTION_ALREADY_ACTIVE_COPY,
   SUBSCRIPTION_UNAVAILABLE_COPY,
@@ -91,6 +92,7 @@ describe("checkout da assinatura", () => {
     expect(subscribeHelpCopy(6)).toBe("Abre o WhatsApp com o pedido pronto. Ativamos em até 6 h.");
     expect(subscribeHelpCopy(null)).toBe("Abre o WhatsApp com o pedido pronto.");
     expect(renewalDueCopy("2026-10-16T02:59:59.000Z", zone)).toBe("Sua assinatura vence em quinta, 15 de outubro.");
+    expect(SUBSCRIPTION_MANUAL_ACTIVATION_HOURS).toBe(2);
     expect(subscribeCtaLabel(BASE_PLAN.priceCents)).toBe("Assinar por R$ 49/mês");
     expect(renewCtaLabel(BASE_PLAN.priceCents)).toBe("Renovar por R$ 49/mês");
     expect(SUBSCRIPTION_UNAVAILABLE_COPY).toBe("A assinatura está indisponível no momento. Tente de novo mais tarde.");

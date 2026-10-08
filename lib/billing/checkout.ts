@@ -30,6 +30,8 @@ export const SUBSCRIPTION_ACTIVE_TOAST = "Assinatura ativa. Seus agendamentos on
 export const SUBSCRIPTION_ALREADY_ACTIVE_COPY = "Sua assinatura já está ativa.";
 export const SUBSCRIPTION_WHATSAPP_LABEL = "Falar no WhatsApp de novo";
 export const SUBSCRIPTION_PENDING_TITLE = "Pedido recebido";
+/** Decisão do Teteu: a ativação manual leva até 2 horas. A prévia usa este valor; a tela lê o que o back mandar. */
+export const SUBSCRIPTION_MANUAL_ACTIVATION_HOURS = 2;
 
 /** Renovação aparece com 3 dias corridos ou menos no fuso do negócio. Com 4, o botão some. */
 export const RENEWAL_WINDOW_DAYS = 3;
