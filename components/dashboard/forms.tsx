@@ -92,25 +92,26 @@ export function HoursForm({ businessId, hours, multiInterval = MULTI_INTERVAL_HO
   const order = [1, 2, 3, 4, 5, 6, 0];
   const feedback = clientError ? { error: clientError } : state;
   return <form action={action} onSubmit={submit} className="grid gap-4 pb-24 md:pb-0" aria-busy={pending} aria-label="Horários de funcionamento">
-    <input type="hidden" name="businessId" value={businessId} />
-    {multiInterval ? <input type="hidden" name="hoursJson" value={JSON.stringify(payload)} /> : order.map((weekday) => {
-      const value = days[weekday];
-      return value?.open ? <span key={weekday}>
-        <input type="hidden" name={`open-${weekday}`} value="on" />
-        <input type="hidden" name={`start-${weekday}`} value={value.start} />
-        <input type="hidden" name={`end-${weekday}`} value={value.end} />
-      </span> : null;
-    })}
+    <div className="hidden">
+      <input type="hidden" name="businessId" value={businessId} />
+      {multiInterval ? <input type="hidden" name="hoursJson" value={JSON.stringify(payload)} /> : order.map((weekday) => {
+        const value = days[weekday];
+        return value?.open ? <span key={weekday}>
+          <input type="hidden" name={`open-${weekday}`} value="on" />
+          <input type="hidden" name={`start-${weekday}`} value={value.start} />
+          <input type="hidden" name={`end-${weekday}`} value={value.end} />
+        </span> : null;
+      })}
+    </div>
     <div className="divide-y divide-line rounded-field border border-line">
       {order.map((weekday) => {
         const day = weekdays[weekday];
         const value = days[weekday];
         const invalid = clientError !== "" && dayError(value, multiInterval) === clientError;
-        return <fieldset key={day} className="grid min-w-0 gap-3 px-3 py-3 sm:px-4">
-          <legend className="sr-only">{day}</legend>
+        return <fieldset key={day} aria-labelledby={`hours-day-${weekday}`} className="grid min-w-0 gap-3 px-3 py-3 sm:px-4">
           <div className="flex min-h-11 min-w-0 items-center gap-3">
             <Switch name={`open-visible-${weekday}`} checked={value.open} onChange={(event) => changeDay(weekday, { open: event.target.checked })} aria-label={`${day}: aberto`} disabled={pending} />
-            <span className="font-semibold">{day}</span>
+            <span id={`hours-day-${weekday}`} className="font-semibold">{day}</span>
             <span className={cn("ml-auto text-xs font-semibold", value.open ? "text-success" : "text-muted")}>{value.open ? "Aberto" : "Fechado"}</span>
           </div>
           <div className={cn("grid min-w-0 grid-cols-2 gap-3", !value.open && "dash-disabled")}>

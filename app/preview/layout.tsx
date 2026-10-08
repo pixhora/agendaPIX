@@ -1,4 +1,4 @@
-import React from "react";
+import React, { Suspense } from "react";
 import type { Metadata } from "next";
 import { PreviewBadge } from "@/components/preview/PreviewBadge";
 
@@ -11,7 +11,9 @@ export default function PreviewLayout({ children }: { children: React.ReactNode 
   return (
     <div className="relative min-h-screen">
       {children}
-      <PreviewBadge />
+      <Suspense fallback={null}>
+        <PreviewBadge />
+      </Suspense>
     </div>
   );
 }
