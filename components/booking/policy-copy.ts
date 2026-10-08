@@ -121,87 +121,29 @@ export function mirrorCustomerPolicy(input: {
   };
 }
 
-/** Linhas da folha. No caso em cima da hora, some o "Até {data}" e entra o aviso. */
-export function policyLinesForCustomer(
-  lines: Array<{ title: string; body: string; tone?: "ok" | "warn" }> | null | undefined,
-  late: boolean,
-  hours: number | null,
-): Array<{ title: string; body: string; tone?: "ok" | "warn" }> {
-  const source = lines ?? [];
-  if (!late) return source;
-  const rest = source.filter((line) => !line.title.startsWith("Até "));
-  if (hours == null) return rest;
-  const notice = policyLateBookingNotice(hours);
-  if (rest.some((line) => line.body === notice || `${line.title}: ${line.body.charAt(0).toLowerCase()}${line.body.slice(1)}` === notice)) {
-    return rest;
-  }
-  return [
-    {
-      title: `Faltam menos de ${hours} h para o horário`,
-      body: "Se cancelar, o sinal não é devolvido.",
-      tone: "warn",
-    },
-    ...rest,
-  ];
-}
-
-/** Comprovante e ICS. Data de devolução só entra se o prazo ainda não chegou. */
+/** Data de devolução do comprovante local. Prazo vencido não vira frase: isso chega em `policy.text`. */
 export function receiptRefundCopy(input: {
   businessName: string;
-  hours: number | null;
   refundDeadlineAt: string | null | undefined;
   dateLabel: string;
   timeLabel: string;
   now?: Date;
-}): { tone: "ok" | "warn"; text: string | null } {
+}): string | null {
   const now = input.now ?? new Date();
   const deadline = input.refundDeadlineAt ? new Date(input.refundDeadlineAt).getTime() : Number.NaN;
-  if (!Number.isNaN(deadline) && now.getTime() < deadline) {
-    return { tone: "ok", text: policyReceiptRefund(input.businessName, input.dateLabel, input.timeLabel) };
-  }
-  if (!Number.isNaN(deadline) && input.hours != null) {
-    return { tone: "warn", text: policyLateBookingNotice(input.hours) };
-  }
-  return { tone: "ok", text: null };
+  if (Number.isNaN(deadline) || now.getTime() >= deadline) return null;
+  return policyReceiptRefund(input.businessName, input.dateLabel, input.timeLabel);
 }
 
-const OWNER_POLICY_MARK = /\bpainel\b|Devolver pelo AgendaPix/;
-const DATED_REFUND_MARK = /pode devolver o sinal até/;
+/** O comprovante mostra `policy.text` como chegou. Sem esse campo, usa a data só se ela ainda estiver no futuro. */
+export function confirmationPolicyText(policyText: string | null | undefined, datedFallback: string | null): string | null {
+  const incoming = policyText?.trim();
+  return incoming ? incoming : datedFallback;
+}
 
-/**
- * Texto do comprovante e do calendário.
- * `policy.text` do #29 em 7e74a59 é o texto do cliente, mas ainda inclui
- * "pode devolver o sinal até {data}" quando a reserva já está dentro do prazo.
- * Nesse caso o front mostra o aviso e esconde a data.
- */
-export function confirmationPolicyCopy(input: {
-  policyText?: string | null;
-  businessName: string;
-  hours: number | null;
-  refundDeadlineAt?: string | null;
-  dateLabel: string;
-  timeLabel: string;
-  now?: Date;
-}): { tone: "ok" | "warn"; text: string | null } {
-  const now = input.now ?? new Date();
-  const local = receiptRefundCopy({
-    businessName: input.businessName,
-    hours: input.hours,
-    refundDeadlineAt: input.refundDeadlineAt,
-    dateLabel: input.dateLabel,
-    timeLabel: input.timeLabel,
-    now,
-  });
-  const incoming = input.policyText?.trim() ?? "";
-  const safeIncoming = incoming && !OWNER_POLICY_MARK.test(incoming) ? incoming : "";
-  const deadline = input.refundDeadlineAt ? new Date(input.refundDeadlineAt).getTime() : Number.NaN;
-  const closed = !Number.isNaN(deadline) && now.getTime() >= deadline;
-  if (closed) {
-    if (safeIncoming && !DATED_REFUND_MARK.test(safeIncoming)) return { tone: "warn", text: safeIncoming };
-    return local.tone === "warn" ? local : { tone: "warn", text: null };
-  }
-  if (safeIncoming) return { tone: "ok", text: safeIncoming };
-  return local;
+/** Tom do cartão. O nome do campo no payload ainda vem do #29; até lá a prop fica desligada. */
+export function confirmationCardTone(lateBooking = false): "ok" | "warn" {
+  return lateBooking ? "warn" : "ok";
 }
 
 export function isFutureInstant(iso: string | null | undefined, now = new Date()): boolean {

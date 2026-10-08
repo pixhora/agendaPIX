@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { CONFIRMATION_ICONS } from "@/lib/icons/registry";
 import { ReservedTimeBand } from "./ReservedTimeBand";
-import { confirmationPolicyCopy, isFutureInstant } from "./policy-copy";
+import { confirmationCardTone, confirmationPolicyText, isFutureInstant, policyReceiptRefund } from "./policy-copy";
 import { REMAINDER_LABEL } from "@/lib/copy/booking-summary";
 
 interface BookingConfirmationProps {
@@ -17,8 +17,13 @@ interface BookingConfirmationProps {
   timezone: string;
   customerName: string;
   customerPhone: string;
-  /** Snapshot gravado na reserva. A tela só mostra o que o servidor mandou. */
+  /** Snapshot gravado na reserva. `policy.text` entra como o servidor mandou. */
   policy?: BookingPolicyView | null;
+  /**
+   * Pinta o cartão da política em âmbar. Desligado até o #29 nomear o booleano
+   * ao lado de `policy.text`. Aguardando nome do campo do #29.
+   */
+  lateBooking?: boolean;
   onNewBooking: () => void;
 }
 
@@ -71,23 +76,24 @@ export function BookingConfirmation({
   customerName,
   customerPhone,
   policy,
+  lateBooking = false,
   onNewBooking,
 }: BookingConfirmationProps) {
   const remainingCents = Math.max(0, service.priceCents - service.depositCents);
-  const hours = service.depositPolicy?.refundUntilHours ?? policy?.snapshot?.refundUntilHours ?? null;
   const refundDeadlineAt = policy?.refundDeadlineAt;
-  const refundCopy = confirmationPolicyCopy({
-    policyText: policy?.text,
-    businessName,
-    hours,
-    refundDeadlineAt,
-    dateLabel: refundDeadlineAt ? formatDateFull(refundDeadlineAt, timezone).replace(/^./, (letter) => letter.toLowerCase()) : "",
-    timeLabel: refundDeadlineAt ? formatTimeSlot(refundDeadlineAt, timezone) : "",
-  });
+  const datedRefund = refundDeadlineAt && isFutureInstant(refundDeadlineAt)
+    ? policyReceiptRefund(
+        businessName,
+        formatDateFull(refundDeadlineAt, timezone).replace(/^./, (letter) => letter.toLowerCase()),
+        formatTimeSlot(refundDeadlineAt, timezone),
+      )
+    : null;
+  const policyText = confirmationPolicyText(policy?.text, datedRefund);
+  const policyTone = confirmationCardTone(lateBooking);
   const rescheduleOpen = isFutureInstant(policy?.rescheduleDeadlineAt);
   const icsHref = useMemo(
-    () => buildIcs({ businessName, service, slot, customerName, policyLine: refundCopy.text }),
-    [businessName, service, slot, customerName, refundCopy.text],
+    () => buildIcs({ businessName, service, slot, customerName, policyLine: policyText }),
+    [businessName, service, slot, customerName, policyText],
   );
 
   const whatsappMessage = encodeURIComponent(
@@ -144,11 +150,11 @@ export function BookingConfirmation({
             <div className="flex justify-between border-t border-line pt-2 font-bold text-ink"><dt>{REMAINDER_LABEL}</dt><dd className="tabular-nums">{formatCurrency(remainingCents)}</dd></div>
           </dl>
         </div>
-        {refundCopy.text || (rescheduleOpen && policy?.rescheduleDeadlineAt) ? (
-          <div className="border-t border-line p-5" data-testid="policy-snapshot" data-tone={refundCopy.tone}>
+        {policyText || (rescheduleOpen && policy?.rescheduleDeadlineAt) ? (
+          <div className="border-t border-line p-5" data-testid="policy-snapshot" data-tone={policyTone}>
             <p className="text-sm font-semibold text-ink">Política do sinal</p>
-            {refundCopy.text ? (
-              <p className={refundCopy.tone === "warn" ? "mt-2 text-sm font-medium text-warning" : "mt-2 text-sm text-muted"}>{refundCopy.text}</p>
+            {policyText ? (
+              <p className={policyTone === "warn" ? "mt-2 text-sm font-medium text-warning" : "mt-2 text-sm text-muted"}>{policyText}</p>
             ) : null}
             {rescheduleOpen && policy?.rescheduleDeadlineAt ? (
               <p className="mt-1 text-sm text-muted">Remarcação até {formatDateFull(policy.rescheduleDeadlineAt, timezone).replace(/^./, (letter) => letter.toLowerCase())}, às {formatTimeSlot(policy.rescheduleDeadlineAt, timezone)}.</p>

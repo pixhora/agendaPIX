@@ -29,11 +29,13 @@ import { Button } from "@/components/ui/button";
 import { BusinessAvatar } from "@/components/ui/business-avatar";
 import { PREVIEW_PIX_COPY_PASTE, PREVIEW_PIX_QR } from "@/lib/preview/sample-pix-qr";
 import { PIX_HOLD_MS, previewLateSlot, previewOpeningSlot, previewPayDeadline } from "@/lib/preview/preview-schedule";
-import { mirrorCustomerPolicy, policyLinesForCustomer } from "@/components/booking/policy-copy";
-import { policyLineTone } from "@/components/booking/policy-gate";
+import { mirrorCustomerPolicy } from "@/components/booking/policy-copy";
+
+/** Frase de comprovante da reserva em cima da hora. A variante de crédito ainda não está na spec 06. */
+const LATE_BOOKING_POLICY_TEXT = "Este sinal não é devolvido se cancelar.";
 
 function previewStep(scene: PreviewScene): 1 | 2 | 3 | 4 {
-  if (scene === "dados" || scene === "politica" || scene === "politica-mudou" || scene === "cima-da-hora") return 3;
+  if (scene === "dados" || scene === "politica" || scene === "politica-mudou") return 3;
   if (scene === "pix" || scene === "pix-perto" || scene === "pix-expirado") return 4;
   return 1;
 }
@@ -61,7 +63,8 @@ function previewBooking(scene: PreviewScene, service: PublicService, slot: Avail
   };
 }
 
-function previewPolicy(slot: AvailabilitySlot): BookingPolicyView {
+function previewPolicy(slot: AvailabilitySlot, lateBooking: boolean): BookingPolicyView {
+  if (lateBooking) return { text: LATE_BOOKING_POLICY_TEXT };
   const deadline = new Date(new Date(slot.startsAt).getTime() - 24 * 60 * 60 * 1000).toISOString();
   return {
     refundDeadlineAt: deadline,
@@ -94,7 +97,8 @@ export function PreviewBookingFlow({ scene = "fluxo" }: { scene?: PreviewScene }
   const contactWhatsapp = scene === "indisponivel" || scene === "pausada" ? "5511987654321" : null;
   const openingService = services.find((service) => service.bookable !== false) ?? services[0];
   const [step, setStep] = useState<1 | 2 | 3 | 4>(() => previewStep(scene));
-  const [isCompleted, setIsCompleted] = useState(scene === "comprovante");
+  const lateBooking = scene === "cima-da-hora";
+  const [isCompleted, setIsCompleted] = useState(scene === "comprovante" || lateBooking);
 
   const [selectedService, setSelectedService] = useState<PublicService | null>(openingService);
   const [selectedSlot, setSelectedSlot] = useState<AvailabilitySlot | null>(openingSlot);
@@ -217,7 +221,8 @@ export function PreviewBookingFlow({ scene = "fluxo" }: { scene?: PreviewScene }
               timezone={MOCK_PUBLIC_BUSINESS.timezone}
               customerName={customerName}
               customerPhone={customerPhone}
-              policy={selectedSlot ? previewPolicy(selectedSlot) : null}
+              policy={previewPolicy(selectedSlot, lateBooking)}
+              lateBooking={lateBooking}
               onNewBooking={handleRestart}
             />
           </div>
@@ -350,7 +355,7 @@ export function PreviewBookingFlow({ scene = "fluxo" }: { scene?: PreviewScene }
           businessName={MOCK_PUBLIC_BUSINESS.name}
           serviceName={selectedService.name}
           depositLabel={formatCurrency(selectedService.depositCents)}
-          lines={policyLinesForCustomer(selectedService.policyDetails, policyLineTone(selectedService.depositPolicy, selectedSlot?.startsAt) === "warn", selectedService.depositPolicy?.refundUntilHours ?? null)}
+          lines={selectedService.policyDetails}
           text={selectedService.policySummary}
           notice={scene === "politica-mudou" ? POLICY_CHANGED_MESSAGE : null}
           onClose={() => setPolicyOpen(false)}

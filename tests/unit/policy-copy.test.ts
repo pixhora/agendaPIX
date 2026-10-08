@@ -3,10 +3,10 @@ import { readFileSync } from "node:fs";
 import {
   formatPolicyWindowTitle,
   mirrorCustomerPolicy,
+  confirmationCardTone,
+  confirmationPolicyText,
   policyHowToChange,
   policyLateCancelDetail,
-  policyLinesForCustomer,
-  confirmationPolicyCopy,
   policyNoShowCredit,
   policyNoShowRefund,
   policyOneLiner,
@@ -68,7 +68,7 @@ const CUSTOMER_SCREEN_FILES = [
 ];
 
 describe("telas do cliente", () => {
-  it("não renderizam policy.text nem citam painel ou Devolver pelo AgendaPix", () => {
+  it("não citam painel nem Devolver pelo AgendaPix, e só o comprovante lê policy.text", () => {
     const customerLines = [
       policyOneLiner(business, 24, "keep"),
       policyOneLiner(business, 24, "credit"),
@@ -131,53 +131,49 @@ describe("frases de crédito", () => {
   });
 });
 
-describe("policy.text do cliente", () => {
+describe("policy.text do comprovante", () => {
   const now = new Date("2026-10-08T21:54:00.000Z");
   const pastDeadline = "2026-10-08T14:30:00.000Z";
   const futureDeadline = "2026-10-10T14:30:00.000Z";
+  const dated = "Studio Bella pode devolver o sinal até sábado, 10 de outubro, às 11:30.";
 
-  it("mostra o texto do cliente quando o prazo ainda está aberto", () => {
-    const copy = confirmationPolicyCopy({
-      policyText: "Studio Bella pode devolver o sinal até sáb, 10 out, às 11:30. Cancele e Studio Bella pode devolver o sinal, ou remarque usando o sinal (1 vez).",
-      businessName: "Studio Bella",
-      hours: 24,
-      refundDeadlineAt: futureDeadline,
-      dateLabel: "sábado, 10 de outubro",
-      timeLabel: "11:30",
-      now,
-    });
-    expect(copy.tone).toBe("ok");
-    expect(copy.text).toMatch(/^Studio Bella pode devolver o sinal até sáb, 10 out/);
+  it("mostra policy.text como chegou, inclusive com data no passado", () => {
+    const incoming = "Studio Bella pode devolver o sinal até qui, 08 out, às 11:30. Cancele e Studio Bella pode devolver o sinal.";
+    expect(confirmationPolicyText(incoming, dated)).toBe(incoming);
+    expect(confirmationPolicyText("Este sinal não é devolvido se cancelar.", dated)).toBe("Este sinal não é devolvido se cancelar.");
   });
 
-  it("troca a data vencida que ainda vem em policy.text pelo aviso âmbar", () => {
-    const copy = confirmationPolicyCopy({
-      policyText: "Studio Bella pode devolver o sinal até qui, 08 out, às 11:30. Cancele e Studio Bella pode devolver o sinal.",
+  it("usa a data futura só quando policy.text não veio", () => {
+    expect(confirmationPolicyText(null, dated)).toBe(dated);
+    expect(confirmationPolicyText("  ", dated)).toBe(dated);
+    expect(confirmationPolicyText(undefined, null)).toBeNull();
+  });
+
+  it("não inventa frase de aviso nem a variante de crédito quando o prazo já passou", () => {
+    expect(receiptRefundCopy({
       businessName: "Studio Bella",
-      hours: 24,
       refundDeadlineAt: pastDeadline,
       dateLabel: "quinta-feira, 08 de outubro",
       timeLabel: "11:30",
       now,
-    });
-    expect(copy).toEqual({
-      tone: "warn",
-      text: "Faltam menos de 24 h para o horário: se cancelar, o sinal não é devolvido.",
-    });
-  });
-
-  it("não exibe a prévia do dono se ela ainda vier no campo", () => {
-    const copy = confirmationPolicyCopy({
-      policyText: OWNER_POLICY_TEXT,
+    })).toBeNull();
+    expect(receiptRefundCopy({
       businessName: "Studio Bella",
-      hours: 24,
       refundDeadlineAt: futureDeadline,
       dateLabel: "sábado, 10 de outubro",
       timeLabel: "11:30",
       now,
-    });
-    expect(copy.text).toBe("Studio Bella pode devolver o sinal até sábado, 10 de outubro, às 11:30.");
-    expect(copy.text).not.toMatch(/\bpainel\b|Devolver pelo AgendaPix/);
+    })).toBe(dated);
+  });
+
+  it("pinta o cartão em âmbar só com a flag, que nasce desligada", () => {
+    expect(confirmationCardTone()).toBe("ok");
+    expect(confirmationCardTone(false)).toBe("ok");
+    expect(confirmationCardTone(true)).toBe("warn");
+    const confirmation = readFileSync("components/booking/BookingConfirmation.tsx", "utf8");
+    expect(confirmation).toContain("lateBooking = false");
+    expect(confirmation).not.toContain("Este sinal não é devolvido se cancelar.");
+    expect(confirmation).not.toContain("vira crédito");
   });
 });
 
@@ -241,13 +237,12 @@ describe("reserva dentro e fora do prazo de devolução", () => {
     });
     const receipt = receiptRefundCopy({
       businessName: name,
-      hours: 24,
       refundDeadlineAt: view.refundDeadlineAt,
       dateLabel: "sábado, 10 de outubro",
       timeLabel: "11:30",
       now,
     });
-    expect(receipt).toEqual({ tone: "ok", text: "Studio Bella pode devolver o sinal até sábado, 10 de outubro, às 11:30." });
+    expect(receipt).toBe("Studio Bella pode devolver o sinal até sábado, 10 de outubro, às 11:30.");
     expect(policyLineTone({ refundUntilHours: 24 }, startsAt.toISOString(), now.getTime())).toBe("ok");
   });
 
@@ -263,23 +258,21 @@ describe("reserva dentro e fora do prazo de devolução", () => {
 
     const receipt = receiptRefundCopy({
       businessName: name,
-      hours: 24,
       refundDeadlineAt: view.refundDeadlineAt,
       dateLabel: "quinta-feira, 08 de outubro",
       timeLabel: "11:30",
       now,
     });
-    expect(receipt.tone).toBe("warn");
-    expect(receipt.text).toBe(view.summary);
-    expect(receipt.text).not.toMatch(/pode devolver o sinal até/);
-
-    const shown = policyLinesForCustomer(
-      [{ title: "Até qui, 08 out, 11:30", body: "Cancele e Studio Bella pode devolver o sinal, ou remarque usando o sinal (1 vez).", tone: "warn" }, view.details[1]!],
-      true,
-      24,
-    );
-    expect(shown.map((line) => line.title)).not.toContain("Até qui, 08 out, 11:30");
-    expect(shown[0]?.tone).toBe("warn");
+    expect(receipt).toBeNull();
     expect(policyLineTone({ refundUntilHours: 24 }, startsAt.toISOString(), now.getTime())).toBe("warn");
+
+    const preview = readFileSync("components/preview/PreviewBookingFlow.tsx", "utf8");
+    const flow = readFileSync("components/booking/BookingFlow.tsx", "utf8");
+    expect(preview).toContain('lines={selectedService.policyDetails}');
+    expect(flow).toContain("lines={selectedService.policyDetails}");
+    expect(preview).not.toContain("policyLinesForCustomer");
+    expect(preview).toContain("Este sinal não é devolvido se cancelar.");
+    expect(preview).not.toContain("Se cancelar, o sinal vira crédito para outro horário, válido por 60 dias.");
+    expect(preview).toContain("lateBooking={lateBooking}");
   });
 });
