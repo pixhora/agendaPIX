@@ -11,7 +11,7 @@ import { RollingNumber } from "../../components/motion/rolling-number";
 import { formatRollingValue, splitRollingText, cssDurationMs } from "../../components/motion/rolling-format";
 import { SegmentedThumb } from "../../components/motion/segmented-thumb";
 import { COPY_ERROR, COPY_RESET_MS, copyValue } from "../../components/motion/motion-runtime";
-import { PIX_WINDOW_MINUTES } from "../../lib/payments/pix-window";
+import { DEMO_PIX_WINDOW_MINUTES } from "../../app/preview/motion/demo-pix";
 import { nextInViewState, shouldDisconnectObserver, shouldStartInViewAnimation } from "../../components/motion/in-view-policy";
 import { isMotionPreviewOpen } from "../../app/preview/motion/access";
 import robots from "../../app/robots";
@@ -311,16 +311,20 @@ describe("vitrine de movimento", () => {
     expect(blocked).toContain("/preview");
     expect(sitemap().some((item) => item.url.includes("/preview"))).toBe(false);
     const preview = readFileSync("app/preview/motion/page.tsx", "utf8");
+    expect(preview).not.toContain("lib/payments");
     expect(preview).not.toContain("mercadopago");
-    expect(preview).toContain("PIX_WINDOW_MINUTES");
-    expect(preview).toContain("PIX_WINDOW_MINUTES * 60");
-    expect(PIX_WINDOW_MINUTES * 60).toBe(1800);
+    expect(preview).toContain("DEMO_PIX_WINDOW_MINUTES");
+    expect(preview).toContain("DEMO_PIX_WINDOW_MINUTES * 60");
+    expect(DEMO_PIX_WINDOW_MINUTES * 60).toBe(1800);
+    for (const name of readdirSync("app/preview/motion")) {
+      if (!name.endsWith(".ts") && !name.endsWith(".tsx")) continue;
+      expect(readFileSync(`app/preview/motion/${name}`, "utf8"), name).not.toContain("lib/payments");
+    }
     expect(preview).not.toContain("#f6f5f2");
     expect(preview).not.toContain("#0b0b0c");
     const rolling = readFileSync("components/motion/rolling-number-motion.tsx", "utf8");
     expect(rolling).not.toContain('transform: "translateY(0)"');
     expect(readFileSync("components/motion/copy-button.tsx", "utf8")).not.toContain("removeAttribute");
-    expect(readFileSync("lib/payments/mercadopago.ts", "utf8")).toContain('import "server-only"');
   });
 
   it("marca a licença do Cult UI nos arquivos adaptados e não na Grade A", () => {

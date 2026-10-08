@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { PIX_WINDOW_MINUTES } from "@/lib/payments/pix-window";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { BookingIsland } from "@/components/motion/booking-island";
 import { CopyButton } from "@/components/motion/copy-button";
@@ -10,6 +9,7 @@ import { GradeLoader } from "@/components/motion/grade-loader";
 import { RollingNumber } from "@/components/motion/rolling-number";
 import { SegmentedThumb } from "@/components/motion/segmented-thumb";
 import { isMotionPreviewOpen } from "@/app/preview/motion/access";
+import { DEMO_PIX_WINDOW_MINUTES } from "@/app/preview/motion/demo-pix";
 import "./stage.css";
 import { ThemeAppearanceDemo } from "@/app/preview/motion/theme-demo";
 
@@ -60,7 +60,7 @@ function GradeLoaderStage({ tone, title }: { tone: "light" | "dark"; title: stri
 
 export default function MotionPreviewPage() {
   if (!isMotionPreviewOpen(process.env.NODE_ENV)) notFound();
-  const pixWindowSeconds = PIX_WINDOW_MINUTES * 60;
+  const pixWindowSeconds = DEMO_PIX_WINDOW_MINUTES * 60;
 
   return (
     <div className="min-h-screen bg-paper px-4 pt-16 pb-24 text-ink">
@@ -87,7 +87,7 @@ export default function MotionPreviewPage() {
             </article>
             <article className="rounded-card bg-surface p-4 shadow-card ring-1 ring-line">
               <p className="text-sm text-muted">Tempo para pagar o sinal</p>
-              <RollingNumber id="preview-hold" value={PIX_WINDOW_MINUTES} suffix=" minutos" className="mt-2 font-display text-[40px] font-bold" />
+              <RollingNumber id="preview-hold" value={DEMO_PIX_WINDOW_MINUTES} suffix=" minutos" className="mt-2 font-display text-[40px] font-bold" />
             </article>
           </div>
         </section>

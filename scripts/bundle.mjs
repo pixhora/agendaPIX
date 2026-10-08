@@ -5,14 +5,7 @@
 import { existsSync, rmSync } from "node:fs";
 import { build } from "esbuild";
 
-const common = {
-  bundle: true,
-  platform: "node",
-  target: "node22",
-  external: ["pg-native"],
-  alias: { "server-only": "./scripts/empty-server-only.mjs" },
-  logLevel: "info",
-};
+const common = { bundle: true, platform: "node", target: "node22", external: ["pg-native"], logLevel: "info" };
 
 rmSync("dist", { recursive: true, force: true });
 await build({ ...common, entryPoints: ["scripts/migrate.mjs"], format: "cjs", outfile: "dist/migrate.cjs" });

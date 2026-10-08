@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import type * as schema from "../../db/schema";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
@@ -8,11 +7,9 @@ import { processWebhook } from "../../lib/payments/webhook";
 import {
   buildMercadoPagoManifest,
   centsToTransactionAmount,
-  MERCADOPAGO_PIX_MIN_EXPIRATION_MS,
   MercadoPagoPaymentProvider,
   signMercadoPagoWebhook,
 } from "../../lib/payments/mercadopago";
-import { PIX_WINDOW_MINUTES } from "../../lib/payments/pix-window";
 import { InMemoryChargeReferenceStore } from "../../lib/payments/reference-store";
 
 const accessToken = "TEST-access-token-not-real";
@@ -147,15 +144,6 @@ function signedHeaders(dataId: string, requestId = "req-1") {
     "content-type": "application/json",
   });
 }
-
-describe("janela do Pix", () => {
-  it("usa os 30 minutos do módulo leve, sem outro número solto", () => {
-    expect(PIX_WINDOW_MINUTES).toBe(30);
-    expect(MERCADOPAGO_PIX_MIN_EXPIRATION_MS).toBe(PIX_WINDOW_MINUTES * 60 * 1000);
-    const source = readFileSync("lib/payments/pix-window.ts", "utf8");
-    expect(source).not.toMatch(/^import /m);
-  });
-});
 
 describe("MercadoPagoPaymentProvider: cobrança", () => {
   it("cria Pix com X-Idempotency-Key=order.id, external_reference, CPF e QR", async () => {

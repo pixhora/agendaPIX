@@ -14,9 +14,6 @@ function withTsSuffix(path) {
 }
 
 export async function resolve(specifier, context, next) {
-  if (specifier === "server-only") {
-    return { shortCircuit: true, url: pathToFileURL(`${root}/scripts/empty-server-only.mjs`).href };
-  }
   if (specifier.startsWith("@/")) {
     const resolved = withTsSuffix(`${root}/${specifier.slice(2)}`);
     if (resolved) return { shortCircuit: true, url: resolved };
