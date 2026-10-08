@@ -7,7 +7,7 @@ import { decidePaidEvent } from "./rules";
 import type { PaidEvent } from "./provider";
 
 type Database = NodePgDatabase<typeof schema>;
-export type PaidOutcome = { outcome: string; reason: string | null };
+export type PaidOutcome = { outcome: string; reason: string | null; paymentId?: string; businessId?: string; bookingId?: string };
 
 async function audit(database: Database, input: { businessId: string; paymentId: string; bookingId: string; action: string; detail?: Record<string, unknown> }) {
   await database.insert(schema.paymentAudit).values({ ...input, detail: input.detail ?? null });
@@ -15,9 +15,10 @@ async function audit(database: Database, input: { businessId: string; paymentId:
 
 /**
  * Efeito de um pagamento confirmado, compartilhado pelo webhook e pela reconciliação.
- * Deduplica por (provider, eventId), aplica decidePaidEvent e resolve pagamento tardio
- * conforme businesses.latePaymentPolicy. Exige estar dentro de uma transação do chamador
- * quando o efeito precisa ser atômico com a entrega do webhook.
+ * Deduplica por (provider, eventId) e aplica decidePaidEvent. Pagamento dentro do hold
+ * confirma a reserva. Pagamento depois do hold não é tratado como confirmado até a
+ * reserva gravar `confirmed` (`late_rebooked`, horário ainda livre). Sem horário, devolve
+ * `late_no_slot` e o estorno roda depois do commit. Não há repasse: o Pix cai na conta do dono.
  */
 export async function applyPaidEvent(database: Database, providerName: string, event: PaidEvent, now = new Date()): Promise<PaidOutcome> {
   const payloadHash = hash(JSON.stringify(event));
@@ -51,17 +52,22 @@ export async function applyPaidEvent(database: Database, providerName: string, e
       await database.update(schema.payments).set({ status: "paid", paidAt: new Date(event.paidAt) })
         .where(and(eq(schema.payments.businessId, found.businessId), eq(schema.payments.id, payment.id)));
     }
+    const ids = { paymentId: payment.id, businessId: found.businessId, bookingId: booking.id };
     if (decision.confirm) {
       await database.update(schema.bookings).set({ status: "confirmed" })
         .where(and(eq(schema.bookings.businessId, found.businessId), eq(schema.bookings.id, booking.id), eq(schema.bookings.status, "pending_payment")));
-      result = { outcome: decision.outcome, reason: decision.reason };
+      await audit(database, {
+        businessId: found.businessId, paymentId: payment.id, bookingId: booking.id, action: "payment_confirmed",
+        detail: { eventId: event.eventId, statusDetail: event.statusDetail ?? null },
+      });
+      result = { outcome: decision.outcome, reason: decision.reason, ...ids };
     } else if (decision.outcome === "ignored" && decision.reason === "late_payment") {
       result = await resolveLatePayment(database, { business, payment, booking, event, now: processingNow });
     } else {
-      result = { outcome: decision.outcome, reason: decision.reason };
+      result = { outcome: decision.outcome, reason: decision.reason, ...ids };
     }
   }
-  await database.update(schema.paymentEvents).set(result).where(eq(schema.paymentEvents.id, inserted.id));
+  await database.update(schema.paymentEvents).set({ outcome: result.outcome, reason: result.reason }).where(eq(schema.paymentEvents.id, inserted.id));
   return result;
 }
 
@@ -73,26 +79,31 @@ async function resolveLatePayment(database: Database, input: {
   now: Date;
 }): Promise<PaidOutcome> {
   const { business, payment, booking, event, now } = input;
+  // Só vira confirmed se o horário ainda estiver livre. Antes dessa gravação o atraso
+  // não é tratado como confirmado. Não cria repasse.
   if (business.latePaymentPolicy === "rebook_if_free" && booking.startsAt > now) {
-    // Tenta reabrir o mesmo intervalo: se a exclusão gist não conflitar, confirma; senão marca reembolso.
     try {
       await database.update(schema.bookings).set({ status: "confirmed", expiresAt: null })
         .where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.id, booking.id), or(eq(schema.bookings.status, "expired"), eq(schema.bookings.status, "pending_payment"))));
       const [current] = await database.select().from(schema.bookings)
         .where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.id, booking.id))).limit(1);
       if (current.status === "confirmed") {
-        await audit(database, { businessId: business.id, paymentId: payment.id, bookingId: booking.id, action: "late_payment_rebooked", detail: { eventId: event.eventId } });
-        return { outcome: "processed", reason: "late_rebooked" };
+        await audit(database, { businessId: business.id, paymentId: payment.id, bookingId: booking.id, action: "late_payment_rebooked", detail: { eventId: event.eventId, statusDetail: event.statusDetail ?? null } });
+        return { outcome: "processed", reason: "late_rebooked", paymentId: payment.id, businessId: business.id, bookingId: booking.id };
       }
     } catch (error) {
       const cause = error instanceof Error && error.cause ? error.cause : error;
       if (!(typeof cause === "object" && cause !== null && "code" in cause && cause.code === "23P01")) throw error;
     }
   }
-  await database.update(schema.payments).set({ status: "refund_pending" })
-    .where(and(eq(schema.payments.businessId, business.id), eq(schema.payments.id, payment.id), eq(schema.payments.status, "paid")));
-  await audit(database, { businessId: business.id, paymentId: payment.id, bookingId: booking.id, action: "late_payment_refund_pending", detail: { eventId: event.eventId, policy: business.latePaymentPolicy } });
-  return { outcome: "ignored", reason: "late_payment_refund_pending" };
+  await audit(database, {
+    businessId: business.id, paymentId: payment.id, bookingId: booking.id, action: "late_no_slot",
+    detail: {
+      actor: "system", actorUserId: null, amountCents: payment.amountCents, status: null, mpRefundId: null,
+      failureCause: null, policyHash: null, reason: "late_no_slot", eventId: event.eventId, statusDetail: event.statusDetail ?? null,
+    },
+  });
+  return { outcome: "ignored", reason: "late_no_slot", paymentId: payment.id, businessId: business.id, bookingId: booking.id };
 }
 
 /** Consulta se um intervalo ainda está livre (para testes e decisões fora do update). */

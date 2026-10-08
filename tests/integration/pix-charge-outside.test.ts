@@ -9,6 +9,7 @@ import { databaseEnvSchema } from "../../lib/env";
 import { FakeChargeStore, FakePaymentProvider } from "../../lib/payments/fake";
 import { reconcileOnce } from "../../lib/payments/reconcile";
 import { applyPaidEvent } from "../../lib/payments/apply-paid";
+import { drizzleRefundPorts, settleAutomaticLateRefund } from "../../lib/payments/refund-flow";
 import { polledPaidEvent, type ChargeInput, type PaymentProvider } from "../../lib/payments/provider";
 import { hash } from "../../lib/bookings/service";
 import { padraoPolicyHash } from "../helpers/deposit-policy";
@@ -46,6 +47,8 @@ afterEach(async () => {
     await database.delete(schema.paymentEvents).where(inArray(schema.paymentEvents.externalId, externalIds));
     await database.delete(schema.paymentEvents).where(inArray(schema.paymentEvents.eventId, externalIds.map((id) => `poll:${id}`)));
   }
+  await database.delete(schema.paymentRefunds).where(eq(schema.paymentRefunds.businessId, businessId));
+  await database.delete(schema.ownerNotices).where(eq(schema.ownerNotices.businessId, businessId));
   await database.delete(schema.payments).where(eq(schema.payments.businessId, businessId));
   await database.delete(schema.bookings).where(eq(schema.bookings.businessId, businessId));
   await database.delete(schema.customers).where(eq(schema.customers.businessId, businessId));
@@ -92,7 +95,7 @@ describe("cobrança fora da transação", () => {
     expect(store.byIdempotencyKey.size).toBe(1);
   });
 
-  it("retry após timeout reenvia os dados do pagador (CPF) e recupera a cobrança já criada no gateway", async () => {
+  it("retry após timeout reenvia os dados do pagador e recupera a cobrança já criada no gateway", async () => {
     vi.stubEnv("PAYMENT_PROVIDER_TIMEOUT_MS", "150");
     provider.latencyMs = 400;
     const inputs: ChargeInput[] = [];
@@ -101,12 +104,12 @@ describe("cobrança fora da transação", () => {
       name: provider.name,
       createPixCharge: async (charge: ChargeInput) => {
         inputs.push(charge);
-        if (!charge.customer?.cpfCnpj) throw new Error("cpf_required");
         // Ignora o abort de propósito: o gateway real conclui a criação mesmo após o timeout local.
         return provider.createPixCharge(charge);
       },
       getCharge: provider.getCharge.bind(provider), findChargeByReference: provider.findChargeByReference.bind(provider),
       cancelCharge: provider.cancelCharge.bind(provider), verifyWebhook: provider.verifyWebhook.bind(provider),
+      refundCharge: provider.refundCharge.bind(provider),
     };
     const key = randomUUID();
     await expect(createBooking(slug, input(0), key, database, strict)).rejects.toMatchObject({ status: 503 });
@@ -128,7 +131,7 @@ describe("cobrança fora da transação", () => {
 
   it("duas retomadas concorrentes de creating não geram duas cobranças", async () => {
     const key = randomUUID();
-    const broken = { name: provider.name, createPixCharge: async () => { throw new Error("fail"); }, getCharge: provider.getCharge.bind(provider), findChargeByReference: provider.findChargeByReference.bind(provider), cancelCharge: provider.cancelCharge.bind(provider), verifyWebhook: provider.verifyWebhook.bind(provider) };
+    const broken = { name: provider.name, createPixCharge: async () => { throw new Error("fail"); }, getCharge: provider.getCharge.bind(provider), findChargeByReference: provider.findChargeByReference.bind(provider), cancelCharge: provider.cancelCharge.bind(provider), verifyWebhook: provider.verifyWebhook.bind(provider), refundCharge: provider.refundCharge.bind(provider) };
     await expect(createBooking(slug, input(0), key, database, broken)).rejects.toMatchObject({ status: 503 });
     const results = await Promise.allSettled([
       createBooking(slug, input(0), key, database, provider),
@@ -144,7 +147,7 @@ describe("cobrança fora da transação", () => {
 
 describe("reconciliação", () => {
   it("retoma creating preso (> stuck seconds) e anexa o QR", async () => {
-    const broken = { name: provider.name, createPixCharge: async () => { throw new Error("fail"); }, getCharge: provider.getCharge.bind(provider), findChargeByReference: provider.findChargeByReference.bind(provider), cancelCharge: provider.cancelCharge.bind(provider), verifyWebhook: provider.verifyWebhook.bind(provider) };
+    const broken = { name: provider.name, createPixCharge: async () => { throw new Error("fail"); }, getCharge: provider.getCharge.bind(provider), findChargeByReference: provider.findChargeByReference.bind(provider), cancelCharge: provider.cancelCharge.bind(provider), verifyWebhook: provider.verifyWebhook.bind(provider), refundCharge: provider.refundCharge.bind(provider) };
     await expect(createBooking(slug, input(0), randomUUID(), database, broken)).rejects.toMatchObject({ status: 503 });
     await database.update(schema.payments).set({ updatedAt: new Date(Date.now() - 120_000) }).where(eq(schema.payments.businessId, businessId));
     const report = await reconcileOnce(database, provider, { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50 });
@@ -183,12 +186,21 @@ describe("reconciliação", () => {
     const charge = provider.markPaid(data.payment!.externalId!);
     await database.transaction(async (tx) => {
       const result = await applyPaidEvent(tx, "fake", polledPaidEvent(charge, hash), new Date());
-      expect(result).toMatchObject({ outcome: "ignored", reason: "late_payment_refund_pending" });
+      expect(result).toMatchObject({ outcome: "ignored", reason: "late_no_slot" });
     });
+    const callsBefore = store.calls.refund;
+    expect(await settleAutomaticLateRefund(drizzleRefundPorts(database), provider, data.payment!.id, async () => {})).toBe("submitted");
+    expect(store.calls.refund).toBe(callsBefore + 1);
     const [payment] = await database.select().from(schema.payments).where(eq(schema.payments.id, data.payment!.id));
-    expect(payment.status).toBe("refund_pending");
+    expect(payment.status).toBe("refunded");
+    expect(payment.refundStatus).toBe("refunded");
+    const [lateBooking] = await database.select().from(schema.bookings).where(eq(schema.bookings.id, data.bookingId));
+    expect(lateBooking.status).toBe("expired");
     const audits = await database.select().from(schema.paymentAudit).where(eq(schema.paymentAudit.paymentId, data.payment!.id));
-    expect(audits.some((a) => a.action === "late_payment_refund_pending")).toBe(true);
+    expect(audits.some((a) => a.action === "late_no_slot" && (a.detail as { actor?: string; reason?: string } | null)?.actor === "system")).toBe(true);
+    expect(audits.some((a) => a.action === "automatic_refund")).toBe(true);
+    expect(await settleAutomaticLateRefund(drizzleRefundPorts(database), provider, data.payment!.id, async () => {})).toBe("done");
+    expect(store.calls.refund).toBe(callsBefore + 1);
   });
 
   it("pagamento tardio com rebook_if_free confirma se o horário estiver livre", async () => {
@@ -202,10 +214,12 @@ describe("reconciliação", () => {
     });
     const [booking] = await database.select().from(schema.bookings).where(eq(schema.bookings.id, data.bookingId));
     expect(booking.status).toBe("confirmed");
+    const [payment] = await database.select().from(schema.payments).where(eq(schema.payments.id, data.payment!.id));
+    expect(payment.status).toBe("paid");
   });
 
   it("sem provedor disponível (produção sem Mercado Pago) ainda expira holds e creating vencidos", async () => {
-    const broken = { name: provider.name, createPixCharge: async () => { throw new Error("fail"); }, getCharge: provider.getCharge.bind(provider), findChargeByReference: provider.findChargeByReference.bind(provider), cancelCharge: provider.cancelCharge.bind(provider), verifyWebhook: provider.verifyWebhook.bind(provider) };
+    const broken = { name: provider.name, createPixCharge: async () => { throw new Error("fail"); }, getCharge: provider.getCharge.bind(provider), findChargeByReference: provider.findChargeByReference.bind(provider), cancelCharge: provider.cancelCharge.bind(provider), verifyWebhook: provider.verifyWebhook.bind(provider), refundCharge: provider.refundCharge.bind(provider) };
     const { data: pending } = await createBooking(slug, input(0), randomUUID(), database, provider);
     await expect(createBooking(slug, input(1, "+5511999999901"), randomUUID(), database, broken)).rejects.toMatchObject({ status: 503 });
     const past = new Date(Date.now() - 1000);

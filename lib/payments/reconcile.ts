@@ -7,13 +7,15 @@ import { paymentsConfig, type PaymentsConfig } from "./config";
 import { applyPaidEvent } from "./apply-paid";
 import { getPaymentProvider } from "./index";
 import { polledPaidEvent, type PaymentProvider } from "./provider";
+import { createDrizzleReminderPorts, runManualRefundReminders } from "./manual-refund-reminders";
+import { drizzleRefundPorts, observeInProcessRefunds, retryAutomaticLateRefunds } from "./refund-flow";
 import { callProvider } from "./timeout";
 
 type Database = NodePgDatabase<typeof schema>;
 type PoolDatabase = Database & { $client: Pool };
 export type ReconcileReport = {
   stuckRetried: number; stuckCancelled: number; expiredCancelled: number;
-  polledPaid: number; audits: number; skippedLock: boolean;
+  polledPaid: number; refundsSettled: number; audits: number; skippedLock: boolean;
 };
 
 const RECONCILE_LOCK_KEY = 872014551; // constante estável do processo de reconciliação
@@ -67,7 +69,7 @@ export async function reconcileOnce(
       activeProvider = null;
     }
   }
-  const report: ReconcileReport = { stuckRetried: 0, stuckCancelled: 0, expiredCancelled: 0, polledPaid: 0, audits: 0, skippedLock: false };
+  const report: ReconcileReport = { stuckRetried: 0, stuckCancelled: 0, expiredCancelled: 0, polledPaid: 0, refundsSettled: 0, audits: 0, skippedLock: false };
   // Lock de sessão exige a mesma conexão PG durante toda a passagem (o Pool do Drizzle alternaria conexões).
   const client: PoolClient = await database.$client.connect();
   try {
@@ -78,11 +80,16 @@ export async function reconcileOnce(
     try {
       if (!activeProvider) {
         await expireLocalHolds(scoped, now, config.RECONCILE_BATCH_SIZE, report);
+        await sendManualRefundReminders(scoped, now);
         return report;
       }
       report.stuckRetried += await retryStuckCreating(scoped, activeProvider, config, now, report);
       report.expiredCancelled += await cancelExpiredPending(scoped, activeProvider, config, now, report);
       report.polledPaid += await pollPendingForMissedWebhooks(scoped, activeProvider, config, now, report);
+      const ports = drizzleRefundPorts(scoped);
+      report.refundsSettled += await retryAutomaticLateRefunds(ports, activeProvider, config.RECONCILE_BATCH_SIZE);
+      await observeInProcessRefunds(ports, activeProvider, config.RECONCILE_BATCH_SIZE, now);
+      await sendManualRefundReminders(scoped, now);
     } finally {
       await client.query("SELECT pg_advisory_unlock($1)", [RECONCILE_LOCK_KEY]);
     }
@@ -90,6 +97,15 @@ export async function reconcileOnce(
     client.release();
   }
   return report;
+}
+
+/** Só e-mail. Falha aqui não estorna e não derruba o resto da reconciliação. */
+async function sendManualRefundReminders(database: Database, now: Date) {
+  try {
+    await runManualRefundReminders(createDrizzleReminderPorts(database), now);
+  } catch {
+    // O próximo ciclo tenta de novo. Nada de dinheiro se move neste passo.
+  }
 }
 
 async function retryStuckCreating(database: Database, provider: PaymentProvider, config: PaymentsConfig, now: Date, report: ReconcileReport) {
@@ -104,9 +120,9 @@ async function retryStuckCreating(database: Database, provider: PaymentProvider,
       await database.transaction(async (tx) => {
         await lockBusiness(tx, payment.businessId);
         await expirePending(tx, payment.businessId, now);
-        const remote = await withTimeout(config, (signal) => provider.findChargeByReference(payment.id, { signal }));
+        const remote = await withTimeout(config, (signal) => provider.findChargeByReference(payment.id, { signal, businessId: payment.businessId }));
         if (remote) {
-          await withTimeout(config, (signal) => provider.cancelCharge(remote.externalId, { signal }));
+          await withTimeout(config, (signal) => provider.cancelCharge(remote.externalId, { signal, businessId: payment.businessId }));
           await tx.update(schema.payments).set({ externalId: remote.externalId, status: "expired" })
             .where(and(eq(schema.payments.id, payment.id), eq(schema.payments.status, "creating")));
         } else {
@@ -121,11 +137,11 @@ async function retryStuckCreating(database: Database, provider: PaymentProvider,
     }
     // Hold ainda válido: tenta criar/anexar; idempotência do gateway evita cobrança dupla.
     try {
-      let charge = await withTimeout(config, (signal) => provider.findChargeByReference(payment.id, { signal }));
+      let charge = await withTimeout(config, (signal) => provider.findChargeByReference(payment.id, { signal, businessId: payment.businessId }));
       if (!charge) {
         const created = await withTimeout(config, (signal) => provider.createPixCharge({
           idempotencyKey: payment.idempotencyKey, reference: payment.id, amountCents: payment.amountCents, expiresAt: payment.expiresAt,
-        }, { signal }));
+        }, { signal, businessId: payment.businessId }));
         charge = { ...created, reference: payment.id, status: "pending", paidAt: null };
       }
       if (charge.status === "paid" && charge.paidAt) {
@@ -168,7 +184,7 @@ async function cancelExpiredPending(database: Database, provider: PaymentProvide
       await expirePending(tx, payment.businessId, now);
     });
     try {
-      const remote = await withTimeout(config, (signal) => provider.cancelCharge(payment.externalId!, { signal }));
+      const remote = await withTimeout(config, (signal) => provider.cancelCharge(payment.externalId!, { signal, businessId: payment.businessId }));
       if (remote?.status === "paid" && remote.paidAt) {
         await database.transaction(async (tx) => { await applyPaidEvent(tx, provider.name, polledPaidEvent(remote, hash), now); });
         continue;
@@ -190,11 +206,11 @@ async function pollPendingForMissedWebhooks(database: Database, provider: Paymen
   for (const payment of rows) {
     if (!payment.externalId) continue;
     try {
-      const remote = await withTimeout(config, (signal) => provider.getCharge(payment.externalId!, { signal }));
+      const remote = await withTimeout(config, (signal) => provider.getCharge(payment.externalId!, { signal, businessId: payment.businessId }));
       if (!remote || remote.status !== "paid" || !remote.paidAt) continue;
       await database.transaction(async (tx) => {
         const result = await applyPaidEvent(tx, provider.name, polledPaidEvent(remote, hash), now);
-        if (result.outcome === "processed" || result.reason === "late_rebooked" || result.reason === "late_payment_refund_pending") {
+        if (result.outcome === "processed" || result.reason === "late_no_slot") {
           await audit(tx, { businessId: payment.businessId, paymentId: payment.id, bookingId: payment.bookingId, action: "polled_payment_applied", detail: { outcome: result.outcome, reason: result.reason } });
           report.audits++;
         }

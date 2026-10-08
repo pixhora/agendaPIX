@@ -11,13 +11,29 @@ describe("configuração antiabuso", () => {
     expect(bookingConfig({})).toEqual({
       BOOKING_TRUST_PROXY: false, BOOKING_CLIENT_IP_HEADER: "x-real-ip", BOOKING_TRUSTED_PROXY_HOPS: 1,
       BOOKING_RATE_LIMIT_PER_CLIENT: 10, BOOKING_RATE_LIMIT_PER_BUSINESS: 120,
-      BOOKING_HOLD_MINUTES: 10, BOOKING_MAX_PENDING_PER_CLIENT: 3, BOOKING_MAX_PENDING_PER_PHONE: 2, BOOKING_MAX_PENDING_PER_BUSINESS: 50,
+      BOOKING_HOLD_MINUTES: 30, BOOKING_MAX_PENDING_PER_CLIENT: 3, BOOKING_MAX_PENDING_PER_PHONE: 2, BOOKING_MAX_PENDING_PER_BUSINESS: 50,
     });
-    expect(bookingConfig({ BOOKING_HOLD_MINUTES: "", BOOKING_TRUST_PROXY: "" }).BOOKING_HOLD_MINUTES).toBe(10);
+    expect(bookingConfig({ BOOKING_HOLD_MINUTES: "", BOOKING_TRUST_PROXY: "" }).BOOKING_HOLD_MINUTES).toBe(30);
+    expect(bookingConfig({ BOOKING_HOLD_MINUTES: "28" }).BOOKING_HOLD_MINUTES).toBe(28);
+    expect(bookingConfig({ BOOKING_HOLD_MINUTES: "29" }).BOOKING_HOLD_MINUTES).toBe(29);
+  });
+  it("recusa hold abaixo de 28 porque o Pix ficaria com menos de 30 minutos", () => {
+    expect(() => bookingConfig({ BOOKING_HOLD_MINUTES: "27" })).toThrow(expect.objectContaining({
+      status: 503,
+      code: "booking_unavailable",
+      message: expect.stringContaining("28"),
+    }));
+    try {
+      bookingConfig({ BOOKING_HOLD_MINUTES: "27" });
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toMatch(/30 minutos/);
+      expect((error as Error).message).toMatch(/hold \+ 2/);
+    }
   });
   it.each([
     { BOOKING_TRUST_PROXY: "yes" }, { BOOKING_CLIENT_IP_HEADER: "forwarded" }, { BOOKING_TRUSTED_PROXY_HOPS: "0" },
-    { BOOKING_HOLD_MINUTES: "1" }, { BOOKING_HOLD_MINUTES: "31" }, { BOOKING_MAX_PENDING_PER_CLIENT: "0" },
+    { BOOKING_HOLD_MINUTES: "1" }, { BOOKING_HOLD_MINUTES: "27" }, { BOOKING_HOLD_MINUTES: "43201" }, { BOOKING_MAX_PENDING_PER_CLIENT: "0" },
     { BOOKING_RATE_LIMIT_PER_CLIENT: "20", BOOKING_RATE_LIMIT_PER_BUSINESS: "10" }, { BOOKING_MAX_PENDING_PER_BUSINESS: "abc" },
   ])("recusa configuração inválida %o com 503 em vez de cair em padrão silencioso", (env) => {
     expect(() => bookingConfig(env)).toThrow(expect.objectContaining({ status: 503, code: "booking_unavailable" }));

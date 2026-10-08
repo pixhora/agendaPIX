@@ -104,3 +104,17 @@ export async function sendSignInCodeEmail(email: string, otp: string) {
   const { env, transporter } = emailTransport();
   await transporter.sendMail({ from: env.SMTP_FROM, to: email, subject: message.subject, text: message.text, html: message.html });
 }
+
+export type OwnerMailer = (to: string, subject: string, text: string) => Promise<void>;
+
+/** Mesmo transporte do link de acesso. Não há central de avisos no painel: o e-mail é o aviso. */
+export async function sendOwnerEmail(to: string, subject: string, text: string, html?: string) {
+  const capture = process.env.MAGIC_LINK_CAPTURE_FILE;
+  if (capture) {
+    await mkdir(path.dirname(capture), { recursive: true });
+    await writeFile(capture, `${to}\n${subject}\n${text}\n`, "utf8");
+    return;
+  }
+  const { env, transporter } = emailTransport();
+  await transporter.sendMail({ from: env.SMTP_FROM, to, subject, text, ...(html ? { html } : {}) });
+}

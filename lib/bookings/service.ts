@@ -4,12 +4,13 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { getDb } from "../../db";
 import * as schema from "../../db/schema";
-import { authEnvSchema } from "../env";
+import { bookingAccessSecret } from "../env";
 import { HttpError } from "../http";
 import { paymentsConfig } from "../payments/config";
 import { assertMpConnectedForDeposit } from "../mercadopago-oauth/bookability";
 import { createDrizzleMpStore } from "../mercadopago-oauth/repository";
 import { getPaymentProvider } from "../payments";
+import { MpAccountNotConnectedError } from "../payments/seller-account";
 import { pixChargeSchema, type PaymentProvider, type PixCharge } from "../payments/provider";
 import { callProvider, ProviderTimeoutError } from "../payments/timeout";
 import { loadBookingAccess } from "../billing/load";
@@ -19,7 +20,9 @@ import { clientPolicyText, policySummary, refundWindowClosedAtBooking } from "..
 import { availableSlots, localDate } from "./availability";
 import { assertDepositBookable } from "./deposit-bookability";
 import { availabilitySchema, bookingInputSchema, requestKeySchema, slugSchema } from "./validation";
+import { depositSlotAllowed } from "./hold";
 import { bookingConfig, type BookingConfig } from "./config";
+import { getPublicBookingFacts } from "../marketing/facts";
 import { consumeBookingRateLimit, tenantScopedHash } from "./rate-limit";
 
 type Database = NodePgDatabase<typeof schema>;
@@ -32,9 +35,9 @@ export function chargeIdempotencyKey(businessId: string, requestKey: string) {
   return `${value.slice(0, 8)}-${value.slice(8, 12)}-${value.slice(12, 16)}-${value.slice(16, 20)}-${value.slice(20)}`;
 }
 function accessToken(businessId: string, bookingId: string) {
-  const env = authEnvSchema.safeParse(process.env);
-  if (!env.success) throw new HttpError(503, "booking_unavailable", "Agendamento indisponível. Tente novamente mais tarde.");
-  return createHmac("sha256", env.data.BETTER_AUTH_SECRET).update(`booking-access:v1:${businessId}:${bookingId}`).digest("base64url");
+  const secret = bookingAccessSecret();
+  if (!secret) throw new HttpError(503, "booking_unavailable", "Agendamento indisponível. Tente novamente mais tarde.");
+  return createHmac("sha256", secret).update(`booking-access:v1:${businessId}:${bookingId}`).digest("base64url");
 }
 export async function lockBusiness(database: Database, businessId: string) {
   await database.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${businessId}, 0))`);
@@ -76,6 +79,7 @@ function deadlineAt(startsAt: Date, hours: number | null) {
 export async function listPublicServices(slug: string, database: Database = getDb()) {
   const business = await businessBySlug(slug, database);
   const access = await loadBookingAccess(business, database);
+  const facts = await getPublicBookingFacts(business.id);
   const rows = await database.select({
     id: schema.services.id,
     name: schema.services.name,
@@ -92,8 +96,8 @@ export async function listPublicServices(slug: string, database: Database = getD
     logoUrl: null,
     contactWhatsapp: business.contactWhatsapp,
     bookingsPaused: access.bookingsPaused,
-    requiresPayerCpf: true,
-    pixRecipientDisplayName: business.name,
+    requiresPayerCpf: facts.requiresPayerCpf,
+    pixRecipientDisplayName: facts.pixRecipientDisplayName,
     services: rows.map((service) => ({
       id: service.id,
       name: service.name,
@@ -112,7 +116,10 @@ async function slotsFor(business: typeof schema.businesses.$inferSelect, service
     eq(schema.bookings.businessId, business.id), lt(schema.bookings.startsAt, new Date(day + 172800000)), gt(schema.bookings.endsAt, new Date(day - 86400000)),
     or(inArray(schema.bookings.status, ["confirmed", "completed"]), and(eq(schema.bookings.status, "pending_payment"), gt(schema.bookings.expiresAt, now))),
   ));
-  return availableSlots({ date, timezone: business.timezone, durationMinutes: service.durationMinutes, hours: hours ?? null, busy, now });
+  const slots = availableSlots({ date, timezone: business.timezone, durationMinutes: service.durationMinutes, hours: hours ?? null, busy, now });
+  if (service.depositCents <= 0) return slots;
+  const holdMinutes = bookingConfig().BOOKING_HOLD_MINUTES;
+  return slots.filter((slot) => depositSlotAllowed(slot.startsAt, now, holdMinutes));
 }
 export async function getAvailability(slug: string, query: unknown, database: Database = getDb()) {
   const input = availabilitySchema.parse(query);
@@ -134,24 +141,33 @@ export async function attachCreatedCharge(database: Database, payment: typeof sc
   if (charge.amountCents !== payment.amountCents) throw new Error("Cobrança divergente.");
   const [updated] = await database.update(schema.payments).set({
     status: "pending", externalId: charge.externalId, qrCodeDataUrl: charge.qrCodeDataUrl, copyPaste: charge.copyPaste,
-    // Mantém o vencimento da reserva (não o do gateway, que pode ser mais longo).
-    expiresAt: payment.expiresAt,
+    expiresAt: charge.expiresAt,
   }).where(and(eq(schema.payments.businessId, payment.businessId), eq(schema.payments.id, payment.id), eq(schema.payments.status, "creating"))).returning();
-  return updated ?? null;
+  if (!updated) return null;
+  // Reserva e Pix vencem no mesmo instante devolvido pelo gateway (ou no prazo único, se ele não devolver data).
+  await database.update(schema.bookings).set({ expiresAt: charge.expiresAt }).where(and(
+    eq(schema.bookings.businessId, payment.businessId),
+    eq(schema.bookings.id, payment.bookingId),
+    eq(schema.bookings.status, "pending_payment"),
+  ));
+  return updated;
 }
 
 async function createChargeOutsideTx(
   payment: typeof schema.payments.$inferSelect,
   provider: PaymentProvider,
-  customer?: { name: string; phone: string; cpfCnpj: string },
+  customer?: { name: string; phone: string; cpfCnpj?: string },
 ) {
   const timeoutMs = paymentsConfig().PAYMENT_PROVIDER_TIMEOUT_MS;
   try {
     return pixChargeSchema.parse(await callProvider(timeoutMs, (signal) => provider.createPixCharge({
       idempotencyKey: payment.idempotencyKey, reference: payment.id, amountCents: payment.amountCents, expiresAt: payment.expiresAt,
       customer,
-    }, { signal })));
+    }, { signal, businessId: payment.businessId })));
   } catch (error) {
+    if (error instanceof MpAccountNotConnectedError) {
+      throw new HttpError(409, "mp_account_not_connected", "Conecte o Mercado Pago ao AgendaPix para cobrar o sinal.");
+    }
     if (error instanceof ProviderTimeoutError) throw new HttpError(503, "payment_unavailable", "Não foi possível criar a cobrança. Tente novamente com a mesma chave.");
     throw new HttpError(503, "payment_unavailable", "Não foi possível criar a cobrança. Tente novamente com a mesma chave.");
   }
@@ -161,7 +177,7 @@ async function finalizeCreatingPayment(
   database: Database,
   payment: typeof schema.payments.$inferSelect,
   provider: PaymentProvider,
-  customer?: { name: string; phone: string; cpfCnpj: string },
+  customer?: { name: string; phone: string; cpfCnpj?: string },
 ) {
   const charge = await createChargeOutsideTx(payment, provider, customer);
   // Transação curta, sem lock do negócio: só anexa se ainda creating.
@@ -231,8 +247,11 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
   await consumeBookingRateLimit(database, business.id, clientIdentity, config);
   const clientHash = clientIdentity ? tenantScopedHash("booking-client:v1", business.id, clientIdentity) : null;
   const paymentProvider = provider ?? (undefined as PaymentProvider | undefined);
-  // Mesmo CPF em retries: requestHash cobre o corpo inteiro, então a chave repetida traz os mesmos dados do pagador.
-  const chargeCustomer = { name: input.customer.name, phone: input.customer.phone, cpfCnpj: input.customer.cpfCnpj };
+  const chargeCustomer = {
+    name: input.customer.name,
+    phone: input.customer.phone,
+    ...(input.customer.cpfCnpj ? { cpfCnpj: input.customer.cpfCnpj } : {}),
+  };
 
   // Transação curta com lock: reserva o horário e, se houver sinal, cria pagamento em "creating" sem chamar o gateway.
   const reserved = await database.transaction(async (transaction) => {
@@ -251,6 +270,9 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
     if (service.depositCents > 0) {
       assertDepositBookable(business);
       await assertMpConnectedForDeposit(business.id, { store: createDrizzleMpStore(database) });
+      if ((await getPublicBookingFacts()).requiresPayerCpf && !input.customer.cpfCnpj) {
+        throw new HttpError(400, "payer_cpf_required", "Informe o CPF para gerar o Pix.");
+      }
     }
     const policy = service.depositCents > 0 ? depositPolicySchema.parse(service.depositPolicy) : null;
     const currentHash = policy ? policyHashFor(policy, { depositCents: service.depositCents }) : null;
@@ -268,11 +290,15 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
     if (!slot) throw new HttpError(409, "slot_unavailable", "Esse horário não está disponível. Escolha outro.");
     if (service.depositCents > 0) await enforcePendingHoldLimits(transaction, business.id, { clientHash, phone: input.customer.phone }, now, config);
     const { cpfCnpj: _cpf, ...customerRow } = input.customer;
-    void _cpf; // CPF vai só ao gateway; não é persistido em customers.
+    void _cpf; // CPF antigo não entra no cadastro nem no pedido do Mercado Pago.
     const [insertedCustomer] = await transaction.insert(schema.customers).values({ businessId: business.id, ...customerRow }).onConflictDoNothing({ target: [schema.customers.businessId, schema.customers.phone] }).returning({ id: schema.customers.id });
     const [existingCustomer] = insertedCustomer ? [] : await transaction.select({ id: schema.customers.id }).from(schema.customers).where(and(eq(schema.customers.businessId, business.id), eq(schema.customers.phone, input.customer.phone))).limit(1);
     const customerId = (insertedCustomer ?? existingCustomer).id;
-    const expiresAt = service.depositCents > 0 ? new Date(Math.min(now.getTime() + config.BOOKING_HOLD_MINUTES * 60000, slot.startsAt.getTime())) : null;
+    const holdMs = config.BOOKING_HOLD_MINUTES * 60_000;
+    const expiresAt = service.depositCents > 0 ? new Date(now.getTime() + holdMs) : null;
+    if (expiresAt && !depositSlotAllowed(slot.startsAt, now, config.BOOKING_HOLD_MINUTES)) {
+      throw new HttpError(409, "slot_unavailable", "Esse horário não está disponível. Escolha outro.");
+    }
     const [booking] = await transaction.insert(schema.bookings).values({ businessId: business.id, serviceId: service.id, customerId, requestKey, requestHash, clientHash, ...slot,
       priceCents: service.priceCents, depositCents: service.depositCents, status: expiresAt ? "pending_payment" : "confirmed", expiresAt, createdAt: now,
       policySnapshot: policy, policyText: policy ? clientPolicyText(policy, { businessName: business.name, depositCents: service.depositCents, contactWhatsapp: business.contactWhatsapp, startsAt: slot.startsAt, bookedAt: now, timezone: business.timezone }) : null, policyHash: currentHash,
