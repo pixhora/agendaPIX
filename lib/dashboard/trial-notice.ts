@@ -1,4 +1,4 @@
-import { parseCheckout, type SubscriptionCheckout } from "../billing/checkout";
+import type { BillingCheckout } from "./subscription-ui";
 
 export const LAST_DAYS_THRESHOLD = 2;
 export const COMPLETE_PLAN = { name: "Completo", available: false, label: "Em breve" } as const;
@@ -10,7 +10,7 @@ export type BillingView = {
   bookingsPaused: boolean;
   plan: { name: string; priceCents: number };
   subscription: { status: string; currentPeriodEnd: string | null; provider: string | null } | null;
-  checkout: SubscriptionCheckout;
+  checkout: BillingCheckout;
 };
 
 export type TrialTone = "none" | "discreet" | "strong" | "paused";
@@ -22,7 +22,7 @@ type BillingSource = {
   bookingsPaused: boolean;
   plan: { name: string; priceCents: number };
   subscription: { status: string; currentPeriodEnd: Date | string | null; provider?: string | null } | null;
-  checkout?: unknown;
+  checkout: BillingCheckout;
 };
 
 function iso(value: Date | string | null) {
@@ -44,7 +44,7 @@ export function toBillingView(billing: BillingSource): BillingView {
           provider: billing.subscription.provider ?? null,
         }
       : null,
-    checkout: parseCheckout(billing.checkout),
+    checkout: billing.checkout,
   };
 }
 

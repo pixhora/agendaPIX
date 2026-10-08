@@ -8,7 +8,7 @@ import {
   SUBSCRIPTION_WHATSAPP_LABEL,
   subscribeHelpCopy,
   type SubscriptionCta,
-} from "@/lib/billing/checkout";
+} from "@/lib/dashboard/subscription-ui";
 import { renewCtaLabel, subscribeCtaLabel } from "@/lib/dashboard/trial-notice";
 import { SubscriptionCheckoutForm } from "./subscription-checkout-form";
 
@@ -33,12 +33,9 @@ export function SubscriptionCheckout({
 
   if (cta.kind === "subscribe" && action) {
     return (
-      <>
-        <SubscriptionCheckoutForm action={action}>
-          <Button type="submit" className="w-full bg-pix-bright text-[#0b0b0c] hover:bg-pix-bright sm:w-auto">{subscribeCtaLabel(priceCents)}<span className="sr-only"> (abre em nova aba)</span></Button>
-        </SubscriptionCheckoutForm>
-        <p className={`max-w-[62ch] text-sm leading-relaxed ${muted}`}>{subscribeHelpCopy(cta.activationHours)}</p>
-      </>
+      <SubscriptionCheckoutForm action={action} note={<p className={`max-w-[62ch] text-sm leading-relaxed ${muted}`}>{subscribeHelpCopy(cta.activationHours)}</p>}>
+        <Button type="submit" className="w-full bg-pix-bright text-[#0b0b0c] hover:bg-pix-bright sm:w-auto">{subscribeCtaLabel(priceCents)}<span className="sr-only"> (abre em nova aba)</span></Button>
+      </SubscriptionCheckoutForm>
     );
   }
 

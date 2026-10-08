@@ -1,8 +1,5 @@
 import { Check, Clock, Pause, X } from "lucide-react";
-import {
-  subscriptionCheckoutAction,
-  subscriptionCta,
-} from "@/lib/billing/checkout";
+import { subscriptionCheckoutAction, subscriptionCta } from "@/lib/dashboard/subscription-ui";
 import {
   formatPlanReais,
   formatTrialEnd,

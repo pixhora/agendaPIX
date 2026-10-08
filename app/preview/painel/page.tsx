@@ -3,7 +3,7 @@ import { ServiceBlockNotice } from "@/components/dashboard/service-block-notice"
 import { TrialBanner } from "@/components/dashboard/trial-banner";
 import { depositPolicyPresets, type DepositPolicy } from "@/lib/policy/schema";
 import { policyListLabel } from "@/lib/policy/text";
-import { absentCheckout, SUBSCRIPTION_MANUAL_ACTIVATION_HOURS, type SubscriptionCheckout } from "@/lib/billing/checkout";
+import { SUBSCRIPTION_MANUAL_ACTIVATION_HOURS, unavailableCheckout, type BillingCheckout } from "@/lib/dashboard/subscription-ui";
 import type { BillingView } from "@/lib/dashboard/trial-notice";
 
 const BUSINESS_ID = "4eeb8372-55cd-4d11-910e-62d4e4374011";
@@ -33,23 +33,24 @@ function billing(patch: Partial<BillingView>): BillingView {
     bookingsPaused: false,
     plan: { name: "AgendaPix", priceCents: 4900 },
     subscription: null,
-    checkout: absentCheckout(),
+    checkout: unavailableCheckout(),
     ...patch,
   };
 }
 
 const REQUESTED_TODAY = "2026-10-08T23:10:00.000Z";
+const REQUEST_ID = "6f1c2a40-7b52-4a1e-9c33-0d5e8a7b1c24";
 
-function previewCheckout(mode: string | undefined): SubscriptionCheckout {
-  if (mode === "assinar") return { available: true, unavailableReason: null, activationHours: SUBSCRIPTION_MANUAL_ACTIVATION_HOURS, pendingRequest: null };
+function previewCheckout(mode: string | undefined): BillingCheckout {
+  if (mode === "assinar") return { provider: "manual", available: true, unavailableReason: null, activationHours: SUBSCRIPTION_MANUAL_ACTIVATION_HOURS, pendingRequest: null };
   if (mode === "pedido" || mode === "pedido-hoje" || mode === "pedido-outro-dia") {
-    return { available: true, unavailableReason: null, activationHours: SUBSCRIPTION_MANUAL_ACTIVATION_HOURS, pendingRequest: { requestedAt: REQUESTED_TODAY } };
+    return { provider: "manual", available: true, unavailableReason: null, activationHours: SUBSCRIPTION_MANUAL_ACTIVATION_HOURS, pendingRequest: { id: REQUEST_ID, requestedAt: REQUESTED_TODAY } };
   }
   if (mode === "pedido-sem-horas") {
-    return { available: true, unavailableReason: null, activationHours: null, pendingRequest: { requestedAt: REQUESTED_TODAY } };
+    return { provider: "manual", available: false, unavailableReason: "config_missing", activationHours: null, pendingRequest: { id: REQUEST_ID, requestedAt: REQUESTED_TODAY } };
   }
-  if (mode === "config-missing") return { available: true, unavailableReason: "config_missing", activationHours: null, pendingRequest: null };
-  return absentCheckout();
+  if (mode === "config-missing" || mode === "indisponivel") return unavailableCheckout();
+  return unavailableCheckout();
 }
 
 function previewNow(mode: string | undefined) {
@@ -76,7 +77,7 @@ export default async function PreviewPainelPage({ searchParams }: { searchParams
       daysLeft: 3,
       bookingsPaused: false,
       subscription: { status: "active", currentPeriodEnd: "2026-10-16T02:59:59.000Z", provider: null },
-      checkout: { available: true, unavailableReason: null, activationHours: SUBSCRIPTION_MANUAL_ACTIVATION_HOURS, pendingRequest: null },
+      checkout: { provider: "manual", available: true, unavailableReason: null, activationHours: SUBSCRIPTION_MANUAL_ACTIVATION_HOURS, pendingRequest: null },
     })
     : tone === "paused"
     ? billing({ state: "paused", daysLeft: -1, bookingsPaused: true, trialEndsAt: "2026-10-03T02:59:59.000Z", checkout: previewCheckout(query.checkout) })

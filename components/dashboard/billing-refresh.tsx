@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { subscriptionActivatedToast } from "@/lib/billing/checkout";
+import { subscriptionActivatedToast } from "@/lib/dashboard/subscription-ui";
 
 const toasted = new Set<string>();
 

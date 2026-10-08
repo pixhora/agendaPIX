@@ -1,11 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { SUBSCRIPTION_ALREADY_ACTIVE_COPY, subscriptionRaceMessage } from "@/lib/billing/checkout";
+import {
+  SUBSCRIPTION_LOGIN_PATH,
+  SUBSCRIPTION_UNAVAILABLE_COPY,
+  subscriptionPostEffect,
+} from "@/lib/dashboard/subscription-ui";
 
-/** O envio nativo abre o WhatsApp. Se o back responder 409, a aba fecha e o aviso fica neste card. */
-export function SubscriptionCheckoutForm({ action, children }: { action: string; children: ReactNode }) {
-  const [race, setRace] = useState<string | null>(null);
+/** O envio nativo abre o WhatsApp. O JSON de erro fica nesta aba, decidido pelo `code`. */
+export function SubscriptionCheckoutForm({ action, children, note }: { action: string; children: ReactNode; note?: ReactNode }) {
+  const [notice, setNotice] = useState<string | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
   const timerRef = useRef<number | null>(null);
 
   useEffect(() => () => {
@@ -17,7 +22,7 @@ export function SubscriptionCheckoutForm({ action, children }: { action: string;
     const popup = window.open("", "agendapix-subscription-checkout");
     if (!popup) return;
     event.preventDefault();
-    setRace(null);
+    setNotice(null);
     form.target = popup.name || "agendapix-subscription-checkout";
     form.submit();
     if (timerRef.current != null) window.clearInterval(timerRef.current);
@@ -34,12 +39,24 @@ export function SubscriptionCheckoutForm({ action, children }: { action: string;
         if (timerRef.current != null) window.clearInterval(timerRef.current);
         return;
       }
-      const message = subscriptionRaceMessage(text);
-      if (!message) return;
+      const effect = subscriptionPostEffect(text);
+      if (!effect) return;
       if (timerRef.current != null) window.clearInterval(timerRef.current);
       popup.close();
-      setRace(message || SUBSCRIPTION_ALREADY_ACTIVE_COPY);
+      if (effect.kind === "login") {
+        window.location.assign(SUBSCRIPTION_LOGIN_PATH);
+        return;
+      }
+      if (effect.kind === "unavailable") {
+        setUnavailable(true);
+        return;
+      }
+      setNotice(effect.text);
     }, 200);
+  }
+
+  if (unavailable) {
+    return <p role="status" className="max-w-[62ch] text-sm leading-relaxed">{SUBSCRIPTION_UNAVAILABLE_COPY}</p>;
   }
 
   return (
@@ -47,7 +64,8 @@ export function SubscriptionCheckoutForm({ action, children }: { action: string;
       <form method="post" action={action} target="_blank" rel="noopener" onSubmit={onSubmit} className="w-full sm:w-auto">
         {children}
       </form>
-      {race && <p role="status" className="max-w-[62ch] text-sm leading-relaxed">{race}</p>}
+      {notice && <p role="status" className="max-w-[62ch] text-sm leading-relaxed">{notice}</p>}
+      {note}
     </div>
   );
 }
