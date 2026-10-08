@@ -26,7 +26,7 @@ export function demoSteps(requiresPayerCpf: boolean): readonly string[] {
 export type FaqItem = { id: string; question: string; answer: string };
 
 const refundAnswer =
-  "Você escolhe a regra de cada serviço: até quando o cliente pode cancelar ou remarcar e o que acontece se ele faltar. Ele lê essa regra antes de pagar e ela aparece no comprovante. Se a regra manda devolver, você devolve pelo AgendaPix. O botão Devolver pelo AgendaPix, no painel, abre uma confirmação. O valor sai da sua conta Mercado Pago. Nada é devolvido sozinho.";
+  "Você escolhe a regra de cada serviço: até quando o cliente pode cancelar ou remarcar e o que acontece se ele faltar. Ele lê essa regra antes de pagar e ela aparece no comprovante. Se a regra manda devolver, você devolve pelo AgendaPix. O botão Devolver pelo AgendaPix, no painel, abre uma confirmação. O valor sai do saldo da sua conta Mercado Pago. Pix pago fora do prazo com o horário já ocupado é devolvido sozinho, o valor inteiro, e você recebe um e-mail.";
 
 /** A copy não lê pixRecipientDisplayName: na landing ele vem null. */
 export function faqItems(facts: PublicBookingFacts): FaqItem[] {
