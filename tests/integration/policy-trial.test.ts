@@ -81,6 +81,7 @@ describe("política do sinal, teste grátis e WhatsApp", () => {
     expect(created.data.policy?.text?.toLowerCase()).not.toContain("repass");
     const viewed = await getBookingPayment(slug, created.data.bookingId, `Bearer ${created.data.accessToken}`, database);
     expect(viewed.policy?.text).toBe(created.data.policy?.text);
+    expect(viewed.policy?.refundWindowClosedAtBooking).toBe(false);
     expect(created.data.policy?.snapshot).toMatchObject(PADRAO_DEPOSIT_POLICY);
 
     await expect(createBooking(slug, input({ policyHash: "a".repeat(64) }), randomUUID(), database, provider)).rejects.toMatchObject({

@@ -1,9 +1,13 @@
-import type { DepositPolicy } from "./schema";
+import { CREDIT_VALIDITY_DAYS, type DepositPolicy } from "./schema";
+
+/** Trecho de crédito sem o nome do negócio. As frases do cliente reaproveitam isto. */
+export const CREDIT_PHRASE = `crédito para outro horário, válido por ${CREDIT_VALIDITY_DAYS} dias`;
 
 export type PolicySummaryContext = {
   depositCents: number;
   startsAt?: Date;
   now?: Date;
+  bookedAt?: Date;
   businessName?: string;
 };
 
@@ -18,6 +22,7 @@ export type PolicyDetailsContext = {
   contactWhatsapp: string | null;
   startsAt?: Date;
   now?: Date;
+  bookedAt?: Date;
   timezone?: string;
 };
 
@@ -30,6 +35,8 @@ export type PolicyIcsContext = {
   businessName: string;
   depositCents: number;
   startsAt?: Date;
+  now?: Date;
+  bookedAt?: Date;
   timezone?: string;
 };
 
@@ -67,12 +74,31 @@ function deadlineParts(date: Date, timezone: string) {
   };
 }
 
-function beforeDeadline(startsAt: Date, hours: number, now: Date) {
-  return now.getTime() < startsAt.getTime() - hours * 60 * 60 * 1000;
+function creditSentence(businessName: string) {
+  return `o sinal vira crédito por ${CREDIT_VALIDITY_DAYS} dias em ${businessName}`;
 }
 
-function creditSentence(businessName: string) {
-  return `o sinal vira crédito por 60 dias em ${businessName}`;
+function referenceAt(context: { bookedAt?: Date; now?: Date }) {
+  return context.bookedAt ?? context.now ?? new Date();
+}
+
+export function refundWindowClosedAtBooking(policy: DepositPolicy, startsAt: Date, bookedAt: Date) {
+  return policy.refundUntilHours !== null && bookedAt.getTime() >= startsAt.getTime() - policy.refundUntilHours * 3_600_000;
+}
+
+function windowClosed(policy: DepositPolicy, context: { startsAt?: Date; bookedAt?: Date; now?: Date }) {
+  return Boolean(context.startsAt && refundWindowClosedAtBooking(policy, context.startsAt, referenceAt(context)));
+}
+
+function closedWindowLine(policy: DepositPolicy) {
+  const hours = policy.refundUntilHours ?? 0;
+  if (policy.lateCancel === "credit") return `Faltam menos de ${hours} h para o horário: se cancelar, o sinal vira ${CREDIT_PHRASE}.`;
+  return `Faltam menos de ${hours} h para o horário: se cancelar, o sinal não é devolvido.`;
+}
+
+function closedWindowReceipt(policy: DepositPolicy) {
+  if (policy.lateCancel === "credit") return `Se cancelar, o sinal vira ${CREDIT_PHRASE}.`;
+  return "Este sinal não é devolvido se cancelar.";
 }
 
 function refundByBusiness(businessName: string) {
@@ -114,7 +140,7 @@ function mentionsRefund(policy: DepositPolicy) {
 
 function closerToTime(policy: DepositPolicy, businessName: string) {
   if (policy.lateCancel === "credit") {
-    return `Mais perto da hora, o sinal vira crédito para outro horário, válido por ${policy.creditValidityDays} dias.`;
+    return `Mais perto da hora, o sinal vira ${CREDIT_PHRASE}.`;
   }
   return `Mais perto da hora, o sinal fica com ${businessName}.`;
 }
@@ -139,12 +165,12 @@ function withinDeadlineBody(policy: DepositPolicy, businessName: string) {
   return "O sinal não é devolvido nem remarcado.";
 }
 
-function creditDetail(policy: DepositPolicy, businessName: string) {
-  return `crédito para outro horário em ${businessName}, válido por ${policy.creditValidityDays} dias`;
+function creditDetail(businessName: string) {
+  return `crédito para outro horário em ${businessName}, válido por ${CREDIT_VALIDITY_DAYS} dias`;
 }
 
-function receiptSentence(policy: DepositPolicy, context: { businessName: string; startsAt?: Date; timezone?: string }) {
-  if (policy.refundUntilHours === null || !context.startsAt) return "";
+function receiptSentence(policy: DepositPolicy, context: { businessName: string; startsAt?: Date; timezone?: string; bookedAt?: Date; now?: Date }) {
+  if (policy.refundUntilHours === null || !context.startsAt || windowClosed(policy, context)) return "";
   const deadline = new Date(context.startsAt.getTime() - policy.refundUntilHours * 3_600_000);
   const { data, hora } = deadlineParts(deadline, context.timezone ?? "America/Sao_Paulo");
   return `${context.businessName} pode devolver o sinal até ${data}, às ${hora}.`;
@@ -152,10 +178,7 @@ function receiptSentence(policy: DepositPolicy, context: { businessName: string;
 
 export function policySummary(policy: DepositPolicy, context: PolicySummaryContext): string {
   if (context.depositCents <= 0) return "Sem sinal.";
-  const now = context.now ?? new Date();
-  if (context.startsAt && policy.refundUntilHours !== null && !beforeDeadline(context.startsAt, policy.refundUntilHours, now)) {
-    return `Faltam menos de ${policy.refundUntilHours} h para o horário: se cancelar, o sinal não é devolvido.`;
-  }
+  if (windowClosed(policy, context)) return closedWindowLine(policy);
   if (policy.refundUntilHours !== null) return refundWindowSummary(policy, context.businessName ?? "");
   if (policy.rescheduleUntilHours !== null) return `O sinal não é devolvido, mas dá para remarcar até ${policy.rescheduleUntilHours} h antes.`;
   return "O sinal não é devolvido nem remarcado.";
@@ -170,13 +193,16 @@ export function policyListLabel(policy: DepositPolicy, depositCents: number): st
 
 export function policyDetails(policy: DepositPolicy, context: PolicyDetailsContext): PolicyDetailLine[] {
   const timezone = context.timezone ?? "America/Sao_Paulo";
-  const now = context.now ?? new Date();
   const refundHours = policy.refundUntilHours;
   const rescheduleHours = policy.rescheduleUntilHours;
-  const insideRefundWindow = Boolean(context.startsAt && refundHours !== null && !beforeDeadline(context.startsAt, refundHours, now));
+  const closed = windowClosed(policy, context);
   const hours = refundHours ?? rescheduleHours;
   let title = "Dentro do prazo";
-  if (hours !== null && context.startsAt) {
+  let windowBody = withinDeadlineBody(policy, context.businessName);
+  if (closed) {
+    title = "Perto do horário";
+    windowBody = closedWindowLine(policy);
+  } else if (hours !== null && context.startsAt) {
     const deadline = new Date(context.startsAt.getTime() - hours * 3_600_000);
     const { data, hora } = deadlineParts(deadline, timezone);
     title = `Até ${data}, ${hora}`;
@@ -190,11 +216,11 @@ export function policyDetails(policy: DepositPolicy, context: PolicyDetailsConte
   const refundHow = `A devolução não é automática: quem devolve é ${context.businessName}, da conta Mercado Pago do negócio, depois de confirmar o cancelamento.`;
 
   return [
-    { title, body: withinDeadlineBody(policy, context.businessName), tone: insideRefundWindow ? "warn" : "ok" },
+    { title, body: windowBody, tone: closed ? "warn" : "ok" },
     {
       title: "Depois disso",
       body: policy.lateCancel === "credit"
-        ? `Se cancelar, o sinal vira ${creditDetail(policy, context.businessName)}.`
+        ? `Se cancelar, o sinal vira ${creditDetail(context.businessName)}.`
         : `Se cancelar, o sinal fica com ${context.businessName}.`,
       tone: policy.lateCancel === "retain" ? "warn" : "ok",
     },
@@ -203,7 +229,7 @@ export function policyDetails(policy: DepositPolicy, context: PolicyDetailsConte
       body: policy.noShow === "refund"
         ? `${context.businessName} pode devolver o sinal.`
         : policy.noShow === "credit"
-          ? `O sinal vira crédito para outro horário, válido por ${policy.creditValidityDays} dias.`
+          ? `O sinal vira ${CREDIT_PHRASE}.`
           : `O sinal fica com ${context.businessName}.`,
       tone: policy.noShow === "retain" ? "warn" : "ok",
     },
@@ -227,6 +253,7 @@ export function ownerPreview(policy: DepositPolicy, context: OwnerPreviewContext
 
 export function policyIcsText(policy: DepositPolicy, context: PolicyIcsContext): string {
   if (context.depositCents <= 0) return "";
+  if (windowClosed(policy, context)) return closedWindowReceipt(policy);
   const receipt = receiptSentence(policy, context);
   if (receipt) return receipt;
   if (policy.refundUntilHours !== null) return refundWindowSummary(policy, context.businessName);

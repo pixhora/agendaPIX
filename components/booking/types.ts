@@ -76,6 +76,7 @@ export interface BookingResponse {
     snapshot: unknown;
     refundDeadlineAt: string | null;
     rescheduleDeadlineAt: string | null;
+    refundWindowClosedAtBooking: boolean;
   } | null;
 }
 

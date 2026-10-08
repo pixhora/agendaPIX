@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { PADRAO_DEPOSIT_POLICY, type DepositPolicy } from "../../lib/policy/schema";
-import { clientPolicyText, ownerPreview, policyDetails, policyIcsText, policyListLabel, policySummary } from "../../lib/policy/text";
+import { CREDIT_PHRASE, clientPolicyText, ownerPreview, policyDetails, policyIcsText, policyListLabel, policySummary, refundWindowClosedAtBooking } from "../../lib/policy/text";
 
 const HOURS = [null, 2, 12, 24, 48] as const;
 const LATE = ["retain", "credit"] as const;
@@ -46,9 +46,7 @@ describe("texto da política do sinal", () => {
     expect(policySummary(creditPolicy(), { depositCents: 2000, businessName: "Barbearia do Zé" })).toBe(
       "Com 24 h de antecedência, Barbearia do Zé pode devolver o sinal. Mais perto da hora, o sinal vira crédito para outro horário, válido por 60 dias.",
     );
-    expect(policySummary({ ...creditPolicy(), creditValidityDays: 45 } as unknown as DepositPolicy, { depositCents: 2000, businessName: "Barbearia do Zé" })).toContain(
-      "válido por 45 dias.",
-    );
+    expect(policySummary({ ...creditPolicy(), creditValidityDays: 45 } as unknown as DepositPolicy, { depositCents: 2000, businessName: "Barbearia do Zé" })).toContain(CREDIT_PHRASE);
     expect(policySummary(PADRAO_DEPOSIT_POLICY, { depositCents: 0, businessName: "Barbearia do Zé" })).toBe("Sem sinal.");
     const startsAt = new Date("2030-01-02T15:00:00.000Z");
     expect(policySummary(PADRAO_DEPOSIT_POLICY, { depositCents: 2000, businessName: "Barbearia do Zé", startsAt, now: new Date("2030-01-02T12:00:00.000Z") }))
@@ -92,7 +90,7 @@ describe("texto da política do sinal", () => {
     const twice = policyDetails({ ...PADRAO_DEPOSIT_POLICY, maxReschedules: 2 } as unknown as DepositPolicy, { ...context, contactWhatsapp: null });
     expect(twice[0]?.body).toContain("(2 vezes)");
 
-    expect(policyIcsText(PADRAO_DEPOSIT_POLICY, { businessName: "Barbearia do Zé", depositCents: 2000, startsAt })).toBe(
+    expect(policyIcsText(PADRAO_DEPOSIT_POLICY, { businessName: "Barbearia do Zé", depositCents: 2000, startsAt, now })).toBe(
       "Barbearia do Zé pode devolver o sinal até qua, 07 out, às 11:30.",
     );
 
@@ -102,7 +100,7 @@ describe("texto da política do sinal", () => {
       expect(blob.toLowerCase()).not.toContain("repass");
       expect(blob).not.toMatch(/(?:^|\s)(?:o|a|do|da|no|na|pelo|pela)\s+Barbearia do Zé/);
     }
-    const receipt = policyIcsText(PADRAO_DEPOSIT_POLICY, { businessName: "Barbearia do Zé", depositCents: 2000, startsAt });
+    const receipt = policyIcsText(PADRAO_DEPOSIT_POLICY, { businessName: "Barbearia do Zé", depositCents: 2000, startsAt, now });
     expect(receipt).not.toMatch(/painel|AgendaPix/);
   });
 
@@ -118,7 +116,7 @@ describe("texto da política do sinal", () => {
             for (const contactWhatsapp of ["+5511999999999", null]) {
               const summary = policySummary(current, { depositCents: 2000, businessName: "Barbearia do Zé", startsAt, now });
               const details = policyDetails(current, { businessName: "Barbearia do Zé", contactWhatsapp, startsAt, now, timezone: "America/Sao_Paulo" });
-              const ics = policyIcsText(current, { businessName: "Barbearia do Zé", depositCents: 2000, startsAt, timezone: "America/Sao_Paulo" });
+              const ics = policyIcsText(current, { businessName: "Barbearia do Zé", depositCents: 2000, startsAt, now, timezone: "America/Sao_Paulo" });
               const stored = clientPolicyText(current, { businessName: "Barbearia do Zé", depositCents: 2000, contactWhatsapp, startsAt, now, timezone: "America/Sao_Paulo" });
               const blob = [summary, ics, stored, ...details.map((line) => `${line.title} ${line.body}`)].join("\n");
               expect(blob).not.toMatch(forbidden);
@@ -137,6 +135,56 @@ describe("texto da política do sinal", () => {
     });
     expect(stored.startsWith("Barbearia do Zé pode devolver o sinal até qua, 07 out, às 11:30.")).toBe(true);
     expect(stored).not.toBe(ownerPreview(PADRAO_DEPOSIT_POLICY, { businessName: "Barbearia do Zé", depositCents: 2000 }));
+  });
+
+  it("reserva dentro e fora do prazo de devolução", () => {
+    const startsAt = new Date("2026-10-09T14:30:00.000Z");
+    const bookedInside = new Date("2026-10-08T22:00:00.000Z");
+    const bookedOutside = new Date(startsAt.getTime() - 48 * 3_600_000);
+    const deadline = "qui, 08 out";
+    const dated = /até\s+(dom|seg|ter|qua|qui|sex|sáb)|Até\s+(dom|seg|ter|qua|qui|sex|sáb)/;
+    const base = { businessName: "Barbearia do Zé", timezone: "America/Sao_Paulo" as const, startsAt };
+
+    expect(refundWindowClosedAtBooking(PADRAO_DEPOSIT_POLICY, startsAt, bookedInside)).toBe(true);
+    expect(refundWindowClosedAtBooking(creditPolicy(), startsAt, bookedOutside)).toBe(false);
+
+    const insideRetain = "Faltam menos de 24 h para o horário: se cancelar, o sinal não é devolvido.";
+    const insideCredit = `Faltam menos de 24 h para o horário: se cancelar, o sinal vira ${CREDIT_PHRASE}.`;
+    expect(policySummary(PADRAO_DEPOSIT_POLICY, { depositCents: 2000, ...base, bookedAt: bookedInside })).toBe(insideRetain);
+    expect(policySummary(creditPolicy(), { depositCents: 2000, ...base, bookedAt: bookedInside })).toBe(insideCredit);
+    expect(policyIcsText(PADRAO_DEPOSIT_POLICY, { ...base, depositCents: 2000, bookedAt: bookedInside })).toBe("Este sinal não é devolvido se cancelar.");
+    expect(policyIcsText(creditPolicy(), { ...base, depositCents: 2000, bookedAt: bookedInside })).toBe(`Se cancelar, o sinal vira ${CREDIT_PHRASE}.`);
+
+    for (const current of [PADRAO_DEPOSIT_POLICY, creditPolicy()]) {
+      const context = { ...base, contactWhatsapp: "+5511999999999" as string | null, bookedAt: bookedInside };
+      const details = policyDetails(current, context);
+      const summary = policySummary(current, { depositCents: 2000, ...base, bookedAt: bookedInside });
+      const ics = policyIcsText(current, { ...base, depositCents: 2000, bookedAt: bookedInside });
+      const stored = clientPolicyText(current, { ...context, depositCents: 2000 });
+      expect(details[0]?.tone).toBe("warn");
+      expect(details[0]?.title).not.toMatch(/^Até /);
+      expect(details.find((line) => line.title === "Se faltar")?.body).toBe(
+        current.noShow === "credit" ? `O sinal vira ${CREDIT_PHRASE}.` : "O sinal fica com Barbearia do Zé.",
+      );
+      const blob = [summary, ics, stored, ...details.flatMap((line) => [line.title, line.body])].join("\n");
+      expect(blob).not.toMatch(dated);
+      expect(blob).not.toContain(deadline);
+      expect(blob).not.toContain("pode devolver o sinal até");
+    }
+
+    const openContext = { ...base, contactWhatsapp: null, bookedAt: bookedOutside };
+    const openDetails = policyDetails(PADRAO_DEPOSIT_POLICY, openContext);
+    expect(openDetails[0]?.title).toBe(`Até ${deadline}, 11:30`);
+    expect(openDetails[0]?.body).toBe("Cancele e Barbearia do Zé pode devolver o sinal, ou remarque usando o sinal (1 vez).");
+    expect(policyIcsText(PADRAO_DEPOSIT_POLICY, { ...base, depositCents: 2000, bookedAt: bookedOutside })).toBe(
+      `Barbearia do Zé pode devolver o sinal até ${deadline}, às 11:30.`,
+    );
+    expect(policySummary(PADRAO_DEPOSIT_POLICY, { depositCents: 2000, ...base, bookedAt: bookedOutside })).toBe(
+      "Com 24 h de antecedência, Barbearia do Zé pode devolver o sinal. Mais perto da hora, o sinal fica com Barbearia do Zé.",
+    );
+    expect(clientPolicyText(creditPolicy(), { ...openContext, depositCents: 2000, contactWhatsapp: "+5511999999999" })).toContain(
+      `Se cancelar, o sinal vira crédito para outro horário em Barbearia do Zé, válido por 60 dias.`,
+    );
   });
 });
 

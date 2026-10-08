@@ -15,6 +15,7 @@ interface BookingConfirmationProps {
   customerName: string;
   customerPhone: string;
   policyText?: string | null;
+  refundWindowClosedAtBooking?: boolean;
   contactWhatsapp?: string | null;
   onNewBooking: () => void;
 }
@@ -71,6 +72,7 @@ export function BookingConfirmation({
   customerName,
   customerPhone,
   policyText,
+  refundWindowClosedAtBooking,
   contactWhatsapp,
   onNewBooking,
 }: BookingConfirmationProps) {
@@ -135,7 +137,7 @@ export function BookingConfirmation({
       </article>
 
       {policyText && (
-        <p className="rounded-card border border-line bg-surface p-4 text-sm text-muted">{policyText}</p>
+        <p className={refundWindowClosedAtBooking ? "rounded-card border border-warning/30 bg-warning-soft p-4 text-sm text-warning" : "rounded-card border border-line bg-surface p-4 text-sm text-muted"}>{policyText}</p>
       )}
 
       <div className="grid gap-3 sm:grid-cols-2">
