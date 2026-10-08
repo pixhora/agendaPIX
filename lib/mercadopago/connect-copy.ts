@@ -1,7 +1,4 @@
-/** Textos da tela de conexão (spec v3.4). A versão do aceite continua 2026-10-08.v3.2. */
-
-export const MP_AUTO_REFUND_ACK_TEXT =
-  "Entendi e autorizo: quando um Pix chegar depois do prazo e o horário já estiver ocupado, o AgendaPix devolve sozinho o valor inteiro, do saldo da minha conta Mercado Pago, e me avisa por e-mail. Se essa devolução falhar, eu devolvo manualmente em até 7 dias corridos, contados do aviso.";
+/** Textos da tela de conexão além do aceite. O texto da caixa vem de `MP_CONNECT_CONSENT_TEXT`. */
 
 export const MP_AUTO_REFUND_ACK_HINT =
   "Obrigatório para conectar. Essa devolução é regra do AgendaPix para proteger seus clientes e não pode ser desligada.";

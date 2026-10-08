@@ -4,22 +4,21 @@ import { useEffect, useRef, type ReactNode, type RefObject } from "react";
 import { ExternalLink, Loader2 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { MP_CONNECT_CONSENT_VERSION } from "@/lib/mercadopago/consent";
-import { MP_AUTO_REFUND_ACK_HINT, MP_AUTO_REFUND_ACK_TEXT } from "@/lib/mercadopago/connect-copy";
+import { MP_CONNECT_CONSENT_TEXT, MP_CONNECT_CONSENT_VERSION } from "@/lib/mercadopago/consent";
+import { MP_AUTO_REFUND_ACK_HINT } from "@/lib/mercadopago/connect-copy";
 import { AUTO_REFUND_ACK_ERROR, gateConnectSubmit, mpConnectAction, type MpReturnTo } from "@/lib/mercadopago/contract";
 
 const fieldReset = "outline-none focus:outline-none focus-visible:outline-none";
-const ACK_LEAD = "Entendi e autorizo:";
 
 function AckCopy() {
-  if (!MP_AUTO_REFUND_ACK_TEXT.startsWith(ACK_LEAD)) {
-    return <span className="text-sm leading-snug text-ink">{MP_AUTO_REFUND_ACK_TEXT}</span>;
+  const colon = MP_CONNECT_CONSENT_TEXT.indexOf(":");
+  if (colon < 1) {
+    return <span className="text-sm leading-snug text-ink">{MP_CONNECT_CONSENT_TEXT}</span>;
   }
+  const lead = MP_CONNECT_CONSENT_TEXT.slice(0, colon + 1);
+  const rest = MP_CONNECT_CONSENT_TEXT.slice(colon + 1);
   return (
-    <span className="text-sm leading-snug text-ink">
-      <strong className="font-semibold">{ACK_LEAD}</strong>
-      {MP_AUTO_REFUND_ACK_TEXT.slice(ACK_LEAD.length)}
-    </span>
+    <span className="text-sm leading-snug text-ink"><strong className="font-semibold">{lead}</strong>{rest}</span>
   );
 }
 

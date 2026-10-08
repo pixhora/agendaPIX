@@ -1,13 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
-import { MpConnectForm } from "../../components/payments/mp-connect-form";
+import { AutoRefundAck, MpConnectForm } from "../../components/payments/mp-connect-form";
 import { MpOnboardingStep } from "../../components/payments/mp-onboarding-step";
 import { isAutoRefundAck, MP_CONNECT_CONSENT_TEXT, MP_CONNECT_CONSENT_VERSION } from "../../lib/mercadopago/consent";
 import {
   MP_AUTO_REFUND_ACK_ERROR,
   MP_AUTO_REFUND_ACK_HINT,
-  MP_AUTO_REFUND_ACK_TEXT,
   MP_GOOD_TO_KNOW,
   MP_MOCK_FRIDAY_16,
   MP_MOCK_FRIDAY_23,
@@ -63,8 +62,8 @@ describe("Mercado Pago connect consent", () => {
     expect(html).toContain('name="autoRefundAck" value="on"');
     expect(html).toContain("required");
     expect(html).toContain(MP_AUTO_REFUND_ACK_HINT);
-    expect(html).toContain("Entendi e autorizo:");
-    expect(html).toContain("7 dias corridos, contados do aviso.");
+    const label = html.slice(html.indexOf("<label"), html.indexOf("</label>") + "</label>".length);
+    expect(label.replace(/<[^>]*>/g, "")).toBe(MP_CONNECT_CONSENT_TEXT);
     expect(html).not.toMatch(/checked=/);
     expect(html).not.toMatch(/<button\b[^>]*\sdisabled[\s=>]/);
     expect(html).not.toContain('href="/api/');
@@ -91,9 +90,20 @@ describe("Mercado Pago connect consent", () => {
     expect(html).not.toContain("referrerpolicy");
   });
 
-  it("keeps the published consent version and the v3.4 checkbox copy", () => {
+  it("renders the checkbox label from the hashed consent text", () => {
+    const html = renderToStaticMarkup(createElement(AutoRefundAck, {
+      checked: false,
+      onChange: () => undefined,
+      invalid: false,
+    }));
+    const label = html.slice(html.indexOf("<label"), html.indexOf("</label>") + "</label>".length);
+    expect(label.replace(/<[^>]*>/g, "")).toBe(MP_CONNECT_CONSENT_TEXT);
+    const colon = MP_CONNECT_CONSENT_TEXT.indexOf(":");
+    expect(html).toContain(`<strong class="font-semibold">${MP_CONNECT_CONSENT_TEXT.slice(0, colon + 1)}</strong>`);
+  });
+
+  it("keeps the published consent version and the other screen strings", () => {
     expect(MP_CONNECT_CONSENT_VERSION).toBe("2026-10-08.v3.2");
-    expect(MP_AUTO_REFUND_ACK_TEXT).toBe(MP_CONNECT_CONSENT_TEXT);
     expect(MP_AUTO_REFUND_ACK_ERROR).toBe("Marque a autorização da devolução automática para continuar.");
     expect(MP_GOOD_TO_KNOW).toHaveLength(5);
     expect(MP_GOOD_TO_KNOW[1]).toContain("em até 7 dias corridos, contados do aviso.");
