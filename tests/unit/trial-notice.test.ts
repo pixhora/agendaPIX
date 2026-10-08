@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { absentCheckout } from "../../lib/billing/checkout";
 import { BASE_PLAN } from "../../lib/billing/status";
 import { serviceBlockCopy } from "../../lib/dashboard/service-block";
 import {
-  CHECKOUT_AVAILABLE,
   COMPLETE_PLAN,
   LAST_DAYS_THRESHOLD,
-  PLAN_CHECKOUT_HREF,
   formatPlanReais,
   formatTrialEnd,
   formatTrialEndLong,
@@ -24,6 +23,7 @@ function billing(patch: Partial<BillingView>): BillingView {
     bookingsPaused: false,
     plan: { name: "AgendaPix", priceCents: 4900 },
     subscription: null,
+    checkout: absentCheckout(),
     ...patch,
   };
 }
@@ -71,8 +71,6 @@ describe("aviso de teste no painel", () => {
   it("mostra só o plano de R$ 49 e deixa Completo fora de venda", () => {
     expect(formatPlanReais(4900)).toBe("R$ 49");
     expect(formatPlanReais(4950)).toBe("R$ 49,50");
-    expect(CHECKOUT_AVAILABLE).toBe(false);
-    expect(PLAN_CHECKOUT_HREF).toBeNull();
     expect(subscribeCtaLabel(BASE_PLAN.priceCents)).toBe("Assinar por R$ 49/mês");
     expect(COMPLETE_PLAN).toEqual({ name: "Completo", available: false, label: "Em breve" });
     expect(formatTrialEnd("2026-10-16T15:00:00.000Z", "America/Sao_Paulo")).toBe("sex, 16 out");
@@ -94,6 +92,7 @@ describe("aviso de teste no painel", () => {
     });
     expect(view.trialEndsAt).toBe("2026-10-20T02:59:59.000Z");
     expect(view.subscription).toEqual({ status: "canceled", currentPeriodEnd: null, provider: null });
+    expect(view.checkout).toEqual(absentCheckout());
     expect(trialTone(view)).toBe("strong");
   });
 

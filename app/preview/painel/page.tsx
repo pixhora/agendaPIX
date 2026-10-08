@@ -3,6 +3,7 @@ import { ServiceBlockNotice } from "@/components/dashboard/service-block-notice"
 import { TrialBanner } from "@/components/dashboard/trial-banner";
 import { depositPolicyPresets, type DepositPolicy } from "@/lib/policy/schema";
 import { policyListLabel } from "@/lib/policy/text";
+import { absentCheckout, type SubscriptionCheckout } from "@/lib/billing/checkout";
 import type { BillingView } from "@/lib/dashboard/trial-notice";
 
 const BUSINESS_ID = "4eeb8372-55cd-4d11-910e-62d4e4374011";
@@ -32,8 +33,18 @@ function billing(patch: Partial<BillingView>): BillingView {
     bookingsPaused: false,
     plan: { name: "AgendaPix", priceCents: 4900 },
     subscription: null,
+    checkout: absentCheckout(),
     ...patch,
   };
+}
+
+/** Horas só desta prévia. O card lê o número do payload; não é o prazo real da assinatura. */
+const PREVIEW_ACTIVATION_HOURS = 6;
+
+function previewCheckout(mode: string | undefined): SubscriptionCheckout {
+  if (mode === "assinar") return { available: true, unavailableReason: null, activationHours: null, pendingRequest: null };
+  if (mode === "pedido") return { available: true, unavailableReason: null, activationHours: PREVIEW_ACTIVATION_HOURS, pendingRequest: { status: "received" } };
+  return absentCheckout();
 }
 
 const BLOCKS = [
@@ -42,13 +53,13 @@ const BLOCKS = [
   { id: "mp", name: "Sobrancelha", reason: "mp_account_not_connected" },
 ] as const;
 
-export default async function PreviewPainelPage({ searchParams }: { searchParams: Promise<{ scene?: string; preset?: string; tone?: string }> }) {
+export default async function PreviewPainelPage({ searchParams }: { searchParams: Promise<{ scene?: string; preset?: string; tone?: string; checkout?: string }> }) {
   const query = await searchParams;
   const scene = query.scene ?? "politica";
   const policy = policyFor(query.preset);
   const tone = query.tone ?? "discreet";
   const trial = tone === "paused"
-    ? billing({ state: "paused", daysLeft: -1, bookingsPaused: true, trialEndsAt: "2026-10-03T02:59:59.000Z" })
+    ? billing({ state: "paused", daysLeft: -1, bookingsPaused: true, trialEndsAt: "2026-10-03T02:59:59.000Z", checkout: previewCheckout(query.checkout) })
     : tone === "strong"
       ? billing({ state: "trial_ending", daysLeft: 2, trialEndsAt: "2026-10-17T02:59:59.000Z" })
       : billing({ state: "trial", daysLeft: 5, trialEndsAt: "2026-10-20T02:59:59.000Z" });
@@ -80,6 +91,6 @@ export default async function PreviewPainelPage({ searchParams }: { searchParams
         {item.reason === null && <p className="mt-3 text-sm text-muted">Clientes podem reservar este serviço.</p>}
       </li>)}
     </ul>}
-    {scene === "trial" && <div className="mt-4"><TrialBanner billing={trial} timeZone="America/Sao_Paulo" publicHref="/studio-bella" /></div>}
+    {scene === "trial" && <div className="mt-4"><TrialBanner billing={trial} businessId={BUSINESS_ID} timeZone="America/Sao_Paulo" publicHref="/studio-bella" /></div>}
   </main>;
 }

@@ -1,12 +1,14 @@
-"use client";
-
-import { useId, useRef } from "react";
+import type { ReactNode } from "react";
 import { Check, Clock, Pause, X } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
-  CHECKOUT_AVAILABLE,
-  COMPLETE_PLAN,
-  PLAN_CHECKOUT_HREF,
+  pendingActivationCopy,
+  pausedSubscriptionCta,
+  SUBSCRIPTION_UNAVAILABLE_COPY,
+  SUBSCRIPTION_WHATSAPP_LABEL,
+  subscriptionCheckoutAction,
+} from "@/lib/billing/checkout";
+import {
   formatPlanReais,
   formatTrialEnd,
   formatTrialEndLong,
@@ -15,28 +17,48 @@ import {
   trialTone,
   type BillingView,
 } from "@/lib/dashboard/trial-notice";
+import { TrialChangesDialog } from "./trial-changes-dialog";
 
 const KEEPS = [
   "Reservas já feitas continuam valendo",
   "Você edita serviços, horários e a política do sinal",
 ] as const;
 
-export function TrialBanner({ billing, timeZone, publicHref }: { billing: BillingView; timeZone: string; publicHref?: string }) {
+function CheckoutForm({ action, children }: { action: string; children: ReactNode }) {
+  return (
+    <form method="post" action={action} target="_blank" rel="noopener" className="w-full sm:w-auto">
+      {children}
+    </form>
+  );
+}
+
+export function TrialBanner({
+  billing,
+  businessId,
+  timeZone,
+  publicHref,
+  now = new Date(),
+}: {
+  billing: BillingView;
+  businessId: string;
+  timeZone: string;
+  publicHref?: string;
+  now?: Date;
+}) {
   const tone = trialTone(billing);
   const endLabel = tone === "paused" ? formatTrialEndLong(billing.trialEndsAt, timeZone) : formatTrialEnd(billing.trialEndsAt, timeZone);
   const copy = trialCopy(billing, endLabel);
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const titleId = useId();
   if (!copy || tone === "none") return null;
   const price = formatPlanReais(billing.plan.priceCents);
-  const open = () => dialogRef.current?.showModal();
+  const action = subscriptionCheckoutAction(businessId);
+  const cta = pausedSubscriptionCta(billing, now);
 
   return (
     <>
       {tone === "discreet" && (
         <div role="region" aria-label="Aviso da assinatura" className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-card border border-line bg-surface px-4 py-3">
           <p className="min-w-0 text-sm"><span className="font-semibold">{copy.title}</span> <span className="text-muted">· {copy.body}</span></p>
-          <Button type="button" variant="outline" onClick={open} className="shrink-0">O que muda?</Button>
+          <TrialChangesDialog planName={billing.plan.name} priceLabel={price} checkoutAvailable={billing.checkout.available} variant="outline" className="shrink-0" />
         </div>
       )}
       {tone === "strong" && (
@@ -49,7 +71,7 @@ export function TrialBanner({ billing, timeZone, publicHref }: { billing: Billin
             </div>
           </div>
           <div className="mt-3">
-            <Button type="button" variant="outline" onClick={open} className="w-full sm:w-auto">O que muda?</Button>
+            <TrialChangesDialog planName={billing.plan.name} priceLabel={price} checkoutAvailable={billing.checkout.available} variant="outline" className="w-full sm:w-auto" />
           </div>
         </section>
       )}
@@ -71,44 +93,22 @@ export function TrialBanner({ billing, timeZone, publicHref }: { billing: Billin
             {publicHref && <> <a href={publicHref} target="_blank" rel="noopener noreferrer" className="font-semibold leading-[inherit] text-pix-bright underline decoration-1 underline-offset-2">Ver como fica<span className="sr-only"> (abre em nova aba)</span></a></>}
           </p>
           <div className="mt-4 flex flex-col items-start gap-2">
-            {PLAN_CHECKOUT_HREF ? (
-              <a href={PLAN_CHECKOUT_HREF} className={buttonVariants({ className: "w-full bg-pix-bright text-[#0b0b0c] hover:bg-pix-bright sm:w-auto" })}>
-                {subscribeCtaLabel(billing.plan.priceCents)}
-              </a>
-            ) : (
-              <Button type="button" onClick={open} className="w-full bg-pix-bright text-[#0b0b0c] hover:bg-pix-bright sm:w-auto">{subscribeCtaLabel(billing.plan.priceCents)}</Button>
+            {cta.kind === "subscribe" && action && (
+              <CheckoutForm action={action}>
+                <Button type="submit" className="w-full bg-pix-bright text-[#0b0b0c] hover:bg-pix-bright sm:w-auto">{subscribeCtaLabel(billing.plan.priceCents)}<span className="sr-only"> (abre em nova aba)</span></Button>
+              </CheckoutForm>
             )}
-            <button type="button" onClick={open} className="inline-flex min-h-11 items-center text-sm font-semibold text-pix-bright underline decoration-1 underline-offset-2">O que muda?</button>
+            {cta.kind === "pending" && <p className="max-w-[62ch] text-sm leading-relaxed">{pendingActivationCopy(cta.activationHours)}</p>}
+            {cta.kind === "pending" && cta.allowResend && action && (
+              <CheckoutForm action={action}>
+                <Button type="submit" variant="outline" className="w-full border-white/20 bg-transparent text-slab-foreground hover:bg-white/10 sm:w-auto">{SUBSCRIPTION_WHATSAPP_LABEL}<span className="sr-only"> (abre em nova aba)</span></Button>
+              </CheckoutForm>
+            )}
+            {cta.kind === "unavailable" && <p className="max-w-[62ch] text-sm leading-relaxed text-slab-muted">{SUBSCRIPTION_UNAVAILABLE_COPY}</p>}
+            <TrialChangesDialog planName={billing.plan.name} priceLabel={price} checkoutAvailable={billing.checkout.available} variant="text" />
           </div>
         </section>
       )}
-      <dialog ref={dialogRef} aria-labelledby={titleId} className="m-auto w-[min(calc(100%-2rem),28rem)] max-h-[85vh] overflow-auto rounded-card border border-line bg-surface p-0 text-ink backdrop:bg-ink/50">
-        <div className="p-5 sm:p-6">
-          <h2 id={titleId} className="font-display text-xl font-bold">O que muda</h2>
-          <p className="mt-1 text-sm text-muted">Plano à venda agora. O outro fica para depois.</p>
-          <div className="mt-4 rounded-card bg-slab p-4 text-slab-foreground">
-            <p className="text-sm text-slab-muted">{billing.plan.name}</p>
-            <p className="font-display text-4xl font-extrabold tabular-nums">{price}<span className="text-base font-semibold text-slab-muted">/mês</span></p>
-          </div>
-          <ul className="mt-4 grid gap-2 text-sm">
-            <li className="flex gap-2"><Check aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-pix" />Página com link para os clientes</li>
-            <li className="flex gap-2"><Check aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-pix" />Agenda do dia e da semana</li>
-            <li className="flex gap-2"><Check aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-pix" />Sinal por Pix na conta Mercado Pago do negócio</li>
-            <li className="flex gap-2"><Check aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-pix" />Política do sinal por serviço</li>
-          </ul>
-          <div className="mt-4 rounded-card border border-dashed border-line-strong/70 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <p className="font-display text-lg font-bold text-muted">{COMPLETE_PLAN.name}</p>
-              <span className="rounded-full bg-subtle px-2.5 py-1 text-xs font-semibold text-muted">{COMPLETE_PLAN.label}</span>
-            </div>
-            <p className="mt-1 text-sm text-muted">Este plano ainda não está à venda.</p>
-          </div>
-          {!CHECKOUT_AVAILABLE && <p className="mt-4 text-sm text-ink">Ainda não dá para contratar a assinatura por aqui. O plano {billing.plan.name} é {price}/mês quando a contratação entrar no painel.</p>}
-          <form method="dialog" className="mt-5">
-            <Button type="submit" className="w-full">Entendi</Button>
-          </form>
-        </div>
-      </dialog>
     </>
   );
 }

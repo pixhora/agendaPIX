@@ -1,11 +1,6 @@
+import { parseCheckout, type SubscriptionCheckout } from "../billing/checkout";
+
 export const LAST_DAYS_THRESHOLD = 2;
-/**
- * Não existe rota de contratação da assinatura (só `GET /api/businesses/{id}/billing`, que devolve o status).
- * O teste pausado mostra o preço do plano e não aponta para um endereço inventado.
- */
-export const CHECKOUT_AVAILABLE = false;
-/** Destino do botão de assinar. Fica nulo até existir uma rota real de checkout do plano. */
-export const PLAN_CHECKOUT_HREF: string | null = null;
 export const COMPLETE_PLAN = { name: "Completo", available: false, label: "Em breve" } as const;
 
 export type BillingView = {
@@ -15,6 +10,7 @@ export type BillingView = {
   bookingsPaused: boolean;
   plan: { name: string; priceCents: number };
   subscription: { status: string; currentPeriodEnd: string | null; provider: string | null } | null;
+  checkout: SubscriptionCheckout;
 };
 
 export type TrialTone = "none" | "discreet" | "strong" | "paused";
@@ -26,6 +22,7 @@ type BillingSource = {
   bookingsPaused: boolean;
   plan: { name: string; priceCents: number };
   subscription: { status: string; currentPeriodEnd: Date | string | null; provider?: string | null } | null;
+  checkout?: unknown;
 };
 
 function iso(value: Date | string | null) {
@@ -47,6 +44,7 @@ export function toBillingView(billing: BillingSource): BillingView {
           provider: billing.subscription.provider ?? null,
         }
       : null,
+    checkout: parseCheckout(billing.checkout),
   };
 }
 
