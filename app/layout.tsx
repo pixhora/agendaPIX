@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans, Inter } from "next/font/google";
+import { headers } from "next/headers";
 import { Toaster } from "@/components/ui/toaster";
 import { themeInitScript } from "@/lib/theme";
 import "./globals.css";
@@ -28,12 +29,14 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  // Reading headers opts every page into dynamic rendering so the nonce matches this request.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
     <html lang="pt-BR" className={`${plusJakartaSans.variable} ${inter.variable}`} suppressHydrationWarning>
       <head>
-        {/* Aplica o tema salvo antes da primeira pintura (sem flash). */}
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        {/* Aplica o tema salvo antes da primeira pintura (sem flash). Nonce vem do proxy. */}
+        <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body className="min-h-dvh bg-paper font-sans text-ink antialiased">
         {children}
