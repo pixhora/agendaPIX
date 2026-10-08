@@ -84,7 +84,7 @@ export function StepBusiness({ businessName, slug, onChangeBusinessName, onChang
             placeholder="seu-negocio"
             value={slug}
             onChange={handleSlugChange}
-            className="min-w-0 flex-1 bg-transparent px-3 text-base text-ink placeholder:text-muted/80 focus:outline-none"
+            className="min-w-0 flex-1 bg-transparent px-3 text-base text-ink placeholder:text-muted focus:outline-none"
           />
         </div>
         {showSlugError ? (

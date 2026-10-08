@@ -38,7 +38,7 @@ Fonte: `docs/design-tokens.md` + `app/globals.css`.
 | `--paper` | `#F6F5F2` | `#0F0F10` | Fundo canvas mineral |
 | `--surface` | `#FFFFFF` | `#19191B` | Cartões / molduras |
 | `--ink` | `#0B0B0C` | `#F6F5F2` | Texto e botão primário |
-| `--muted` | `#5B5B5F` | `#A3A3A8` | Apoio (~6:1 vs paper) |
+| `--muted` | `#6C6C6C` | `#A3A3A8` | Apoio (4,82:1 vs paper) |
 | `--line` | `#DEDCD6` | `#2C2C2F` | Bordas |
 | `--lime` | `#C0F739` | `#C0F739` | Dot/chip de estado apenas |
 | `--slab` | `#0B0B0C` | `#000000` | Placa de Valor |
@@ -211,7 +211,7 @@ Manter a paleta v2. Contrastes declarados no doc interno (verificação document
 | Par | Uso | Nota de contraste |
 |---|---|---|
 | ink `#0B0B0C` × paper `#F6F5F2` | Texto / botão | ~18:1 (AAA) — `design-tokens.md` |
-| muted `#5B5B5F` × paper | Secundário | ~6:1 (AA) — `design-tokens.md` |
+| muted `#6C6C6C` × paper | Secundário | 4,82:1 (AA) — `design-tokens.md` |
 | lime `#C0F739` × slab | Dot/chip | 15:1 vs slab — **proibido** como texto sobre paper |
 | danger `#B3261E` × paper | Erro claro | Validar ≥4.5:1 em QA visual |
 | danger escuro `#FF8A80` × paper escuro | Erro dark | Idem |

@@ -19,7 +19,7 @@
 | `--surface` | `#FFFFFF` | `#19191B` | Cartões, listas, campos |
 | `--subtle` | `#EFEEEA` | `#222225` | Fundos sutis: skeleton, prefixo de campo, cabeçalho de tabela, hover |
 | `--ink` / `--ink-hover` | `#0B0B0C` / `#26262A` | `#F6F5F2` / `#E2E1DD` | Texto principal e botão primário |
-| `--muted` | `#5B5B5F` | `#A3A3A8` | Texto secundário (só texto) |
+| `--muted` | `#6C6C6C` | `#A3A3A8` | Texto secundário (só texto). Alias `--muted-foreground`. |
 | `--line` / `--line-strong` | `#DEDCD6` / `#8D8C88` | `#2C2C2F` / `#6B6B70` | Divisores / borda de campo (3:1 contra a superfície) |
 | `--slab` / `--slab-foreground` / `--slab-muted` | `#0B0B0C` / `#FFF` / `#C9C9CC` | `#000` / `#FFF` / `#B8B8BD` | Placa de Valor e faixas escuras |
 | `--pix` / `--pix-hover` / `--pix-foreground` | `#0A6E63` / `#085A52` / `#FFF` | `#3FD0BE` / `#5FDCCC` / `#0B0B0C` | Acento único: Pix, dinheiro, estado ativo |
@@ -37,7 +37,7 @@ Aliases shadcn mantidos para compatibilidade: `background`, `foreground`, `prima
 | Par | Claro | Escuro |
 |---|---|---|
 | `ink` sobre `paper` | 18,1:1 | 17,6:1 |
-| `muted` sobre `paper` / `surface` / `subtle` | 6,2 / 6,8 / 5,8:1 | 7,6 / 7,0 / 6,3:1 |
+| `muted` sobre `paper` / `surface` / `subtle` | 4,82 / 5,25 / 4,52:1 | 7,63 / 6,99 / 6,32:1 |
 | `pix` sobre `paper` / `surface` / `pix-soft` | 5,6 / 6,1 / 5,5:1 | 10,0 / 9,2 / 7,4:1 |
 | `pix-foreground` sobre `pix` (botão Pix) | 6,1:1 | 10,3:1 |
 | `success` / `warning` / `danger` sobre o `-soft` | 5,8 / 5,7 / 5,6:1 | 7,7 / 8,0 / 7,0:1 |
