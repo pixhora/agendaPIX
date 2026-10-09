@@ -5,13 +5,17 @@ import { safeEqualString } from "./timing";
 export const MP_OAUTH_COOKIE = "mp_oauth";
 export const MP_OAUTH_COOKIE_MAX_AGE_SECONDS = 10 * 60;
 
-const payloadSchema = z.object({
+const attemptFields = {
   state: z.string().min(32).max(128),
-  verifier: z.string().min(43).max(128),
   businessId: z.uuid(),
   returnTo: z.string().min(1).max(512),
   exp: z.number().int(),
-}).strict();
+};
+
+const payloadSchema = z.discriminatedUnion("pkce", [
+  z.object({ ...attemptFields, pkce: z.literal(true), verifier: z.string().min(43).max(128) }).strict(),
+  z.object({ ...attemptFields, pkce: z.literal(false) }).strict(),
+]);
 
 export type MpOAuthCookie = z.infer<typeof payloadSchema>;
 

@@ -48,6 +48,10 @@ test.describe("painel do dono — autenticado", () => {
     await expect(page.getByRole("heading", { name: "Horários de funcionamento", exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Recebimento", exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Mercado Pago", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Sua página pública", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Aparência", exact: true })).toBeVisible();
+    await expect(page.getByText("Compartilhe este link para receber reservas com sinal via Pix.")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Chave Pix do negócio" })).toHaveCount(0);
   });
 
   test("isolamento: negócio alheio não abre dados", async ({ page }) => {
