@@ -297,7 +297,8 @@ export function PreviewBookingFlow({
               {step === 1 && (
                 <StepService
                   services={services}
-                  contactWhatsapp={contactWhatsapp}
+                  businessName={MOCK_PUBLIC_BUSINESS.name}
+                  contactPhone={contactWhatsapp}
                   selectedServiceId={selectedService?.id ?? null}
                   onSelectService={(srv) => {
                     setSelectedService(srv);

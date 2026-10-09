@@ -327,7 +327,7 @@ export function BookingFlow({ slug, initialBookingId, previewBusiness }: Booking
         setBookingError({ message: failure.message, contactHref: null, tone: "danger" });
         return;
       }
-      if (!data || !("bookingId" in data)) {
+      if (!data || typeof data !== "object" || !("bookingId" in data)) {
         throw new Error("Não foi possível criar o agendamento. Tente novamente.");
       }
 
@@ -581,7 +581,6 @@ export function BookingFlow({ slug, initialBookingId, previewBusiness }: Booking
                   setSelectedSlot(null);
                 }}
                 onNext={() => setStep(2)}
-                contactWhatsapp={business.contactWhatsapp}
               />
             )}
 
