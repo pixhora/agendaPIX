@@ -226,7 +226,7 @@ describe("reconciliação", () => {
     await database.update(schema.payments).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(schema.payments.id, data.payment!.id));
     const other = await createBooking(slug, input(0, "+5511999999901"), randomUUID(), database, provider);
     provider.markPaid(data.payment!.externalId!);
-    const report = await reconcileOnce(database, provider, { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50 });
+    const report = await reconcileOnce(database, provider, { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50, RECONCILE_BUDGET_MS: 50_000 });
     expect(report.refundsSettled).toBe(1);
     const [lateBooking] = await database.select().from(schema.bookings).where(eq(schema.bookings.id, data.bookingId));
     expect(lateBooking.status).toBe("expired");
