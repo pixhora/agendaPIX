@@ -1,8 +1,9 @@
 import React, { Suspense } from "react";
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { PreviewBadge } from "@/components/preview/PreviewBadge";
-import { isPreviewBadgeEnabled } from "@/components/preview/preview-badge-gate";
-import { closePreviewInProduction } from "@/lib/preview/access";
+import { isDevExampleOpen, isPreviewBadgeEnabled } from "@/components/preview/preview-badge-gate";
+import { isPreviewRouteOpen } from "@/lib/preview/access";
 
 export const metadata: Metadata = {
   title: "Modo Preview",
@@ -11,7 +12,7 @@ export const metadata: Metadata = {
 };
 
 export default function PreviewLayout({ children }: { children: React.ReactNode }) {
-  closePreviewInProduction();
+  if (!isDevExampleOpen() && !isPreviewRouteOpen()) notFound();
   return (
     <div className="relative min-h-screen">
       {children}

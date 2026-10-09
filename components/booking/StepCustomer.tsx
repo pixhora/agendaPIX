@@ -65,7 +65,7 @@ export function StepCustomer({
   legalPagesPublished = false,
 }: StepCustomerProps) {
   const [touched, setTouched] = useState({ name: false, phone: false, cpf: false });
-  const askCpf = requiresPayerCpf !== false;
+  const askCpf = requiresPayerCpf === true;
   const policyState = servicePolicyState(service);
   const policyBlocked = policyState === "missing";
 

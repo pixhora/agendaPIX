@@ -100,7 +100,6 @@ describe("cobrança fora da transação", () => {
     vi.stubEnv("PAYMENT_PROVIDER_TIMEOUT_MS", "150");
     provider.latencyMs = 400;
     const inputs: ChargeInput[] = [];
-    // Gateway estrito como a regressão do review: sem CPF, recusa ANTES de consultar a referência.
     const strict: PaymentProvider = {
       name: provider.name,
       createPixCharge: async (charge: ChargeInput) => {
@@ -125,7 +124,8 @@ describe("cobrança fora da transação", () => {
     expect(resumed.replayed).toBe(true);
     expect(resumed.data.payment?.status).toBe("pending");
     expect(inputs).toHaveLength(2);
-    expect(inputs[1].customer).toEqual({ name: "Cliente", phone: "+5511999999900", cpfCnpj: "52998224725" });
+    expect(inputs[1].customer).toEqual({ name: "Cliente", phone: "+5511999999900" });
+    expect(inputs[0].customer).toEqual(inputs[1].customer);
     expect(inputs[1].reference).toBe(inputs[0].reference);
     expect(store.byIdempotencyKey.size).toBe(1);
   });

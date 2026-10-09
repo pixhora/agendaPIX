@@ -13,6 +13,7 @@ import {
   stepFromStored,
   TAKEN_LATER,
   createOnboardingData,
+  onboardingPlanForEnv,
 } from "@/lib/onboarding/flow";
 import { followUpFromFailure } from "@/lib/onboarding/commit-follow-up";
 import { commitOnboardingDraft, createOnboardingDraft, patchOnboardingDraft } from "@/lib/onboarding/drafts-client";
@@ -63,7 +64,7 @@ function onlineNow() {
 export function OnboardingFlow({ legalPagesPublished = false, publicHost }: { legalPagesPublished?: boolean; publicHost: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const initialPlan = searchParams.get("plano") === "base" ? "base" : "completo";
+  const initialPlan = onboardingPlanForEnv(searchParams.get("plano"));
   const [step, setStep] = useState<OnboardingStep>("business");
   const [data, setData] = useState<OnboardingData>(() => createOnboardingData(initialPlan));
   const [draftId, setDraftId] = useState<string | null>(null);

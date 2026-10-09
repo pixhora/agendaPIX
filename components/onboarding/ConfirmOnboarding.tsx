@@ -18,7 +18,7 @@ import { followUpFromFailure } from "@/lib/onboarding/commit-follow-up";
 import { signInWithEmailOtp } from "@/lib/onboarding/auth-otp";
 import { OTP_LENGTH, mapOtpError, otpDigits, wrongCodeMessage } from "@/lib/onboarding/otp";
 import { clearOnboardingProgress, readOnboardingDraftRaw, writeCommitResult } from "./storage";
-import { restoreOnboardingDraft } from "@/lib/onboarding/flow";
+import { onboardingPlanForEnv, restoreOnboardingDraft } from "@/lib/onboarding/flow";
 
 const HAS_BUSINESS_TOAST = "Você já tem uma página. Abrimos o seu painel.";
 const CONSUMED_TOAST = "Esse cadastro já virou uma página. Abrimos o seu painel.";
@@ -46,12 +46,12 @@ export function ConfirmOnboarding({ draftId }: { draftId: string }) {
   const [status, setStatus] = useState<OtpVisualStatus>("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [attemptsUsed, setAttemptsUsed] = useState(0);
-  const local = restoreOnboardingDraft(readOnboardingDraftRaw(), "completo");
+  const local = restoreOnboardingDraft(readOnboardingDraftRaw(), onboardingPlanForEnv(null));
 
   useEffect(() => {
     const fragmentCode = readFragmentCode();
     clearFragment();
-    const stored = restoreOnboardingDraft(readOnboardingDraftRaw(), "completo");
+    const stored = restoreOnboardingDraft(readOnboardingDraftRaw(), onboardingPlanForEnv(null));
     const storedEmail = isUsableEmail(stored.email) ? stored.email : "";
     queueMicrotask(() => {
       if (fragmentCode.length === OTP_LENGTH) {

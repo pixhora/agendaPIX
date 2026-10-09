@@ -1,10 +1,12 @@
+import { notFound } from "next/navigation";
+import { isDevExampleOpen } from "@/components/preview/preview-badge-gate";
 import { ServiceForm } from "@/components/dashboard/forms";
 import { ServiceBlockNotice } from "@/components/dashboard/service-block-notice";
 import { TrialBanner } from "@/components/dashboard/trial-banner";
 import { depositPolicyPresets, type DepositPolicy } from "@/lib/policy/schema";
 import { policyListLabel } from "@/lib/policy/text";
 import { SUBSCRIPTION_MANUAL_ACTIVATION_HOURS, unavailableCheckout, type BillingCheckout } from "@/lib/dashboard/subscription-ui";
-import { closePreviewInProduction } from "@/lib/preview/access";
+import { isPreviewRouteOpen } from "@/lib/preview/access";
 import type { BillingView } from "@/lib/dashboard/trial-notice";
 
 const BUSINESS_ID = "4eeb8372-55cd-4d11-910e-62d4e4374011";
@@ -67,7 +69,7 @@ const BLOCKS = [
 ] as const;
 
 export default async function PreviewPainelPage({ searchParams }: { searchParams: Promise<{ scene?: string; preset?: string; tone?: string; checkout?: string }> }) {
-  closePreviewInProduction();
+  if (!isDevExampleOpen() && !isPreviewRouteOpen()) notFound();
   const query = await searchParams;
   const scene = query.scene ?? "politica";
   const policy = policyFor(query.preset);

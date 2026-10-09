@@ -12,6 +12,12 @@ export function serviceBlockCopy(reason: string | null) {
       body: "Serviços com sinal precisam de uma conta Mercado Pago conectada. O Pix do sinal cai direto nessa conta.",
     };
   }
+  if (reason === "mp_account_test_mode") {
+    return {
+      title: "Conta Mercado Pago em modo de teste",
+      body: "A conta conectada é de teste. O cliente não consegue pagar o sinal enquanto a conta de produção não estiver conectada.",
+    };
+  }
   return {
     title: "Serviço indisponível para reserva",
     body: "Este serviço com sinal ainda não pode ser reservado.",

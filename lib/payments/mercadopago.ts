@@ -349,7 +349,8 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
       if (existing.amountCents !== data.amountCents) throw new Error("Chave de idempotência reutilizada com outros dados.");
       return this.toPix(existing, data.expiresAt);
     }
-    if (payerCpfRequired() && !data.customer?.cpfCnpj) throw new Error("CPF do pagador é obrigatório.");
+    const payerCpf = payerCpfRequired() ? data.customer?.cpfCnpj : undefined;
+    if (payerCpfRequired() && !payerCpf) throw new Error("CPF do pagador é obrigatório.");
     const mpExpiresAt = new Date(data.expiresAt.getTime() + MERCADOPAGO_PIX_EXPIRATION_MARGIN_MINUTES * 60_000);
     if (mpExpiresAt.getTime() - this.now().getTime() < MERCADOPAGO_PIX_MIN_EXPIRATION_MS) {
       throw new Error("Validade do Pix abaixo do mínimo do Mercado Pago.");
@@ -372,7 +373,7 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
           payer: {
             email: payerEmail(data.customer, data.reference),
             ...(data.customer ? { first_name: names.firstName, last_name: names.lastName } : {}),
-            ...(data.customer?.cpfCnpj ? { identification: { type: "CPF", number: data.customer.cpfCnpj } } : {}),
+            ...(payerCpf ? { identification: { type: "CPF", number: payerCpf } } : {}),
           },
         },
       }));

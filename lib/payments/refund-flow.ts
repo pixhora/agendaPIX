@@ -14,6 +14,7 @@ import { assessRefund, refundBlockMessage, type RefundBlockReason, type RefundSt
 import {
   disconnectedConfirmedNotice,
   formatAppointment,
+  lateRefundCause,
   lateRefundFailedNotice,
   lateRefundNoTokenNotice,
   lateRefundedNotice,
@@ -43,6 +44,7 @@ export type RefundView = {
   serviceName: string;
   startsAt: Date;
   timezone: string;
+  latePaymentPolicy: "refund" | "rebook_if_free";
   policyText: string | null;
   policyHash: string | null;
   policyRefundDeadlineAt: string | null;
@@ -378,7 +380,12 @@ export async function executeOwnerRefund(
 
 function lateNotice(type: "submitted" | "done" | "failed_now" | "failed_already" | "no_token" | "no_token_already" | "deferred", view: RefundView) {
   const when = formatAppointment(view.startsAt, view.timezone);
-  const names = { customerName: view.customerName, serviceName: view.serviceName, when };
+  const names = {
+    customerName: view.customerName,
+    serviceName: view.serviceName,
+    when,
+    cause: lateRefundCause(view.latePaymentPolicy),
+  };
   if (type === "submitted" || type === "done") return { action: "notice_late_refunded", notice: lateRefundedNotice(names) };
   if (type === "failed_now" || type === "failed_already") return { action: "notice_late_refund_failed", notice: lateRefundFailedNotice({ ...names, deadlineLabel: deadlineLabel(view) }) };
   if (type === "no_token") return { action: "notice_late_no_token", notice: lateRefundNoTokenNotice({ ...names, deadlineLabel: deadlineLabel(view) }) };
@@ -627,6 +634,7 @@ function toView(row: {
   refundStatus: RefundStatus | null; refundedAt: Date | null; manualRefundDueAt: Date | null;
   policyRefundRequestedOn: string | null; paidAt: Date | null;
   customerName: string; customerEmail: string | null; serviceName: string; startsAt: Date; timezone: string;
+  latePaymentPolicy: "refund" | "rebook_if_free";
 }, policy: PolicySnapshot): RefundView {
   return { ...row, policyText: policy.text, policyHash: policy.hash, policyRefundDeadlineAt: policy.refundDeadlineAt };
 }
@@ -650,6 +658,7 @@ const refundColumns = {
   serviceName: schema.services.name,
   startsAt: schema.bookings.startsAt,
   timezone: schema.businesses.timezone,
+  latePaymentPolicy: schema.businesses.latePaymentPolicy,
 };
 
 function refundQuery(database: Database) {
