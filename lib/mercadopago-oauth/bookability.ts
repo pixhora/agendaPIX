@@ -26,8 +26,8 @@ export function getServiceBlockedReason(
 ): MpBlockedReason | null {
   if (service.depositCents <= 0) return null;
   if (!context.mpConnected) return MP_ACCOUNT_NOT_CONNECTED;
-  if (context.consentCurrent === false) return MP_CONSENT_OUTDATED;
   if (context.liveMode === false && enforceLiveMercadoPagoAccount(env)) return "mp_account_test_mode";
+  if (context.consentCurrent === false) return MP_CONSENT_OUTDATED;
   return null;
 }
 

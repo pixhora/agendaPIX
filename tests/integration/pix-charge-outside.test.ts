@@ -228,7 +228,7 @@ describe("reconciliação", () => {
     await database.update(schema.bookings).set({ createdAt: new Date(Date.now() - 60_000), expiresAt: new Date(Date.now() - 1000), status: "expired" }).where(eq(schema.bookings.id, data.bookingId));
     await database.update(schema.payments).set({ expiresAt: new Date(Date.now() - 1000), status: "expired" }).where(eq(schema.payments.id, data.payment!.id));
     await createBooking(slug, input(0, "+5511999999901"), randomUUID(), database, provider);
-    const charge = provider.markPaid(data.payment!.externalId!);
+    const charge = provider.markPaid(data.payment!.externalId!, new Date(Date.now() + PIX_APPROVAL_TOLERANCE_MS));
     const emails: string[] = [];
     await database.transaction(async (tx) => {
       const result = await applyPaidEvent(tx, "fake", polledPaidEvent(charge, hash), new Date());
@@ -253,7 +253,7 @@ describe("reconciliação", () => {
     const { data } = await createBooking(slug, input(0), randomUUID(), database, provider);
     await database.update(schema.bookings).set({ createdAt: new Date(Date.now() - 60_000), expiresAt: new Date(Date.now() - 1000), status: "expired" }).where(eq(schema.bookings.id, data.bookingId));
     await database.update(schema.payments).set({ expiresAt: new Date(Date.now() - 1000), status: "expired" }).where(eq(schema.payments.id, data.payment!.id));
-    const charge = provider.markPaid(data.payment!.externalId!);
+    const charge = provider.markPaid(data.payment!.externalId!, new Date(Date.now() + PIX_APPROVAL_TOLERANCE_MS));
     const emails: string[] = [];
     await database.transaction(async (tx) => {
       expect(await applyPaidEvent(tx, "fake", polledPaidEvent(charge, hash), new Date())).toMatchObject({ outcome: "ignored", reason: "late_no_slot" });

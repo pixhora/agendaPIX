@@ -663,7 +663,11 @@ describe("OAuth Mercado Pago por negócio", () => {
     expect(getServiceBlockedReason({ depositCents: 1000 }, { mpConnected: true, liveMode: null }, production)).toBeNull();
     expect(getServiceBlockedReason({ depositCents: 1000 }, { mpConnected: true, liveMode: false }, { NODE_ENV: "production", MERCADOPAGO_ENV: "sandbox" })).toBeNull();
     expect(getServiceBlockedReason({ depositCents: 1000 }, { mpConnected: true, liveMode: false }, { NODE_ENV: "development", MERCADOPAGO_ENV: "production" })).toBeNull();
-    const store = createMemoryMpStore([connection({ liveMode: false })]);
+    const store = createMemoryMpStore([connection({
+      liveMode: false,
+      consentVersion: MP_CONNECT_CONSENT_VERSION,
+      autoRefundAckAt: now,
+    })]);
     await expect(assertMpConnectedForDeposit(businessId, { store, now, env: production })).rejects.toMatchObject({
       status: 409,
       code: "mp_account_test_mode",
