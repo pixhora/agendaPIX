@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildPublicBookingBody, publicBookingSession, stripStoredBookingCpf } from "../../components/booking/booking-payload";
+import { pixResumePayload } from "../../components/booking/pix-resume";
+import { buildPublicBookingBody, stripStoredBookingCpf } from "../../components/booking/booking-payload";
 
 const service = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -50,17 +51,17 @@ describe("corpo do agendamento público", () => {
     }).customer).toEqual({ name: "Ana", phone: "+5511987654321" });
   });
 
-  it("a sessão do navegador não guarda CPF e apaga um valor antigo", () => {
-    const session = publicBookingSession({
+  it("a sessão do navegador não guarda nome, WhatsApp nem CPF e apaga um valor antigo", () => {
+    const session = JSON.parse(pixResumePayload({
       bookingId: "b1",
       accessToken: "tok",
       serviceId: service.id,
-      customerName: "Ana",
-      customerPhone: "11987654321",
       expiresAt: "2030-01-01T15:30:00.000Z",
-    });
+    })) as Record<string, unknown>;
+    expect(session).not.toHaveProperty("customerName");
+    expect(session).not.toHaveProperty("customerPhone");
     expect(JSON.stringify(session)).not.toContain("cpf");
-    const stripped = stripStoredBookingCpf({ ...session, customerCpf: "529.982.247-25" });
+    const stripped = stripStoredBookingCpf({ ...session, customerCpf: "529.982.247-25", customerName: "Ana" });
     expect(stripped.hadCpf).toBe(true);
     expect(stripped.record).not.toHaveProperty("customerCpf");
     expect(stripStoredBookingCpf(session).hadCpf).toBe(false);

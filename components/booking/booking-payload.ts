@@ -30,25 +30,6 @@ export function buildPublicBookingBody(input: PublicBookingBodyInput) {
   };
 }
 
-/** Sessão do Pix em andamento. Não leva CPF: o documento fica só na memória da tela. */
-export function publicBookingSession(input: {
-  bookingId: string;
-  accessToken: string;
-  serviceId: string;
-  customerName: string;
-  customerPhone: string;
-  expiresAt?: string | null;
-}) {
-  return {
-    bookingId: input.bookingId,
-    accessToken: input.accessToken,
-    serviceId: input.serviceId,
-    customerName: input.customerName,
-    customerPhone: input.customerPhone,
-    expiresAt: input.expiresAt ?? null,
-  };
-}
-
 /** Tira CPF gravado por uma versão antiga da sessão. */
 export function stripStoredBookingCpf(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return { record: null, hadCpf: false };

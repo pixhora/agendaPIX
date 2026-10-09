@@ -42,7 +42,7 @@ import {
   refundedCopy,
 } from "./pix-deadline-copy";
 import { WHATSAPP_CONTACT_LABEL } from "./customer-copy";
-import { createStatusPoller, isTerminalPixPhase } from "./payment-poll";
+import { createStatusPoller, isTerminalPixPhase, rateLimitHint } from "./payment-poll";
 import { parsePaymentStatusResponse, publicApiErrorSchema, type PaymentStatusResponse } from "@/lib/public/payment-status";
 
 interface StepPaymentProps {
@@ -87,6 +87,7 @@ export function StepPayment({
   const [latePolicy, setLatePolicy] = useState(() => latePaymentChoice(booking.policy));
   const [lateWatching, setLateWatching] = useState(() => pixUiPhase(booking) === "expired");
   const [checkError, setCheckError] = useState<string | null>(null);
+  const [rateLimitedUntil, setRateLimitedUntil] = useState(0);
   const [isSimulating, setIsSimulating] = useState(false);
   const reducedMotion = usePrefersReducedMotion();
   const pixPolicy = summary
@@ -114,6 +115,10 @@ export function StepPayment({
   const whatsappLabel = whatsappContact
     ? (businessName?.trim() ? businessWhatsappLabel(businessName.trim()) : WHATSAPP_CONTACT_LABEL)
     : null;
+  const rateLimited = rateLimitedUntil > 0 && (now == null || now < rateLimitedUntil);
+  const waitSeconds = rateLimited && now != null
+    ? Math.max(1, Math.ceil((rateLimitedUntil - now) / 1000))
+    : rateLimited ? 1 : 0;
 
   const applyStatus = useCallback(
     (data: PaymentStatusResponse | null | undefined, source: "manual" | "background") => {
@@ -256,8 +261,15 @@ export function StepPayment({
           return { kind: "error", aborted };
         }
       },
-      onOk: (data, source) => applyRef.current(data, source),
-      onRateLimited: (view) => setCheckError(view.message),
+      onOk: (data, source) => {
+        setRateLimitedUntil(0);
+        applyRef.current(data, source);
+      },
+      onRateLimited: (view) => {
+        setRateLimitedUntil(view.until);
+        setNow(Date.now());
+        setCheckError(view.message);
+      },
       onFailure: (view) => {
         if (view.message) setCheckError(view.message);
       },
@@ -276,6 +288,18 @@ export function StepPayment({
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [stopPolling]);
+
+  useEffect(() => {
+    if (rateLimitedUntil <= 0) return;
+    const tick = () => {
+      const current = Date.now();
+      setNow(current);
+      if (current >= rateLimitedUntil) setRateLimitedUntil(0);
+    };
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [rateLimitedUntil]);
 
   const handleCopy = async () => {
     if (!payment?.copyPaste) return;
@@ -516,15 +540,20 @@ export function StepPayment({
         <Button
           type="button"
           variant="outline"
-          disabled={isManualChecking || isSimulating}
+          disabled={isManualChecking || isSimulating || rateLimited}
           aria-busy={isManualChecking || undefined}
+          aria-describedby={rateLimited ? "pix-rate-limit-hint" : undefined}
           onClick={() => void pollerRef.current?.manual()}
           className="w-full"
         >
           {isManualChecking ? <Icon icon={PIX_ICONS.loading} size="md" className="animate-spin motion-reduce:animate-none" /> : <Icon icon={PIX_ICONS.refresh} size="md" />}
           {isManualChecking ? "Verificando confirmação…" : "Já paguei, verificar agora"}
         </Button>
-        <p className="text-center text-xs text-muted">A conferência do pagamento se repete a cada poucos segundos. Guarde o comprovante.</p>
+        {rateLimited ? (
+          <p id="pix-rate-limit-hint" className="text-center text-xs text-muted">{rateLimitHint(waitSeconds)}</p>
+        ) : (
+          <p className="text-center text-xs text-muted">A conferência do pagamento se repete a cada poucos segundos. Guarde o comprovante.</p>
+        )}
       </div>
 
       <p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted">

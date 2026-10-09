@@ -1,9 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import { GENERIC_SUBMIT_MESSAGE } from "../../components/booking/booking-error";
 import {
+  PAYMENT_POLL_BACKOFF_MAX_MS,
   PAYMENT_POLL_GAP_MS,
+  RATE_LIMIT_FALLBACK_MS,
   createStatusPoller,
+  pollBackoffMs,
   pollFailureView,
+  rateLimitHint,
+  readRetryAfterMs,
   type StatusPollOutcome,
 } from "../../components/booking/payment-poll";
 import { PAYMENT_CHECK_TIMEOUT_MS } from "../../components/booking/payment-check";
@@ -70,6 +75,34 @@ describe("consulta do Pix", () => {
     vi.useRealTimers();
   });
 
+  it("não fura a espera do 429 no clique, no start nem ao voltar a aba", async () => {
+    vi.useFakeTimers();
+    let calls = 0;
+    const poller = createStatusPoller<number>({
+      request: async () => {
+        calls += 1;
+        if (calls === 1) return { kind: "rate_limited", retryAfterHeader: "10" };
+        return { kind: "ok", terminal: true, data: 1 };
+      },
+    });
+    void poller.start();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(calls).toBe(1);
+    expect(poller.stats().rateLimitedUntil).toBeGreaterThan(Date.now());
+    void poller.manual();
+    void poller.start();
+    poller.hide();
+    void poller.show();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(calls).toBe(1);
+    await vi.advanceTimersByTimeAsync(9_999);
+    expect(calls).toBe(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(calls).toBe(2);
+    poller.stop();
+    vi.useRealTimers();
+  });
+
   it("respeita o Retry-After do 429", async () => {
     vi.useFakeTimers();
     let calls = 0;
@@ -97,5 +130,50 @@ describe("consulta do Pix", () => {
     expect(second.message).toBeNull();
     expect(pollFailureView(2_000, second.since, second.streak).message).toBe(GENERIC_SUBMIT_MESSAGE);
     expect(pollFailureView(60_000, 0, 0).message).toBe(GENERIC_SUBMIT_MESSAGE);
+  });
+
+  it("aumenta a espera a cada erro e volta ao intervalo base depois de um sucesso", async () => {
+    vi.useFakeTimers();
+    let calls = 0;
+    const poller = createStatusPoller<number>({
+      request: async () => {
+        calls += 1;
+        if (calls === 4) return { kind: "ok", terminal: false, data: 1 };
+        if (calls > 4) return { kind: "ok", terminal: true, data: 1 };
+        return { kind: "error", aborted: false };
+      },
+    });
+    void poller.start();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(calls).toBe(1);
+    await vi.advanceTimersByTimeAsync(PAYMENT_POLL_GAP_MS);
+    expect(calls).toBe(2);
+    await vi.advanceTimersByTimeAsync(PAYMENT_POLL_GAP_MS * 2);
+    expect(calls).toBe(3);
+    await vi.advanceTimersByTimeAsync(PAYMENT_POLL_GAP_MS * 4);
+    expect(calls).toBe(4);
+    await vi.advanceTimersByTimeAsync(PAYMENT_POLL_GAP_MS);
+    expect(calls).toBe(5);
+    poller.stop();
+    vi.useRealTimers();
+  });
+
+  it("limita a espera dos erros em cerca de 30s", () => {
+    expect(pollBackoffMs(1)).toBe(PAYMENT_POLL_GAP_MS);
+    expect(pollBackoffMs(2)).toBe(PAYMENT_POLL_GAP_MS * 2);
+    expect(pollBackoffMs(3)).toBe(PAYMENT_POLL_GAP_MS * 4);
+    expect(pollBackoffMs(4)).toBe(PAYMENT_POLL_BACKOFF_MAX_MS);
+    expect(pollBackoffMs(8)).toBe(PAYMENT_POLL_BACKOFF_MAX_MS);
+  });
+
+  it("lê Retry-After em segundos e em data HTTP", () => {
+    const now = Date.parse("2026-10-09T12:00:00.000Z");
+    expect(readRetryAfterMs("60", now)).toBe(60_000);
+    expect(readRetryAfterMs("0", now)).toBe(0);
+    expect(readRetryAfterMs(null, now)).toBe(RATE_LIMIT_FALLBACK_MS);
+    expect(readRetryAfterMs("não é data", now)).toBe(RATE_LIMIT_FALLBACK_MS);
+    expect(readRetryAfterMs(new Date(now + 15_000).toUTCString(), now)).toBe(15_000);
+    expect(readRetryAfterMs(new Date(now - 5_000).toUTCString(), now)).toBe(0);
+    expect(rateLimitHint(10)).toBe("Aguarde 10 s para verificar de novo.");
   });
 });

@@ -5,6 +5,9 @@ import type { PixUiPhase } from "./pix-status";
 /** Espera depois que a consulta anterior termina, antes da próxima. */
 export const PAYMENT_POLL_GAP_MS = 4_000;
 
+/** Teto da espera depois de erros seguidos. */
+export const PAYMENT_POLL_BACKOFF_MAX_MS = 30_000;
+
 /** Compatível com o nome antigo do intervalo. */
 export const PAYMENT_POLL_INTERVAL_MS = PAYMENT_POLL_GAP_MS;
 
@@ -12,11 +15,30 @@ export const RATE_LIMIT_FALLBACK_MS = 10_000;
 
 export const RATE_LIMIT_ERROR_AFTER_MS = 60_000;
 
-export function readRetryAfterMs(header: string | null | undefined): number {
+/** `Retry-After` em segundos ou em data HTTP. Data no passado espera 0. */
+export function readRetryAfterMs(header: string | null | undefined, now = Date.now()): number {
   if (!header) return RATE_LIMIT_FALLBACK_MS;
-  const seconds = Number.parseInt(header.trim(), 10);
-  if (!Number.isFinite(seconds) || seconds < 0) return RATE_LIMIT_FALLBACK_MS;
-  return seconds * 1000;
+  const trimmed = header.trim();
+  if (/^\d+$/.test(trimmed)) {
+    const seconds = Number.parseInt(trimmed, 10);
+    if (!Number.isFinite(seconds) || seconds < 0) return RATE_LIMIT_FALLBACK_MS;
+    return seconds * 1000;
+  }
+  const at = Date.parse(trimmed);
+  if (!Number.isFinite(at)) return RATE_LIMIT_FALLBACK_MS;
+  return Math.max(0, at - now);
+}
+
+/** 4s, 8s, 16s… até cerca de 30s. A primeira falha espera o intervalo base. */
+export function pollBackoffMs(streak: number, baseMs = PAYMENT_POLL_GAP_MS): number {
+  const step = Math.max(0, streak - 1);
+  const delay = baseMs * 2 ** step;
+  return Math.min(PAYMENT_POLL_BACKOFF_MAX_MS, delay);
+}
+
+export function rateLimitHint(seconds: number): string {
+  const wait = Math.max(1, Math.ceil(seconds));
+  return `Aguarde ${wait} s para verificar de novo.`;
 }
 
 /** 429 rate_limited: espera o Retry-After e só mostra erro se passar de ~60s. */
@@ -30,7 +52,7 @@ export function rateLimitView(now: number, since: number | null, retryAfterHeade
   const showError = now - started >= RATE_LIMIT_ERROR_AFTER_MS;
   return {
     since: started,
-    delayMs: readRetryAfterMs(retryAfterHeader),
+    delayMs: readRetryAfterMs(retryAfterHeader, now),
     showError,
     message: showError ? GENERIC_SUBMIT_MESSAGE : null,
   };
@@ -64,7 +86,7 @@ export function createStatusPoller<T>(options: {
   abortMs?: number;
   request: (signal: AbortSignal, source: "background" | "manual") => Promise<StatusPollOutcome<T>>;
   onFeedback?: (checking: boolean) => void;
-  onRateLimited?: (view: { showError: boolean; message: string | null }) => void;
+  onRateLimited?: (view: { showError: boolean; message: string | null; until: number }) => void;
   onFailure?: (view: { message: string | null }) => void;
   onOk?: (data: T, source: "background" | "manual") => void;
 }) {
@@ -83,6 +105,7 @@ export function createStatusPoller<T>(options: {
   let hidden = false;
   let stopped = false;
   let rateSince: number | null = null;
+  let rateLimitedUntil = 0;
   let failureSince: number | null = null;
   let failureStreak = 0;
   const starts: number[] = [];
@@ -91,6 +114,10 @@ export function createStatusPoller<T>(options: {
   function clearTimer() {
     timer?.cancel();
     timer = null;
+  }
+
+  function rateLimitWait(): number {
+    return Math.max(0, rateLimitedUntil - now());
   }
 
   function arm(delay: number) {
@@ -121,6 +148,11 @@ export function createStatusPoller<T>(options: {
 
   async function run(source: "background" | "manual"): Promise<void> {
     if (stopped || (hidden && source !== "manual")) return;
+    const wait = rateLimitWait();
+    if (wait > 0) {
+      arm(wait);
+      return;
+    }
     const mine = ++generation;
     controller?.abort();
     clearTimer();
@@ -154,17 +186,19 @@ export function createStatusPoller<T>(options: {
       failureSince = view.since;
       failureStreak = view.streak;
       options.onFailure?.(view);
-      arm(gapMs);
+      arm(pollBackoffMs(view.streak, gapMs));
       return;
     }
     if (outcome.kind === "rate_limited") {
       const view = rateLimitView(now(), rateSince, outcome.retryAfterHeader);
       rateSince = view.since;
-      options.onRateLimited?.(view);
+      rateLimitedUntil = now() + view.delayMs;
+      options.onRateLimited?.({ ...view, until: rateLimitedUntil });
       arm(view.delayMs);
       return;
     }
     rateSince = null;
+    rateLimitedUntil = 0;
     failureSince = null;
     failureStreak = 0;
     options.onOk?.(outcome.data, source);
@@ -194,7 +228,7 @@ export function createStatusPoller<T>(options: {
       controller?.abort();
     },
     stats() {
-      return { inFlight, maxInFlight, starts: [...starts], requests };
+      return { inFlight, maxInFlight, starts: [...starts], requests, rateLimitedUntil };
     },
   };
 }

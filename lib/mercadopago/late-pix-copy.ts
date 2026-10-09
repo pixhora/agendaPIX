@@ -7,7 +7,16 @@ export const LATE_PIX_REFUND_LEAD =
 export const LATE_PIX_REFUND_DEFAULT =
   "Na política padrão, todo Pix atrasado é devolvido.";
 
-/** A tela não oferece remarcar. O texto descreve só a devolução automática. */
-export function latePixRefundCopy(): string {
-  return `${LATE_PIX_REFUND_LEAD} ${LATE_PIX_REFUND_DEFAULT}`;
+const LATE_PIX_REFUND_SENTENCE = `${LATE_PIX_REFUND_LEAD} ${LATE_PIX_REFUND_DEFAULT}`;
+
+/**
+ * A tela não oferece remarcar. As duas políticas usam a mesma frase de devolução.
+ * Hoje o chamador passa `refund`, a única política disponível.
+ */
+export function latePixRefundCopy(policy: LatePixPolicyChoice): string {
+  const copy: Record<LatePixPolicyChoice, string> = {
+    refund: LATE_PIX_REFUND_SENTENCE,
+    rebook_if_free: LATE_PIX_REFUND_SENTENCE,
+  };
+  return copy[policy];
 }
