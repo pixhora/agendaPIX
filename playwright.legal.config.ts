@@ -21,7 +21,7 @@ export default defineConfig({
     { name: "mobile", use: { ...devices["iPhone 13"], browserName: "chromium", viewport: { width: 390, height: 844 } } },
   ],
   webServer: {
-    command: `pnpm exec next dev --hostname 127.0.0.1 --port ${PORT}`,
+    command: `NEXT_DIST_DIR=.next-legal LEGAL_PAGES_PUBLISHED=true LEGAL_CONTENT_DIR=tests/fixtures/legal pnpm exec next dev --hostname 127.0.0.1 --port ${PORT}`,
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
@@ -31,6 +31,7 @@ export default defineConfig({
       PAYMENT_PROVIDER: "fake",
       LEGAL_PAGES_PUBLISHED: "true",
       LEGAL_CONTENT_DIR: "tests/fixtures/legal",
+      NEXT_DIST_DIR: ".next-legal",
     },
   },
 });
