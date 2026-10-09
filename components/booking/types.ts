@@ -99,7 +99,7 @@ export interface PixPaymentData {
   id: string;
   provider: string;
   /** Id da cobrança no gateway (order ORDTST…/ORD… no Mercado Pago). */
-  externalId: string;
+  externalId: string | null;
   amountCents: number;
   status: PixPaymentStatus;
   /** Vencimento do Pix no servidor. Ausente: a UI não inventa prazo. */
@@ -121,6 +121,8 @@ export interface BookingPolicyView {
    * Com `true`, o comprovante usa o tom de aviso e `text` não traz data.
    */
   refundWindowClosedAtBooking?: boolean;
+  /** Só se o payload já trouxer. Ausente: a tela de prazo usa a frase de política desconhecida. */
+  latePaymentPolicy?: "refund" | "rebook_if_free" | null;
   /** Linhas da folha, se o servidor enviar junto do snapshot. */
   details?: PolicyDetailLine[] | null;
 }
@@ -136,13 +138,7 @@ export interface BookingResponse {
   policy?: BookingPolicyView | null;
 }
 
-export interface PaymentStatusResponse {
-  bookingId: string;
-  status: "pending_payment" | "confirmed" | "cancelled" | "expired" | "completed";
-  expiresAt: string | null;
-  payment: PixPaymentData | null;
-  policy?: BookingPolicyView | null;
-}
+export type { PaymentStatusResponse } from "@/lib/public/payment-status";
 
 export interface CustomerFormData {
   name: string;

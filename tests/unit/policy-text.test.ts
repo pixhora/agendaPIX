@@ -15,13 +15,13 @@ describe("texto da política do sinal", () => {
   it("a prévia do dono fala com você, sem o nome do negócio", () => {
     const businessName = "Barbearia do Zé";
     expect(ownerPreview(PADRAO_DEPOSIT_POLICY, { depositCents: 2000 })).toBe(
-      "O cliente paga R$ 20,00 de sinal no Pix para reservar. Pode cancelar ou remarcar até 24 h antes. Depois disso, ou se faltar, o sinal fica com você. Quando o cliente cancelar no prazo, você devolve pelo AgendaPix, depois de confirmar o cancelamento.",
+      "O cliente paga R$ 20,00 de sinal no Pix para reservar. Pode cancelar ou remarcar até 24 h antes. Depois disso, ou se faltar, o sinal fica com você. Quando o cliente cancelar no prazo, você confirma o cancelamento. Você devolve pelo app do Mercado Pago.",
     );
     expect(ownerPreview(PADRAO_DEPOSIT_POLICY, { depositCents: 0 })).toBe("Sem sinal: a reserva confirma na hora, sem Pix.");
     const different = (lateCancel: DepositPolicy["lateCancel"], noShow: DepositPolicy["noShow"]) =>
       ownerPreview(policy({ refundUntilHours: 48, rescheduleUntilHours: 2, lateCancel, noShow }), { depositCents: 2000 });
     expect(different("retain", "retain")).toBe(
-      "O cliente paga R$ 20,00 de sinal no Pix para reservar. Pode cancelar até 48 h antes ou remarcar até 2 h antes, usando o sinal (1 vez). Depois do prazo para cancelar, ou se faltar, o sinal fica com você. Quando o cliente cancelar no prazo, você devolve pelo AgendaPix, depois de confirmar o cancelamento.",
+      "O cliente paga R$ 20,00 de sinal no Pix para reservar. Pode cancelar até 48 h antes ou remarcar até 2 h antes, usando o sinal (1 vez). Depois do prazo para cancelar, ou se faltar, o sinal fica com você. Quando o cliente cancelar no prazo, você confirma o cancelamento. Você devolve pelo app do Mercado Pago.",
     );
     expect(different("credit", "credit")).toContain(`Depois do prazo para cancelar, ou se faltar, o sinal vira ${CREDIT_PHRASE}.`);
     expect(different("retain", "credit")).toContain(`Depois do prazo para cancelar, o sinal fica com você. Se faltar, o sinal vira ${CREDIT_PHRASE}.`);
@@ -69,12 +69,13 @@ describe("texto da política do sinal", () => {
             }
 
             if (noShow === "refund") {
-              expect(text).toContain("Quando houver devolução, você faz pelo AgendaPix, depois de confirmar com o cliente.");
+              expect(text).toContain("Quando houver devolução, você confirma com o cliente. Você devolve pelo app do Mercado Pago.");
               expect(text).not.toContain("Quando o cliente cancelar no prazo");
             } else if (refundUntilHours !== null) {
-              expect(text).toContain("Quando o cliente cancelar no prazo, você devolve pelo AgendaPix, depois de confirmar o cancelamento.");
+              expect(text).toContain("Quando o cliente cancelar no prazo, você confirma o cancelamento. Você devolve pelo app do Mercado Pago.");
             } else {
               expect(text).not.toContain("pelo AgendaPix");
+              expect(text).not.toContain("Você devolve pelo app do Mercado Pago.");
             }
           }
         }

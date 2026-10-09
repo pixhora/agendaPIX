@@ -16,6 +16,22 @@ export function holdAnswer(holdMinutes: number): string {
   return `${formatMinutes(holdMinutes)} depois de escolher o horário. Se o Pix não for pago nesse tempo, o código vence e o horário volta a ficar livre para outra pessoa.`;
 }
 
+/** Três passos que o código faz hoje, na seção de demonstração. */
+export function customerAgendaSteps(): readonly string[] {
+  return [
+    "Escolhe o horário.",
+    "Paga o sinal no Pix.",
+    "Recebe a confirmação.",
+  ];
+}
+
+export const honestBenefits = [
+  { title: "O sinal cai na sua conta", text: "O Pix do sinal vai para a conta Mercado Pago que você conecta no AgendaPix." },
+  { title: "Confirma quando o Pix chega", text: "A reserva confirma quando o pagamento chega. Você não confere comprovante." },
+  { title: "Pix atrasado volta inteiro", text: "O Pix pago depois do prazo é devolvido para quem pagou, no valor inteiro." },
+  { title: "Lista de clientes, sem CPF", text: "O AgendaPix não guarda CPF. A lista de clientes fica no painel." },
+] as const;
+
 export function demoSteps(requiresPayerCpf: boolean): readonly string[] {
   return [
     "Escolhe o serviço e vê o valor do sinal antes de tudo.",
@@ -30,7 +46,7 @@ export function demoSteps(requiresPayerCpf: boolean): readonly string[] {
 export type FaqItem = { id: string; question: string; answer: string };
 
 const refundAnswer =
-  "Você escolhe a regra de cada serviço: até quando o cliente pode cancelar ou remarcar e o que acontece se ele faltar. Ele lê essa regra antes de pagar e ela aparece no comprovante. Se a regra manda devolver, você devolve pelo AgendaPix. O botão Devolver pelo AgendaPix, no painel, abre uma confirmação. O valor sai do saldo da sua conta Mercado Pago. Pix pago fora do prazo com o horário já ocupado é devolvido sozinho, o valor inteiro, e você recebe um e-mail.";
+  "Você escolhe a regra de cada serviço: até quando o cliente pode cancelar ou remarcar e o que acontece se ele faltar. Ele lê essa regra antes de pagar e ela aparece no comprovante. Se a regra manda devolver, você devolve pelo app do Mercado Pago. O Pix pago depois do prazo é devolvido para quem pagou, no valor inteiro, e você recebe um e-mail.";
 
 /** A copy não lê pixRecipientDisplayName: na landing ele vem null. */
 export function faqItems(facts: PublicBookingFacts): FaqItem[] {

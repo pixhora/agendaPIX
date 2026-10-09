@@ -1,6 +1,7 @@
 import { formatAppointmentMeta } from "@/components/booking/formatters";
 import { CheckIcon } from "./icons";
 import { buttonVariants } from "@/components/ui/button";
+import { IllustrativeBadge } from "./IllustrativeBadge";
 import { ValueSlab } from "@/components/ui/value-slab";
 
 const niches = ["Barbearias", "Salões", "Manicures", "Estética", "Clínicas", "Personal trainers"];
@@ -35,7 +36,7 @@ export function LandingHero({ publicHost }: { publicHost: string }) {
             <a id="hero-primary-cta" href="/onboarding" className={buttonVariants({ size: "lg", className: "w-full sm:w-auto" })}>
               Criar minha agenda grátis
             </a>
-            <a href="/preview/booking" className={buttonVariants({ variant: "outline", size: "lg", className: "w-full sm:w-auto" })}>
+            <a href="/exemplo" className={buttonVariants({ variant: "outline", size: "lg", className: "w-full sm:w-auto" })}>
               Ver uma página de exemplo
             </a>
           </div>
@@ -62,7 +63,9 @@ export function LandingHero({ publicHost }: { publicHost: string }) {
             <PhoneStage publicHost={publicHost} />
             <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-paper to-transparent lg:hidden" />
           </div>
-          <div aria-hidden="true" className="pointer-events-none absolute top-full left-0 z-10 mt-3 hidden w-[210px] max-w-[calc(100%-14.5rem)] rounded-card border border-line bg-surface p-3 shadow-[var(--shadow-raised)] xl:block">
+          <p className="mt-3 text-center text-[12px] text-muted lg:text-left">Exemplo ilustrativo. Não é um cliente real.</p>
+          <div aria-hidden="true" className="pointer-events-none absolute top-full left-0 z-10 mt-3 hidden w-[210px] max-w-[calc(100%-14.5rem)] rounded-card border border-line bg-surface p-3 pt-6 shadow-[var(--shadow-raised)] xl:block">
+            <IllustrativeBadge className="absolute right-3 top-2" />
             <p className="text-[13px] font-semibold text-ink">Nova reserva · Ana</p>
             <p className="mt-1 text-[13px] text-muted">
               Design de sobrancelha <span className="whitespace-nowrap">· {anaWhen}</span>
@@ -71,14 +74,16 @@ export function LandingHero({ publicHost }: { publicHost: string }) {
               <CheckIcon className="size-3.5" /> Confirmado · sinal pago
             </p>
           </div>
-          <ValueSlab
-            aria-hidden="true"
-            size="compact"
-            className="absolute top-[calc(100%-1rem)] right-0 z-10 hidden w-[220px] shadow-[var(--shadow-raised)] xl:block"
-            label="Sinais de hoje"
-            value="R$ 80,00"
-            badge="4 reservas confirmadas"
-          />
+          <div aria-hidden="true" className="absolute top-[calc(100%-1rem)] right-0 z-10 hidden w-[220px] xl:block">
+            <IllustrativeBadge className="mb-1 block text-right" />
+            <ValueSlab
+              size="compact"
+              className="relative w-full shadow-[var(--shadow-raised)]"
+              label="Sinais de hoje"
+              value="R$ 80,00"
+              badge="4 reservas confirmadas"
+            />
+          </div>
         </div>
       </div>
     </section>
@@ -95,6 +100,7 @@ function PhoneStage({ publicHost }: { publicHost: string }) {
           <span>
             <span className="block text-sm font-bold text-ink">Studio Bella</span>
             <span className="block max-w-[180px] truncate text-[11px] text-muted">{publicHost}/studio-bella</span>
+            <IllustrativeBadge className="mt-1 block" />
           </span>
         </div>
         <div className="mt-4 rounded-card border border-line p-3">

@@ -3,6 +3,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "../../db/schema";
 import { sendOwnerEmail } from "../email";
 import { refundDeadlineEveNotice, type EveKind } from "../email/templates/refund-deadline-eve";
+import { MP_MANUAL_REFUND_CHANNEL } from "../mercadopago/connect-copy";
 import { formatAppointment } from "./notices";
 import {
   MANUAL_REFUND_REMINDER_HOUR,
@@ -102,12 +103,12 @@ function dailyText(item: ReminderCase) {
   if (item.kind === "review") {
     return {
       subject: `Lembrete: confira o Pix de ${item.customerName}`,
-      text: `O horário é ${when}. A data limite para devolver continua a mesma. Devolva pelo AgendaPix ou pelo app do Mercado Pago.`,
+      text: `O horário é ${when}. A data limite para devolver continua a mesma. ${MP_MANUAL_REFUND_CHANNEL}`,
     };
   }
   return {
     subject: `Ainda pendente: devolva ${brl(item.amountCents)} para ${item.customerName} até ${due}`,
-    text: `A devolução automática continua pendente. A data limite não mudou (${due}). Devolva pelo AgendaPix, no botão Devolver pelo AgendaPix, ou pelo app do Mercado Pago.`,
+    text: `A devolução automática continua pendente. A data limite não mudou (${due}). Você devolve pelo app do Mercado Pago.`,
   };
 }
 

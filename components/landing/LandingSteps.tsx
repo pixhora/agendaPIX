@@ -1,4 +1,5 @@
 import { CheckIcon } from "./icons";
+import { IllustrativeBadge } from "./IllustrativeBadge";
 import { Eyebrow, Section, SectionTitle } from "./section";
 
 const steps = [
@@ -46,7 +47,8 @@ export function LandingSteps({ publicHost }: { publicHost: string }) {
 
 function ServicePreview() {
   return (
-    <div className="rounded-card border border-line bg-paper px-3 py-3 text-sm">
+    <div className="relative rounded-card border border-line bg-paper px-3 py-3 pt-6 text-sm">
+      <IllustrativeBadge className="absolute right-3 top-2" />
       <p className="font-semibold text-ink">Design de sobrancelha</p>
       <p className="mt-1 text-muted">R$ 60,00</p>
       <p className="mt-1 font-semibold text-pix">Sinal no Pix R$ 20,00</p>
@@ -56,7 +58,8 @@ function ServicePreview() {
 
 function LinkPreview({ host }: { host: string }) {
   return (
-    <div>
+    <div className="relative pt-4">
+      <IllustrativeBadge className="absolute right-0 top-0" />
       <div className="flex min-w-0 items-center gap-2 rounded-field border border-line-strong/60 bg-paper px-3 py-3">
         <span className="min-w-0 flex-1 truncate text-sm text-ink">{host}/studio-bella</span>
         <span className="shrink-0 text-sm font-semibold text-pix">Copiar</span>
@@ -70,6 +73,8 @@ function LinkPreview({ host }: { host: string }) {
 
 function PaidPreview() {
   return (
+    <div className="relative pt-4">
+    <IllustrativeBadge className="absolute right-0 top-0" />
     <ul className="grid gap-2 text-sm">
       {[
         ["Qui 15, 15:30", "Ana"],
@@ -83,5 +88,6 @@ function PaidPreview() {
         </li>
       ))}
     </ul>
+    </div>
   );
 }

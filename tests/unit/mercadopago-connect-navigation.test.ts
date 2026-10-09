@@ -17,7 +17,7 @@ function formRequest(returnTo: string, accept = "text/html,application/xhtml+xml
       "sec-fetch-dest": "document",
       "sec-fetch-mode": "navigate",
     },
-    body: new URLSearchParams({ returnTo, autoRefundAck: "on", consentVersion: "2026-10-08.v3.2" }),
+    body: new URLSearchParams({ returnTo, autoRefundAck: "on", consentVersion: "2026-10-09.v4" }),
   });
 }
 
@@ -55,7 +55,7 @@ describe("navegação do connect com mp_oauth_pkce_invalid", () => {
     const request = new Request("https://app.example.com/api/businesses/x/mercadopago/connect", {
       method: "POST",
       headers: { accept: "application/json", "content-type": "application/json" },
-      body: JSON.stringify({ returnTo: "/dashboard", autoRefundAck: "on", consentVersion: "2026-10-08.v3.2" }),
+      body: JSON.stringify({ returnTo: "/dashboard", autoRefundAck: "on", consentVersion: "2026-10-09.v4" }),
     });
     const response = await respondMercadoPagoConnect(request, async () => {
       throw new HttpError(503, "mp_oauth_pkce_invalid", "MP_OAUTH_PKCE deve ser on ou off.");

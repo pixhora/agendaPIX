@@ -83,17 +83,19 @@ describe("checkout da assinatura", () => {
     expect(receivedWhenPhrase(requestedToday, today, zone)).toBe("hoje às 20:10");
     expect(receivedWhenPhrase(requestedToday, new Date("2026-10-09T15:00:00.000Z"), zone)).toBe("em 8 de outubro, às 20:10");
     expect(receivedWhenPhrase("2026-10-09T02:30:00.000Z", new Date("2026-10-09T03:10:00.000Z"), zone)).toBe("em 8 de outubro, às 23:30");
-    expect(pendingRequestCopy("hoje às 20:10", 6)).toBe("Recebemos seu pedido hoje às 20:10. Ativamos em até 6 h, e seus agendamentos online voltam sozinhos.");
-    expect(pendingRequestCopy("em 8 de outubro, às 20:10", 6)).toBe("Recebemos seu pedido em 8 de outubro, às 20:10. Ativamos em até 6 h, e seus agendamentos online voltam sozinhos.");
+    expect(pendingRequestCopy("hoje às 20:10", 6)).toBe("Recebemos seu pedido hoje às 20:10. Ativamos em até 6 horas, e seus agendamentos online voltam sozinhos.");
+    expect(pendingRequestCopy("em 8 de outubro, às 20:10", 6)).toBe("Recebemos seu pedido em 8 de outubro, às 20:10. Ativamos em até 6 horas, e seus agendamentos online voltam sozinhos.");
+    expect(pendingRequestCopy("hoje às 20:10", 1)).toBe("Recebemos seu pedido hoje às 20:10. Ativamos em até 1 hora, e seus agendamentos online voltam sozinhos.");
     expect(pendingRequestCopy("hoje às 20:10", null)).toBe("Recebemos seu pedido hoje às 20:10. Seus agendamentos online voltam assim que a assinatura for ativada.");
     expect(pendingRequestCopy("hoje às 20:10", 2)).not.toBe("Recebemos seu pedido. Ativamos em até 2 h.");
   });
 
   it("escreve a ajuda de assinar, o vencimento e o preço a partir do plano", () => {
-    expect(subscribeHelpCopy(6)).toBe("Abre o WhatsApp com o pedido pronto. Ativamos em até 6 h.");
+    expect(subscribeHelpCopy(6)).toBe("Abre o WhatsApp com o pedido pronto. Ativamos em até 6 horas.");
+    expect(subscribeHelpCopy(1)).toBe("Abre o WhatsApp com o pedido pronto. Ativamos em até 1 hora.");
     expect(subscribeHelpCopy(null)).toBe("Abre o WhatsApp com o pedido pronto.");
     expect(renewalDueCopy("2026-10-16T02:59:59.000Z", zone)).toBe("Sua assinatura vence em quinta, 15 de outubro.");
-    expect(SUBSCRIPTION_MANUAL_ACTIVATION_HOURS).toBe(2);
+    expect(SUBSCRIPTION_MANUAL_ACTIVATION_HOURS).toBe(1);
     expect(subscribeCtaLabel(planPriceCents)).toBe("Assinar por R$ 49/mês");
     expect(renewCtaLabel(planPriceCents)).toBe("Renovar por R$ 49/mês");
     expect(SUBSCRIPTION_UNAVAILABLE_COPY).toBe("A assinatura está indisponível no momento. Tente de novo mais tarde.");

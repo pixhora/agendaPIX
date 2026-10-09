@@ -1,3 +1,5 @@
+import { MP_MANUAL_REFUND_CHANNEL } from "../mercadopago/connect-copy";
+
 export const REFUND_WINDOW_MS = 180 * 24 * 60 * 60 * 1000;
 
 export const refundStatuses = ["in_process", "refunded", "failed"] as const;
@@ -41,7 +43,7 @@ export function refundBlockMessage(reason: RefundBlockReason) {
     case "already_refunded":
       return "Este sinal já foi devolvido.";
     case "refund_window_expired":
-      return "O prazo para devolver este sinal pelo AgendaPix já passou.";
+      return `O prazo para devolver este sinal já passou. ${MP_MANUAL_REFUND_CHANNEL}`;
     case "mp_account_not_connected":
       return "Conecte o Mercado Pago ao AgendaPix para devolver o sinal.";
     case "refund_in_process":

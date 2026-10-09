@@ -263,7 +263,7 @@ describe("devolução automática só no atraso sem horário", () => {
     expect(await settleAutomaticLateRefund(ports, provider, "pay-1", mailer, new Date("2030-06-03T12:00:00.000Z"))).toBe("failed_already");
     expect(calls).toBe(1);
     expect(ports.emails).toHaveLength(1);
-    expect(ports.emails[0]).toContain("Devolver pelo AgendaPix");
+    expect(ports.emails[0]).toContain("Você devolve pelo app do Mercado Pago");
     expect(ports.emails[0]).toContain(dueLabel());
     expect(ports.emails[0]).not.toContain("horário de Brasília");
     const stored = await ports.loadByPaymentId("pay-1");

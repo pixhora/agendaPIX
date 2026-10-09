@@ -79,8 +79,8 @@ describe("landing copy", () => {
     expect(rendered).not.toContain("Titular Que Não Pode Aparecer");
     expect(rendered).toContain("12 minutos");
     expect(rendered).toContain("conta Mercado Pago");
-    expect(rendered).toContain("Devolver pelo AgendaPix");
-    expect(rendered).toContain("devolvido sozinho, o valor inteiro");
+    expect(rendered).toContain("você devolve pelo app do Mercado Pago");
+    expect(rendered).toContain("O Pix pago depois do prazo é devolvido para quem pagou, no valor inteiro");
     expect(rendered).toContain("você recebe um e-mail");
     expect(rendered).not.toMatch(/nada é devolvido sozinho|nada é automático|reembolsos nunca|repasse|chave Pix/i);
   });
@@ -140,7 +140,7 @@ describe("landing copy", () => {
       "components/landing/DemoSection.tsx",
       "components/landing/LandingPricing.tsx",
       "components/landing/LandingFinalCta.tsx",
-      "components/landing/LandingBenefits.tsx",
+      "lib/marketing/landing-copy.ts",
       "components/landing/Roadmap.tsx",
     ]) {
       expect(readFileSync(file, "utf8"), file).toMatch(/conta Mercado Pago/);

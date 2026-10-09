@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { z } from "zod";
 import { BookingFlow } from "@/components/booking/BookingFlow";
+import { toPublicBusinessData } from "@/components/booking/public-business";
+import { legalPagesPublished } from "@/lib/marketing/flags";
 import { listPublicServices } from "@/lib/bookings/service";
 import { HttpError } from "@/lib/http";
 import { siteName } from "@/lib/site";
@@ -63,5 +65,12 @@ export default async function BookingPage({
   const business = await loadPublicBusiness(slug);
   if (!business) notFound();
   const search = searchParams ? await searchParams : undefined;
-  return <BookingFlow slug={slug} initialBookingId={search?.bookingId} />;
+  return (
+    <BookingFlow
+      slug={slug}
+      initialBookingId={search?.bookingId}
+      initialBusiness={toPublicBusinessData(business)}
+      legalPagesPublished={legalPagesPublished()}
+    />
+  );
 }

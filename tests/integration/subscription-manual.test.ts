@@ -19,7 +19,7 @@ import { insertConnectedMercadoPago } from "../helpers/connected-mp";
 const pool = new Pool({ connectionString: databaseEnvSchema.parse(process.env).DATABASE_URL, max: 4, connectionTimeoutMillis: 5000 });
 const database = drizzle(pool, { schema });
 const provider = new FakePaymentProvider("test-only-webhook-secret-with-32-characters");
-const number = "5500000000000";
+const number = "5511912345678";
 const hours = "5";
 const checkoutEnv = { SUPPORT_WHATSAPP_NUMBER: number, SUBSCRIPTION_MANUAL_ACTIVATION_HOURS: hours, BETTER_AUTH_URL: "http://localhost:3000" };
 const now = new Date("2026-10-08T15:00:00.000Z");

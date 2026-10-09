@@ -1,16 +1,17 @@
 import { buttonVariants } from "@/components/ui/button";
 import type { PublicBookingFacts } from "@/lib/marketing/facts";
-import { demoSteps, minutesUnit } from "@/lib/marketing/landing-copy";
+import { customerAgendaSteps, minutesUnit } from "@/lib/marketing/landing-copy";
+import { IllustrativeBadge } from "./IllustrativeBadge";
 import { Eyebrow, Section, SectionTitle } from "./section";
 
 export function DemoSection({ facts }: { facts: PublicBookingFacts }) {
-  const steps = demoSteps(facts.requiresPayerCpf);
+  const steps = customerAgendaSteps();
   return (
     <Section id="exemplo" labelledBy="exemplo-titulo" className="bg-subtle/60">
       <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
         <div>
           <Eyebrow>Página de exemplo</Eyebrow>
-          <SectionTitle id="exemplo-titulo">Veja como seu cliente agenda.</SectionTitle>
+          <SectionTitle id="exemplo-titulo">Veja como o cliente agenda</SectionTitle>
           <p className="mt-4 max-w-[46rem] text-base leading-relaxed text-pretty text-muted lg:text-lg">
             Esta é a página que seu cliente abre pelo link. Toque e faça uma reserva de teste, do serviço até o Pix.
           </p>
@@ -24,8 +25,8 @@ export function DemoSection({ facts }: { facts: PublicBookingFacts }) {
               </li>
             ))}
           </ol>
-          <a href="/preview/booking" className={buttonVariants({ size: "lg", className: "mt-6 w-full sm:w-auto" })}>
-            Abrir a página de exemplo
+          <a href="/exemplo" className={buttonVariants({ size: "lg", className: "mt-6 w-full sm:w-auto" })}>
+            Testar a demonstração
           </a>
           <p className="mt-3 text-[13px] text-muted">Exemplo com dados fictícios. Nenhum Pix de verdade é gerado.</p>
         </div>
@@ -38,8 +39,11 @@ export function DemoSection({ facts }: { facts: PublicBookingFacts }) {
 function ExamplePhone({ holdMinutes }: { holdMinutes: number }) {
   return (
     <div className="mx-auto w-full max-w-[280px]">
-      <p className="mx-auto mb-3 w-fit rounded-full bg-pix-deep px-3 py-1 text-center text-[12px] font-semibold text-slab-foreground">
-        Exemplo · nenhum Pix real
+      <p className="mx-auto mb-3 flex w-fit flex-col items-center gap-1">
+        <IllustrativeBadge />
+        <span className="rounded-full bg-pix-deep px-3 py-1 text-center text-[12px] font-semibold text-slab-foreground">
+          Exemplo · nenhum Pix real
+        </span>
       </p>
       <div aria-hidden="true" className="rounded-[36px] border-8 border-ink bg-surface p-4 shadow-[var(--shadow-raised)]">
         <p className="text-sm font-bold text-ink">Sinal de R$ 20,00</p>

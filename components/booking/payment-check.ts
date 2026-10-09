@@ -1,7 +1,8 @@
 import type { PaymentStatusResponse } from "./types";
+import { pixUiPhase } from "./pix-status";
 
-/** Prazo máximo de uma verificação de status (manual ou polling). Evita spinner infinito. */
-export const PAYMENT_CHECK_TIMEOUT_MS = 8_000;
+/** Aborta a consulta do Pix depois de ~8–10s. O gateway lento não segura o próximo ciclo. */
+export const PAYMENT_CHECK_TIMEOUT_MS = 10_000;
 
 /** Limite de tentativas manuais consecutivas sem confirmação (só reforça o aviso; o botão continua utilizável). */
 export const PAYMENT_CHECK_MAX_MANUAL_ATTEMPTS = 8;
@@ -23,12 +24,9 @@ export type PaymentCheckOutcome =
 
 export function interpretPaymentStatus(data: PaymentStatusResponse | null | undefined): PaymentCheckOutcome {
   if (!data) return { kind: "pending", data: data ?? null };
-  if (data.status === "expired" || data.payment?.status === "expired") {
-    return { kind: "expired", data };
-  }
-  if (data.status === "confirmed") {
-    return { kind: "confirmed", data };
-  }
+  const phase = pixUiPhase(data);
+  if (phase === "paid") return { kind: "confirmed", data };
+  if (phase === "expired") return { kind: "expired", data };
   return { kind: "pending", data };
 }
 

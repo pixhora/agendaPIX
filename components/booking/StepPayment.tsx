@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useRef } from "react";
-import type { BookingResponse, PaymentStatusResponse } from "./types";
+import type { BookingResponse } from "./types";
 import { formatCurrency, formatTimeSlot } from "./formatters";
-import { pixUiPhase } from "./pix-status";
-import { FlaskConical, TriangleAlert } from "lucide-react";
+import { CONFIRMING_PAYMENT_LABEL, pixUiPhase } from "./pix-status";
+import { FlaskConical, Info, TriangleAlert } from "lucide-react";
 import { Icon } from "@/components/ui/icon";
 import { PIX_ICONS, PIX_STATUS_ICONS } from "@/lib/icons/registry";
 import { Button } from "@/components/ui/button";
@@ -13,12 +13,8 @@ import { ValueSlab, StatusChip } from "@/components/ui/value-slab";
 import type { AvailabilitySlot, PublicService } from "./types";
 import { devSimulatePixUrl, publicBookingPaymentUrl } from "@/lib/public-api";
 import {
-  PAYMENT_CHECK_ERROR_MESSAGE,
-  PAYMENT_CHECK_TIMEOUT_MESSAGE,
-  PAYMENT_CHECK_TIMEOUT_MS,
   canShowDevSimulatePix,
   pendingMessageForAttempts,
-  withPaymentCheckTimeout,
 } from "./payment-check";
 import {
   formatCountdown,
@@ -33,6 +29,20 @@ import { PolicySummaryLine } from "@/components/policy/PolicySummaryLine";
 import { pixPaymentPolicy } from "./policy-copy";
 import { usePrefersReducedMotion } from "./use-prefers-reduced-motion";
 import { cn } from "@/lib/utils";
+import { whatsappHref } from "./booking-error";
+import {
+  CHOOSE_ANOTHER_SLOT_LABEL,
+  EXPIRED_PIX_TITLE,
+  LATE_PAYMENT_WATCH_LINE,
+  LATE_PAYMENT_WATCH_MS,
+  businessWhatsappLabel,
+  expiredPixBody,
+  latePaymentChoice,
+  refundPendingCopy,
+  refundedCopy,
+} from "./pix-deadline-copy";
+import { createStatusPoller, isTerminalPixPhase } from "./payment-poll";
+import { parsePaymentStatusResponse, publicApiErrorSchema, type PaymentStatusResponse } from "@/lib/public/payment-status";
 
 interface StepPaymentProps {
   slug: string;
@@ -44,8 +54,10 @@ interface StepPaymentProps {
   summary?: { service: PublicService; slot: AvailabilitySlot; timezone: string };
   /** Nome de quem recebe o Pix, vindo do servidor. */
   pixRecipientDisplayName?: string | null;
-  /** Nome do negócio na frase da política. */
+  /** Nome do negócio na frase da política e no WhatsApp. */
   businessName?: string | null;
+  /** WhatsApp do negócio. Sem número, o botão de contato não aparece. */
+  contactWhatsapp?: string | null;
   onOpenPolicy?: (trigger: HTMLElement) => void;
 }
 
@@ -58,6 +70,7 @@ export function StepPayment({
   summary,
   pixRecipientDisplayName,
   businessName,
+  contactWhatsapp,
   onOpenPolicy,
 }: StepPaymentProps) {
   const payment = booking.payment;
@@ -69,10 +82,9 @@ export function StepPayment({
   const [now, setNow] = useState<number | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const [phase, setPhase] = useState(() => pixUiPhase(booking));
-  /** Spinner do botão "Já paguei" — só em verificação manual. */
   const [isManualChecking, setIsManualChecking] = useState(false);
-  /** Indicador suave no status (polling em segundo plano). */
-  const [, setIsBackgroundChecking] = useState(false);
+  const [latePolicy, setLatePolicy] = useState(() => latePaymentChoice(booking.policy));
+  const [lateWatching, setLateWatching] = useState(false);
   const [checkError, setCheckError] = useState<string | null>(null);
   const [isSimulating, setIsSimulating] = useState(false);
   const reducedMotion = usePrefersReducedMotion();
@@ -87,15 +99,18 @@ export function StepPayment({
     : { warn: null, summary: null };
   const lateNotice = pixPolicy.warn;
 
-  const isCheckingRef = useRef(false);
+  const phaseRef = useRef(phase);
+  const pollerRef = useRef<ReturnType<typeof createStatusPoller<PaymentStatusResponse | null>> | null>(null);
+  const watchUntilRef = useRef<number | null>(null);
   const hasCheckedOnExpireRef = useRef(false);
   const manualAttemptsRef = useRef(0);
-  const abortRef = useRef<AbortController | null>(null);
   const announcedRef = useRef<Set<PixDeadlineMilestone>>(new Set());
   const lastMinuteRef = useRef<number | null>(null);
-
   const showDevSimulate = canShowDevSimulatePix(payment?.provider);
-  const isTerminal = phase === "expired" || phase === "cancelled";
+  const haltClock = phase === "paid" || phase === "expired" || phase === "cancelled" || phase === "refund_pending" || phase === "refunded";
+  const stopPolling = phase === "paid" || phase === "cancelled" || phase === "refund_pending" || phase === "refunded" || (phase === "expired" && !lateWatching);
+  const whatsappContact = whatsappHref(contactWhatsapp);
+  const whatsappLabel = businessName?.trim() && whatsappContact ? businessWhatsappLabel(businessName.trim()) : null;
 
   const applyStatus = useCallback(
     (data: PaymentStatusResponse | null | undefined, source: "manual" | "background") => {
@@ -108,15 +123,21 @@ export function StepPayment({
       }
 
       const next = pixUiPhase(data);
+      phaseRef.current = next;
       setPhase(next);
+      setLatePolicy(latePaymentChoice(data.policy));
+      if (next === "expired" && watchUntilRef.current == null) {
+        watchUntilRef.current = Date.now() + LATE_PAYMENT_WATCH_MS;
+        setLateWatching(true);
+      }
 
-      if (next === "paid" || data.status === "confirmed") {
+      if (next === "paid") {
         setCheckError(null);
         onPaymentConfirmed(data);
         return;
       }
 
-      if (next === "expired" || next === "cancelled") {
+      if (next === "confirming" || next === "expired" || next === "cancelled" || next === "refund_pending" || next === "refunded") {
         setCheckError(null);
         return;
       }
@@ -129,69 +150,18 @@ export function StepPayment({
     [onPaymentConfirmed],
   );
 
-  const checkStatus = useCallback(
-    async (source: "manual" | "background" = "background") => {
-      if (isCheckingRef.current) return;
-      isCheckingRef.current = true;
-      if (source === "manual") {
-        setIsManualChecking(true);
-        setCheckError(null);
-      } else {
-        setIsBackgroundChecking(true);
-      }
-
-      abortRef.current?.abort();
-      const controller = new AbortController();
-      abortRef.current = controller;
-      const timeoutId = setTimeout(() => controller.abort(), PAYMENT_CHECK_TIMEOUT_MS);
-
-      try {
-        let data: PaymentStatusResponse | null | undefined;
-
-        if (checkStatusFn) {
-          data = await withPaymentCheckTimeout(checkStatusFn(), controller.signal);
-        } else {
-          if (!booking.accessToken) {
-            if (source === "manual") {
-              setCheckError(PAYMENT_CHECK_ERROR_MESSAGE);
-            }
-            return;
-          }
-
-          const res = await fetch(publicBookingPaymentUrl(slug, booking.bookingId), {
-            headers: { Authorization: `Bearer ${booking.accessToken}` },
-            signal: controller.signal,
-          });
-
-          if (!res.ok) {
-            throw new Error("Erro ao verificar pagamento.");
-          }
-
-          data = (await res.json()) as PaymentStatusResponse;
-        }
-
-        applyStatus(data, source);
-      } catch (error) {
-        const aborted = error instanceof DOMException
-          ? error.name === "AbortError"
-          : error instanceof Error && error.name === "AbortError";
-        if (source === "manual") {
-          setCheckError(aborted ? PAYMENT_CHECK_TIMEOUT_MESSAGE : PAYMENT_CHECK_ERROR_MESSAGE);
-        } else if (aborted) {
-          // Polling silencioso: não sobrescreve mensagem manual com timeout de fundo.
-        } else {
-          setCheckError((prev) => prev ?? PAYMENT_CHECK_ERROR_MESSAGE);
-        }
-      } finally {
-        clearTimeout(timeoutId);
-        if (abortRef.current === controller) abortRef.current = null;
-        setIsManualChecking(false);
-        setIsBackgroundChecking(false);
-        isCheckingRef.current = false;
-      }
-    },
-    [slug, booking.bookingId, booking.accessToken, checkStatusFn, applyStatus],
-  );
+  const statusInput = useRef({
+    slug,
+    bookingId: booking.bookingId,
+    accessToken: booking.accessToken,
+    checkStatusFn,
+  });
+  const applyRef = useRef(applyStatus);
+  useEffect(() => {
+    statusInput.current = { slug, bookingId: booking.bookingId, accessToken: booking.accessToken, checkStatusFn };
+    applyRef.current = applyStatus;
+    phaseRef.current = phase;
+  });
 
   // Relógio visual. O texto acessível fica no horário-limite; o ao vivo só muda nos marcos.
   useEffect(() => {
@@ -200,7 +170,7 @@ export function StepPayment({
   }, [deadlineIso]);
 
   useEffect(() => {
-    if (deadlineMs == null || isTerminal) return;
+    if (deadlineMs == null || haltClock) return;
 
     const tick = () => {
       const current = Date.now();
@@ -221,31 +191,85 @@ export function StepPayment({
       setAnnouncement(next.message);
       if (next.milestone === "expired" && !hasCheckedOnExpireRef.current) {
         hasCheckedOnExpireRef.current = true;
-        void checkStatus("background");
+        void pollerRef.current?.start();
       }
     };
 
     tick();
     const interval = window.setInterval(tick, 1000);
     return () => window.clearInterval(interval);
-  }, [deadlineMs, timezone, checkStatus, isTerminal]);
-
-  // Polling automático a cada 4 segundos
-  useEffect(() => {
-    if (isTerminal) return;
-
-    const interval = setInterval(() => {
-      void checkStatus("background");
-    }, 4000);
-
-    return () => clearInterval(interval);
-  }, [checkStatus, isTerminal]);
+  }, [deadlineMs, timezone, haltClock]);
 
   useEffect(() => {
-    return () => {
-      abortRef.current?.abort();
+    if (phase !== "expired") return;
+    const until = watchUntilRef.current;
+    if (until == null) return;
+    const remaining = until - Date.now();
+    if (remaining <= 0) {
+      setLateWatching(false);
+      return;
+    }
+    const id = window.setTimeout(() => setLateWatching(false), remaining);
+    return () => window.clearTimeout(id);
+  }, [phase, lateWatching]);
+
+  // Próxima consulta 4s depois que a anterior assenta. Timeout de ~10s não segura o ciclo nem o clique manual.
+  useEffect(() => {
+    if (stopPolling) return;
+    const poller = createStatusPoller<PaymentStatusResponse | null>({
+      request: async (signal) => {
+        const input = statusInput.current;
+        try {
+          if (input.checkStatusFn) {
+            const data = await input.checkStatusFn();
+            if (!data) return { kind: "ok", terminal: false, data: null };
+            const next = pixUiPhase(data);
+            const watching = next === "expired" && (watchUntilRef.current == null || watchUntilRef.current > Date.now());
+            return { kind: "ok", data, terminal: isTerminalPixPhase(next) && !watching };
+          }
+          if (!input.accessToken) return { kind: "error", aborted: false };
+          const res = await fetch(publicBookingPaymentUrl(input.slug, input.bookingId), {
+            cache: "no-store",
+            headers: { Authorization: `Bearer ${input.accessToken}` },
+            signal,
+          });
+          if (res.status === 429) {
+            const body: unknown = await res.json().catch(() => null);
+            const parsed = publicApiErrorSchema.safeParse(body);
+            if (parsed.success && parsed.data.error.code === "rate_limited") {
+              return { kind: "rate_limited", retryAfterHeader: res.headers.get("Retry-After") };
+            }
+          }
+          if (!res.ok) return { kind: "error", aborted: false };
+          const data = parsePaymentStatusResponse(await res.json());
+          const next = pixUiPhase(data);
+          const watching = next === "expired" && (watchUntilRef.current == null || watchUntilRef.current > Date.now());
+          return { kind: "ok", data, terminal: isTerminalPixPhase(next) && !watching };
+        } catch (error) {
+          const aborted = signal.aborted || (error instanceof Error && error.name === "AbortError");
+          return { kind: "error", aborted };
+        }
+      },
+      onOk: (data, source) => applyRef.current(data, source),
+      onRateLimited: (view) => setCheckError(view.message),
+      onFailure: (view) => {
+        if (view.message) setCheckError(view.message);
+      },
+      onFeedback: setIsManualChecking,
+    });
+    pollerRef.current = poller;
+    void poller.start();
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") poller.hide();
+      else void poller.show();
     };
-  }, []);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      poller.stop();
+      if (pollerRef.current === poller) pollerRef.current = null;
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [stopPolling]);
 
   const handleCopy = async () => {
     if (!payment?.copyPaste) return;
@@ -276,10 +300,11 @@ export function StepPayment({
       }
       // Lê o status fora do mutex do polling para avançar mesmo se houver verificação em curso.
       const statusRes = await fetch(publicBookingPaymentUrl(slug, booking.bookingId), {
+        cache: "no-store",
         headers: { Authorization: `Bearer ${booking.accessToken}` },
       });
       if (!statusRes.ok) throw new Error("Falha ao ler status");
-      const data = (await statusRes.json()) as PaymentStatusResponse;
+      const data = parsePaymentStatusResponse(await statusRes.json());
       applyStatus(data, "manual");
     } catch {
       setCheckError("Não foi possível simular o pagamento. Verifique o ambiente de desenvolvimento.");
@@ -291,34 +316,60 @@ export function StepPayment({
   const remainingMs = now != null && deadlineMs != null ? deadlineMs - now : null;
   const countdown = remainingMs != null ? formatCountdown(remainingMs) : null;
   const close = remainingMs != null && isDeadlineClose(remainingMs);
-  const releasedTime = summary ? formatTimeSlot(summary.slot.startsAt, summary.timezone) : null;
+
+  const followUpActions = (
+    <div className="space-y-2">
+      <Button onClick={onRestart} size="lg" className="w-full">
+        {CHOOSE_ANOTHER_SLOT_LABEL}
+      </Button>
+      {whatsappLabel && whatsappContact ? (
+        <Button asChild variant="outline" size="lg" className="w-full">
+          <a href={whatsappContact} target="_blank" rel="noopener noreferrer">
+            {whatsappLabel}
+          </a>
+        </Button>
+      ) : null}
+    </div>
+  );
 
   if (phase === "expired") {
     return (
-      <div role="alert" aria-live="assertive" className="space-y-4 rounded-card border border-danger/30 bg-danger-soft p-6 text-center">
-        <Icon icon={PIX_STATUS_ICONS.expired} size="xl" className="mx-auto text-danger" />
-        <h2 className="font-display text-xl font-bold text-ink">Tempo de reserva esgotado</h2>
-        <p className="text-sm text-ink">
-          {releasedTime
-            ? `O prazo para pagar o sinal acabou e o horário das ${releasedTime} foi liberado para outros clientes.`
-            : "O prazo para pagar o sinal acabou e o horário foi liberado para outros clientes."}
-        </p>
-        <Button onClick={onRestart} size="lg" className="w-full">
-          Fazer novo agendamento
-        </Button>
+      <div className="space-y-4">
+        <div role="alert" aria-live="assertive" className="space-y-4 rounded-card border border-line bg-surface p-6 text-center">
+          <Icon icon={PIX_STATUS_ICONS.expired} size="xl" className="mx-auto text-ink" />
+          <h2 className="font-display text-xl font-bold text-ink">{EXPIRED_PIX_TITLE}</h2>
+          <p className="text-sm text-ink">{expiredPixBody(latePolicy)}</p>
+        </div>
+        {lateWatching ? <p className="text-center text-xs text-muted" data-testid="pix-late-watch">{LATE_PAYMENT_WATCH_LINE}</p> : null}
+        {followUpActions}
+      </div>
+    );
+  }
+
+  if (phase === "refund_pending" || phase === "refunded") {
+    const amountLabel = formatCurrency(payment?.amountCents ?? 0);
+    const copy = phase === "refunded" ? refundedCopy(amountLabel) : refundPendingCopy(amountLabel);
+    return (
+      <div className="space-y-4">
+        <div role="status" aria-live="polite" className="space-y-4 rounded-card border border-line bg-surface p-6 text-center">
+          <Info aria-hidden="true" className="mx-auto size-8 text-ink" />
+          <h2 className="font-display text-xl font-bold text-ink">{copy.title}</h2>
+          <p className="text-sm text-ink">{copy.body}</p>
+        </div>
+        {followUpActions}
       </div>
     );
   }
 
   if (phase === "cancelled") {
     return (
-      <div role="alert" aria-live="assertive" className="space-y-4 rounded-card border border-danger/30 bg-danger-soft p-6 text-center">
-        <Icon icon={PIX_STATUS_ICONS.cancelled} size="xl" className="mx-auto text-danger" />
-        <h2 className="font-display text-xl font-bold text-ink">Pagamento cancelado</h2>
-        <p className="text-sm text-ink">Esta cobrança Pix foi cancelada. Escolha outro horário para gerar um novo sinal.</p>
-        <Button onClick={onRestart} size="lg" className="w-full">
-          Fazer novo agendamento
-        </Button>
+      <div className="space-y-4">
+        <div role="alert" aria-live="assertive" className="space-y-4 rounded-card border border-line bg-surface p-6 text-center">
+          <Icon icon={PIX_STATUS_ICONS.cancelled} size="xl" className="mx-auto text-ink" />
+          <h2 className="font-display text-xl font-bold text-ink">Pagamento cancelado</h2>
+          <p className="text-sm text-ink">Esta cobrança Pix foi cancelada. Escolha outro horário para gerar um novo sinal.</p>
+        </div>
+        {followUpActions}
       </div>
     );
   }
@@ -333,7 +384,11 @@ export function StepPayment({
             <span className="relative inline-flex size-2.5 rounded-full bg-pix" />
           </span>
           <span role="status" aria-live="polite" aria-atomic="true">
-            {isManualChecking ? "Verificando o pagamento…" : "Horário pré-reservado. Aguardando o pagamento do Pix."}
+            {phase === "confirming"
+              ? CONFIRMING_PAYMENT_LABEL
+              : isManualChecking
+                ? "Verificando o pagamento…"
+                : "Horário pré-reservado. Aguardando o pagamento do Pix."}
           </span>
         </p>
       </div>
@@ -456,7 +511,7 @@ export function StepPayment({
           variant="outline"
           disabled={isManualChecking || isSimulating}
           aria-busy={isManualChecking || undefined}
-          onClick={() => void checkStatus("manual")}
+          onClick={() => void pollerRef.current?.manual()}
           className="w-full"
         >
           {isManualChecking ? <Icon icon={PIX_ICONS.loading} size="md" className="animate-spin motion-reduce:animate-none" /> : <Icon icon={PIX_ICONS.refresh} size="md" />}
