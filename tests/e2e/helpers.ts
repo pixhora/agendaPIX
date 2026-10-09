@@ -48,7 +48,18 @@ function summarize(violations: Awaited<ReturnType<AxeBuilder["analyze"]>>["viola
  * elas são sticky e o conteúdo rola por baixo delas (com scroll-padding), então não contam como obstrução.
  * Toasts transitórios também ficam de fora dessa checagem.
  */
+/** Espera o toast assentar: opaco se está na frente, invisível se ficou atrás. Sem isso o axe lê o fade. */
+async function settleToastOpacity(page: Page) {
+  await expect.poll(async () => page.evaluate(() => {
+    const mounted = [...document.querySelectorAll("[data-sonner-toast][data-mounted='true']")];
+    const hidden = [...document.querySelectorAll("[data-sonner-toast][data-expanded='false'][data-front='false'] > *")];
+    return mounted.every((node) => getComputedStyle(node).opacity === "1")
+      && hidden.every((node) => getComputedStyle(node).opacity === "0");
+  })).toBe(true);
+}
+
 export async function expectNoAxeViolations(page: Page, context: string) {
+  await settleToastOpacity(page);
   const main = await new AxeBuilder({ page }).withTags(WCAG_TAGS).disableRules(["target-size"]).exclude("nextjs-portal").analyze();
   const style = await page.addStyleTag({ content: "[data-sticky-chrome]{position:static!important}[data-sonner-toaster]{display:none!important}" });
   const targets = await new AxeBuilder({ page }).withRules(["target-size"]).exclude("nextjs-portal").analyze();
