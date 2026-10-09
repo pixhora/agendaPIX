@@ -23,7 +23,8 @@ import { availabilitySchema, bookingInputSchema, requestKeySchema, slugSchema } 
 import { depositSlotAllowed } from "./hold";
 import { bookingConfig, type BookingConfig } from "./config";
 import { getPublicBookingFacts } from "../marketing/facts";
-import { consumeBookingRateLimit, tenantScopedHash } from "./rate-limit";
+import { withDerivedExpiry } from "./payment-status";
+import { consumeBookingRateLimit, consumePaymentPollRateLimit, tenantScopedHash } from "./rate-limit";
 
 type Database = NodePgDatabase<typeof schema>;
 export function hash(value: string) { return createHash("sha256").update(value).digest("hex"); }
@@ -336,20 +337,33 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
   return { replayed: reserved.kind === "existing", data: { ...await bookingView(booking, database, now), accessToken: reserved.token } };
 }
 
-export async function getBookingPayment(slug: string, id: string, authorization: string | null, database: Database = getDb()) {
+const PAYMENT_BEARER = /^Bearer ([A-Za-z0-9_-]{43})$/;
+
+function bearerToken(authorization: string | null) {
+  return PAYMENT_BEARER.exec(authorization ?? "")?.[1] ?? null;
+}
+
+function tokenMatches(token: string, accessTokenHash: string | null) {
+  return Boolean(accessTokenHash && /^[a-f0-9]{64}$/.test(accessTokenHash)
+    && timingSafeEqual(Buffer.from(hash(token), "hex"), Buffer.from(accessTokenHash, "hex")));
+}
+
+/**
+ * Consulta pública do Pix. Somente leitura: sem transação, sem lock do negócio e sem `expirePending`.
+ * Formato do token antes de qualquer leitura; o hash é conferido na linha, sem escrita.
+ * O vencido da resposta sai de `expiresAt <= now`.
+ */
+export async function getBookingPayment(slug: string, id: string, authorization: string | null, database: Database = getDb(), identity: string | null = null, config: BookingConfig = bookingConfig()) {
   const bookingId = z.uuid().parse(id);
-  const token = /^Bearer ([A-Za-z0-9_-]{43})$/.exec(authorization ?? "")?.[1];
+  slugSchema.parse(slug);
+  const token = bearerToken(authorization);
+  if (!token) throw new HttpError(404, "booking_not_found", "Agendamento não encontrado.");
   const business = await businessBySlug(slug, database);
-  return database.transaction(async (transaction) => {
-    await lockBusiness(transaction, business.id);
-    const [booking] = await transaction.select().from(schema.bookings).where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.id, bookingId))).limit(1);
-    if (!booking || !token || !booking.accessTokenHash || !/^[a-f0-9]{64}$/.test(booking.accessTokenHash)
-      || !timingSafeEqual(Buffer.from(hash(token), "hex"), Buffer.from(booking.accessTokenHash, "hex"))) {
-      throw new HttpError(404, "booking_not_found", "Agendamento não encontrado.");
-    }
-    const now = new Date();
-    await expirePending(transaction, business.id, now);
-    const [current] = await transaction.select().from(schema.bookings).where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.id, bookingId))).limit(1);
-    return bookingView(current, transaction, now);
-  });
+  await consumePaymentPollRateLimit(database, business.id, identity, config);
+  const [booking] = await database.select().from(schema.bookings).where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.id, bookingId))).limit(1);
+  if (!booking || !tokenMatches(token, booking.accessTokenHash)) {
+    throw new HttpError(404, "booking_not_found", "Agendamento não encontrado.");
+  }
+  const now = new Date();
+  return withDerivedExpiry(await bookingView(booking, database, now), now);
 }

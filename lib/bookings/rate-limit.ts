@@ -77,15 +77,34 @@ async function consumeBucket(database: NodePgDatabase<typeof schema>, businessId
   return result.rows.length > 0;
 }
 
-export async function consumeBookingRateLimit(database: NodePgDatabase<typeof schema>, businessId: string, identity: string | null, config: BookingConfig = bookingConfig()) {
+async function consumeWindow(database: NodePgDatabase<typeof schema>, businessId: string, identity: string | null, purpose: string, perClient: number, perBusiness: number, clientMessage: string, businessMessage: string) {
   // Limpeza limitada; a tabela guarda somente contadores descartáveis.
   await database.execute(sql`DELETE FROM booking_rate_limits WHERE window_started_at < now() - interval '24 hours' AND (business_id, client_hash) IN
     (SELECT business_id, client_hash FROM booking_rate_limits WHERE window_started_at < now() - interval '24 hours' LIMIT 100)`);
   // Balde do cliente primeiro: tentativas recusadas de um cliente não consomem o teto compartilhado do negócio.
-  if (identity && !await consumeBucket(database, businessId, tenantScopedHash("booking-rate:v1", businessId, identity), config.BOOKING_RATE_LIMIT_PER_CLIENT)) {
-    throw new HttpError(429, "rate_limited", "Muitas tentativas. Aguarde um minuto e tente novamente.", 60);
+  if (identity && !await consumeBucket(database, businessId, tenantScopedHash(purpose, businessId, identity), perClient)) {
+    throw new HttpError(429, "rate_limited", clientMessage, 60);
   }
-  if (!await consumeBucket(database, businessId, tenantScopedHash("booking-rate:v1", businessId, BUSINESS_BUCKET), config.BOOKING_RATE_LIMIT_PER_BUSINESS)) {
-    throw new HttpError(429, "rate_limited", "Muitas tentativas neste negócio. Aguarde um minuto e tente novamente.", 60);
+  if (!await consumeBucket(database, businessId, tenantScopedHash(purpose, businessId, BUSINESS_BUCKET), perBusiness)) {
+    throw new HttpError(429, "rate_limited", businessMessage, 60);
   }
+}
+
+export async function consumeBookingRateLimit(database: NodePgDatabase<typeof schema>, businessId: string, identity: string | null, config: BookingConfig = bookingConfig()) {
+  await consumeWindow(
+    database, businessId, identity, "booking-rate:v1",
+    config.BOOKING_RATE_LIMIT_PER_CLIENT, config.BOOKING_RATE_LIMIT_PER_BUSINESS,
+    "Muitas tentativas. Aguarde um minuto e tente novamente.",
+    "Muitas tentativas neste negócio. Aguarde um minuto e tente novamente.",
+  );
+}
+
+/** Polling do Pix (a cada 4 s). Balde separado da criação de reserva, sem lock do negócio. */
+export async function consumePaymentPollRateLimit(database: NodePgDatabase<typeof schema>, businessId: string, identity: string | null, config: BookingConfig = bookingConfig()) {
+  await consumeWindow(
+    database, businessId, identity, "payment-poll:v1",
+    config.PAYMENT_POLL_RATE_LIMIT_PER_CLIENT, config.PAYMENT_POLL_RATE_LIMIT_PER_BUSINESS,
+    "Muitas consultas. Aguarde um minuto e tente novamente.",
+    "Muitas consultas neste negócio. Aguarde um minuto e tente novamente.",
+  );
 }
