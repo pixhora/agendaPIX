@@ -6,7 +6,7 @@ import * as schema from "../../db/schema";
 import { HttpError } from "../http";
 import { paymentsConfig } from "./config";
 import { getPaymentProvider } from "./index";
-import { reconcileOnce } from "./reconcile";
+import { reconcileFailureCode, reconcileOnce, type ReconcileReport } from "./reconcile";
 
 const cronSecret = z.string().min(32).refine((value) => !value.startsWith("replace-this-"));
 const postgresUrl = z.url().refine((value) => ["postgres:", "postgresql:"].includes(new URL(value).protocol));
@@ -34,6 +34,28 @@ export function reconcileDatabaseUrl(env: Readonly<Record<string, string | undef
   const parsed = postgresUrl.safeParse(candidate);
   if (!parsed.success) throw new HttpError(503, "cron_unavailable", "Reconciliação indisponível.");
   return parsed.data;
+}
+
+/**
+ * Limpeza de rascunhos e reconciliação na mesma rota. Falha ao apagar rascunhos
+ * não impede a passagem de pagamento: o relatório marca `draftCleanupFailed` e segue.
+ */
+export async function runCronTick(input: {
+  deleteExpiredDrafts: () => Promise<number>;
+  reconcile: () => Promise<ReconcileReport>;
+  now?: Date;
+  onDraftCleanupError?: (code: string) => void;
+}) {
+  let expiredDraftsDeleted = 0;
+  let draftCleanupFailed = false;
+  try {
+    expiredDraftsDeleted = await input.deleteExpiredDrafts();
+  } catch (error) {
+    draftCleanupFailed = true;
+    input.onDraftCleanupError?.(reconcileFailureCode(error));
+  }
+  const report = await input.reconcile();
+  return { at: (input.now ?? new Date()).toISOString(), expiredDraftsDeleted, draftCleanupFailed, ...report };
 }
 
 /** Uma passagem com pool dedicado de uma conexão, encerrado ao final (nada fica aberto entre execuções). */

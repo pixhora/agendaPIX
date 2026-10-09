@@ -20,9 +20,12 @@ válido para o agendador externo.
 Holds vencidos já expiram sozinhos em cada leitura/criação de reserva.
 
 - **Hobby:** a Vercel só aceita cron diário (`vercel.json` usa `0 6 * * *` UTC). Expressões mais
-  frequentes fazem o deploy falhar em silêncio. Para rodar a cada 1–5 min, use um agendador externo
+  frequentes fazem o deploy falhar. Para rodar a cada 1–5 min, use um agendador externo
   (cron-job.org, GitHub Actions) chamando `POST /api/cron/reconcile` com o bearer.
-- **Pro:** pode trocar para `*/2 * * * *` no `vercel.json`.
+  O polling de webhook perdido só olha cobrança `pending` com `expiresAt` ainda no futuro
+  (hold padrão de 30 min). Um cron diário quase nunca pega essa janela; o agendador externo
+  precisa ser mais frequente que o hold.
+- **Pro:** pode trocar para `*/2 * * * *` ou `*/5 * * * *` no `vercel.json` (o mínimo do plano é 1 minuto).
 
 ## Variáveis (Production)
 

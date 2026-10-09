@@ -26,7 +26,7 @@ describe("timeout do gateway", () => {
 
 describe("config de pagamentos", () => {
   it("usa padrões e rejeita inválidos", () => {
-    expect(paymentsConfig({})).toMatchObject({ PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_STUCK_SECONDS: 60 });
+    expect(paymentsConfig({})).toMatchObject({ PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BUDGET_MS: 50_000 });
     expect(() => paymentsConfig({ PAYMENT_PROVIDER_TIMEOUT_MS: "5" })).toThrow();
   });
 });
