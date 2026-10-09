@@ -44,20 +44,16 @@ export async function refreshPaidFromGateway(input: {
   } catch {
     return false;
   }
-  if (!remote || remote.status !== "paid" || !remote.paidAt) return false;
+  if (!remote || remote.status !== "paid") return false;
   try {
-    const [{ applyPaidEvent }, { hash }, { drizzleRefundPorts, settleAutomaticLateRefund }] = await Promise.all([
+    const [{ applyPaidEvent }, { hash }, { drizzleRefundPorts, settleLateRefundOutsideLock }] = await Promise.all([
       import("./apply-paid"),
       import("../bookings/service"),
       import("./refund-flow"),
     ]);
-    const outcome = await database.transaction((tx) => applyPaidEvent(tx, provider.name, polledPaidEvent(remote, hash), now));
+    const outcome = await database.transaction((tx) => applyPaidEvent(tx, provider.name, polledPaidEvent(remote, hash, now), now));
     if (outcome.reason === "late_no_slot" && outcome.paymentId) {
-      try {
-        await settleAutomaticLateRefund(drizzleRefundPorts(database), provider, outcome.paymentId);
-      } catch {
-        // A reconciliação retoma o estorno. A consulta do cliente continua com o estado já gravado.
-      }
+      await settleLateRefundOutsideLock(drizzleRefundPorts(database), provider, outcome.paymentId);
     }
   } catch {
     // Conflito de evento ou corrida com o webhook: a releitura mostra o efeito único.
