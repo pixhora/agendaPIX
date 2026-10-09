@@ -9,6 +9,8 @@ export const paymentsEnvSchema = z.object({
   RECONCILE_INTERVAL_SECONDS: int(5, 3600, 60),
   RECONCILE_STUCK_SECONDS: int(10, 3600, 60),
   RECONCILE_BATCH_SIZE: int(1, 1000, 50),
+  /** Teto de uma passagem. O padrão fica abaixo do maxDuration de 60s da rota de cron. */
+  RECONCILE_BUDGET_MS: int(1000, 300_000, 50_000),
 });
 export type PaymentsConfig = z.infer<typeof paymentsEnvSchema>;
 

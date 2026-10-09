@@ -4,6 +4,8 @@ import * as schema from "../../db/schema";
 import { HttpError } from "../http";
 import { sendOwnerEmail, type OwnerMailer } from "../email";
 import type { PaymentProvider } from "./provider";
+import { paymentsConfig } from "./config";
+import { callProvider, ProviderTimeoutError } from "./timeout";
 import { z } from "zod";
 import { assessPolicyRequestedOn, formatBusinessDay, localDate, manualRefundDueAtFromNotice } from "./manual-refund-calendar";
 import { MP_MANUAL_REFUND_CHANNEL } from "../mercadopago/connect-copy";
@@ -66,6 +68,7 @@ export type RefundAttempt = {
   mpRefundId: string | null;
   amountCents: number;
   requestedByUserId: string | null;
+  createdAt: Date;
 };
 
 export type RefundWriter = {
@@ -158,11 +161,76 @@ function auditDetail(view: RefundView, input: { actor: string; status: string | 
   };
 }
 
+/** O aviso sai fora do lock. A auditoria só entra depois do envio, para uma falha de e-mail poder tentar de novo. */
 async function notifyOnce(ports: RefundPorts, view: RefundView, action: string, mailer: OwnerMailer, notice: { subject: string; text: string }) {
+  const pending = await ports.withPaymentLock(view.paymentId, async (_current, writer) => !(await writer.hasAudit(action)));
+  if (!pending) return;
+  await mailer(view.ownerEmail, notice.subject, notice.text);
   await ports.withPaymentLock(view.paymentId, async (_current, writer) => {
     if (await writer.hasAudit(action)) return;
-    await mailer(view.ownerEmail, notice.subject, notice.text);
     await writer.audit(action, { actor: "system", paymentId: view.paymentId, subject: notice.subject });
+  });
+}
+
+async function safeNotify(ports: RefundPorts, view: RefundView, action: string, mailer: OwnerMailer, notice: { subject: string; text: string }) {
+  try {
+    await notifyOnce(ports, view, action, mailer, notice);
+  } catch {
+    // O dinheiro já foi commitado. Sem a linha de auditoria, o próximo ciclo reenvia o aviso.
+  }
+}
+
+function isProviderTimeout(error: unknown) {
+  return error instanceof ProviderTimeoutError || (error instanceof Error && error.name === "AbortError");
+}
+
+/** `processing` recente ou já aceito pelo gateway não dispara outra chamada. `requested` e `processing` antigo retomam. */
+function attemptBlocksRetry(attempt: RefundAttempt) {
+  if (attempt.status !== "processing") return false;
+  if (attempt.mpRefundId) return true;
+  const started = attempt.createdAt?.getTime() ?? Date.now();
+  return Date.now() - started < paymentsConfig().PAYMENT_PROVIDER_TIMEOUT_MS + 1_000;
+}
+
+function replayRefund(current: RefundView, attempts: RefundAttempt[]) {
+  const settled = attempts.find((row) => row.status === "refunded");
+  if (settled) return { status: "refunded" as const, refundId: settled.mpRefundId };
+  const blocking = attempts.find((row) => attemptBlocksRetry(row));
+  if (blocking) return { status: "in_process" as const, refundId: blocking.mpRefundId };
+  if (current.refundStatus === "refunded" || current.paymentStatus === "refunded") return { status: "refunded" as const, refundId: null };
+  if (current.refundStatus === "in_process") return { status: "in_process" as const, refundId: null };
+  return null;
+}
+
+async function claimAttempt(writer: RefundWriter, input: { kind: RefundAttemptKind; idempotencyKey: string; amountCents: number; requestedByUserId: string | null }) {
+  const attempts = await writer.listAttempts();
+  const reusable = attempts.find((row) => row.status === "requested" || (row.status === "processing" && !row.mpRefundId && !attemptBlocksRetry(row)));
+  if (reusable) {
+    await writer.finishAttempt(reusable.id, { status: "processing", mpRefundId: reusable.mpRefundId, errorCode: null });
+    return { ...reusable, status: "processing" as const };
+  }
+  const created = await writer.beginAttempt(input);
+  await writer.finishAttempt(created.id, { status: "processing", mpRefundId: null, errorCode: null });
+  return { ...created, status: "processing" as const };
+}
+
+async function refundWithTimeout(
+  provider: Pick<PaymentProvider, "refundCharge">,
+  externalId: string,
+  idempotencyKey: string,
+  businessId: string,
+) {
+  const timeoutMs = paymentsConfig().PAYMENT_PROVIDER_TIMEOUT_MS;
+  return callProvider(timeoutMs, (signal) => provider.refundCharge(externalId, { idempotencyKey }, {
+    signal,
+    businessId,
+    purpose: "settlement",
+  }));
+}
+
+async function releaseAttempt(ports: RefundPorts, paymentId: string, attemptId: string) {
+  await ports.withPaymentLock(paymentId, async (_current, writer) => {
+    await writer.finishAttempt(attemptId, { status: "requested", mpRefundId: null, errorCode: null });
   });
 }
 
@@ -196,23 +264,6 @@ export function parseOwnerRefundBody(value: unknown) {
   return ownerRefundBodySchema.parse(body);
 }
 
-const ACTIVE_ATTEMPT = new Set<RefundAttemptStatus>(["requested", "processing", "refunded"]);
-
-async function currentRefund(current: RefundView, writer: RefundWriter) {
-  const active = (await writer.listAttempts()).find((row) => ACTIVE_ATTEMPT.has(row.status));
-  if (active) {
-    return {
-      status: active.status === "refunded" ? "refunded" as const : "in_process" as const,
-      refundId: active.mpRefundId,
-    };
-  }
-  if (current.refundStatus === "refunded" || current.paymentStatus === "refunded") {
-    return { status: "refunded" as const, refundId: null };
-  }
-  if (current.refundStatus === "in_process") return { status: "in_process" as const, refundId: null };
-  return null;
-}
-
 export async function executeOwnerRefund(
   ports: RefundPorts,
   provider: Pick<PaymentProvider, "refundCharge">,
@@ -221,45 +272,85 @@ export async function executeOwnerRefund(
   const now = input.now ?? new Date();
   const view = await ports.loadOwned(input.businessId, input.bookingId, input.ownerId);
   if (!view) throw new HttpError(404, "booking_not_found", "Agendamento não encontrado.");
-  const outcome = await ports.withPaymentLock(view.paymentId, async (current, writer) => {
-    const replay = await currentRefund(current, writer);
-    if (replay) return { type: "ok" as const, status: replay.status, refundId: replay.refundId };
-    if (input.expectedAmountCents !== current.amountCents) {
-      return { type: "reject" as const, code: "refund_amount_changed" as const };
-    }
-    const available = await settlementAvailable(current.businessId);
-    const decision = decisionFor(current, now, available);
-    if (!decision.eligible && decision.reason) return { type: "reject" as const, code: decision.reason };
-    if (!current.externalId) return { type: "reject" as const, code: "not_paid" as const };
-    if (!current.policyRefundRequestedOn) {
-      const assessed = assessPolicyRequestedOn({
-        requestedOn: input.requestedOn,
-        todayLocal: localDate(now, current.timezone),
-        paidOnLocal: current.paidAt ? localDate(current.paidAt, current.timezone) : null,
-        timeZone: current.timezone,
-      });
-      if (!assessed.ok) return { type: "date" as const, code: assessed.code };
-      await writer.setRefund({
-        policyRefundRequestedOn: assessed.requestedOn,
-        ...(current.manualRefundDueAt ? {} : { manualRefundDueAt: assessed.dueAt }),
-      });
-      current.policyRefundRequestedOn = assessed.requestedOn;
-      current.manualRefundDueAt = current.manualRefundDueAt ?? assessed.dueAt;
-    }
+  // Fora do lock: o gancho de OAuth abre outra conexão e não pode esperar a linha do pagamento.
+  const available = await settlementAvailable(view.businessId);
+  const prepared = await ports.withPaymentLock(view.paymentId, async (current, writer) => {
     const attempts = await writer.listAttempts();
-    const attempt = await writer.beginAttempt({
+    const replay = replayRefund(current, attempts);
+    if (replay) return { type: "ok" as const, status: replay.status, refundId: replay.refundId };
+    const resumable = attempts.some((row) => row.status === "requested" || (row.status === "processing" && !row.mpRefundId && !attemptBlocksRetry(row)));
+    if (!resumable) {
+      if (input.expectedAmountCents !== current.amountCents) {
+        return { type: "reject" as const, code: "refund_amount_changed" as const };
+      }
+      const decision = decisionFor(current, now, available);
+      if (!decision.eligible && decision.reason) return { type: "reject" as const, code: decision.reason };
+      if (!current.externalId) return { type: "reject" as const, code: "not_paid" as const };
+      if (!current.policyRefundRequestedOn) {
+        const assessed = assessPolicyRequestedOn({
+          requestedOn: input.requestedOn,
+          todayLocal: localDate(now, current.timezone),
+          paidOnLocal: current.paidAt ? localDate(current.paidAt, current.timezone) : null,
+          timeZone: current.timezone,
+        });
+        if (!assessed.ok) return { type: "date" as const, code: assessed.code };
+        await writer.setRefund({
+          policyRefundRequestedOn: assessed.requestedOn,
+          ...(current.manualRefundDueAt ? {} : { manualRefundDueAt: assessed.dueAt }),
+        });
+        current.policyRefundRequestedOn = assessed.requestedOn;
+        current.manualRefundDueAt = current.manualRefundDueAt ?? assessed.dueAt;
+      }
+    }
+    if (!current.externalId) return { type: "reject" as const, code: "not_paid" as const };
+    const attempt = await claimAttempt(writer, {
       kind: "owner_api",
       idempotencyKey: ownerRefundIdempotencyKey(current.paymentId, attempts.length + 1),
       amountCents: current.amountCents,
       requestedByUserId: input.ownerId,
     });
-    try {
-      const result = await provider.refundCharge(current.externalId, { idempotencyKey: attempt.idempotencyKey }, {
-        businessId: current.businessId,
-        purpose: "settlement",
+    return { type: "charge" as const, attemptId: attempt.id, idempotencyKey: attempt.idempotencyKey, externalId: current.externalId };
+  });
+  if (prepared.type === "date") throw new HttpError(422, prepared.code, REQUESTED_ON_MESSAGE[prepared.code] ?? "Informe a data do pedido.");
+  if (prepared.type === "reject") {
+    const code = prepared.code;
+    const message = code === "refund_amount_changed"
+      ? "O valor do sinal mudou. Atualize a tela e tente de novo."
+      : refundBlockMessage(code);
+    throw new HttpError(409, code, message);
+  }
+  if (prepared.type === "ok") return { status: prepared.status, refundId: prepared.refundId };
+  let result;
+  try {
+    result = await refundWithTimeout(provider, prepared.externalId, prepared.idempotencyKey, view.businessId);
+    if (!result) throw new Error("Estorno sem resposta.");
+  } catch (error) {
+    if (isProviderTimeout(error)) {
+      try { await releaseAttempt(ports, view.paymentId, prepared.attemptId); }
+      catch { /* Sem o revert, processing antigo volta a ser retomável depois do prazo, com a mesma chave. */ }
+      throw new HttpError(503, "refund_unavailable", "O Mercado Pago não respondeu. Tente de novo para retomar a mesma devolução.");
+    }
+    const cause = error instanceof Error ? error.message : "erro";
+    await ports.withPaymentLock(view.paymentId, async (current, writer) => {
+      await writer.finishAttempt(prepared.attemptId, {
+        status: "failed",
+        mpRefundId: null,
+        errorCode: insufficientBalance(cause) ? "insufficient_balance" : "refund_failed",
       });
-      if (!result) throw new Error("Estorno sem resposta.");
-      await writer.finishAttempt(attempt.id, {
+      await writer.setRefund({ refundStatus: "failed", refundedAt: null });
+      await writer.audit("owner_refund", { ...auditDetail(current, {
+        actor: input.ownerId,
+        status: "failed",
+        mpRefundId: null,
+        failureCause: cause,
+        reason: "owner_refund",
+      }), requestedOn: current.policyRefundRequestedOn });
+    });
+    throw new HttpError(502, "refund_failed", insufficientBalance(cause) ? INSUFFICIENT_BALANCE_MESSAGE : REFUND_FAILED);
+  }
+  try {
+    await ports.withPaymentLock(view.paymentId, async (current, writer) => {
+      await writer.finishAttempt(prepared.attemptId, {
         status: result.status === "refunded" ? "refunded" : "processing",
         mpRefundId: result.refundId,
         errorCode: null,
@@ -276,37 +367,22 @@ export async function executeOwnerRefund(
         failureCause: null,
         reason: "owner_refund",
       }), requestedOn: current.policyRefundRequestedOn });
-      return { type: "ok" as const, status: result.status, refundId: result.refundId };
-    } catch (error) {
-      const cause = error instanceof Error ? error.message : "erro";
-      await writer.finishAttempt(attempt.id, {
-        status: "failed",
-        mpRefundId: null,
-        errorCode: insufficientBalance(cause) ? "insufficient_balance" : "refund_failed",
-      });
-      await writer.setRefund({ refundStatus: "failed", refundedAt: null });
-      await writer.audit("owner_refund", { ...auditDetail(current, {
-        actor: input.ownerId,
-        status: "failed",
-        mpRefundId: null,
-        failureCause: cause,
-        reason: "owner_refund",
-      }), requestedOn: current.policyRefundRequestedOn });
-      return { type: "provider_failed" as const, insufficient: insufficientBalance(cause) };
-    }
-  });
-  if (outcome.type === "date") throw new HttpError(422, outcome.code, REQUESTED_ON_MESSAGE[outcome.code] ?? "Informe a data do pedido.");
-  if (outcome.type === "reject") {
-    const code = outcome.code;
-    const message = code === "refund_amount_changed"
-      ? "O valor do sinal mudou. Atualize a tela e tente de novo."
-      : refundBlockMessage(code);
-    throw new HttpError(409, code, message);
+    });
+  } catch {
+    try { await releaseAttempt(ports, view.paymentId, prepared.attemptId); }
+    catch { /* A mesma chave retoma quando processing deixar de ser recente. */ }
+    throw new HttpError(503, "refund_unavailable", "O Mercado Pago não respondeu. Tente de novo para retomar a mesma devolução.");
   }
-  if (outcome.type === "provider_failed") {
-    throw new HttpError(502, "refund_failed", outcome.insufficient ? INSUFFICIENT_BALANCE_MESSAGE : REFUND_FAILED);
-  }
-  return { status: outcome.status, refundId: outcome.refundId };
+  return { status: result.status, refundId: result.refundId };
+}
+
+function lateNotice(type: "submitted" | "done" | "failed_now" | "failed_already" | "no_token" | "no_token_already" | "deferred", view: RefundView) {
+  const when = formatAppointment(view.startsAt, view.timezone);
+  const names = { customerName: view.customerName, serviceName: view.serviceName, when };
+  if (type === "submitted" || type === "done") return { action: "notice_late_refunded", notice: lateRefundedNotice(names) };
+  if (type === "failed_now" || type === "failed_already") return { action: "notice_late_refund_failed", notice: lateRefundFailedNotice({ ...names, deadlineLabel: deadlineLabel(view) }) };
+  if (type === "no_token") return { action: "notice_late_no_token", notice: lateRefundNoTokenNotice({ ...names, deadlineLabel: deadlineLabel(view) }) };
+  return null;
 }
 
 export async function settleAutomaticLateRefund(
@@ -318,10 +394,14 @@ export async function settleAutomaticLateRefund(
 ) {
   const loaded = await ports.loadByPaymentId(paymentId);
   if (!loaded) return "missing" as const;
-  const outcome = await ports.withPaymentLock(paymentId, async (current, writer) => {
+  const available = await settlementAvailable(loaded.businessId);
+  const prepared = await ports.withPaymentLock(paymentId, async (current, writer) => {
     if (current.refundStatus === "in_process" || current.refundStatus === "refunded") return { type: "done" as const, view: current };
     if (current.refundStatus === "failed") return { type: "failed_already" as const, view: current };
     if (await writer.hasAudit("late_no_slot_no_token")) return { type: "no_token_already" as const, view: current };
+    const attempts = await writer.listAttempts();
+    if (replayRefund(current, attempts)) return { type: "in_flight" as const };
+ 
     if (!current.externalId) {
       const deadline = keepDeadline(current, now);
       if (!current.manualRefundDueAt) await writer.setRefund({ manualRefundDueAt: deadline });
@@ -330,7 +410,7 @@ export async function settleAutomaticLateRefund(
       }));
       return { type: "no_token" as const, view: { ...current, manualRefundDueAt: deadline } };
     }
-    if (!await settlementAvailable(current.businessId)) {
+    if (!available) {
       const deadline = keepDeadline(current, now);
       if (!current.manualRefundDueAt) await writer.setRefund({ manualRefundDueAt: deadline });
       await writer.audit("late_no_slot_no_token", auditDetail(current, {
@@ -341,19 +421,48 @@ export async function settleAutomaticLateRefund(
       }));
       return { type: "no_token" as const, view: { ...current, manualRefundDueAt: deadline } };
     }
-    const attempt = await writer.beginAttempt({
+    const attempt = await claimAttempt(writer, {
       kind: "auto_late",
       idempotencyKey: automaticRefundIdempotencyKey(current.paymentId),
       amountCents: current.amountCents,
       requestedByUserId: null,
     });
-    try {
-      const result = await provider.refundCharge(current.externalId, { idempotencyKey: attempt.idempotencyKey }, {
-        businessId: current.businessId,
-        purpose: "settlement",
-      });
-      if (!result) throw new Error("Estorno sem resposta.");
-      await writer.finishAttempt(attempt.id, {
+    return { type: "charge" as const, view: current, attemptId: attempt.id, idempotencyKey: attempt.idempotencyKey, externalId: current.externalId };
+  });
+  if (prepared.type === "in_flight") return "done" as const;
+  if (prepared.type !== "charge") {
+    const notice = lateNotice(prepared.type, prepared.view);
+    if (notice) await safeNotify(ports, prepared.view, notice.action, mailer, notice.notice);
+    return prepared.type;
+  }
+  let result;
+  try {
+    result = await refundWithTimeout(provider, prepared.externalId, prepared.idempotencyKey, prepared.view.businessId);
+    if (!result) throw new Error("Estorno sem resposta.");
+  } catch (error) {
+    if (isProviderTimeout(error)) {
+      try { await releaseAttempt(ports, paymentId, prepared.attemptId); }
+      catch { /* processing antigo é retomado na próxima passagem, com a mesma chave. */ }
+      return "deferred" as const;
+    }
+    const cause = error instanceof Error ? error.message : "erro";
+    const view = await ports.withPaymentLock(paymentId, async (current, writer) => {
+      const deadline = keepDeadline(current, now);
+      await writer.finishAttempt(prepared.attemptId, { status: "failed", mpRefundId: null, errorCode: "refund_failed" });
+      await writer.setRefund({ refundStatus: "failed", refundedAt: null, manualRefundDueAt: deadline });
+      await writer.audit("automatic_refund", auditDetail(current, {
+        actor: "system", status: "failed", mpRefundId: null, failureCause: cause, reason: "late_no_slot",
+      }));
+      return { ...current, refundStatus: "failed" as const, manualRefundDueAt: deadline };
+    });
+    const notice = lateNotice("failed_now", view);
+    if (notice) await safeNotify(ports, view, notice.action, mailer, notice.notice);
+    return "failed_now" as const;
+  }
+  let view;
+  try {
+    view = await ports.withPaymentLock(paymentId, async (current, writer) => {
+      await writer.finishAttempt(prepared.attemptId, {
         status: result.status === "refunded" ? "refunded" : "processing",
         mpRefundId: result.refundId,
         errorCode: null,
@@ -370,36 +479,39 @@ export async function settleAutomaticLateRefund(
         failureCause: null,
         reason: "late_no_slot",
       }));
-      return {
-        type: "submitted" as const,
-        view: {
-          ...current,
-          refundStatus: result.status,
-          manualRefundDueAt: current.manualRefundDueAt,
-        },
-      };
-    } catch (error) {
-      const cause = error instanceof Error ? error.message : "erro";
-      const deadline = keepDeadline(current, now);
-      await writer.finishAttempt(attempt.id, { status: "failed", mpRefundId: null, errorCode: "refund_failed" });
-      await writer.setRefund({ refundStatus: "failed", refundedAt: null, manualRefundDueAt: deadline });
-      await writer.audit("automatic_refund", auditDetail(current, {
-        actor: "system", status: "failed", mpRefundId: null, failureCause: cause, reason: "late_no_slot",
-      }));
-      return { type: "failed_now" as const, view: { ...current, refundStatus: "failed" as const, manualRefundDueAt: deadline } };
-    }
-  });
-
-  const when = formatAppointment(outcome.view.startsAt, outcome.view.timezone);
-  const names = { customerName: outcome.view.customerName, serviceName: outcome.view.serviceName, when };
-  if (outcome.type === "submitted" || outcome.type === "done") {
-    await notifyOnce(ports, outcome.view, "notice_late_refunded", mailer, lateRefundedNotice(names));
-  } else if (outcome.type === "failed_now" || outcome.type === "failed_already") {
-    await notifyOnce(ports, outcome.view, "notice_late_refund_failed", mailer, lateRefundFailedNotice({ ...names, deadlineLabel: deadlineLabel(outcome.view) }));
-  } else if (outcome.type === "no_token") {
-    await notifyOnce(ports, outcome.view, "notice_late_no_token", mailer, lateRefundNoTokenNotice({ ...names, deadlineLabel: deadlineLabel(outcome.view) }));
+      return { ...current, refundStatus: result.status, manualRefundDueAt: current.manualRefundDueAt };
+    });
+  } catch {
+    try { await releaseAttempt(ports, paymentId, prepared.attemptId); }
+    catch { /* A mesma chave retoma quando processing deixar de ser recente. */ }
+    return "deferred" as const;
   }
-  return outcome.type;
+  const notice = lateNotice("submitted", view);
+  if (notice) await safeNotify(ports, view, notice.action, mailer, notice.notice);
+  return "submitted" as const;
+}
+
+/**
+ * Estorno de `late_no_slot` depois do commit, fora de lock. A mesma chave do reconciliador.
+ * Timeout ou falha do gateway não sobe: o webhook e o GET respondem com o evento já gravado.
+ */
+export async function settleLateRefundOutsideLock(
+  ports: RefundPorts,
+  provider: Pick<PaymentProvider, "refundCharge">,
+  paymentId: string,
+) {
+  try {
+    const result = await settleAutomaticLateRefund(ports, provider, paymentId);
+    if (result === "deferred") console.error(`[payments] late_refund payment=${paymentId} code=provider_timeout`);
+  } catch (error) {
+    console.error(`[payments] late_refund payment=${paymentId} code=${lateRefundLogCode(error)}`);
+  }
+}
+
+function lateRefundLogCode(error: unknown) {
+  if (error instanceof ProviderTimeoutError) return "provider_timeout";
+  if (error instanceof HttpError && /^[a-z0-9_]{1,40}$/i.test(error.code)) return error.code;
+  return "late_refund_failed";
 }
 
 export async function recordUnverifiableSellerPayment(ports: RefundPorts, externalId: string, mailer: OwnerMailer = sendOwnerEmail, now = new Date()) {
@@ -444,29 +556,49 @@ export async function markRefundedByExternalId(ports: RefundPorts, externalId: s
   return true;
 }
 
-export async function retryAutomaticLateRefunds(ports: RefundPorts, provider: Pick<PaymentProvider, "refundCharge">, limit: number, mailer?: OwnerMailer) {
+export async function retryAutomaticLateRefunds(
+  ports: RefundPorts,
+  provider: Pick<PaymentProvider, "refundCharge">,
+  limit: number,
+  mailer?: OwnerMailer,
+  onPaymentError?: (paymentId: string, error: unknown) => void,
+) {
   const ids = await ports.listLateRefundIds(limit);
   let settled = 0;
   for (const paymentId of ids) {
-    const result = await settleAutomaticLateRefund(ports, provider, paymentId, mailer);
-    if (result === "submitted") settled += 1;
+    try {
+      const result = await settleAutomaticLateRefund(ports, provider, paymentId, mailer);
+      if (result === "submitted") settled += 1;
+    } catch (error) {
+      if (!onPaymentError) throw error;
+      onPaymentError(paymentId, error);
+    }
   }
   return settled;
 }
 
-export async function observeInProcessRefunds(ports: RefundPorts, provider: Pick<PaymentProvider, "getCharge">, limit: number, now = new Date()) {
+export async function observeInProcessRefunds(
+  ports: RefundPorts,
+  provider: Pick<PaymentProvider, "getCharge">,
+  limit: number,
+  now = new Date(),
+  onPaymentError?: (paymentId: string, error: unknown) => void,
+) {
   const ids = await ports.listInProcessIds(limit);
   let observed = 0;
   for (const paymentId of ids) {
     const view = await ports.loadByPaymentId(paymentId);
     if (!view?.externalId) continue;
     try {
-      const remote = await provider.getCharge(view.externalId, { businessId: view.businessId, purpose: "settlement" });
+      const remote = await callProvider(paymentsConfig().PAYMENT_PROVIDER_TIMEOUT_MS, (signal) => provider.getCharge(view.externalId!, {
+        signal, businessId: view.businessId, purpose: "settlement",
+      }));
       if (remote?.status !== "refunded") continue;
       const marked = await markRefundedByExternalId(ports, view.externalId, now);
       if (marked) observed += 1;
-    } catch {
+    } catch (error) {
       // Sem token ou gateway fora: o próximo ciclo tenta de novo. Não estorna daqui.
+      onPaymentError?.(paymentId, error);
     }
   }
   return observed;
@@ -594,6 +726,7 @@ export function createDrizzleRefundPorts(database: Database): RefundPorts {
               mpRefundId: schema.paymentRefunds.mpRefundId,
               amountCents: schema.paymentRefunds.amountCents,
               requestedByUserId: schema.paymentRefunds.requestedByUserId,
+              createdAt: schema.paymentRefunds.createdAt,
             }).from(schema.paymentRefunds).where(and(
               eq(schema.paymentRefunds.paymentId, paymentId),
               eq(schema.paymentRefunds.businessId, view.businessId),
@@ -617,6 +750,7 @@ export function createDrizzleRefundPorts(database: Database): RefundPorts {
               mpRefundId: schema.paymentRefunds.mpRefundId,
               amountCents: schema.paymentRefunds.amountCents,
               requestedByUserId: schema.paymentRefunds.requestedByUserId,
+              createdAt: schema.paymentRefunds.createdAt,
             });
             if (!created) throw new Error("Tentativa de devolução não gravada.");
             return created;

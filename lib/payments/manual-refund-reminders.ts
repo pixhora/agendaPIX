@@ -6,14 +6,12 @@ import { refundDeadlineEveNotice, type EveKind } from "../email/templates/refund
 import { MP_MANUAL_REFUND_CHANNEL } from "../mercadopago/connect-copy";
 import { formatAppointment } from "./notices";
 import {
-  MANUAL_REFUND_REMINDER_HOUR,
   addCalendarDays,
   formatBusinessDate,
   formatBusinessDateTime,
   formatBusinessDay,
   isOpenManualRefund,
   localDate,
-  localHour,
   zonedInstant,
 } from "./manual-refund-calendar";
 import { isSellerDisconnected } from "./seller-account";
@@ -75,8 +73,14 @@ function policyAttemptTooLate(item: ReminderCase) {
   return localDate(item.firstAttemptAt, item.timezone) >= eveDay(item);
 }
 
+/**
+ * Dia local anterior ao prazo, em qualquer hora. O cron diário (`0 6 * * *` UTC,
+ * 03:00 em Brasília, com até 59 min de atraso no Hobby) cai nessa janela. Um cron
+ * frequente manda na primeira passagem depois da meia-noite local. `reminderSentAt`
+ * e o claim impedem o segundo e-mail.
+ */
 export function selectEve(items: ReminderCase[], now: Date) {
-  return items.filter((item) => item.open && !item.reminderSentAt && !policyAttemptTooLate(item) && now.getTime() <= item.dueAt.getTime() && eveToday(item, now) && localHour(now, item.timezone) >= MANUAL_REFUND_REMINDER_HOUR);
+  return items.filter((item) => item.open && !item.reminderSentAt && !policyAttemptTooLate(item) && now.getTime() <= item.dueAt.getTime() && eveToday(item, now));
 }
 
 export function selectDaily(items: ReminderCase[], now: Date, eveIds: ReadonlySet<string>) {
@@ -91,7 +95,7 @@ export function selectDaily(items: ReminderCase[], now: Date, eveIds: ReadonlySe
       return now.getTime() >= Math.min(dayAfter, beforeSlot);
     }
     if (item.kind !== "auto_failed") return false;
-    if (item.reminderCount >= 2 || localHour(now, item.timezone) < MANUAL_REFUND_REMINDER_HOUR) return false;
+    if (item.reminderCount >= 2) return false;
     const origin = localDate(item.noticeAt, item.timezone);
     return today === addCalendarDays(origin, 1) || today === addCalendarDays(origin, 2);
   });
