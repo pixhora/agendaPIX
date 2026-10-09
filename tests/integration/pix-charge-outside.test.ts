@@ -150,7 +150,7 @@ describe("reconciliação", () => {
     const broken = { name: provider.name, createPixCharge: async () => { throw new Error("fail"); }, getCharge: provider.getCharge.bind(provider), findChargeByReference: provider.findChargeByReference.bind(provider), cancelCharge: provider.cancelCharge.bind(provider), verifyWebhook: provider.verifyWebhook.bind(provider), refundCharge: provider.refundCharge.bind(provider) };
     await expect(createBooking(slug, input(0), randomUUID(), database, broken)).rejects.toMatchObject({ status: 503 });
     await database.update(schema.payments).set({ updatedAt: new Date(Date.now() - 120_000) }).where(eq(schema.payments.businessId, businessId));
-    const report = await reconcileOnce(database, provider, { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50 });
+    const report = await reconcileOnce(database, provider, { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50, RECONCILE_BUDGET_MS: 50_000 });
     expect(report.stuckRetried).toBe(1);
     const [payment] = await database.select().from(schema.payments).where(eq(schema.payments.businessId, businessId));
     expect(payment.status).toBe("pending");
@@ -161,7 +161,7 @@ describe("reconciliação", () => {
     const { data } = await createBooking(slug, input(0), randomUUID(), database, provider);
     await database.update(schema.bookings).set({ createdAt: new Date(Date.now() - 60_000), expiresAt: new Date(Date.now() - 1000) }).where(eq(schema.bookings.id, data.bookingId));
     await database.update(schema.payments).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(schema.payments.id, data.payment!.id));
-    const report = await reconcileOnce(database, provider, { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50 });
+    const report = await reconcileOnce(database, provider, { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50, RECONCILE_BUDGET_MS: 50_000 });
     expect(report.expiredCancelled).toBe(1);
     expect(await provider.getCharge(data.payment!.externalId!)).toMatchObject({ status: "cancelled" });
     const [payment] = await database.select().from(schema.payments).where(eq(schema.payments.id, data.payment!.id));
@@ -171,7 +171,7 @@ describe("reconciliação", () => {
   it("descobre pagamento perdido pelo webhook via poll", async () => {
     const { data } = await createBooking(slug, input(0), randomUUID(), database, provider);
     provider.markPaid(data.payment!.externalId!);
-    const report = await reconcileOnce(database, provider, { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50 });
+    const report = await reconcileOnce(database, provider, { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50, RECONCILE_BUDGET_MS: 50_000 });
     expect(report.polledPaid).toBe(1);
     const [booking] = await database.select().from(schema.bookings).where(eq(schema.bookings.id, data.bookingId));
     expect(booking.status).toBe("confirmed");
@@ -226,7 +226,7 @@ describe("reconciliação", () => {
     await database.update(schema.payments).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(schema.payments.id, data.payment!.id));
     const other = await createBooking(slug, input(0, "+5511999999901"), randomUUID(), database, provider);
     provider.markPaid(data.payment!.externalId!);
-    const report = await reconcileOnce(database, provider, { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50 });
+    const report = await reconcileOnce(database, provider, { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50, RECONCILE_BUDGET_MS: 50_000 });
     expect(report.refundsSettled).toBe(1);
     const [lateBooking] = await database.select().from(schema.bookings).where(eq(schema.bookings.id, data.bookingId));
     expect(lateBooking.status).toBe("expired");
@@ -247,7 +247,7 @@ describe("reconciliação", () => {
     const past = new Date(Date.now() - 1000);
     await database.update(schema.bookings).set({ createdAt: new Date(Date.now() - 60_000), expiresAt: past }).where(eq(schema.bookings.businessId, businessId));
     await database.update(schema.payments).set({ expiresAt: past }).where(eq(schema.payments.businessId, businessId));
-    const report = await reconcileOnce(database, null, { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50 });
+    const report = await reconcileOnce(database, null, { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50, RECONCILE_BUDGET_MS: 50_000 });
     expect(report).toMatchObject({ skippedLock: false, stuckCancelled: 1, expiredCancelled: 1, polledPaid: 0 });
     const payments = await database.select().from(schema.payments).where(eq(schema.payments.businessId, businessId));
     expect(payments.map((p) => p.status).sort()).toEqual(["expired", "expired"]);
@@ -261,7 +261,7 @@ describe("reconciliação", () => {
   it("reconcilers concorrentes: só um executa o trabalho", async () => {
     const { data } = await createBooking(slug, input(0), randomUUID(), database, provider);
     provider.markPaid(data.payment!.externalId!);
-    const config = { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50 };
+    const config = { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50, RECONCILE_BUDGET_MS: 50_000 };
     // Duas conexões distintas para advisory locks de sessão.
     const pool2 = new Pool({ connectionString: databaseEnvSchema.parse(process.env).DATABASE_URL, max: 2 });
     const db2 = drizzle(pool2, { schema });

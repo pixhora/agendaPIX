@@ -120,6 +120,13 @@
       "when": 1791502000000,
       "tag": "0016_onboarding_drafts",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1791511503091,
+      "tag": "0017_payment_remote_cancel",
+      "breakpoints": true
     }
   ]
 }
