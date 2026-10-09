@@ -69,9 +69,12 @@ describe("guarda de publicação", () => {
       expect(() => assertLegalPublicationAllowed(markdown, true, name)).not.toThrow();
     }
     const privacy = readFileSync("content/legal/privacidade.md", "utf8");
+    const terms = readFileSync("content/legal/termos.md", "utf8");
     expect(privacy).toContain("Rascunho do cadastro");
     expect(privacy).toContain("Sem nome, WhatsApp ou CPF");
     expect(privacy).not.toContain("nome, WhatsApp e prazo");
+    expect(privacy).toContain("Sem Pix em aberto e sem Pix vencido ou cancelado nas últimas 24 horas, apagados na hora.");
+    expect(terms).toContain("Sem Pix em aberto e sem Pix vencido ou cancelado nas últimas 24 horas, o acesso à sua conta é apagado na hora.");
   });
 
   it("o aceite do Mercado Pago é a citação da seção 5-A.6", () => {

@@ -137,7 +137,7 @@ A aplicação roda na região São Paulo da Vercel. A Vercel é uma empresa estr
 | Rascunho do cadastro (inclui e-mail) | Vence em 7 dias. Depois do vencimento, é apagado por uma rotina que roda uma vez por dia às 03:00 (Brasília), inclusive os rascunhos que já viraram conta |
 | Código e link de acesso | Válidos por 30 minutos |
 | Contadores antiabuso (IP ou e-mail em hash) | Os que têm mais de 24 horas são apagados aos poucos, nas verificações seguintes |
-| Tokens do Mercado Pago depois de desconectar pelo AgendaPix | Sem Pix em aberto, apagados na hora. Com Pix ou devolução em aberto, ficam guardados (cifrados) só para resolvê-los e são apagados em até 24 horas depois que se resolverem, ou depois de 7 dias se algum Pix ficar travado |
+| Tokens do Mercado Pago depois de desconectar pelo AgendaPix | Sem Pix em aberto e sem Pix vencido ou cancelado nas últimas 24 horas, apagados na hora. Com Pix ou devolução em aberto, ficam guardados (cifrados) só para resolvê-los e são apagados em até 24 horas depois que se resolverem, ou depois de 7 dias se algum Pix ficar travado |
 | Tokens do Mercado Pago depois de revogar o aplicativo no Mercado Pago | Apagados assim que recebemos o aviso do Mercado Pago |
 | Resumo do código de acesso ao agendamento | Até 90 dias depois do fim da conta do negócio |
 | Resumo técnico do pedido de agendamento (sem CPF) | Até 90 dias depois do fim da conta do negócio |

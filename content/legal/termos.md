@@ -103,7 +103,7 @@ A devolução é pedida pelo sistema, mas **não é garantida e não tem prazo f
 
 5-A.9. **Como desconectar.** Você pode desconectar quando quiser, no painel do AgendaPix ou direto no Mercado Pago.
 
-- **Pelo AgendaPix:** novos agendamentos com sinal ficam pausados. Agendamentos e sinais já pagos não mudam. Se não houver Pix em aberto, o acesso à sua conta é apagado na hora. Se houver Pix ou devolução em aberto, o acesso fica guardado (cifrado) só para resolvê-los e é apagado em até 24 horas depois que eles se resolverem, ou depois de 7 dias se algum Pix ficar travado. A partir da desconexão, as devoluções que você decidir fazer são feitas por você, direto no Mercado Pago.
+- **Pelo AgendaPix:** novos agendamentos com sinal ficam pausados. Agendamentos e sinais já pagos não mudam. Sem Pix em aberto e sem Pix vencido ou cancelado nas últimas 24 horas, o acesso à sua conta é apagado na hora. Se houver Pix ou devolução em aberto, o acesso fica guardado (cifrado) só para resolvê-los e é apagado em até 24 horas depois que eles se resolverem, ou depois de 7 dias se algum Pix ficar travado. A partir da desconexão, as devoluções que você decidir fazer são feitas por você, direto no Mercado Pago.
 - **Direto no Mercado Pago (revogando o aplicativo):** quando recebemos o aviso do Mercado Pago, o acesso é apagado na hora. Sem acesso, podemos não conseguir verificar pagamentos. Nesse caso, mandamos um e-mail para você conferir e resolver na sua conta.
 
 ## 6. Sinal, política e devoluções
