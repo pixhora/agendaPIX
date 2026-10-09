@@ -205,7 +205,7 @@ pnpm reconcile                 # loop contínuo
 pnpm reconcile --once --json   # report estruturado
 ```
 
-Variáveis: `RECONCILE_INTERVAL_SECONDS`, `RECONCILE_STUCK_SECONDS`, `RECONCILE_BATCH_SIZE`. Em produção use `--once` a cada minuto atrás de um scheduler; vários processos são seguros (advisory lock de sessão). Política de pagamento tardio por negócio: `businesses.late_payment_policy` = `refund` (padrão) ou `rebook_if_free`.
+Variáveis: `RECONCILE_INTERVAL_SECONDS`, `RECONCILE_STUCK_SECONDS`, `RECONCILE_BATCH_SIZE`. Em produção use `--once` a cada minuto atrás de um scheduler; vários processos são seguros (advisory lock de sessão). Cada passagem também apaga tokens Mercado Pago de contas desconectadas sem Pix em aberto. Política de pagamento tardio por negócio: `businesses.late_payment_policy` = `refund` (padrão: todo Pix depois do prazo é devolvido; não há tela para mudar) ou `rebook_if_free`.
 
 Migrations `0008` (enum) e `0009` (schema) exigem o migrador em `scripts/migrate.mjs` (`pnpm db:migrate`), que aplica cada arquivo na própria transação — necessário porque o Postgres só libera valores novos de ENUM após o COMMIT.
 

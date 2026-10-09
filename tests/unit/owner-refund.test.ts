@@ -80,6 +80,10 @@ function memory(initial: RefundView): RefundPorts & { audits: { action: string; 
     },
     async audit(action, detail) { audits.push({ action, detail }); },
     async hasAudit(action) { return audits.some((row) => row.action === action); },
+    async auditDetail(action) {
+      const found = [...audits].reverse().find((row) => row.action === action);
+      return found?.detail ?? null;
+    },
     async listAttempts() { return attempts.map((row) => ({ ...row })); },
     async beginAttempt(input) {
       const created: RefundAttempt = { id: `attempt-${attempts.length + 1}`, status: "requested", mpRefundId: null, ...input };
@@ -250,7 +254,9 @@ describe("devolução automática só no atraso sem horário", () => {
     expect(await settleAutomaticLateRefund(ports, provider, "pay-1", mailer, now)).toBe("done");
     expect(calls).toBe(1);
     expect(ports.emails).toHaveLength(1);
+    expect(ports.emails[0]).toContain("depois que o prazo para reservar o horário acabou");
     expect(ports.emails[0]).toContain("O AgendaPix devolveu o valor automaticamente");
+    expect(ports.emails[0]).not.toContain("não havia horário livre");
     expect(ports.audits.some((row) => row.detail.actor === "system" && row.detail.reason === "late_no_slot")).toBe(true);
   });
 
@@ -263,6 +269,8 @@ describe("devolução automática só no atraso sem horário", () => {
     expect(await settleAutomaticLateRefund(ports, provider, "pay-1", mailer, new Date("2030-06-03T12:00:00.000Z"))).toBe("failed_already");
     expect(calls).toBe(1);
     expect(ports.emails).toHaveLength(1);
+    expect(ports.emails[0]).toContain("depois que o prazo para reservar o horário acabou");
+    expect(ports.emails[0]).not.toContain("não havia horário livre");
     expect(ports.emails[0]).toContain("Devolver pelo AgendaPix");
     expect(ports.emails[0]).toContain(dueLabel());
     expect(ports.emails[0]).not.toContain("horário de Brasília");
@@ -286,12 +294,25 @@ describe("devolução automática só no atraso sem horário", () => {
       expect(await settleAutomaticLateRefund(ports, provider, "pay-1", mailer, now)).toBe("no_token_already");
       expect(calls).toBe(0);
       expect(ports.emails).toHaveLength(1);
+      expect(ports.emails[0]).toContain("depois que o prazo para reservar o horário acabou");
+      expect(ports.emails[0]).not.toContain("não havia horário livre");
       expect(ports.emails[0]).toContain(dueLabel());
       expect((await ports.loadByPaymentId("pay-1"))?.manualRefundDueAt?.toISOString()).toBe(dueAt().toISOString());
       expect(ports.audits.some((row) => row.action === "unverifiable_seller_disconnected")).toBe(true);
     } finally {
       resetSellerAccountHooks();
     }
+  });
+
+  it("e-mail de horário ocupado só sai quando a auditoria diz slot_taken", async () => {
+    const ports = memory(view());
+    ports.audits.push({ action: "late_no_slot", detail: { cause: "slot_taken", reason: "late_no_slot" } });
+    const provider = { refundCharge: async () => ({ status: "refunded" as const, refundId: "auto-slot" }) };
+    const mailer = mailerFor(ports);
+    expect(await settleAutomaticLateRefund(ports, provider, "pay-1", mailer, now)).toBe("submitted");
+    expect(ports.emails[0]).toContain("depois do prazo e o horário já estava ocupado");
+    expect(ports.emails[0]).not.toContain("não havia horário livre");
+    expect(ports.emails[0]).not.toContain("prazo para reservar o horário acabou");
   });
 
   it("nenhum outro fluxo chama o estorno", () => {

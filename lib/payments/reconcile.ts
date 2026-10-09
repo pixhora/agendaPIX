@@ -10,12 +10,14 @@ import { polledPaidEvent, type PaymentProvider } from "./provider";
 import { createDrizzleReminderPorts, runManualRefundReminders } from "./manual-refund-reminders";
 import { drizzleRefundPorts, observeInProcessRefunds, retryAutomaticLateRefunds } from "./refund-flow";
 import { callProvider } from "./timeout";
+import { createDrizzleMpStore } from "../mercadopago-oauth/repository";
+import { purgeDisconnectedMercadoPagoTokens } from "../mercadopago-oauth/refresh";
 
 type Database = NodePgDatabase<typeof schema>;
 type PoolDatabase = Database & { $client: Pool };
 export type ReconcileReport = {
   stuckRetried: number; stuckCancelled: number; expiredCancelled: number;
-  polledPaid: number; refundsSettled: number; audits: number; skippedLock: boolean;
+  polledPaid: number; refundsSettled: number; audits: number; tokensPurged: number; skippedLock: boolean;
 };
 
 const RECONCILE_LOCK_KEY = 872014551; // constante estável do processo de reconciliação
@@ -69,7 +71,7 @@ export async function reconcileOnce(
       activeProvider = null;
     }
   }
-  const report: ReconcileReport = { stuckRetried: 0, stuckCancelled: 0, expiredCancelled: 0, polledPaid: 0, refundsSettled: 0, audits: 0, skippedLock: false };
+  const report: ReconcileReport = { stuckRetried: 0, stuckCancelled: 0, expiredCancelled: 0, polledPaid: 0, refundsSettled: 0, audits: 0, tokensPurged: 0, skippedLock: false };
   // Lock de sessão exige a mesma conexão PG durante toda a passagem (o Pool do Drizzle alternaria conexões).
   const client: PoolClient = await database.$client.connect();
   try {
@@ -81,6 +83,7 @@ export async function reconcileOnce(
       if (!activeProvider) {
         await expireLocalHolds(scoped, now, config.RECONCILE_BATCH_SIZE, report);
         await sendManualRefundReminders(scoped, now);
+        report.tokensPurged = await purgeDisconnectedTokens(scoped);
         return report;
       }
       report.stuckRetried += await retryStuckCreating(scoped, activeProvider, config, now, report);
@@ -90,6 +93,7 @@ export async function reconcileOnce(
       report.refundsSettled += await retryAutomaticLateRefunds(ports, activeProvider, config.RECONCILE_BATCH_SIZE);
       await observeInProcessRefunds(ports, activeProvider, config.RECONCILE_BATCH_SIZE, now);
       await sendManualRefundReminders(scoped, now);
+      report.tokensPurged = await purgeDisconnectedTokens(scoped);
     } finally {
       await client.query("SELECT pg_advisory_unlock($1)", [RECONCILE_LOCK_KEY]);
     }
@@ -97,6 +101,16 @@ export async function reconcileOnce(
     client.release();
   }
   return report;
+}
+
+/** Mesmo apagamento do cron. Falha aqui não derruba o resto da passagem. */
+async function purgeDisconnectedTokens(database: Database) {
+  try {
+    const { purged } = await purgeDisconnectedMercadoPagoTokens({ store: createDrizzleMpStore(database) });
+    return purged;
+  } catch {
+    return 0;
+  }
 }
 
 /** Só e-mail. Falha aqui não estorna e não derruba o resto da reconciliação. */

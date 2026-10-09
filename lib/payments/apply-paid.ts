@@ -3,6 +3,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "../../db/schema";
 import { expirePending, hash, lockBusiness } from "../bookings/service";
 import { HttpError } from "../http";
+import type { LateRefundCause } from "./notices";
 import { decidePaidEvent } from "./rules";
 import type { PaidEvent } from "./provider";
 
@@ -17,8 +18,9 @@ async function audit(database: Database, input: { businessId: string; paymentId:
  * Efeito de um pagamento confirmado, compartilhado pelo webhook e pela reconciliação.
  * Deduplica por (provider, eventId) e aplica decidePaidEvent. Pagamento dentro do hold
  * confirma a reserva. Pagamento depois do hold não é tratado como confirmado até a
- * reserva gravar `confirmed` (`late_rebooked`, horário ainda livre). Sem horário, devolve
- * `late_no_slot` e o estorno roda depois do commit. Não há repasse: o Pix cai na conta do dono.
+ * reserva gravar `confirmed` (`late_rebooked`, só com `rebook_if_free` e horário livre).
+ * Com a política padrão `refund`, todo atraso vira `late_no_slot` e o estorno roda depois do commit.
+ * Não há repasse: o Pix cai na conta do dono.
  */
 export async function applyPaidEvent(database: Database, providerName: string, event: PaidEvent, now = new Date()): Promise<PaidOutcome> {
   const payloadHash = hash(JSON.stringify(event));
@@ -79,31 +81,42 @@ async function resolveLatePayment(database: Database, input: {
   now: Date;
 }): Promise<PaidOutcome> {
   const { business, payment, booking, event, now } = input;
-  // Só vira confirmed se o horário ainda estiver livre. Antes dessa gravação o atraso
-  // não é tratado como confirmado. Não cria repasse.
+  // `refund` (padrão) devolve sempre. `rebook_if_free` só confirma se o horário ainda estiver livre.
+  // Antes dessa gravação o atraso não é tratado como confirmado. Não cria repasse.
+  let cause: LateRefundCause = "window_expired";
   if (business.latePaymentPolicy === "rebook_if_free" && booking.startsAt > now) {
     try {
-      await database.update(schema.bookings).set({ status: "confirmed", expiresAt: null })
-        .where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.id, booking.id), or(eq(schema.bookings.status, "expired"), eq(schema.bookings.status, "pending_payment"))));
-      const [current] = await database.select().from(schema.bookings)
-        .where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.id, booking.id))).limit(1);
-      if (current.status === "confirmed") {
+      // SAVEPOINT: um 23P01 aqui desfaz só este trecho, não a transação do webhook/reconcile.
+      const rebooked = await database.transaction(async (savepoint) => {
+        await savepoint.update(schema.bookings).set({ status: "confirmed", expiresAt: null })
+          .where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.id, booking.id), or(eq(schema.bookings.status, "expired"), eq(schema.bookings.status, "pending_payment"))));
+        const [current] = await savepoint.select().from(schema.bookings)
+          .where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.id, booking.id))).limit(1);
+        return current?.status === "confirmed";
+      });
+      if (rebooked) {
         await audit(database, { businessId: business.id, paymentId: payment.id, bookingId: booking.id, action: "late_payment_rebooked", detail: { eventId: event.eventId, statusDetail: event.statusDetail ?? null } });
         return { outcome: "processed", reason: "late_rebooked", paymentId: payment.id, businessId: business.id, bookingId: booking.id };
       }
     } catch (error) {
-      const cause = error instanceof Error && error.cause ? error.cause : error;
-      if (!(typeof cause === "object" && cause !== null && "code" in cause && cause.code === "23P01")) throw error;
+      if (!isExclusionViolation(error)) throw error;
+      cause = "slot_taken";
     }
   }
   await audit(database, {
     businessId: business.id, paymentId: payment.id, bookingId: booking.id, action: "late_no_slot",
     detail: {
       actor: "system", actorUserId: null, amountCents: payment.amountCents, status: null, mpRefundId: null,
-      failureCause: null, policyHash: null, reason: "late_no_slot", eventId: event.eventId, statusDetail: event.statusDetail ?? null,
+      failureCause: null, policyHash: null, reason: "late_no_slot", cause, eventId: event.eventId, statusDetail: event.statusDetail ?? null,
     },
   });
   return { outcome: "ignored", reason: "late_no_slot", paymentId: payment.id, businessId: business.id, bookingId: booking.id };
+}
+
+function isExclusionViolation(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  if ("code" in error && error.code === "23P01") return true;
+  return error instanceof Error && isExclusionViolation(error.cause);
 }
 
 /** Consulta se um intervalo ainda está livre (para testes e decisões fora do update). */

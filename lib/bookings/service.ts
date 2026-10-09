@@ -27,6 +27,28 @@ import { consumeBookingRateLimit, tenantScopedHash } from "./rate-limit";
 
 type Database = NodePgDatabase<typeof schema>;
 export function hash(value: string) { return createHash("sha256").update(value).digest("hex"); }
+
+/**
+ * Corpo da idempotência sem CPF. O número não entra no hash: um sha256 sem chave do CPF
+ * seria recuperável por força bruta. Nome, telefone, serviço, horário e política continuam.
+ */
+export function bookingIdempotencyPayload(input: {
+  serviceId: string;
+  startsAt: string;
+  customer: { name: string; phone: string; cpfCnpj?: string };
+  policyHash?: string;
+}) {
+  return {
+    serviceId: input.serviceId,
+    startsAt: input.startsAt,
+    customer: { name: input.customer.name, phone: input.customer.phone },
+    ...(input.policyHash ? { policyHash: input.policyHash } : {}),
+  };
+}
+
+export function bookingRequestHash(input: Parameters<typeof bookingIdempotencyPayload>[0]) {
+  return hash(JSON.stringify(bookingIdempotencyPayload(input)));
+}
 export function chargeIdempotencyKey(businessId: string, requestKey: string) {
   const bytes = Buffer.from(hash(`pix-charge:v1:${businessId}:${requestKey}`).slice(0, 32), "hex");
   bytes[6] = (bytes[6] & 0x0f) | 0x40;
@@ -244,7 +266,8 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
   const config = bookingConfig();
   const input = bookingInputSchema.parse(body);
   const requestKey = requestKeySchema.parse(key);
-  const requestHash = hash(JSON.stringify(input));
+  const requestHash = bookingRequestHash(input);
+  const legacyRequestHash = hash(JSON.stringify(input));
   const business = await businessBySlug(slug, database);
   const [prior] = await database.select({ id: schema.bookings.id }).from(schema.bookings).where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.requestKey, requestKey))).limit(1);
   if (!prior) {
@@ -267,7 +290,10 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
     await expirePending(transaction, business.id, now);
     const [existing] = await transaction.select().from(schema.bookings).where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.requestKey, requestKey))).limit(1);
     if (existing) {
-      if (existing.requestHash !== requestHash) throw new HttpError(409, "idempotency_conflict", "Essa chave já foi usada em outro agendamento.");
+      if (existing.requestHash !== requestHash && existing.requestHash !== legacyRequestHash) throw new HttpError(409, "idempotency_conflict", "Essa chave já foi usada em outro agendamento.");
+      if (existing.requestHash !== requestHash) {
+        await transaction.update(schema.bookings).set({ requestHash }).where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.id, existing.id)));
+      }
       const [payment] = await transaction.select().from(schema.payments).where(and(eq(schema.payments.businessId, business.id), eq(schema.payments.bookingId, existing.id))).limit(1);
       return { kind: "existing" as const, booking: existing, payment, token: accessToken(business.id, existing.id), now };
     }
@@ -297,7 +323,7 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
     if (!slot) throw new HttpError(409, "slot_unavailable", "Esse horário não está disponível. Escolha outro.");
     if (service.depositCents > 0) await enforcePendingHoldLimits(transaction, business.id, { clientHash, phone: input.customer.phone }, now, config);
     const { cpfCnpj: _cpf, ...customerRow } = input.customer;
-    void _cpf; // CPF antigo não entra no cadastro nem no pedido do Mercado Pago.
+    void _cpf; // O CPF não entra no cadastro nem no request_hash. Segue só nesta requisição, para o Mercado Pago, se o cliente enviou.
     const [insertedCustomer] = await transaction.insert(schema.customers).values({ businessId: business.id, ...customerRow }).onConflictDoNothing({ target: [schema.customers.businessId, schema.customers.phone] }).returning({ id: schema.customers.id });
     const [existingCustomer] = insertedCustomer ? [] : await transaction.select({ id: schema.customers.id }).from(schema.customers).where(and(eq(schema.customers.businessId, business.id), eq(schema.customers.phone, input.customer.phone))).limit(1);
     const customerId = (insertedCustomer ?? existingCustomer).id;

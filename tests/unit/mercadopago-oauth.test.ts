@@ -383,14 +383,15 @@ describe("OAuth Mercado Pago por negócio", () => {
     expect((await store.findByBusinessId(businessId))?.accessTokenEnc).toContain("v1.");
   });
 
-  it("desconecta sem apagar o token de liquidação e esconde o status público", async () => {
+  it("desconecta e apaga o token na hora quando não há Pix em aberto", async () => {
     const store = createMemoryMpStore([connection()]);
     await disconnectMercadoPago(businessId, { store, now });
     await disconnectMercadoPago(businessId, { store, now: new Date("2026-10-09T00:00:00.000Z") });
     const row = await store.findByBusinessId(businessId);
     expect(row?.status).toBe("disconnected");
     expect(row?.disconnectedAt?.toISOString()).toBe(now.toISOString());
-    expect(row?.accessTokenEnc).toContain("v1.");
+    expect(row?.accessTokenEnc).toBeNull();
+    expect(row?.refreshTokenEnc).toBeNull();
     expect(await getMercadoPagoOwnerStatus(businessId, { store, now })).toEqual({
       status: "not_connected",
       connectedAt: null,
@@ -404,19 +405,30 @@ describe("OAuth Mercado Pago por negócio", () => {
     });
     expect(await getSellerAccessToken(businessId, { store, env, now })).toBeNull();
     expect(await isMpConnected(businessId, { store, now })).toBe(false);
-    expect(await getSellerAccessTokenForSettlement(businessId, { store, env })).toEqual({ accessToken: "seller-access", mpUserId: "4242" });
+    expect(await getSellerAccessTokenForSettlement(businessId, { store, env })).toBeNull();
     expect(await findBusinessIdByMpUserId("4242", { store })).toBeNull();
     await expect(assertMpConnectedForDeposit(businessId, { store, now })).rejects.toMatchObject({ status: 409, code: "mp_account_not_connected" });
   });
 
-  it("apaga tokens desconectados só depois do último vencimento mais 24h", async () => {
+  it("guarda o token desconectado só enquanto o Pix pendente não venceu", async () => {
+    const store = createMemoryMpStore([connection()]);
+    store.pendingExpiresAt.set(businessId, new Date(now.getTime() + 30 * 60_000));
+    await disconnectMercadoPago(businessId, { store, now });
+    expect((await store.findByBusinessId(businessId))?.accessTokenEnc).toContain("v1.");
+    expect(await getSellerAccessTokenForSettlement(businessId, { store, env })).toEqual({ accessToken: "seller-access", mpUserId: "4242" });
+    expect(await getSellerAccessToken(businessId, { store, env, now })).toBeNull();
+  });
+
+  it("apaga tokens desconectados assim que o Pix vence, sem esperar 24h", async () => {
     const store = createMemoryMpStore([connection({ status: "disconnected", disconnectedAt: now })]);
     const pendingUntil = new Date("2026-10-08T15:00:00.000Z");
     store.pendingExpiresAt.set(businessId, pendingUntil);
-    expect(disconnectedTokensReadyToPurge(pendingUntil, new Date(pendingUntil.getTime() + 23 * 60 * 60 * 1000))).toBe(false);
-    expect(await purgeDisconnectedMercadoPagoTokens({ store, now: new Date(pendingUntil.getTime() + 23 * 60 * 60 * 1000) })).toEqual({ purged: 0 });
+    const before = new Date(pendingUntil.getTime() - 60_000);
+    expect(disconnectedTokensReadyToPurge(pendingUntil, before)).toBe(false);
+    expect(await purgeDisconnectedMercadoPagoTokens({ store, now: before })).toEqual({ purged: 0 });
     expect((await store.findByBusinessId(businessId))?.accessTokenEnc).toContain("v1.");
-    expect(await purgeDisconnectedMercadoPagoTokens({ store, now: new Date(pendingUntil.getTime() + 24 * 60 * 60 * 1000) })).toEqual({ purged: 1 });
+    expect(disconnectedTokensReadyToPurge(pendingUntil, pendingUntil)).toBe(true);
+    expect(await purgeDisconnectedMercadoPagoTokens({ store, now: pendingUntil })).toEqual({ purged: 1 });
     expect((await store.findByBusinessId(businessId))?.accessTokenEnc).toBeNull();
     expect(await getSellerAccessTokenForSettlement(businessId, { store, env })).toBeNull();
     expect(disconnectedTokensReadyToPurge(null, now)).toBe(true);
@@ -547,7 +559,7 @@ describe("OAuth Mercado Pago por negócio", () => {
     expect(new URL(referer.location).searchParams.has("scope")).toBe(false);
     const state = new URL(referer.location).searchParams.get("state");
     const pending = await store.findOAuthState(state ?? "");
-    expect(MP_CONNECT_CONSENT_TEXT).toBe("Entendi e autorizo: quando um Pix chegar depois do prazo e o horário já estiver ocupado, o AgendaPix devolve sozinho o valor inteiro, do saldo da minha conta Mercado Pago, e me avisa por e-mail. Se essa devolução falhar, eu devolvo manualmente em até 7 dias corridos, contados do aviso.");
+    expect(MP_CONNECT_CONSENT_TEXT).toBe("Entendi e autorizo: quando um Pix chegar depois do prazo para reservar o horário, o AgendaPix devolve sozinho o valor inteiro, do saldo da minha conta Mercado Pago, e me avisa por e-mail. Se essa devolução falhar, eu devolvo manualmente em até 7 dias corridos, contados do aviso.");
     expect(pending?.consentVersion).toBe(MP_CONNECT_CONSENT_VERSION);
     expect(pending?.consentTextSha256).toBe(createHash("sha256").update(MP_CONNECT_CONSENT_TEXT).digest("hex"));
     expect(pending?.consentUserId).toBe("owner");

@@ -27,12 +27,13 @@ function needsReconnect(connection: MpConnection, lastError: string): MpConnecti
   return { ...connection, status: "needs_reconnect", accessTokenEnc: null, refreshTokenEnc: null, lastError, disconnectedAt: null };
 }
 
-/** Margem depois do date_of_expiration local (`payments.expires_at`) para a reconciliação ainda achar o pagamento. */
-export const MP_DISCONNECT_SETTLEMENT_GRACE_MS = 24 * 60 * 60 * 1000;
-
+/**
+ * Sem Pix `creating`/`pending`, apaga. Com `expires_at` no futuro, guarda o token
+ * para confirmar ou devolver. Com o prazo já vencido, apaga: o Pix não está mais em aberto.
+ */
 export function disconnectedTokensReadyToPurge(pendingExpiresAt: Date | null, now: Date) {
   if (!pendingExpiresAt) return true;
-  return pendingExpiresAt.getTime() + MP_DISCONNECT_SETTLEMENT_GRACE_MS <= now.getTime();
+  return pendingExpiresAt.getTime() <= now.getTime();
 }
 
 /**
@@ -125,7 +126,7 @@ export async function refreshDueMercadoPagoConnections(deps: RefreshDeps = {}) {
   return counts;
 }
 
-/** Apaga tokens de contas desconectadas por nós quando não há mais sinal pendente dentro da margem. */
+/** Apaga tokens de contas desconectadas por nós quando não há Pix em aberto dentro do prazo. */
 export async function purgeDisconnectedMercadoPagoTokens(deps: RefreshDeps = {}) {
   const now = deps.now ?? new Date();
   const store = deps.store ?? createDrizzleMpStore();

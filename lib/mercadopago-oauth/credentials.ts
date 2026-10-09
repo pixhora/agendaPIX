@@ -2,7 +2,7 @@ import { accountIdLast4 } from "./account-profile";
 import { mpOAuthConfig } from "./config";
 import { decryptMpToken } from "./crypto";
 import { createDrizzleMpStore } from "./repository";
-import { MP_REFRESH_ON_DEMAND_WINDOW_MS, refreshMercadoPagoConnection, type RefreshDeps } from "./refresh";
+import { disconnectedTokensReadyToPurge, MP_REFRESH_ON_DEMAND_WINDOW_MS, refreshMercadoPagoConnection, type RefreshDeps } from "./refresh";
 import type { MpConnection, MpConnectionStore } from "./types";
 
 function storeOf(deps?: RefreshDeps): MpConnectionStore {
@@ -88,14 +88,18 @@ export async function getMercadoPagoOwnerStatus(businessId: string, deps?: Refre
 }
 
 /**
- * Desconecta do nosso lado sem apagar os tokens na hora.
- * Eles ficam só para liquidar sinais já emitidos e somem no cron depois da margem.
+ * Desconecta do nosso lado. Sem Pix em aberto, apaga os tokens na mesma chamada.
+ * Com Pix `creating`/`pending` ainda no prazo, guarda o par só para confirmar ou devolver
+ * e o reconciliador (e o webhook, quando o Pix se resolve) apaga em seguida.
  */
 export async function disconnectMercadoPago(businessId: string, deps?: RefreshDeps) {
   const store = storeOf(deps);
   const row = await store.findByBusinessId(businessId);
   if (!row || row.status === "disconnected") return;
-  await store.markDisconnected(businessId, deps?.now ?? new Date());
+  const now = deps?.now ?? new Date();
+  await store.markDisconnected(businessId, now);
+  const pendingExpiresAt = await store.latestPendingDepositExpiresAt(businessId);
+  if (disconnectedTokensReadyToPurge(pendingExpiresAt, now)) await store.clearDisconnectedTokens(businessId);
 }
 
 /**

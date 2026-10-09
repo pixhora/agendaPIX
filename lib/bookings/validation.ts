@@ -25,8 +25,9 @@ export const bookingInputSchema = z.object({
     name: z.string().trim().min(1).max(120),
     phone: z.string().regex(/^\+[1-9][0-9]{7,14}$/),
     /**
-     * Aceito só por compatibilidade com clientes antigos. O Orders API não exige CPF para Pix
-     * (`payer.identification` é só de boleto). Não é persistido nem enviado ao Mercado Pago.
+     * Opcional. Se o cliente envia, o servidor repassa ao Mercado Pago nesta requisição
+     * (`payer.identification`) e não grava o número: nem em `customers`, nem em `request_hash`,
+     * nem no sessionStorage do navegador.
      */
     cpfCnpj: z.string().trim().min(11).max(18).transform(cpfDigits).refine(isValidCpf, "CPF inválido.").optional(),
   }).strict(),

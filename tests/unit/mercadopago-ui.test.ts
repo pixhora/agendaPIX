@@ -111,7 +111,9 @@ describe("Mercado Pago connect consent", () => {
   });
 
   it("keeps the published consent version and the other screen strings", () => {
-    expect(MP_CONNECT_CONSENT_VERSION).toBe("2026-10-08.v3.2");
+    expect(MP_CONNECT_CONSENT_VERSION).toBe("2026-10-09.v4");
+    expect(MP_CONNECT_CONSENT_TEXT).toContain("depois do prazo para reservar o horário");
+    expect(MP_CONNECT_CONSENT_TEXT).not.toContain("horário já estiver ocupado");
     expect(MP_AUTO_REFUND_ACK_ERROR).toBe("Marque a autorização da devolução automática para continuar.");
     expect(MP_GOOD_TO_KNOW).toHaveLength(5);
     expect(MP_GOOD_TO_KNOW[1]).toContain("em até 7 dias corridos, contados do aviso.");
@@ -121,6 +123,9 @@ describe("Mercado Pago connect consent", () => {
   it("leaves continue focusable and lets skip ignore the checkbox", () => {
     const html = renderToStaticMarkup(createElement(MpOnboardingStep, { businessId: "biz" }));
     expect(html).not.toMatch(/<button\b[^>]*\sdisabled[\s=>]/);
+    expect(html).toContain("quando o cliente paga depois do prazo de 30 minutos para reservar o horário");
+    expect(html).not.toContain("único caso");
+    expect(html).not.toContain("horário já está ocupado");
     expect(html).toContain("Continuar para o Mercado Pago");
     expect(html).toContain('href="/onboarding/concluir"');
     expect(html).toContain("Agora não");
@@ -273,7 +278,22 @@ describe("Mercado Pago connect consent", () => {
     expect(html).toContain("(abre em nova aba)");
     expect(html).not.toContain("desvincule o AgendaPix");
     expect(html).toContain("2 clientes estão com Pix em aberto.");
+    expect(html).toContain("em até 24 horas depois que eles forem pagos, vencerem ou forem cancelados");
+    expect(html).toContain("Enquanto houver Pix em aberto, o AgendaPix guarda o acesso");
+    expect(html).not.toContain("45 minutos");
+    expect(html).not.toContain("apaga agora");
     expect(html).toContain(">Cancelar<");
+    const now = renderToStaticMarkup(createElement(MpDisconnectDialog, {
+      open: true,
+      pending: false,
+      pendingPixCount: 0,
+      onCancel: () => undefined,
+      onConfirm: () => undefined,
+    }));
+    expect(now).toContain("O AgendaPix apaga agora o acesso à sua conta.");
+    expect(now).toContain("Devoluções, a partir de agora, inclusive as de Pix pago fora do prazo, você faz direto no Mercado Pago.");
+    expect(now).not.toContain("45 minutos");
+    expect(now).not.toContain("com Pix em aberto");
   });
 });
 

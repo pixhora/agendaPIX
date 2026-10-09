@@ -142,7 +142,6 @@ export function BookingFlow({ slug, initialBookingId, previewBusiness }: Booking
       serviceId?: string;
       customerName?: string;
       customerPhone?: string;
-      customerCpf?: string;
       expiresAt?: string;
     } | null = null;
 
@@ -223,7 +222,6 @@ export function BookingFlow({ slug, initialBookingId, previewBusiness }: Booking
 
         if (stored?.customerName) setCustomerName(stored.customerName);
         if (stored?.customerPhone) setCustomerPhone(stored.customerPhone);
-        if (stored?.customerCpf) setCustomerCpf(stored.customerCpf);
 
         if (paymentData.status === "confirmed") {
           setIsCompleted(true);
@@ -349,7 +347,6 @@ export function BookingFlow({ slug, initialBookingId, previewBusiness }: Booking
                 serviceId: selectedService.id,
                 customerName: customerName.trim(),
                 customerPhone: customerPhone.trim(),
-                customerCpf: customerCpf.trim(),
                 expiresAt: booking.expiresAt,
               })
             );

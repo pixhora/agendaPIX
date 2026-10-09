@@ -1,5 +1,5 @@
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { and, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import * as schema from "../../db/schema";
 import { HttpError } from "../http";
 import { sendOwnerEmail, type OwnerMailer } from "../email";
@@ -11,11 +11,13 @@ import { assessRefund, refundBlockMessage, type RefundBlockReason, type RefundSt
 import {
   disconnectedConfirmedNotice,
   formatAppointment,
+  lateRefundCause,
   lateRefundFailedNotice,
   lateRefundNoTokenNotice,
   lateRefundedNotice,
   maskEmail,
   unverifiableSellerNotice,
+  type LateRefundCause,
 } from "./notices";
 import { isSellerDisconnected, settlementAvailable } from "./seller-account";
 
@@ -71,6 +73,7 @@ export type RefundWriter = {
   setRefund(patch: RefundPatch): Promise<void>;
   audit(action: string, detail: Record<string, unknown>): Promise<void>;
   hasAudit(action: string): Promise<boolean>;
+  auditDetail(action: string): Promise<Record<string, unknown> | null>;
   listAttempts(): Promise<RefundAttempt[]>;
   beginAttempt(input: { kind: RefundAttemptKind; idempotencyKey: string; amountCents: number; requestedByUserId: string | null }): Promise<RefundAttempt>;
   finishAttempt(id: string, patch: { status: RefundAttemptStatus; mpRefundId: string | null; errorCode: string | null }): Promise<void>;
@@ -317,7 +320,9 @@ export async function settleAutomaticLateRefund(
 ) {
   const loaded = await ports.loadByPaymentId(paymentId);
   if (!loaded) return "missing" as const;
+  let cause: LateRefundCause = "window_expired";
   const outcome = await ports.withPaymentLock(paymentId, async (current, writer) => {
+    cause = lateRefundCause(await writer.auditDetail("late_no_slot"));
     if (current.refundStatus === "in_process" || current.refundStatus === "refunded") return { type: "done" as const, view: current };
     if (current.refundStatus === "failed") return { type: "failed_already" as const, view: current };
     if (await writer.hasAudit("late_no_slot_no_token")) return { type: "no_token_already" as const, view: current };
@@ -390,7 +395,7 @@ export async function settleAutomaticLateRefund(
   });
 
   const when = formatAppointment(outcome.view.startsAt, outcome.view.timezone);
-  const names = { customerName: outcome.view.customerName, serviceName: outcome.view.serviceName, when };
+  const names = { customerName: outcome.view.customerName, serviceName: outcome.view.serviceName, when, cause };
   if (outcome.type === "submitted" || outcome.type === "done") {
     await notifyOnce(ports, outcome.view, "notice_late_refunded", mailer, lateRefundedNotice(names));
   } else if (outcome.type === "failed_now" || outcome.type === "failed_already") {
@@ -583,6 +588,13 @@ export function createDrizzleRefundPorts(database: Database): RefundPorts {
               eq(schema.paymentAudit.action, action),
             )).limit(1);
             return Boolean(found);
+          },
+          async auditDetail(action) {
+            const [found] = await tx.select({ detail: schema.paymentAudit.detail }).from(schema.paymentAudit).where(and(
+              eq(schema.paymentAudit.paymentId, paymentId),
+              eq(schema.paymentAudit.action, action),
+            )).orderBy(desc(schema.paymentAudit.createdAt)).limit(1);
+            return found?.detail ?? null;
           },
           async listAttempts() {
             return tx.select({

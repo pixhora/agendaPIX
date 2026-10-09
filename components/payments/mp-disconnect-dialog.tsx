@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { ExternalLink, Info, Loader2 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { openPixDisconnectNote } from "@/lib/mercadopago/contract";
+import { disconnectAccessSentence, openPixDisconnectNote } from "@/lib/mercadopago/contract";
 
 const MP_APPS_HELP_URL = "https://www.mercadopago.com.br/ajuda/26873";
 
@@ -52,7 +52,8 @@ export function MpDisconnectDialog({
     >
       <h2 id="mp-disconnect-title" className="font-display text-xl font-extrabold tracking-tight">Desconectar sua conta Mercado Pago?</h2>
       <p id="mp-disconnect-body" className="mt-3 text-sm leading-relaxed text-ink">
-        O AgendaPix vai apagar o acesso à sua conta. Novos agendamentos com sinal ficam pausados até você conectar de novo. Agendamentos e sinais já pagos não mudam. Devoluções, a partir de agora, inclusive as de Pix pago fora do prazo, você faz direto no Mercado Pago. No Mercado Pago, em{" "}
+        {disconnectAccessSentence(pendingPixCount)}{" "}
+        Novos agendamentos com sinal ficam pausados até você conectar de novo. Agendamentos e sinais já pagos não mudam. No Mercado Pago, em{" "}
         <a href={MP_APPS_HELP_URL} target="_blank" rel="noopener" className="inline-flex items-center gap-1 font-semibold underline underline-offset-4 outline-none focus-visible:shadow-[var(--shadow-focus)]">
           Segurança › Aplicativos conectados
           <ExternalLink aria-hidden="true" className="size-3.5" />

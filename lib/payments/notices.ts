@@ -11,6 +11,18 @@ export function maskEmail(email: string | null | undefined) {
 
 export type OwnerNotice = { subject: string; text: string };
 
+/** `window_expired`: política `refund` (ou o horário já passou). `slot_taken`: `rebook_if_free` com o horário ocupado. */
+export type LateRefundCause = "window_expired" | "slot_taken";
+
+export function lateRefundCause(detail: Record<string, unknown> | null | undefined): LateRefundCause {
+  return detail?.cause === "slot_taken" ? "slot_taken" : "window_expired";
+}
+
+export function lateRefundReason(cause: LateRefundCause = "window_expired") {
+  if (cause === "slot_taken") return "depois do prazo e o horário já estava ocupado";
+  return "depois que o prazo para reservar o horário acabou";
+}
+
 export function disconnectedConfirmedNotice(input: { customerName: string; serviceName: string; when: string }): OwnerNotice {
   return {
     subject: "Sinal confirmado com o Mercado Pago desconectado",
@@ -18,27 +30,31 @@ export function disconnectedConfirmedNotice(input: { customerName: string; servi
   };
 }
 
-export function lateRefundedNotice(input: { customerName: string; serviceName: string; when: string }): OwnerNotice {
+function latePaymentSentence(input: { customerName: string; serviceName: string; when: string; cause?: LateRefundCause }) {
+  return `O cliente ${input.customerName} pagou o sinal de ${input.serviceName} (${input.when}) ${lateRefundReason(input.cause)}.`;
+}
+
+export function lateRefundedNotice(input: { customerName: string; serviceName: string; when: string; cause?: LateRefundCause }): OwnerNotice {
   return {
     subject: "Sinal devolvido pelo AgendaPix",
-    text: `O cliente ${input.customerName} pagou o sinal de ${input.serviceName} (${input.when}) fora do prazo e não havia horário livre. O AgendaPix devolveu o valor automaticamente.`,
+    text: `${latePaymentSentence(input)} O AgendaPix devolveu o valor automaticamente.`,
   };
 }
 
 const manualRefundLine = (deadlineLabel: string) =>
   `Devolva até ${deadlineLabel} (7 dias depois deste aviso) pelo AgendaPix, no botão Devolver pelo AgendaPix, ou pelo app do Mercado Pago.`;
 
-export function lateRefundFailedNotice(input: { customerName: string; serviceName: string; when: string; deadlineLabel: string }): OwnerNotice {
+export function lateRefundFailedNotice(input: { customerName: string; serviceName: string; when: string; deadlineLabel: string; cause?: LateRefundCause }): OwnerNotice {
   return {
     subject: "Devolva um sinal pelo AgendaPix",
-    text: `O cliente ${input.customerName} pagou o sinal de ${input.serviceName} (${input.when}) fora do prazo e não havia horário livre. Não foi possível devolver o valor automaticamente. ${manualRefundLine(input.deadlineLabel)}`,
+    text: `${latePaymentSentence(input)} Não foi possível devolver o valor automaticamente. ${manualRefundLine(input.deadlineLabel)}`,
   };
 }
 
-export function lateRefundNoTokenNotice(input: { customerName: string; serviceName: string; when: string; deadlineLabel: string }): OwnerNotice {
+export function lateRefundNoTokenNotice(input: { customerName: string; serviceName: string; when: string; deadlineLabel: string; cause?: LateRefundCause }): OwnerNotice {
   return {
     subject: "Confira um sinal no Mercado Pago",
-    text: `O cliente ${input.customerName} pagou o sinal de ${input.serviceName} (${input.when}) fora do prazo e não havia horário livre. O AgendaPix não conseguiu devolver o valor porque a conta Mercado Pago está desvinculada. ${manualRefundLine(input.deadlineLabel)}`,
+    text: `${latePaymentSentence(input)} O AgendaPix não conseguiu devolver o valor porque a conta Mercado Pago está desvinculada. ${manualRefundLine(input.deadlineLabel)}`,
   };
 }
 

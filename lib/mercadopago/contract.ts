@@ -212,10 +212,31 @@ export function formatConnectedSince(iso: string | null, timeZone = "America/Sao
   return new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "long", year: "numeric", timeZone }).format(date);
 }
 
+/**
+ * Teto que a tela pode prometer. Os crons da Vercel rodam uma vez por dia
+ * (`vercel.json`: reconcile às 06:00 UTC, refresh às 07:15 UTC). O worker Docker
+ * chama o mesmo apagamento em cada passagem do reconciliador.
+ */
+export const MP_DISCONNECT_TOKEN_MAX_HOURS = 24;
+
+/** Sem Pix em aberto o acesso some na hora. Com Pix em aberto, o aviso abaixo diz o teto. */
+export function disconnectAccessSentence(pendingPixCount: number): string {
+  if (pendingPixCount > 0) {
+    return "Enquanto houver Pix em aberto, o AgendaPix guarda o acesso à sua conta só para confirmar o pagamento ou devolver o sinal se ele chegar fora do prazo. Quando esses Pix forem pagos, vencerem ou forem cancelados, o acesso é apagado.";
+  }
+  return "O AgendaPix apaga agora o acesso à sua conta. Devoluções, a partir de agora, inclusive as de Pix pago fora do prazo, você faz direto no Mercado Pago.";
+}
+
 export function openPixDisconnectNote(count: number): string | null {
   if (!Number.isInteger(count) || count <= 0) return null;
-  const lead = count === 1 ? "1 cliente está" : `${count} clientes estão`;
-  return `${lead} com Pix em aberto. Se pagarem dentro do prazo, o agendamento é confirmado, o dinheiro cai na sua conta Mercado Pago e avisamos você. Até lá, o acesso à sua conta fica guardado só para conferir esses Pix e é apagado em até 45 minutos.`;
+  const one = count === 1;
+  const lead = one ? "1 cliente está" : `${count} clientes estão`;
+  const pay = one ? "Se pagar" : "Se pagarem";
+  const pix = one ? "esse Pix" : "esses Pix";
+  const after = one
+    ? "ele for pago, vencer ou for cancelado"
+    : "eles forem pagos, vencerem ou forem cancelados";
+  return `${lead} com Pix em aberto. ${pay} dentro do prazo, o agendamento é confirmado, o dinheiro cai na sua conta Mercado Pago e avisamos você. O acesso à sua conta fica guardado só para conferir ${pix} e é apagado em até ${MP_DISCONNECT_TOKEN_MAX_HOURS} horas depois que ${after}.`;
 }
 
 export function depositUnavailable(service: { bookable?: boolean; reason?: string | null }): boolean {
@@ -257,7 +278,7 @@ export const PERMISSIONS: { strong: string; rest: string }[] = [
   { strong: "devolver um sinal quando você mandar", rest: ", pelo botão \"Devolver pelo AgendaPix\". O valor sai do saldo da sua conta Mercado Pago;" },
   {
     strong: "devolver sozinho o valor inteiro",
-    rest: ` em um único caso: quando o cliente paga depois do prazo de ${DEPOSIT_HOLD_MINUTES} minutos e o horário já está ocupado. Você recebe um e-mail a cada devolução;`,
+    rest: ` quando o cliente paga depois do prazo de ${DEPOSIT_HOLD_MINUTES} minutos para reservar o horário. Você recebe um e-mail a cada devolução;`,
   },
   { strong: "manter a conexão ativa", rest: " sem pedir sua autorização de novo a cada renovação." },
 ];

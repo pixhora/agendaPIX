@@ -5,6 +5,8 @@ import { getDb } from "../../db";
 import * as schema from "../../db/schema";
 import { hash } from "../bookings/service";
 import { HttpError, MAX_BODY_BYTES, readBody } from "../http";
+import { createDrizzleMpStore } from "../mercadopago-oauth/repository";
+import { purgeDisconnectedMercadoPagoTokens } from "../mercadopago-oauth/refresh";
 import { applyPaidEvent } from "./apply-paid";
 import { getPaymentProvider } from "./index";
 import {
@@ -85,6 +87,11 @@ export async function processWebhook(request: Request, providerName: string, dat
       } catch {
         // O aviso não desfaz a confirmação.
       }
+    }
+    try {
+      await purgeDisconnectedMercadoPagoTokens({ store: createDrizzleMpStore(database) });
+    } catch {
+      // A passagem do reconciliador apaga. A resposta continua 200 para o gateway não reenviar.
     }
     return outcome;
   } catch (error) {

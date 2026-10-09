@@ -197,6 +197,7 @@ export async function submitMercadoPagoConnect(input: {
   const store = input.store ?? createDrizzleMpStore();
   const existing = await store.findByBusinessId(input.businessId);
   const textSha256 = createHash("sha256").update(MP_CONNECT_CONSENT_TEXT).digest("hex");
+  // Versão antiga continua recebendo sinal. O texto novo só é exigido na próxima tentativa de conectar.
   const reused = existing?.consentVersion === MP_CONNECT_CONSENT_VERSION && existing.autoRefundAckAt && existing.consentUserId
     ? { version: existing.consentVersion, ackAt: existing.autoRefundAckAt, userId: existing.consentUserId, textSha256: existing.consentTextSha256 ?? textSha256 }
     : null;
