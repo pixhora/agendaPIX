@@ -18,4 +18,6 @@ export interface OnboardingData {
   closesAt: string;
   email: string;
   segment?: string;
+  /** Opcional. O cadastro novo não pede; o provisionamento antigo ainda aceita. */
+  contactWhatsapp?: string;
 }
