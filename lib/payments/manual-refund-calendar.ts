@@ -100,9 +100,44 @@ export function formatBusinessDateTime(instant: Date, timeZone: string) {
   return `${value.weekday}, ${value.day} ${value.month}, ${value.hour}:${value.minute}`;
 }
 
-/** Data de calendário já no fuso do negócio, sem hora. */
-export function formatBusinessDate(isoDate: string, timeZone: string) {
-  return formatBusinessDay(zonedInstant(isoDate, 12 * 60 * 60, timeZone), timeZone, true);
+export type BusinessDateStyle = "short" | "sentence";
+
+function sentenceParts(instant: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("pt-BR", {
+    timeZone,
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).formatToParts(instant);
+  const value = Object.fromEntries(parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+  return {
+    weekday: value.weekday.replace(/-feira$/, ""),
+    day: value.day,
+    month: value.month,
+    year: value.year,
+  };
+}
+
+function referenceYear(timeZone: string, todayLocal?: string) {
+  if (todayLocal && DATE.test(todayLocal)) return todayLocal.slice(0, 4);
+  return localDate(new Date(), timeZone).slice(0, 4);
+}
+
+/**
+ * Uma data, dois jeitos. `short` é "qui, 15 out" (chip e metadado).
+ * `sentence` é "quinta, 15 de outubro"; o ano entra só se for diferente do ano local de hoje.
+ */
+export function formatBusinessDate(
+  isoDate: string,
+  timeZone: string,
+  options?: { style?: BusinessDateStyle; todayLocal?: string },
+) {
+  const instant = zonedInstant(isoDate, 12 * 60 * 60, timeZone);
+  if (options?.style !== "sentence") return formatBusinessDay(instant, timeZone, true);
+  const value = sentenceParts(instant, timeZone);
+  const body = `${value.weekday}, ${value.day} de ${value.month}`;
+  return isoDate.slice(0, 4) === referenceYear(timeZone, options.todayLocal) ? body : `${body} de ${value.year}`;
 }
 
 export type RequestedOnCode = "refund_requested_on_invalid" | "refund_requested_on_in_future" | "refund_requested_on_before_payment";

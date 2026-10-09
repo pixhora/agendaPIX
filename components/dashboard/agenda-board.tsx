@@ -6,6 +6,9 @@ import { Icon } from "@/components/ui/icon";
 import { ACTION_ICONS, SUMMARY_ICONS } from "@/lib/icons/registry";
 import { StatusBadge, type BookingStatusValue } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
+import { RefundDialog } from "@/components/dashboard/refund-dialog";
+import { RefundEveLine, RefundMarks } from "@/components/dashboard/refund-deadline";
+import { REFUND_BUTTON_LABEL, showRefundAction, type RefundUiStatus } from "@/lib/dashboard/refund-ui";
 import { cn } from "@/lib/utils";
 
 export type AgendaItem = {
@@ -21,13 +24,24 @@ export type AgendaItem = {
   deposit: string;
   remaining: string;
   hasDeposit: boolean;
+  depositCents: number;
+  refundStatus: RefundUiStatus;
+  manualRefundDueTomorrow: boolean;
+  manualRefundDueLabel: string | null;
+  whenLabel: string;
 };
 
 export type AgendaDay = { date: string; label: string; weekday: string; dayNumber: string; isToday: boolean };
 
 const inactive = (status: BookingStatusValue) => status === "cancelled" || status === "expired";
 
-function BookingDetail({ booking, day, businessName, onClose }: { booking: AgendaItem | null; day?: AgendaDay; businessName: string; onClose: () => void }) {
+function BookingDetail({ booking, day, businessName, onClose, onRefund }: {
+  booking: AgendaItem | null;
+  day?: AgendaDay;
+  businessName: string;
+  onClose: () => void;
+  onRefund: () => void;
+}) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = ref.current;
@@ -51,7 +65,10 @@ function BookingDetail({ booking, day, businessName, onClose }: { booking: Agend
       {booking && <div className="flex h-full flex-col">
         <div className="flex items-start justify-between gap-3 border-b border-line px-5 pb-4 pt-5 sm:px-6">
           <div className="min-w-0">
-            <StatusBadge status={booking.status} />
+            <div className="flex flex-wrap items-center gap-1.5">
+              <StatusBadge status={booking.status} />
+              <RefundMarks refundStatus={booking.refundStatus} dueTomorrow={booking.manualRefundDueTomorrow} />
+            </div>
             <h2 id="booking-detail-title" className="mt-3 break-words font-display text-2xl font-extrabold tracking-tight">{booking.customerName}</h2>
             <p className="mt-0.5 text-sm text-muted">{booking.customerPhone}</p>
           </div>
@@ -70,6 +87,14 @@ function BookingDetail({ booking, day, businessName, onClose }: { booking: Agend
             </dd>
           </div>
         </dl>
+        {(booking.manualRefundDueTomorrow && booking.manualRefundDueLabel) || showRefundAction(booking) ? (
+          <div className="grid gap-3 px-5 pb-2 sm:px-6">
+            {booking.manualRefundDueTomorrow && booking.manualRefundDueLabel && <RefundEveLine dueLabel={booking.manualRefundDueLabel} />}
+            {showRefundAction(booking) && (
+              <Button type="button" variant="outline" className="w-full whitespace-normal" onClick={onRefund}>{REFUND_BUTTON_LABEL}</Button>
+            )}
+          </div>
+        ) : null}
         <div className="mt-auto grid grid-cols-2 gap-2 border-t border-line px-5 py-4 sm:px-6">
           <a className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-ink px-4 text-sm font-semibold text-paper hover:bg-ink-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" href={`https://wa.me/${phoneDigits}?text=${encodeURIComponent(`Olá, ${booking.customerName}! Aqui é ${businessName}.`)}`} target="_blank" rel="noopener noreferrer"><Icon icon={ACTION_ICONS.whatsapp} size="md" />WhatsApp<span className="sr-only"> (abre em nova aba)</span></a>
           <a className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-line bg-surface px-4 text-sm font-semibold hover:bg-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" href={`tel:${booking.customerPhone}`}><Icon icon={ACTION_ICONS.phone} size="md" />Ligar</a>
@@ -79,7 +104,19 @@ function BookingDetail({ booking, day, businessName, onClose }: { booking: Agend
   );
 }
 
-function DayRow({ booking, onOpen }: { booking: AgendaItem; onOpen: () => void }) {
+function RefundRowExtra({ booking, onRefund }: { booking: AgendaItem; onRefund: () => void }) {
+  const show = showRefundAction(booking);
+  const eve = booking.manualRefundDueTomorrow && booking.manualRefundDueLabel;
+  if (!show && !eve) return null;
+  return (
+    <div className="grid gap-2 px-1 pb-1 md:px-5 md:pb-3">
+      {eve && booking.manualRefundDueLabel && <RefundEveLine dueLabel={booking.manualRefundDueLabel} />}
+      {show && <Button type="button" variant="outline" className="w-full whitespace-normal" onClick={onRefund}>{REFUND_BUTTON_LABEL}</Button>}
+    </div>
+  );
+}
+
+function DayRow({ booking, onOpen, onRefund }: { booking: AgendaItem; onOpen: () => void; onRefund: () => void }) {
   return (
     <li>
       <button
@@ -103,13 +140,17 @@ function DayRow({ booking, onOpen }: { booking: AgendaItem; onOpen: () => void }
         </span>
         <span className="hidden truncate text-sm text-muted md:block">{booking.serviceName}</span>
         <span className="hidden text-sm font-semibold tabular-nums md:block">{booking.hasDeposit ? booking.deposit : "—"}</span>
-        <span className="col-start-2 md:col-start-auto"><StatusBadge status={booking.status} /></span>
+        <span className="col-start-2 flex flex-wrap items-center gap-1.5 md:col-start-auto">
+          <StatusBadge status={booking.status} />
+          <RefundMarks refundStatus={booking.refundStatus} dueTomorrow={booking.manualRefundDueTomorrow} />
+        </span>
       </button>
+      <RefundRowExtra booking={booking} onRefund={onRefund} />
     </li>
   );
 }
 
-function WeekCard({ booking, onOpen }: { booking: AgendaItem; onOpen: () => void }) {
+function WeekCard({ booking, onOpen, onRefund }: { booking: AgendaItem; onOpen: () => void; onRefund: () => void }) {
   return (
     <li>
       <button
@@ -126,17 +167,30 @@ function WeekCard({ booking, onOpen }: { booking: AgendaItem; onOpen: () => void
         <span className="text-xs font-bold tabular-nums text-muted">{booking.start}–{booking.end}</span>
         <span className={cn("truncate text-sm font-semibold", inactive(booking.status) && "text-muted line-through decoration-muted")}>{booking.customerName}</span>
         <span className="truncate text-xs text-muted">{booking.serviceName}</span>
-        <StatusBadge status={booking.status} compact className="justify-self-start" />
+        <span className="flex flex-wrap items-center gap-1.5">
+          <StatusBadge status={booking.status} compact className="justify-self-start" />
+          <RefundMarks refundStatus={booking.refundStatus} dueTomorrow={booking.manualRefundDueTomorrow} />
+        </span>
       </button>
+      <RefundRowExtra booking={booking} onRefund={onRefund} />
     </li>
   );
 }
 
 /** Lista do dia (tabela no desktop, cartões no celular) ou colunas por dia na semana; detalhe em painel lateral. */
-export function AgendaBoard({ days, bookings, weekly, businessName }: { days: AgendaDay[]; bookings: AgendaItem[]; weekly: boolean; businessName: string }) {
+export function AgendaBoard({ days, bookings, weekly, businessName, businessId, timeZone }: {
+  days: AgendaDay[];
+  bookings: AgendaItem[];
+  weekly: boolean;
+  businessName: string;
+  businessId: string;
+  timeZone: string;
+}) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [refundId, setRefundId] = useState<string | null>(null);
   const selected = bookings.find((booking) => booking.id === selectedId) ?? null;
   const selectedDay = selected ? days.find((day) => day.date === selected.day) : undefined;
+  const refundBooking = bookings.find((booking) => booking.id === refundId) ?? null;
 
   return (
     <>
@@ -151,7 +205,7 @@ export function AgendaBoard({ days, bookings, weekly, businessName }: { days: Ag
                   <span className={cn("font-display text-lg font-extrabold tabular-nums lg:flex lg:size-9 lg:items-center lg:justify-center lg:rounded-full", day.isToday && "lg:bg-pix lg:text-pix-foreground")}>{day.dayNumber}</span>
                   {day.isToday && <span className="text-xs font-semibold lg:sr-only">Hoje</span>}
                 </h2>
-                {items.length ? <ol className="grid gap-2">{items.map((booking) => <WeekCard key={booking.id} booking={booking} onOpen={() => setSelectedId(booking.id)} />)}</ol>
+                {items.length ? <ol className="grid gap-2">{items.map((booking) => <WeekCard key={booking.id} booking={booking} onOpen={() => setSelectedId(booking.id)} onRefund={() => setRefundId(booking.id)} />)}</ol>
                   : <p className="rounded-field border border-dashed border-line px-3 py-3 text-xs text-muted lg:border-0 lg:text-center">Sem atendimentos</p>}
               </section>
             );
@@ -163,11 +217,19 @@ export function AgendaBoard({ days, bookings, weekly, businessName }: { days: Ag
             <span>Horário</span><span>Cliente</span><span>Serviço</span><span>Sinal Pix</span><span>Status</span>
           </div>
           <ol className="grid gap-2 md:gap-0" aria-label={`Atendimentos de ${days[0]?.label ?? "hoje"}`}>
-            {bookings.map((booking) => <DayRow key={booking.id} booking={booking} onOpen={() => setSelectedId(booking.id)} />)}
+            {bookings.map((booking) => <DayRow key={booking.id} booking={booking} onOpen={() => setSelectedId(booking.id)} onRefund={() => setRefundId(booking.id)} />)}
           </ol>
         </div>
       )}
-      <BookingDetail booking={selected} day={selectedDay} businessName={businessName} onClose={() => setSelectedId(null)} />
+      <BookingDetail booking={selected} day={selectedDay} businessName={businessName} onClose={() => setSelectedId(null)} onRefund={() => { if (selected) setRefundId(selected.id); }} />
+      <RefundDialog
+        open={refundBooking !== null}
+        onClose={() => setRefundId(null)}
+        businessId={businessId}
+        bookingId={refundBooking?.id ?? ""}
+        serviceLine={refundBooking ? `${refundBooking.serviceName} · ${refundBooking.whenLabel}` : ""}
+        timeZone={timeZone}
+      />
     </>
   );
 }

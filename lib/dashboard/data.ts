@@ -118,6 +118,21 @@ function presentBooking<T extends { refundStatus: string | null; refundedAt: Dat
   return { ...rest, refundStatus, refundedAt: isoOrNull(row.refundedAt), manualRefundDueAt: dueAt, ...flags };
 }
 export type DashboardBooking = Awaited<ReturnType<typeof dashboardBookings>>[number];
+
+/** Acha a reserva entre os negócios do dono. O link do e-mail não traz o id do negócio. */
+export async function dashboardOwnedBooking(ownerId: string, bookingId: string, database: Database = getDb()) {
+  const list = await ownedBusinesses(ownerId, database);
+  for (const business of list) {
+    try {
+      const booking = await dashboardBookingDetail(ownerId, business.id, bookingId, database);
+      return { business, booking };
+    } catch (error) {
+      if (error instanceof HttpError && error.status === 404) continue;
+      throw error;
+    }
+  }
+  return null;
+}
 export async function saveDashboardService(ownerId: string, input: unknown, database: Database = getDb()) {
   const { businessId, id, ...values } = serviceFormSchema.parse(input);
   await authorize(ownerId, businessId, database);

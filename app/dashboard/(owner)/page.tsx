@@ -14,6 +14,8 @@ import { dashboardAgendaKpis, dashboardAgendaSummary, formatBrlCents } from "@/l
 import { ownerContext } from "@/lib/dashboard/session";
 import { dateSchema, shiftDate, weekDates } from "@/lib/dashboard/validation";
 import { localDate } from "@/lib/bookings/availability";
+import { formatBusinessDate, formatBusinessDateTime } from "@/lib/payments/manual-refund-calendar";
+import { asRefundStatus } from "@/lib/dashboard/refund-ui";
 import { cn } from "@/lib/utils";
 
 const utcDay = (day: string) => new Date(`${day}T12:00:00Z`);
@@ -72,6 +74,13 @@ export default async function AgendaPage({ searchParams }: { searchParams: Promi
     deposit: money(booking.depositCents),
     remaining: money(Math.max(0, booking.priceCents - booking.depositCents)),
     hasDeposit: booking.depositCents > 0,
+    depositCents: booking.depositCents,
+    refundStatus: asRefundStatus(booking.refundStatus),
+    manualRefundDueTomorrow: booking.manualRefundDueTomorrow,
+    manualRefundDueLabel: booking.manualRefundDueAt
+      ? formatBusinessDate(localDate(new Date(booking.manualRefundDueAt), timezone), timezone, { style: "sentence" })
+      : null,
+    whenLabel: formatBusinessDateTime(booking.startsAt, timezone),
   }));
 
   const periodWord = weekly ? "na semana" : date === today ? "hoje" : "no dia";
@@ -124,7 +133,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Promi
         <p>Compartilhe o link da sua página para receber reservas com sinal via Pix.</p>
         <div className="mx-auto mt-4 max-w-sm text-left"><PublicLink slug={business.slug} /></div>
         <Link className="mt-3 inline-flex min-h-11 items-center font-semibold text-ink underline underline-offset-4" href={`/dashboard/settings?businessId=${business.id}`}>Conferir horários de funcionamento</Link>
-      </Empty> : <AgendaBoard days={days} bookings={items} weekly={weekly} businessName={business.name} />}
+      </Empty> : <AgendaBoard days={days} bookings={items} weekly={weekly} businessName={business.name} businessId={business.id} timeZone={timezone} />}
     </>}
   </DashboardShell>;
 }
