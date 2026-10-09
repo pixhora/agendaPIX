@@ -29,7 +29,7 @@ function manualUntil(item: EveItem) {
 function steps(item: EveItem) {
   if (item.kind === "review") {
     if (item.slotOccupied) {
-      return `O horário já foi ocupado. O prazo de 7 dias para devolver vence amanhã, ${item.dueLabel}. ${manualUntil(item)}`;
+      return `O horário já foi ocupado. O prazo de 7 dias para devolver vence amanhã, ${item.dueLabel}. ${MP_MANUAL_REFUND_CHANNEL}`;
     }
     return [
       "Se for manter o agendamento, ele continua na sua agenda.",
@@ -122,7 +122,7 @@ export function refundDeadlineEveNotice(input: { ownerName: string | null; items
     ``,
     `${actionLabel()}: ${item.bookingPath}`,
   ].join("\n"));
-  const text = [greeting, ``, preheader, ``, ...blocks, ``, "Você recebe este e-mail porque tem um negócio no AgendaPix."].join("\n");
+  const text = [greeting, ``, ...blocks, ``, "Você recebe este e-mail porque tem um negócio no AgendaPix."].join("\n");
   const html = `<div style="display:none;max-height:0;overflow:hidden">${escapeHtml(preheader)}</div><p>${htmlBlocks(input.ownerName, input.items)}</p>`;
   return { subject, preheader, text, html };
 }
@@ -132,14 +132,22 @@ function htmlBlocks(ownerName: string | null, items: EveItem[]) {
   return [greeting, ...items.map(htmlItem), "Você recebe este e-mail porque tem um negócio no AgendaPix."].join("<br><br>");
 }
 
+function agendaLink(item: EveItem) {
+  return `<a href="${escapeHtml(item.bookingPath)}">${escapeHtml(actionLabel())}</a>`;
+}
+
 function htmlItem(item: EveItem) {
-  if (item.kind !== "policy") return escapeHtml([lead(item), ...frame(item), steps(item)].join("\n")).replaceAll("\n", "<br>");
+  const link = agendaLink(item);
+  if (item.kind !== "policy") {
+    const body = escapeHtml([lead(item), ...frame(item), steps(item)].join("\n")).replaceAll("\n", "<br>");
+    return `${body}<br><br>${link}`;
+  }
   const requested = `<strong>${escapeHtml(item.requestedOnLabel)}</strong>`;
   const amount = `<strong>${escapeHtml(item.amountLabel)}</strong>`;
   const due = `<strong>amanhã, ${escapeHtml(item.dueLabel)}</strong>`;
   const opening = `${escapeHtml(item.customerName)} pediu para cancelar dentro da regra do sinal em ${requested}. A devolução de ${amount} ainda está pendente, e o prazo de 7 dias para devolver termina ${due}.`;
   const lines = frame(item).map((line) => escapeHtml(line)).join("<br>");
-  return [opening, lines, escapeHtml(steps(item)).replaceAll("\n", "<br>"), escapeHtml("Este é o último lembrete sobre esta devolução.")].join("<br><br>");
+  return [opening, lines, escapeHtml(steps(item)).replaceAll("\n", "<br>"), escapeHtml("Este é o último lembrete sobre esta devolução."), link].join("<br><br>");
 }
 
 function escapeHtml(value: string) {

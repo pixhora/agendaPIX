@@ -38,8 +38,9 @@ function laterInstant(left: Date | null, right: Date | null): Date | null {
 
 /**
  * Sem Pix em aberto e sem vencimento ou cancelamento recente, apaga na hora.
- * Com `creating`/`pending`, guarda. Depois que o último `expires_at` ou
- * `remote_cancelled_at` passou, guarda por mais 24 h para confirmar ou devolver.
+ * `creating`/`pending` com menos de 7 dias, ou devolução `processing`, segura o token.
+ * Um `creating` preso há mais de 7 dias entra só como vencimento: não muda status no Mercado Pago.
+ * Depois que o último `expires_at` ou `remote_cancelled_at` passou, guarda por mais 24 h.
  */
 export function disconnectedTokensReadyToPurge(hold: DisconnectTokenHold, now: Date) {
   if (hold.hasOpenPix) return false;
@@ -148,7 +149,7 @@ export async function purgeDisconnectedMercadoPagoTokens(deps: RefreshDeps & { b
   const rows = listed.filter((row): row is MpConnection => Boolean(row && row.status === "disconnected" && row.accessTokenEnc && row.refreshTokenEnc));
   let purged = 0;
   for (const row of rows) {
-    const hold = await store.disconnectTokenHold(row.businessId);
+    const hold = await store.disconnectTokenHold(row.businessId, now);
     if (!disconnectedTokensReadyToPurge(hold, now)) continue;
     await store.clearDisconnectedTokens(row.businessId);
     purged += 1;

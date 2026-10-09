@@ -292,10 +292,10 @@ export const PERMISSIONS: { strong: string; rest: string }[] = [
   { strong: "criar cobranças Pix", rest: " no valor do sinal dos seus agendamentos;" },
   { strong: "ver o status", rest: " dessas cobranças, para confirmar o agendamento quando o cliente pagar;" },
   { strong: "cancelar", rest: " cobranças que não foram pagas no prazo;" },
-  { strong: "conciliar o pagamento", rest: " quando o aviso atrasar: confirma o horário se o Pix foi pago no prazo e devolve o valor se foi pago fora do prazo;" },
+  { strong: "conciliar o pagamento", rest: " quando o aviso atrasar: confirma o horário se o Pix foi pago no prazo;" },
   {
     strong: "devolver sozinho o valor inteiro",
-    rest: ` quando um Pix chega depois do prazo. ${latePixRefundCopy("refund")} Você recebe um e-mail a cada devolução;`,
+    rest: `. ${latePixRefundCopy()} Você recebe um e-mail a cada devolução;`,
   },
   { strong: "manter a conexão ativa", rest: " sem pedir sua autorização de novo a cada renovação." },
 ];

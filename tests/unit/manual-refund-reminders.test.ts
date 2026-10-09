@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { manualRefundDueAtFromNotice } from "../../lib/payments/manual-refund-calendar";
 import { dailyNoticeState, runManualRefundReminders, selectDaily, selectEve, type ReminderCase, type ReminderPorts } from "../../lib/payments/manual-refund-reminders";
 
@@ -136,11 +136,16 @@ describe("lembretes da devolução manual", () => {
       async recordDaily() {},
     };
     const now = new Date("2026-10-22T12:00:00.000Z");
-    await Promise.all([runManualRefundReminders(ports, now), runManualRefundReminders(ports, now)]);
+    vi.stubEnv("BETTER_AUTH_URL", "https://agendapix.example");
+    try {
+      await Promise.all([runManualRefundReminders(ports, now), runManualRefundReminders(ports, now)]);
+    } finally {
+      vi.unstubAllEnvs();
+    }
     expect(sent).toHaveLength(1);
     expect(sent[0]?.to).toBe("dono@example.com");
     expect(sent[0]?.text).not.toContain("cliente@");
-    expect(sent[0]?.text).toContain("Abrir agenda: /dashboard?businessId=biz-1&date=2026-10-16");
+    expect(sent[0]?.text).toContain("Abrir agenda: https://agendapix.example/dashboard?businessId=biz-1&date=2026-10-16");
     expect(sent[0]?.text).not.toContain("/dashboard/agenda/");
     expect(sent[0]?.text).not.toContain("Tentar de novo");
     expect(sent[0]?.text).not.toContain("Devolvi pelo Mercado Pago");

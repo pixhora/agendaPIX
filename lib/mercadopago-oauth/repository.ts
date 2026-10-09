@@ -1,7 +1,7 @@
 import { and, eq, isNotNull, lt, ne, sql } from "drizzle-orm";
 import { getDb } from "../../db";
 import { mercadopagoConnections, mercadopagoOauthStates, mpConnectionEvents, payments } from "../../db/schema";
-import type { DisconnectTokenHold, MpConnection, MpConnectionStore } from "./types";
+import { MP_DISCONNECT_STUCK_PIX_MS, type DisconnectTokenHold, type MpConnection, type MpConnectionStore } from "./types";
 
 type Database = Pick<ReturnType<typeof getDb>, "select" | "insert" | "update" | "delete" | "transaction" | "execute">;
 type Row = typeof mercadopagoConnections.$inferSelect;
@@ -158,9 +158,19 @@ export function createDrizzleMpStore(database: Database = getDb()): MpConnection
       ));
       return rows.map(fromRow);
     },
-    async disconnectTokenHold(businessId): Promise<DisconnectTokenHold> {
+    async disconnectTokenHold(businessId, now = new Date()): Promise<DisconnectTokenHold> {
+      const freshAfter = new Date(now.getTime() - MP_DISCONNECT_STUCK_PIX_MS);
       const [row] = await database.select({
-        hasOpenPix: sql<boolean | null>`bool_or(${payments.status} in ('creating', 'pending'))`,
+        hasOpenPix: sql<boolean | null>`bool_or(
+          (${payments.status} in ('creating', 'pending') and (${payments.expiresAt} is null or ${payments.expiresAt} >= ${freshAfter}))
+          or ${payments.refundStatus} = 'in_process'
+          or exists (
+            select 1 from payment_refunds
+            where payment_refunds.business_id = ${payments.businessId}
+              and payment_refunds.payment_id = ${payments.id}
+              and payment_refunds.status = 'processing'
+          )
+        )`,
         lastExpiresAt: sql<Date | string | null>`max(${payments.expiresAt})`,
         lastRemoteCancelledAt: sql<Date | string | null>`max(${payments.remoteCancelledAt})`,
       }).from(payments).where(eq(payments.businessId, businessId));

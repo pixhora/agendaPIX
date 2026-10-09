@@ -17,7 +17,7 @@ function policyItem(overrides: Partial<EveItem> = {}): EveItem {
     dueShort: formatBusinessDay(due, tz, false),
     requestedOnLabel: formatBusinessDate("2026-10-16", tz),
     paidAtLabel: formatBusinessDateTime(new Date("2026-10-08T17:02:00.000Z"), tz),
-    bookingPath: "/dashboard?businessId=biz-1&date=2026-10-16",
+    bookingPath: "https://agendapix.example/dashboard?businessId=biz-1&date=2026-10-16",
     slotOccupied: false,
     disconnected: false,
     ...overrides,
@@ -37,7 +37,10 @@ describe("E5 devolução pela política", () => {
     expect(notice.text).toContain("Prazo: até sex, 23 out");
     expect(notice.text).toContain(`Devolva até sex, 23 out. ${MP_MANUAL_REFUND_CHANNEL}`);
     expect(notice.text).toContain("Este é o último lembrete sobre esta devolução.");
-    expect(notice.text).toContain("Abrir agenda: /dashboard?businessId=biz-1&date=2026-10-16");
+    expect(notice.text).not.toContain(notice.preheader);
+    expect(notice.text).toContain("Abrir agenda: https://agendapix.example/dashboard?businessId=biz-1&date=2026-10-16");
+    expect(notice.html).toContain('<a href="https://agendapix.example/dashboard?businessId=biz-1&amp;date=2026-10-16">Abrir agenda</a>');
+    expect(notice.html).toContain(notice.preheader);
     expect(notice.text).not.toContain("/dashboard/agenda/");
     expect(notice.text).not.toContain("Devolver agora");
     expect(notice.text).not.toContain("Devolver pelo AgendaPix");
@@ -55,7 +58,8 @@ describe("E5 devolução pela política", () => {
     expect(notice.text).not.toContain("Coloque saldo");
     expect(notice.text).not.toContain("Devolver agora");
     expect(notice.text).not.toContain("Devolver pelo AgendaPix");
-    expect(notice.text).toContain("Abrir agenda: /dashboard?businessId=biz-1&date=2026-10-16");
+    expect(notice.text).toContain("Abrir agenda: https://agendapix.example/dashboard?businessId=biz-1&date=2026-10-16");
+    expect(notice.html).toContain('<a href="https://agendapix.example/dashboard?businessId=biz-1&amp;date=2026-10-16">Abrir agenda</a>');
     expect(notice.text).not.toContain("/dashboard/agenda/");
     expect(notice.text).not.toContain("?devolver=1");
   });
@@ -65,10 +69,13 @@ describe("E5 devolução pela política", () => {
     const review = refundDeadlineEveNotice({ ownerName: "Marina", items: [policyItem({ kind: "review", slotOccupied: false })] });
     const occupied = refundDeadlineEveNotice({ ownerName: "Marina", items: [policyItem({ kind: "review", slotOccupied: true })] });
     expect(failed.text).toContain(`Devolva até sex, 23 out. ${MP_MANUAL_REFUND_CHANNEL}`);
-    expect(occupied.text).toContain(`Devolva até sex, 23 out. ${MP_MANUAL_REFUND_CHANNEL}`);
+    expect(occupied.text).toContain(`O horário já foi ocupado. O prazo de 7 dias para devolver vence amanhã, sex, 23 out. ${MP_MANUAL_REFUND_CHANNEL}`);
+    expect(occupied.text).not.toContain("Devolva até");
     expect(review.text).toContain(`Se não for manter, devolva até sex, 23 out. ${MP_MANUAL_REFUND_CHANNEL}`);
     for (const notice of [failed, review, occupied]) {
-      expect(notice.text).toContain("Abrir agenda: /dashboard?businessId=biz-1&date=2026-10-16");
+      expect(notice.text).not.toContain(notice.preheader);
+      expect(notice.text).toContain("Abrir agenda: https://agendapix.example/dashboard?businessId=biz-1&date=2026-10-16");
+      expect(notice.html).toContain('<a href="https://agendapix.example/dashboard?businessId=biz-1&amp;date=2026-10-16">Abrir agenda</a>');
       expect(notice.text).not.toContain("Tentar de novo");
       expect(notice.text).not.toContain("Devolvi pelo Mercado Pago");
       expect(notice.text).not.toContain("Confirmar agendamento");

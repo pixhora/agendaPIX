@@ -38,7 +38,10 @@ describe("cópia do Mercado Pago", () => {
   it("as permissões descrevem a conciliação e a devolução automática", () => {
     const text = PERMISSIONS.map((item) => `${item.strong}${item.rest}`).join(" ");
     expect(text).toContain("conciliar o pagamento");
+    expect(text).toContain("confirma o horário se o Pix foi pago no prazo");
     expect(text).toContain("devolver sozinho o valor inteiro");
+    expect(text).not.toContain("devolve o valor se foi pago fora do prazo");
+    expect(text).not.toContain("quando um Pix chega depois do prazo. Quando um Pix");
     expect(text).not.toContain("quando você mandar");
     expect(text).not.toContain(MP_MANUAL_REFUND_CHANNEL);
     expect(text).not.toContain("Devolver pelo AgendaPix");

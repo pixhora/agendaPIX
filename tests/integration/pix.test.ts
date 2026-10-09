@@ -446,6 +446,59 @@ describe("webhook transacional e auditável", () => {
     const [after] = await database.select().from(schema.mercadopagoConnections).where(eq(schema.mercadopagoConnections.businessId, businessIds[0]));
     expect(after.accessTokenEnc).toBeTruthy();
   });
+  it("devolução em processamento segura o token depois do vencimento", async () => {
+    const first = await createBooking(slugs[0], input(), randomUUID(), database, provider);
+    const longAgo = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000);
+    await database.update(schema.bookings).set({ status: "expired", expiresAt: longAgo }).where(eq(schema.bookings.id, first.data.bookingId));
+    await database.update(schema.payments).set({
+      status: "paid",
+      paidAt: new Date(longAgo.getTime() + 60_000),
+      expiresAt: longAgo,
+      refundStatus: "in_process",
+    }).where(eq(schema.payments.id, first.data.payment!.id));
+    await database.insert(schema.paymentRefunds).values({
+      businessId: businessIds[0],
+      paymentId: first.data.payment!.id,
+      bookingId: first.data.bookingId,
+      amountCents: 1000,
+      kind: "auto_late",
+      status: "processing",
+      idempotencyKey: `hold:${first.data.payment!.id}`,
+    });
+    const store = createDrizzleMpStore(database);
+    await disconnectMercadoPago(businessIds[0], { store });
+    expect(await purgeDisconnectedMercadoPagoTokens({ store, businessId: businessIds[0], now: new Date() })).toEqual({ purged: 0 });
+    const [kept] = await database.select().from(schema.mercadopagoConnections).where(eq(schema.mercadopagoConnections.businessId, businessIds[0]));
+    expect(kept.accessTokenEnc).toBeTruthy();
+    await database.update(schema.paymentRefunds).set({ status: "refunded" }).where(eq(schema.paymentRefunds.paymentId, first.data.payment!.id));
+    await database.update(schema.payments).set({ refundStatus: "refunded", refundedAt: new Date() }).where(eq(schema.payments.id, first.data.payment!.id));
+    expect(await purgeDisconnectedMercadoPagoTokens({ store, businessId: businessIds[0], now: new Date() })).toEqual({ purged: 1 });
+    const [gone] = await database.select().from(schema.mercadopagoConnections).where(eq(schema.mercadopagoConnections.businessId, businessIds[0]));
+    expect(gone.accessTokenEnc).toBeNull();
+  });
+  it("creating preso há mais de 7 dias não segura o token e não muda o status", async () => {
+    const first = await createBooking(slugs[0], input(), randomUUID(), database, provider);
+    const sixDaysAgo = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
+    await database.update(schema.bookings).set({ status: "expired", expiresAt: sixDaysAgo }).where(eq(schema.bookings.id, first.data.bookingId));
+    await database.update(schema.payments).set({
+      status: "creating",
+      externalId: null,
+      qrCodeDataUrl: null,
+      copyPaste: null,
+      expiresAt: sixDaysAgo,
+    }).where(eq(schema.payments.id, first.data.payment!.id));
+    const store = createDrizzleMpStore(database);
+    await disconnectMercadoPago(businessIds[0], { store });
+    expect(await purgeDisconnectedMercadoPagoTokens({ store, businessId: businessIds[0], now: new Date() })).toEqual({ purged: 0 });
+    const eightDaysAgo = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000);
+    await database.update(schema.payments).set({ expiresAt: eightDaysAgo }).where(eq(schema.payments.id, first.data.payment!.id));
+    expect(await purgeDisconnectedMercadoPagoTokens({ store, businessId: businessIds[0], now: new Date() })).toEqual({ purged: 1 });
+    const [payment] = await database.select().from(schema.payments).where(eq(schema.payments.id, first.data.payment!.id));
+    expect(payment.status).toBe("creating");
+    expect(payment.externalId).toBeNull();
+    const [gone] = await database.select().from(schema.mercadopagoConnections).where(eq(schema.mercadopagoConnections.businessId, businessIds[0]));
+    expect(gone.accessTokenEnc).toBeNull();
+  });
   it("evento de um negócio não altera a reserva do outro", async () => {
     const first = await createBooking(slugs[0], input(), randomUUID(), database, provider);
     const second = await createBooking(slugs[1], { ...input(), serviceId: serviceIds[1] }, randomUUID(), database, provider);
