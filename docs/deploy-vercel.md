@@ -38,14 +38,19 @@ Holds vencidos já expiram sozinhos em cada leitura/criação de reserva.
 | `PAYMENT_PROVIDER` | `mercadopago` |
 | `MERCADOPAGO_ACCESS_TOKEN` | Access Token (teste agora; produção depois) |
 | `MERCADOPAGO_ENV` | `sandbox` (ou `production` com credenciais de produção) |
-| `MERCADOPAGO_WEBHOOK_SECRET` | o secret **gerado pelo painel** do Mercado Pago ao salvar o webhook |
-| `PIX_KEY_ENCRYPTION_KEY` | `openssl rand -hex 32` (guarde: perder a chave invalida chaves Pix salvas) |
+| `MERCADOPAGO_WEBHOOK_SECRET` | o secret **gerado pelo painel** do Mercado Pago ao salvar o webhook (pagamento e mp-connect) |
+| `MP_CLIENT_ID` / `MP_CLIENT_SECRET` | credenciais OAuth da aplicação; o Pix do sinal usa o token do vendedor, não o da plataforma |
+| `MP_OAUTH_REDIRECT_URI` | `https://<domínio>/api/integrations/mercadopago/callback` (https, sem query nem fragmento) |
+| `MP_TOKEN_ENCRYPTION_KEY` | `openssl rand -hex 32` (cifra o token OAuth do dono) |
+| `MP_OAUTH_PKCE` | ausente ou `off`. Nunca vazio: string vazia derruba o boot (`mp_oauth_pkce_invalid`) |
 | `CRON_SECRET` | `openssl rand -hex 32` |
+| `SUPPORT_WHATSAPP_NUMBER` | dígitos E.164 sem `+`. Sem isso o checkout da assinatura fica `available: false` |
+| `SUBSCRIPTION_MANUAL_ACTIVATION_HOURS` | inteiro ≥ 1, sem zero à esquerda. Sem isso o checkout responde 503 |
 | `BOOKING_TRUST_PROXY` | `true` (a Vercel sobrescreve `X-Real-IP`/`X-Forwarded-For`) |
 | `BOOKING_CLIENT_IP_HEADER` | `x-real-ip` |
 | `ENABLE_EXPERIMENTAL_COREPACK` | `1` (pnpm 12 do `packageManager`) |
 
-`FAKE_WEBHOOK_SECRET` não é usado em produção. Os demais `BOOKING_*`/`RECONCILE_*` têm padrão.
+`FAKE_WEBHOOK_SECRET` não é usado em produção. Os demais `BOOKING_*`/`RECONCILE_*` têm padrão. `BOOKING_HOLD_MINUTES` ausente vale 30; abaixo de 28 o agendamento responde `503` `booking_unavailable`. `PIX_KEY_ENCRYPTION_KEY` não é lida pelo código atual (a rota da chave responde 410); não apague a chave se ainda houver ciphertext antigo para guardar.
 
 ## Ordem
 
@@ -56,6 +61,6 @@ Holds vencidos já expiram sozinhos em cada leitura/criação de reserva.
 5. `vercel deploy --prod` (pelo CLI, para ver erros de validação do `vercel.json`).
 6. Conferir `GET /api/health` (200) e `GET /api/ready` (200 = banco + SMTP ok).
 7. Mercado Pago → Suas integrações → Webhooks (modo teste): URL
-   `https://<domínio>/api/webhooks/payments/mercadopago`, evento **Order**; copiar o secret gerado para
+   `https://<domínio>/api/webhooks/payments/mercadopago`, eventos **payment** e **mp-connect**; copiar o secret gerado para
    `MERCADOPAGO_WEBHOOK_SECRET` e fazer redeploy.
 8. Teste ponta a ponta: login por link mágico, onboarding, reserva, Pix de teste (APRO), confirmação.

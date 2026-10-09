@@ -12,7 +12,7 @@ Fontes:
 
 ## Token
 
-Hoje toda chamada usa o token da plataforma. A função injetada fica pronta para o OAuth do dono:
+O sinal sai com o access token OAuth do vendedor, cifrado em `mercadopago_connections`. `getPaymentProvider` e o boot do Next (`instrumentation.ts`, só fora do edge) chamam `registerSellerAccountHooks()`, que liga `getSellerAccessToken`, `getSellerAccessTokenForSettlement` e `findBusinessIdByMpUserId`. O worker de reconciliação não sobe o Next, então o registro também fica em `getPaymentProvider`. A taxa da plataforma é zero: o `POST /v1/payments` não envia `application_fee`. A assinatura de R$ 49 não usa este token.
 
 ```ts
 resolveMpAccessToken(query: {
@@ -25,7 +25,7 @@ getSellerAccessTokenForSettlement(businessId: string): Promise<{ accessToken: st
 findBusinessIdByMpUserId(mpUserId: string): Promise<string | null>
 ```
 
-`resolveMpAccessToken` é o único ponto que o pagamento chama. O PR de OAuth liga os três ganchos depois. Sem gancho, as duas finalidades usam o token da plataforma e ignoram a consulta. Com gancho, `charge` usa `getSellerAccessToken` e `settlement` usa `getSellerAccessTokenForSettlement`. Se só houver `mpUserId`, `findBusinessIdByMpUserId` acha o negócio. Gancho que devolve null não cai no token da plataforma. `charge` falha com `mp_account_not_connected` se o dono desconectou. `settlement` pode usar o token retido depois da desconexão. O webhook usa `user_id` da notificação (`collector_id`) com `purpose: "settlement"`. `options.accessToken` substitui o resultado só naquela chamada.
+`resolveMpAccessToken` é o único ponto que o pagamento chama. Com os ganchos do boot, `charge` usa `getSellerAccessToken` (e renova se faltar menos de 1 dia) e `settlement` usa `getSellerAccessTokenForSettlement`. Se só houver `mpUserId`, `findBusinessIdByMpUserId` acha o negócio `connected`. Gancho que devolve null não cai no token da plataforma. `charge` falha com `mp_account_not_connected` se o dono desconectou. `settlement` pode usar o token retido depois da desconexão. O webhook usa `user_id` da notificação com `purpose: "settlement"`. `options.accessToken` substitui o resultado só naquela chamada. Sem os ganchos (teste que ainda não subiu o boot), as duas finalidades usam `MERCADOPAGO_ACCESS_TOKEN`.
 
 ```ts
 createPixCharge(input, { signal, businessId, mpUserId, accessToken, purpose: "charge" })
@@ -41,7 +41,7 @@ refundCharge(externalId, { idempotencyKey }, { signal, businessId, mpUserId, acc
 
 `POST /v1/payments` com `payment_method_id: "pix"`, `transaction_amount`, `payer.email` (`hold-{reference}@pagador.agendapix.invalid` sem e-mail), `external_reference`, `notification_url`, `date_of_expiration` e `X-Idempotency-Key`. Sem `application_fee` (taxa zero).
 
-`date_of_expiration` = fim do hold + **2 minutos** (`MERCADOPAGO_PIX_EXPIRATION_MARGIN_MINUTES`), em ISO-8601 com offset. A doc aceita de 30 minutos a 30 dias. `BOOKING_HOLD_MINUTES` tem padrão **30** e faixa **28–43200**: 28 + 2 = 30, o mínimo do `/v1/payments`. Abaixo de 28 a configuração falha na hora, com a mensagem `BOOKING_HOLD_MINUTES inválido`. O `expiresAt` que a tela recebe continua sendo só o hold. Pago até o hold confirma; depois disso entra no fluxo atrasado. `MP_REQUIRES_PAYER_CPF` continua com padrão `false`.
+`date_of_expiration` = fim do hold + **2 minutos** (`MERCADOPAGO_PIX_EXPIRATION_MARGIN_MINUTES`), em ISO-8601 com offset. A doc aceita de 30 minutos a 30 dias. `BOOKING_HOLD_MINUTES` tem padrão **30** e faixa **28–43200**: 28 + 2 = 30, o mínimo do `/v1/payments`. Abaixo de 28 a reserva responde `503` `booking_unavailable`, com a mensagem `BOOKING_HOLD_MINUTES inválido`. O `expiresAt` que a tela recebe continua sendo só o hold. Pago até o hold confirma; depois disso entra no fluxo atrasado. `MP_REQUIRES_PAYER_CPF` continua com padrão `false`.
 
 QR e copia-e-cola saem de `point_of_interaction.transaction_data` (`qr_code`, `qr_code_base64`, `ticket_url`) e voltam nos campos atuais: `copyPaste` e `qrCodeDataUrl`.
 

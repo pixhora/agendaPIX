@@ -1,6 +1,7 @@
 import { createHmac } from "node:crypto";
 import { z } from "zod";
 import { HttpError } from "../http";
+import { MERCADOPAGO_WEBHOOK_FRESHNESS_MS, mercadoPagoTimestampMs } from "../payments/mercadopago";
 import { webhookSecret } from "./config";
 import { createDrizzleMpStore } from "./repository";
 import { safeEqualHex } from "./timing";
@@ -15,7 +16,10 @@ const notificationSchema = z.object({
 /**
  * Manifesto documentado: id:[data.id da query];request-id:[x-request-id];ts:[ts];
  * Valores ausentes saem do manifesto. data.id alfanumérico vai em minúsculas.
- * A janela de tolerância do ts não está documentada: a assinatura HMAC é obrigatória, a idade do ts não rejeita a entrega.
+ * A doc do x-signature permite comparar o `ts` com o relógio de recebimento para
+ * estabelecer uma tolerância, mas não fixa o número de minutos:
+ * https://www.mercadopago.com.br/developers/en/docs/your-integrations/notifications/webhooks
+ * A janela é a mesma do webhook de pagamento (`MERCADOPAGO_WEBHOOK_FRESHNESS_MS`, ±5 min).
  */
 export function mercadoPagoManifest(parts: { dataId?: string | null; requestId?: string | null; ts: string }) {
   const chunks: string[] = [];
@@ -38,7 +42,7 @@ function parseSignature(header: string) {
   return { ts, v1 };
 }
 
-export function assertMpWebhookSignature(input: { url: string; headers: Headers; secret: string }) {
+export function assertMpWebhookSignature(input: { url: string; headers: Headers; secret: string; now?: Date }) {
   const parsed = parseSignature(input.headers.get("x-signature") ?? "");
   if (!parsed) throw new HttpError(401, "invalid_signature", "Assinatura inválida ou vencida.");
   let dataId: string | null = null;
@@ -47,6 +51,11 @@ export function assertMpWebhookSignature(input: { url: string; headers: Headers;
   const manifest = mercadoPagoManifest({ dataId, requestId: input.headers.get("x-request-id"), ts: parsed.ts });
   const expected = createHmac("sha256", input.secret).update(manifest).digest("hex");
   if (!safeEqualHex(parsed.v1, expected)) throw new HttpError(401, "invalid_signature", "Assinatura inválida ou vencida.");
+  const now = input.now ?? new Date();
+  const tsMs = mercadoPagoTimestampMs(parsed.ts);
+  if (tsMs === null || Math.abs(now.getTime() - tsMs) > MERCADOPAGO_WEBHOOK_FRESHNESS_MS) {
+    throw new HttpError(401, "invalid_signature", "Assinatura inválida ou vencida.");
+  }
 }
 
 export async function handleMpConnectWebhook(input: {
@@ -55,8 +64,9 @@ export async function handleMpConnectWebhook(input: {
   url: string;
   env?: Readonly<Record<string, string | undefined>>;
   store?: MpConnectionStore;
+  now?: Date;
 }) {
-  assertMpWebhookSignature({ url: input.url, headers: input.headers, secret: webhookSecret(input.env) });
+  assertMpWebhookSignature({ url: input.url, headers: input.headers, secret: webhookSecret(input.env), now: input.now });
   let payload: unknown;
   try { payload = JSON.parse(input.body); }
   catch { throw new HttpError(400, "invalid_event", "Evento inválido."); }

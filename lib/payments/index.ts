@@ -3,6 +3,7 @@ import { HttpError } from "../http";
 import { FakePaymentProvider } from "./fake";
 import { getDb } from "../../db";
 import { MERCADOPAGO_BASE_URL, MercadoPagoPaymentProvider, resolveMpAccessToken } from "./mercadopago";
+import { registerSellerAccountHooks } from "./register-seller-hooks";
 import type { PaymentProvider } from "./provider";
 import { DatabaseChargeReferenceStore } from "./reference-store";
 
@@ -26,6 +27,7 @@ export function getPaymentProvider(env: Readonly<Record<string, string | undefin
   if (requested === "mercadopago") {
     const parsed = mercadoPagoEnvSchema.safeParse(env);
     if (!parsed.success) throw unavailable();
+    registerSellerAccountHooks();
     return new MercadoPagoPaymentProvider({
       accessToken: parsed.data.MERCADOPAGO_ACCESS_TOKEN,
       webhookSecret: parsed.data.MERCADOPAGO_WEBHOOK_SECRET,

@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type * as schema from "../../db/schema";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { getPaymentProvider } from "../../lib/payments";
 import { processWebhook } from "../../lib/payments/webhook";
 import { ObservedRefundEvent, UnverifiableSellerPayment } from "../../lib/payments/provider";
-import { MpAccountNotConnectedError } from "../../lib/payments/seller-account";
+import { MpAccountNotConnectedError, resetSellerAccountHooks } from "../../lib/payments/seller-account";
 import {
   buildMercadoPagoManifest,
   centsToTransactionAmount,
@@ -20,6 +20,10 @@ const webhookSecret = "test-only-mercadopago-webhook-secret-32chars";
 const baseUrl = "https://api.mercadopago.com";
 const now = new Date("2030-01-01T12:00:00.000Z");
 const customer = { name: "Cliente Teste Silva", phone: "+5511999999999" };
+
+afterEach(() => {
+  resetSellerAccountHooks();
+});
 
 type Call = { method: string; url: string; body?: Record<string, unknown>; headers?: Record<string, string> };
 type Payment = {
@@ -517,9 +521,9 @@ describe("seleção do provedor", () => {
       calls.push(String(input));
       return json({ message: "not found" }, 404);
     });
-    await getPaymentProvider({ ...mpEnv, NODE_ENV: "test" }).getCharge("ORDTST1");
-    await getPaymentProvider({ ...mpEnv, NODE_ENV: "test", MERCADOPAGO_BASE_URL: "https://api.mercadopago.com" }).getCharge("ORDTST2");
-    await getPaymentProvider({ ...mpEnv, NODE_ENV: "test", MERCADOPAGO_BASE_URL: "https://api.mp-test.example" }).getCharge("ORDTST3");
+    await getPaymentProvider({ ...mpEnv, NODE_ENV: "test" }).getCharge("ORDTST1", { accessToken });
+    await getPaymentProvider({ ...mpEnv, NODE_ENV: "test", MERCADOPAGO_BASE_URL: "https://api.mercadopago.com" }).getCharge("ORDTST2", { accessToken });
+    await getPaymentProvider({ ...mpEnv, NODE_ENV: "test", MERCADOPAGO_BASE_URL: "https://api.mp-test.example" }).getCharge("ORDTST3", { accessToken });
     spy.mockRestore();
     expect(calls).toEqual([
       "https://api.mercadopago.com/v1/payments/ORDTST1",

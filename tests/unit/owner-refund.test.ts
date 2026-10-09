@@ -218,7 +218,7 @@ describe("prévia e devolução do dono", () => {
     expect(ports.attempts).toHaveLength(1);
     expect(ports.attempts[0]?.idempotencyKey).toBe("pay-1:1");
     expect(readFileSync("lib/payments/refund-flow.ts", "utf8")).toContain("for update");
-    const migration = readFileSync("db/migrations/0012_manual_refund_due.sql", "utf8");
+    const migration = readFileSync("db/migrations/0014_manual_refund_due.sql", "utf8");
     expect(migration).toContain("payment_refunds_one_active_per_payment");
     expect(migration).toContain('CREATE TABLE IF NOT EXISTS "owner_notices"');
     expect(migration).toContain('ADD COLUMN IF NOT EXISTS "email_sent_at"');

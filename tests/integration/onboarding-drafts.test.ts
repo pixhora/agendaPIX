@@ -152,7 +152,7 @@ describe.sequential("rascunho de cadastro", () => {
       expect(second.result.businessId).not.toBe(first.result.businessId);
       process.env.ONE_BUSINESS_PER_OWNER = "true";
       const blocked = commitOnboardingDraft((await createOnboardingDraft(draftBody(email, `tres-${ownerId.slice(0, 8)}`), db)).draftId, { userId: ownerId, email }, db);
-      await expect(blocked).rejects.toMatchObject({ status: 409, code: "already_has_business", extra: { publicPath: first.result.publicPath } });
+      await expect(blocked).rejects.toMatchObject({ status: 409, code: "already_has_business", details: { publicPath: first.result.publicPath } });
     } finally {
       if (previous === undefined) delete process.env.ONE_BUSINESS_PER_OWNER;
       else process.env.ONE_BUSINESS_PER_OWNER = previous;

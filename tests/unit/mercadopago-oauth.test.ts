@@ -431,12 +431,14 @@ describe("OAuth Mercado Pago por negócio", () => {
     const signature = createHmac("sha256", webhookSecret).update(manifest).digest("hex");
     const headers = new Headers({ "x-signature": `ts=${ts},v1=${signature}`, "x-request-id": requestId });
     const url = `https://app.example.com/api/webhooks/payments/mercadopago?data.id=${dataId}&type=mp-connect`;
+    const signatureNow = new Date(Number(ts) * 1000);
     const ignored = await handleMpConnectWebhook({
       body: JSON.stringify({ action: "application.authorized", type: "mp-connect", user_id: 4242 }),
       headers,
       url,
       env,
       store,
+      now: signatureNow,
     });
     expect(ignored).toEqual({ outcome: "ignored", reason: "authorized_without_token_exchange" });
     expect((await store.findByBusinessId(businessId))?.accessTokenEnc).toContain("v1.");
@@ -446,6 +448,7 @@ describe("OAuth Mercado Pago por negócio", () => {
       url,
       env,
       store,
+      now: signatureNow,
     });
     expect(deauthorized).toEqual({ outcome: "deauthorized" });
     const row = await store.findByBusinessId(businessId);
@@ -458,7 +461,27 @@ describe("OAuth Mercado Pago por negócio", () => {
       url,
       env,
       store,
+      now: signatureNow,
     })).rejects.toMatchObject({ status: 401, code: "invalid_signature" });
+  });
+
+  it("recusa mp-connect com ts fora de ±5 minutos, como o webhook de pagamento", async () => {
+    const store = createMemoryMpStore([connection()]);
+    const dataId = "abc123";
+    const requestId = "req-stale";
+    const receivedAt = new Date("2026-10-08T12:00:00.000Z");
+    const ts = String(Math.floor(receivedAt.getTime() / 1000) - 301);
+    const manifest = mercadoPagoManifest({ dataId, requestId, ts });
+    const signature = createHmac("sha256", webhookSecret).update(manifest).digest("hex");
+    await expect(handleMpConnectWebhook({
+      body: JSON.stringify({ action: "application.authorized", type: "mp-connect", user_id: 4242 }),
+      headers: new Headers({ "x-signature": `ts=${ts},v1=${signature}`, "x-request-id": requestId }),
+      url: `https://app.example.com/api/webhooks/payments/mercadopago?data.id=${dataId}&type=mp-connect`,
+      env,
+      store,
+      now: receivedAt,
+    })).rejects.toMatchObject({ status: 401, code: "invalid_signature" });
+    expect((await store.findByBusinessId(businessId))?.status).toBe("connected");
   });
 
   it("só inicia o OAuth por POST com consentimento da versão atual", async () => {
