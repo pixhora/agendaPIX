@@ -24,13 +24,18 @@
 | `--slab` / `--slab-foreground` / `--slab-muted` | `#0B0B0C` / `#FFF` / `#C9C9CC` | `#000` / `#FFF` / `#B8B8BD` | Placa de Valor e faixas escuras |
 | `--pix` / `--pix-hover` / `--pix-foreground` | `#0A6E63` / `#085A52` / `#FFF` | `#3FD0BE` / `#5FDCCC` / `#0B0B0C` | Acento único: Pix, dinheiro, estado ativo |
 | `--pix-soft` | `#E8F6F3` | `#10302C` | Fundo de destaque Pix (aviso, próximo atendimento) |
-| `--pix-bright` | `#3FD0BE` | `#3FD0BE` | Ponto "ao vivo" sobre a placa escura |
+| `--pix-bright` | `#3FD0BE` | `#3FD0BE` | Faixa do horário reservado, botão sobre a placa, detalhe de marca. Nunca é cor de texto sobre `--paper` |
+| `--pix-bright-foreground` | `#0B0B0C` | `#0B0B0C` | Texto sobre `--pix-bright`. Fixo nos dois modos (`text-ink` no escuro fica claro e falha) |
+| `--pix-deep` | `#064A43` | `#0B2F2B` | Bloco do CTA final e selo "Exemplo". Uma vez por página |
+| `--pix-deep-muted` | `#B9E4DD` | `#9FD9D0` | Texto secundário sobre `--pix-deep` |
+| `--brand-tile` / `--brand-tile-foreground` | `#0B0B0C` / `#F6F5F2` | `#0B0B0C` / `#F6F5F2` | Azulejo da marca. Escuro nos dois temas, igual ao favicon |
+| `--brand-tile-edge` | transparente | `rgb(255 255 255 / 0.14)` | Borda interna do azulejo no escuro, para não sumir no `#0F0F10` |
 | `--success` / `--success-soft` | `#156B3A` / `#E6F4EA` | `#6FD49A` / `#133222` | Confirmado, salvo |
 | `--warning` / `--warning-soft` | `#8A5300` / `#FDF1DC` | `#F2B25A` / `#33250F` | Aguardando sinal, avisos |
 | `--danger` / `--danger-soft` | `#B3261E` / `#FBE9E7` | `#FF8A80` / `#3A1714` | Erros e ações destrutivas |
 | `--ring` | `#0B0B0C` | `#3FD0BE` | Anel de foco (2px + offset) |
 
-Aliases shadcn mantidos para compatibilidade: `background`, `foreground`, `primary`, `primary-foreground`, `muted-foreground`, `border`, `destructive`.
+Aliases shadcn: `background`, `foreground`, `primary`, `primary-foreground`, `muted-foreground`, `border`, `destructive`, `card`, `card-foreground`, `popover`, `popover-foreground`, `secondary`, `secondary-foreground`, `accent` (`--pix-soft`), `accent-foreground` (`--pix`), `input` (`--line-strong`), `destructive-foreground` (`#ffffff`).
 
 ### 2.1 Contraste (WCAG 2.2, calculado)
 
@@ -57,6 +62,8 @@ Aliases shadcn mantidos para compatibilidade: `background`, `foreground`, `prima
 | `--radius-frame` | 28px | Molduras grandes, placa, folhas laterais |
 | `--radius-card` | 16px | Cartões e listas |
 | `--radius-field` | 12px | Campos, itens de menu |
+| `--radius-slab` | 22px | ValueSlab |
+| `--sticky-cta-height` | 0px | Altura do CTA fixo; o JS atualiza no `<html>` |
 | `--shadow-card` | sutil | Cartões e botões preenchidos |
 | `--shadow-raised` | elevada | Popover, painel lateral, prints da landing |
 | `--shadow-focus` | `0 0 0 4px` com `--ring` a 18% | Halo de foco no invólucro do campo |

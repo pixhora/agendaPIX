@@ -53,7 +53,7 @@ function buildIcs({
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//agendaPIX//PT",
+    "PRODID:-//AgendaPix//PT",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
     "BEGIN:VEVENT",

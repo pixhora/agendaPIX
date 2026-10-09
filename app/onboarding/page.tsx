@@ -6,7 +6,7 @@ import { publicLinkHost } from "@/lib/public-host";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const metadata: Metadata = {
-  title: "Começar teste grátis de 7 dias · AgendaPix",
+  title: "Começar teste grátis de 7 dias",
   description: "Crie sua conta em 3 minutos e comece a receber agendamentos com sinal por Pix.",
 };
 

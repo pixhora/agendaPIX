@@ -30,6 +30,8 @@
   --pix-bright: #3fd0be;
   /* Texto sobre a faixa. Fixo nos dois modos: no escuro --ink fica claro e falha o contraste. */
   --pix-bright-foreground: #0b0b0c;
+  --pix-deep: #064a43;
+  --pix-deep-muted: #b9e4dd;
   /* O azulejo da marca fica escuro nos dois temas, igual ao favicon. */
   --brand-tile: #0b0b0c;
   --brand-tile-foreground: #f6f5f2;
@@ -70,6 +72,8 @@
   --pix-soft: #10302c;
   --pix-bright: #3fd0be;
   --pix-bright-foreground: #0b0b0c;
+  --pix-deep: #0b2f2b;
+  --pix-deep-muted: #9fd9d0;
   --brand-tile: #0b0b0c;
   --brand-tile-foreground: #f6f5f2;
   --brand-tile-edge: rgb(255 255 255 / 0.14);
@@ -105,6 +109,8 @@
     --pix-soft: #10302c;
     --pix-bright: #3fd0be;
     --pix-bright-foreground: #0b0b0c;
+    --pix-deep: #0b2f2b;
+    --pix-deep-muted: #9fd9d0;
     --brand-tile: #0b0b0c;
     --brand-tile-foreground: #f6f5f2;
     --brand-tile-edge: rgb(255 255 255 / 0.14);
@@ -137,6 +143,8 @@
   --color-pix-soft: var(--pix-soft);
   --color-pix-bright: var(--pix-bright);
   --color-pix-bright-foreground: var(--pix-bright-foreground);
+  --color-pix-deep: var(--pix-deep);
+  --color-pix-deep-muted: var(--pix-deep-muted);
   --color-brand-tile: var(--brand-tile);
   --color-brand-tile-foreground: var(--brand-tile-foreground);
   --color-success: var(--success);
@@ -156,10 +164,21 @@
   --color-primary-hover: var(--ink-hover);
   --color-primary-foreground: var(--paper);
   --color-destructive: var(--danger);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--ink);
+  --color-popover: var(--surface);
+  --color-popover-foreground: var(--ink);
+  --color-secondary: var(--subtle);
+  --color-secondary-foreground: var(--ink);
+  --color-accent: var(--pix-soft);
+  --color-accent-foreground: var(--pix);
+  --color-input: var(--line-strong);
+  --color-destructive-foreground: #ffffff;
 
   --radius-frame: 28px;
   --radius-card: 16px;
   --radius-field: 12px;
+  --radius-slab: 22px;
 
   --font-display: var(--font-display-family), "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
   --font-sans: var(--font-sans-family), "Inter", system-ui, -apple-system, sans-serif;
@@ -338,4 +357,10 @@ h1, h2, h3, h4, h5, h6, .font-display {
 [data-sonner-toast][data-expanded="false"][data-front="false"] > * {
   opacity: 0 !important;
   transition: none !important;
+}
+
+/* Placeholder usa o --muted inteiro. O navegador não pode clarear por cima. */
+:where(input, textarea)::placeholder {
+  color: var(--muted);
+  opacity: 1;
 }

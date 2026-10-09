@@ -1,5 +1,5 @@
 /**
- * Mapa de ícones agendaPIX — só lucide-react.
+ * Mapa de ícones AgendaPix — só lucide-react.
  * Decisão: docs/DESIGN_DECISION.md § Ícones + docs/design-refs/icons/.
  * Preferir <Icon icon={…} /> de @/components/ui/icon para stroke/tamanho.
  */

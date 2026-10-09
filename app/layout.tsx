@@ -2,24 +2,34 @@ import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans, Inter } from "next/font/google";
 import { headers } from "next/headers";
 import { Toaster } from "@/components/ui/toaster";
+import { siteDescription, siteName, siteOpenGraph, siteOrigin, siteTitle } from "@/lib/site";
 import { themeInitScript } from "@/lib/theme";
 import "./globals.css";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext"],
+  weight: ["500", "600", "700", "800"],
   variable: "--font-display-family",
   display: "swap",
 });
 
 const inter = Inter({
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext"],
   variable: "--font-sans-family",
   display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "AgendaPix · Agendamento online com sinal por Pix",
-  description: "Seu cliente agenda sozinho, paga o sinal por Pix e você para de perder horário.",
+  metadataBase: siteOrigin(),
+  title: { default: siteTitle, template: `%s · ${siteName}` },
+  description: siteDescription,
+  applicationName: siteName,
+  openGraph: siteOpenGraph,
+  twitter: {
+    card: "summary_large_image",
+    title: siteTitle,
+    description: siteDescription,
+  },
 };
 
 export const viewport: Viewport = {

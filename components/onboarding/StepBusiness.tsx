@@ -112,7 +112,7 @@ export function StepBusiness({
               onChangeBusinessName(next);
               if (!slugTouched) onChangeSlug(normalizeSlug(next, { final: true }));
             }}
-            className="onb-control min-h-12 w-full rounded-field border border-line-strong/60 bg-surface px-3.5 text-base text-ink aria-invalid:border-danger"
+            className="onb-control min-h-12 w-full rounded-field border border-line-strong/60 bg-surface px-3.5 text-base text-ink placeholder:text-muted aria-invalid:border-danger"
           />
           <FieldError id="business-name-error">{showNameError ? NAME_ERROR : null}</FieldError>
         </div>

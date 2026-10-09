@@ -4,8 +4,9 @@ import { PreviewBadge } from "@/components/preview/PreviewBadge";
 import { isPreviewBadgeEnabled } from "@/components/preview/preview-badge-gate";
 
 export const metadata: Metadata = {
-  title: "Modo Preview · AgendaPix",
+  title: "Modo Preview",
   description: "Ambiente de visualização de desenvolvimento sem dependências externas.",
+  robots: { index: false, follow: false },
 };
 
 export default function PreviewLayout({ children }: { children: React.ReactNode }) {

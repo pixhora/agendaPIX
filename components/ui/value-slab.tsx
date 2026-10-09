@@ -66,7 +66,7 @@ export function StatusChip({ children, active = false, tone = "surface", classNa
       )}
       {...props}
     >
-      <span className={cn("size-1.5 shrink-0 rounded-full", active ? "bg-pix-bright" : tone === "slab" ? "bg-slab-muted" : "bg-line-strong")} aria-hidden="true" />
+      <span className={cn("size-1.5 shrink-0 rounded-full", active ? "bg-pix-bright text-pix-bright-foreground" : tone === "slab" ? "bg-slab-muted" : "bg-line-strong")} aria-hidden="true" />
       {children}
     </span>
   );
