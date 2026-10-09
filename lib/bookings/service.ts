@@ -25,6 +25,7 @@ import { bookingConfig, type BookingConfig } from "./config";
 import { getPublicBookingFacts } from "../marketing/facts";
 import { withDerivedExpiry } from "./payment-status";
 import { consumeBookingRateLimit, consumePaymentPollRateLimit, tenantScopedHash } from "./rate-limit";
+import { refreshPaidFromGateway, shouldPollGateway } from "../payments/status-poll";
 
 type Database = NodePgDatabase<typeof schema>;
 export function hash(value: string) { return createHash("sha256").update(value).digest("hex"); }
@@ -348,12 +349,27 @@ function tokenMatches(token: string, accessTokenHash: string | null) {
     && timingSafeEqual(Buffer.from(hash(token), "hex"), Buffer.from(accessTokenHash, "hex")));
 }
 
+export type PaymentGatewayPoll = {
+  provider?: PaymentProvider;
+  timeoutMs?: number;
+};
+
 /**
- * Consulta pública do Pix. Somente leitura: sem transação, sem lock do negócio e sem `expirePending`.
- * Formato do token antes de qualquer leitura; o hash é conferido na linha, sem escrita.
- * O vencido da resposta sai de `expiresAt <= now`.
+ * Consulta pública do Pix. O caminho comum é somente leitura: sem transação, sem lock do negócio
+ * e sem `expirePending`. O vencido da resposta sai de `expiresAt <= now`.
+ * Com cobrança `pending` e hold vigente ou recém-vencido, no máximo uma consulta ao gateway a cada 20 s
+ * (contador no banco). A chamada fica fora de transação. Pago segue `applyPaidEvent`, como o webhook.
+ * Timeout ou erro do gateway devolve o estado local, sem 5xx.
  */
-export async function getBookingPayment(slug: string, id: string, authorization: string | null, database: Database = getDb(), identity: string | null = null, config: BookingConfig = bookingConfig()) {
+export async function getBookingPayment(
+  slug: string,
+  id: string,
+  authorization: string | null,
+  database: Database = getDb(),
+  identity: string | null = null,
+  config: BookingConfig = bookingConfig(),
+  gateway?: PaymentGatewayPoll,
+) {
   const bookingId = z.uuid().parse(id);
   slugSchema.parse(slug);
   const token = bearerToken(authorization);
@@ -365,5 +381,31 @@ export async function getBookingPayment(slug: string, id: string, authorization:
     throw new HttpError(404, "booking_not_found", "Agendamento não encontrado.");
   }
   const now = new Date();
-  return withDerivedExpiry(await bookingView(booking, database, now), now);
+  const view = await bookingView(booking, database, now);
+  if (!shouldPollGateway(view.payment, now)) return withDerivedExpiry(view, now);
+  let provider = gateway?.provider;
+  if (!provider) {
+    try { provider = getPaymentProvider(); }
+    catch { return withDerivedExpiry(view, now); }
+  }
+  const payment = view.payment;
+  if (!payment?.externalId || provider.name !== payment.provider) return withDerivedExpiry(view, now);
+  let timeoutMs = gateway?.timeoutMs;
+  if (timeoutMs == null) {
+    try { timeoutMs = paymentsConfig().PAYMENT_PROVIDER_TIMEOUT_MS; }
+    catch { return withDerivedExpiry(view, now); }
+  }
+  let applied = false;
+  try {
+    applied = await refreshPaidFromGateway({
+      database, businessId: booking.businessId, paymentId: payment.id, externalId: payment.externalId,
+      provider, timeoutMs, now,
+    });
+  } catch {
+    return withDerivedExpiry(view, now);
+  }
+  if (!applied) return withDerivedExpiry(view, now);
+  const [fresh] = await database.select().from(schema.bookings).where(and(eq(schema.bookings.businessId, booking.businessId), eq(schema.bookings.id, booking.id))).limit(1);
+  const readAt = new Date();
+  return withDerivedExpiry(await bookingView(fresh ?? booking, database, readAt), readAt);
 }

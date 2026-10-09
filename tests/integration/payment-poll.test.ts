@@ -1,14 +1,16 @@
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GET } from "../../app/api/public/[slug]/bookings/[id]/payment/route";
 import * as schema from "../../db/schema";
 import { bookingConfig } from "../../lib/bookings/config";
-import { createBooking, getBookingPayment } from "../../lib/bookings/service";
+import { createBooking, getBookingPayment, hash } from "../../lib/bookings/service";
+import { paymentGatewayPollHash } from "../../lib/bookings/rate-limit";
 import { databaseEnvSchema } from "../../lib/env";
-import { FakePaymentProvider } from "../../lib/payments/fake";
+import { FakePaymentProvider, signFakeWebhook } from "../../lib/payments/fake";
+import { processWebhook } from "../../lib/payments/webhook";
 import { padraoPolicyHash } from "../helpers/deposit-policy";
 import { insertConnectedMercadoPago } from "../helpers/connected-mp";
 
@@ -16,6 +18,7 @@ const pool = new Pool({ connectionString: databaseEnvSchema.parse(process.env).D
 const database = drizzle(pool, { schema });
 const secret = "test-only-webhook-secret-with-32-characters";
 const provider = new FakePaymentProvider(secret);
+const bodyHashes: string[] = [];
 let ownerId: string;
 let businessId: string;
 let slug: string;
@@ -29,6 +32,7 @@ const input = () => ({
 });
 
 beforeEach(async () => {
+  bodyHashes.length = 0;
   ownerId = randomUUID();
   businessId = randomUUID();
   serviceId = randomUUID();
@@ -41,6 +45,13 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  await database.delete(schema.paymentAudit).where(eq(schema.paymentAudit.businessId, businessId));
+  await database.delete(schema.paymentRefunds).where(eq(schema.paymentRefunds.businessId, businessId));
+  await database.delete(schema.ownerNotices).where(eq(schema.ownerNotices.businessId, businessId));
+  const payments = await database.select({ externalId: schema.payments.externalId }).from(schema.payments).where(eq(schema.payments.businessId, businessId));
+  const externalIds = payments.flatMap((row) => row.externalId ? [row.externalId] : []);
+  if (externalIds.length) await database.delete(schema.paymentEvents).where(inArray(schema.paymentEvents.externalId, externalIds));
+  if (bodyHashes.length) await database.delete(schema.webhookDeliveries).where(inArray(schema.webhookDeliveries.bodyHash, bodyHashes));
   await database.delete(schema.payments).where(eq(schema.payments.businessId, businessId));
   await database.delete(schema.bookings).where(eq(schema.bookings.businessId, businessId));
   await database.delete(schema.customers).where(eq(schema.customers.businessId, businessId));
@@ -181,5 +192,99 @@ describe("consulta pública do Pix", () => {
       if (previousBusiness === undefined) delete process.env.PAYMENT_POLL_RATE_LIMIT_PER_BUSINESS;
       else process.env.PAYMENT_POLL_RATE_LIMIT_PER_BUSINESS = previousBusiness;
     }
+  });
+
+  function webhook(externalId: string) {
+    const body = JSON.stringify({ eventId: randomUUID(), type: "payment.paid", externalId, amountCents: 1000, paidAt: new Date().toISOString() });
+    bodyHashes.push(hash(body));
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    const headers = new Headers({ "content-type": "application/json", "x-fake-timestamp": timestamp, "x-fake-signature": signFakeWebhook(body, timestamp, secret) });
+    return new Request("http://localhost/api/webhooks/payments/fake", { method: "POST", headers, body });
+  }
+
+  it("confirma Pix pago sem webhook", async () => {
+    const { data } = await createBooking(slug, input(), randomUUID(), database, provider);
+    const externalId = data.payment!.externalId!;
+    provider.markPaid(externalId);
+    const callsBefore = provider.store.calls.get;
+
+    const view = await getBookingPayment(slug, data.bookingId, `Bearer ${data.accessToken}`, database, null, bookingConfig({}), { provider });
+
+    expect(view.status).toBe("confirmed");
+    expect(view.payment).toMatchObject({ status: "paid", qrCodeDataUrl: null, copyPaste: null });
+    const [booking] = await database.select().from(schema.bookings).where(eq(schema.bookings.id, data.bookingId));
+    const [payment] = await database.select().from(schema.payments).where(eq(schema.payments.id, data.payment!.id));
+    expect(booking.status).toBe("confirmed");
+    expect(payment.status).toBe("paid");
+    const events = await database.select().from(schema.paymentEvents).where(eq(schema.paymentEvents.externalId, externalId));
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ eventId: `poll:${externalId}`, outcome: "processed" });
+    expect(await database.select().from(schema.webhookDeliveries).where(eq(schema.webhookDeliveries.eventId, events[0].eventId))).toHaveLength(0);
+    expect(provider.store.calls.get).toBe(callsBefore + 1);
+
+    await getBookingPayment(slug, data.bookingId, `Bearer ${data.accessToken}`, database, null, bookingConfig({}), { provider });
+    expect(provider.store.calls.get).toBe(callsBefore + 1);
+  });
+
+  it("consulta o gateway no máximo uma vez a cada 20 segundos", async () => {
+    const { data } = await createBooking(slug, input(), randomUUID(), database, provider);
+    const poll = { provider } as const;
+    const token = `Bearer ${data.accessToken}`;
+    const before = provider.store.calls.get;
+
+    expect((await getBookingPayment(slug, data.bookingId, token, database, null, bookingConfig({}), poll)).status).toBe("pending_payment");
+    expect(provider.store.calls.get).toBe(before + 1);
+    expect((await getBookingPayment(slug, data.bookingId, token, database, null, bookingConfig({}), poll)).payment?.status).toBe("pending");
+    expect(provider.store.calls.get).toBe(before + 1);
+
+    await database.execute(sql`UPDATE booking_rate_limits SET window_started_at = now() - interval '21 seconds'
+      WHERE business_id = ${businessId} AND client_hash = ${paymentGatewayPollHash(businessId, data.payment!.id)}`);
+    await getBookingPayment(slug, data.bookingId, token, database, null, bookingConfig({}), poll);
+    expect(provider.store.calls.get).toBe(before + 2);
+    const [booking] = await database.select().from(schema.bookings).where(eq(schema.bookings.id, data.bookingId));
+    expect(booking.status).toBe("pending_payment");
+  });
+
+  it("timeout do gateway continua pending e não vira erro", async () => {
+    const { data } = await createBooking(slug, input(), randomUUID(), database, provider);
+    const slow = new FakePaymentProvider(secret, { store: provider.store, latencyMs: 5_000 });
+    const [bookingBefore] = await database.select().from(schema.bookings).where(eq(schema.bookings.id, data.bookingId));
+    const [paymentBefore] = await database.select().from(schema.payments).where(eq(schema.payments.id, data.payment!.id));
+    const started = Date.now();
+
+    const view = await getBookingPayment(slug, data.bookingId, `Bearer ${data.accessToken}`, database, null, bookingConfig({}), { provider: slow, timeoutMs: 30 });
+
+    expect(Date.now() - started).toBeLessThan(1_500);
+    expect(view).toMatchObject({ status: "pending_payment", payment: { status: "pending" } });
+    expect(view.payment?.copyPaste).toContain("FAKE-PIX-NOT-PAYABLE");
+    const [bookingAfter] = await database.select().from(schema.bookings).where(eq(schema.bookings.id, data.bookingId));
+    const [paymentAfter] = await database.select().from(schema.payments).where(eq(schema.payments.id, data.payment!.id));
+    expect(bookingAfter).toMatchObject({ status: "pending_payment", updatedAt: bookingBefore.updatedAt });
+    expect(paymentAfter).toMatchObject({ status: "pending", updatedAt: paymentBefore.updatedAt });
+  });
+
+  it("webhook e GET concorrentes confirmam uma vez só", async () => {
+    const { data } = await createBooking(slug, input(), randomUUID(), database, provider);
+    const externalId = data.payment!.externalId!;
+    provider.markPaid(externalId);
+
+    const [view, webhookResult] = await Promise.all([
+      getBookingPayment(slug, data.bookingId, `Bearer ${data.accessToken}`, database, null, bookingConfig({}), { provider }),
+      processWebhook(webhook(externalId), "fake", database, provider),
+    ]);
+
+    expect(view.status).toBe("confirmed");
+    expect(view.payment?.status).toBe("paid");
+    expect(["processed", "duplicate"]).toContain(webhookResult.outcome);
+    const [booking] = await database.select().from(schema.bookings).where(eq(schema.bookings.id, data.bookingId));
+    const [payment] = await database.select().from(schema.payments).where(eq(schema.payments.id, data.payment!.id));
+    expect(booking.status).toBe("confirmed");
+    expect(payment.status).toBe("paid");
+    expect(payment.paidAt).toBeInstanceOf(Date);
+    const events = await database.select().from(schema.paymentEvents).where(eq(schema.paymentEvents.externalId, externalId));
+    expect(events).toHaveLength(2);
+    expect(events.map((event) => event.outcome).sort()).toEqual(["duplicate", "processed"]);
+    const audits = await database.select().from(schema.paymentAudit).where(eq(schema.paymentAudit.paymentId, payment.id));
+    expect(audits.filter((row) => row.action === "payment_confirmed")).toHaveLength(1);
   });
 });

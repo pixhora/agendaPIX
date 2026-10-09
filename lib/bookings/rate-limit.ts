@@ -108,3 +108,33 @@ export async function consumePaymentPollRateLimit(database: NodePgDatabase<typeo
     "Muitas consultas neste negócio. Aguarde um minuto e tente novamente.",
   );
 }
+
+/** Uma consulta remota por pagamento. Compartilhada entre instâncias; não é o balde HTTP de 4 s. */
+export const PAYMENT_GATEWAY_POLL_PURPOSE = "payment-gateway-poll:v1";
+export const PAYMENT_GATEWAY_POLL_INTERVAL_SECONDS = 20;
+
+export function paymentGatewayPollHash(businessId: string, paymentId: string) {
+  return tenantScopedHash(PAYMENT_GATEWAY_POLL_PURPOSE, businessId, paymentId);
+}
+
+/**
+ * Reserva a próxima consulta ao gateway deste pagamento.
+ * Fora da janela: só leitura, sem atualizar a linha.
+ * Dentro da janela: um único vencedor (INSERT atômico), para várias instâncias serverless.
+ */
+export async function claimPaymentGatewayPoll(database: NodePgDatabase<typeof schema>, businessId: string, paymentId: string) {
+  const clientHash = paymentGatewayPollHash(businessId, paymentId);
+  const fresh = await database.execute(sql`SELECT 1 AS ready FROM booking_rate_limits
+    WHERE business_id = ${businessId} AND client_hash = ${clientHash}
+      AND window_started_at > now() - (${PAYMENT_GATEWAY_POLL_INTERVAL_SECONDS}::int * interval '1 second')
+    LIMIT 1`);
+  if (fresh.rows.length > 0) return false;
+  const claimed = await database.execute(sql`INSERT INTO booking_rate_limits (business_id, client_hash, attempts)
+    VALUES (${businessId}, ${clientHash}, 1)
+    ON CONFLICT (business_id, client_hash) DO UPDATE SET
+      attempts = 1,
+      window_started_at = now()
+    WHERE booking_rate_limits.window_started_at <= now() - (${PAYMENT_GATEWAY_POLL_INTERVAL_SECONDS}::int * interval '1 second')
+    RETURNING attempts`);
+  return claimed.rows.length > 0;
+}
