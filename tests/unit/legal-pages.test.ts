@@ -70,6 +70,8 @@ describe("guarda de publicação", () => {
     }
     const privacy = readFileSync("content/legal/privacidade.md", "utf8");
     expect(privacy).toContain("Rascunho do cadastro");
+    expect(privacy).toContain("Sem nome, WhatsApp ou CPF");
+    expect(privacy).not.toContain("nome, WhatsApp e prazo");
   });
 
   it("o aceite do Mercado Pago é a citação da seção 5-A.6", () => {

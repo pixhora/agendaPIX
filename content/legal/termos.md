@@ -80,6 +80,7 @@
 - **criar cobranças Pix** no valor do sinal dos seus agendamentos;
 - **ver o status** dessas cobranças, para confirmar o agendamento quando o cliente pagar (inclusive pelos avisos automáticos, os "webhooks", enviados pelo Mercado Pago);
 - **cancelar** cobranças que não foram pagas no prazo;
+- **conciliar** quando o aviso automático atrasar, confirmando o horário se o Pix foi pago no prazo;
 - **pedir sozinho a devolução de um Pix que chegou depois do prazo**, conforme o item 5-A.6 e a seção 6.4. O valor sai do saldo da sua conta Mercado Pago, e você recebe um e-mail a cada devolução;
 - **manter a conexão ativa**, renovando o acesso sem pedir a sua autorização de novo a cada renovação;
 - **mostrar qual conta está ligada**, lendo o nome e o e-mail da conta no Mercado Pago (guardamos só um nome curto e o e-mail mascarado).
@@ -102,7 +103,7 @@ A devolução é pedida pelo sistema, mas **não é garantida e não tem prazo f
 
 5-A.9. **Como desconectar.** Você pode desconectar quando quiser, no painel do AgendaPix ou direto no Mercado Pago.
 
-- **Pelo AgendaPix:** novos agendamentos com sinal ficam pausados. Agendamentos e sinais já pagos não mudam. Se não houver Pix em aberto, o acesso à sua conta é apagado na hora. Se houver, o acesso fica guardado (cifrado) só para confirmar o pagamento ou devolver o sinal se ele chegar fora do prazo, e é apagado em até 24 horas depois que esses Pix forem pagos, vencerem ou forem cancelados. A partir da desconexão, as devoluções que você decidir fazer são feitas por você, direto no Mercado Pago.
+- **Pelo AgendaPix:** novos agendamentos com sinal ficam pausados. Agendamentos e sinais já pagos não mudam. Se não houver Pix em aberto, o acesso à sua conta é apagado na hora. Se houver Pix ou devolução em aberto, o acesso fica guardado (cifrado) só para resolvê-los e é apagado em até 24 horas depois que eles se resolverem, ou depois de 7 dias se algum Pix ficar travado. A partir da desconexão, as devoluções que você decidir fazer são feitas por você, direto no Mercado Pago.
 - **Direto no Mercado Pago (revogando o aplicativo):** quando recebemos o aviso do Mercado Pago, o acesso é apagado na hora. Sem acesso, podemos não conseguir verificar pagamentos. Nesse caso, mandamos um e-mail para você conferir e resolver na sua conta.
 
 ## 6. Sinal, política e devoluções
