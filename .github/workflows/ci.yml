@@ -276,6 +276,12 @@ jobs:
       - name: Run Playwright e2e
         if: steps.suite.outputs.full == 'true'
         run: pnpm test:e2e
+      - name: Install WebKit (Playwright)
+        if: steps.suite.outputs.full == 'true'
+        run: pnpm exec playwright install --with-deps webkit
+      - name: Run motion preview on WebKit
+        if: steps.suite.outputs.full == 'true'
+        run: pnpm exec playwright test --config=playwright.motion.config.ts --project=webkit
       - name: Upload Playwright report
         if: failure() && steps.suite.outputs.full == 'true'
         uses: actions/upload-artifact@v7

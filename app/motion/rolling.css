@@ -1,0 +1,35 @@
+@layer components {
+  .roll-window {
+    display: inline-block;
+    height: 1em;
+    width: 1ch;
+    overflow: hidden;
+    line-height: 1;
+  }
+
+  .roll-strip {
+    display: flex;
+    flex-direction: column;
+    line-height: 1;
+  }
+
+  .roll-strip > span {
+    display: block;
+    height: 1em;
+    line-height: 1;
+    text-align: center;
+  }
+
+  .roll-strip[data-digit="0"] { transform: translateY(0); }
+  .roll-strip[data-digit="1"] { transform: translateY(-1em); }
+  .roll-strip[data-digit="2"] { transform: translateY(-2em); }
+  .roll-strip[data-digit="3"] { transform: translateY(-3em); }
+  .roll-strip[data-digit="4"] { transform: translateY(-4em); }
+  .roll-strip[data-digit="5"] { transform: translateY(-5em); }
+  .roll-strip[data-digit="6"] { transform: translateY(-6em); }
+  .roll-strip[data-digit="7"] { transform: translateY(-7em); }
+  .roll-strip[data-digit="8"] { transform: translateY(-8em); }
+  .roll-strip[data-digit="9"] { transform: translateY(-9em); }
+
+  .roll-mark { white-space: pre; }
+}
