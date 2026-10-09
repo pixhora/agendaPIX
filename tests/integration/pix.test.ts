@@ -8,6 +8,7 @@ import { createBooking, getAvailability, getBookingPayment, hash } from "../../l
 import { databaseEnvSchema } from "../../lib/env";
 import { FakePaymentProvider, signFakeWebhook } from "../../lib/payments/fake";
 import { processWebhook } from "../../lib/payments/webhook";
+import { reconcileOnce } from "../../lib/payments/reconcile";
 import { simulateDevFakePayment } from "../../lib/payments/simulate-dev";
 import { padraoPolicyHash } from "../helpers/deposit-policy";
 import { insertConnectedMercadoPago } from "../helpers/connected-mp";
@@ -207,9 +208,32 @@ describe("webhook transacional e auditável", () => {
     await database.update(schema.payments).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(schema.payments.id, first.data.payment!.id));
     const second = await createBooking(slugs[0], input(), randomUUID(), database, provider);
     provider.markPaid(first.data.payment!.externalId!);
-    expect(await processWebhook(webhook(first.data.payment!.externalId!), "fake", database, provider)).toMatchObject({ outcome: "ignored", reason: "late_no_slot" });
+    let refundCalled = false;
+    const hanging = {
+      name: provider.name,
+      createPixCharge: provider.createPixCharge.bind(provider),
+      getCharge: provider.getCharge.bind(provider),
+      findChargeByReference: provider.findChargeByReference.bind(provider),
+      cancelCharge: provider.cancelCharge.bind(provider),
+      verifyWebhook: provider.verifyWebhook.bind(provider),
+      refundCharge: async () => {
+        refundCalled = true;
+        return { status: "refunded" as const, refundId: "nao" };
+      },
+    };
+    const started = Date.now();
+    expect(await processWebhook(webhook(first.data.payment!.externalId!), "fake", database, hanging)).toMatchObject({ outcome: "ignored", reason: "late_no_slot" });
+    expect(Date.now() - started).toBeLessThan(1_000);
+    expect(refundCalled).toBe(false);
     const old = await getBookingPayment(slugs[0], first.data.bookingId, `Bearer ${first.data.accessToken}`, database);
-    expect(old.status).toBe("expired"); expect(old.payment?.status).toBe("refunded");
+    expect(old.status).toBe("expired");
+    expect(old.payment?.status).toBe("paid");
+    const audits = await database.select().from(schema.paymentAudit).where(eq(schema.paymentAudit.paymentId, first.data.payment!.id));
+    expect(audits.some((row) => row.action === "late_no_slot")).toBe(true);
+    const report = await reconcileOnce(database, provider, { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50 });
+    expect(report.refundsSettled).toBe(1);
+    const refunded = await getBookingPayment(slugs[0], first.data.bookingId, `Bearer ${first.data.accessToken}`, database);
+    expect(refunded.payment?.status).toBe("refunded");
     expect((await getBookingPayment(slugs[0], second.data.bookingId, `Bearer ${second.data.accessToken}`, database)).status).toBe("pending_payment");
   });
   it("evento de um negócio não altera a reserva do outro", async () => {

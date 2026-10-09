@@ -117,12 +117,13 @@ async function retryStuckCreating(database: Database, provider: PaymentProvider,
   let retried = 0;
   for (const payment of stuck) {
     if (payment.expiresAt <= now) {
+      // Consulta e cancelamento ficam fora do lock do negócio. Falha aqui não grava nada: a próxima passagem tenta de novo.
+      const remote = await withTimeout(config, (signal) => provider.findChargeByReference(payment.id, { signal, businessId: payment.businessId }));
+      if (remote) await withTimeout(config, (signal) => provider.cancelCharge(remote.externalId, { signal, businessId: payment.businessId }));
       await database.transaction(async (tx) => {
         await lockBusiness(tx, payment.businessId);
         await expirePending(tx, payment.businessId, now);
-        const remote = await withTimeout(config, (signal) => provider.findChargeByReference(payment.id, { signal, businessId: payment.businessId }));
         if (remote) {
-          await withTimeout(config, (signal) => provider.cancelCharge(remote.externalId, { signal, businessId: payment.businessId }));
           await tx.update(schema.payments).set({ externalId: remote.externalId, status: "expired" })
             .where(and(eq(schema.payments.id, payment.id), eq(schema.payments.status, "creating")));
         } else {

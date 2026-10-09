@@ -4,6 +4,8 @@ import { z } from "zod";
 import { PIX_EXPIRATION_MARGIN_MINUTES, PIX_EXPIRATION_MIN_MINUTES } from "../bookings/config";
 import { payerCpfRequired } from "../marketing/facts";
 import { HttpError } from "../http";
+import { paymentsConfig } from "./config";
+import { callProvider } from "./timeout";
 import { MpAccountNotConnectedError, resolveMpAccessToken, type MpAccessTokenQuery } from "./seller-account";
 import {
   chargeInputSchema,
@@ -253,6 +255,12 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
 
   private async request(path: string, init: { method: string; body?: unknown; headers?: Record<string, string>; signal?: AbortSignal; accessToken: string }) {
     if (init.signal?.aborted) throw init.signal.reason ?? new Error("Aborted");
+    if (init.signal) return this.dispatch(path, init);
+    const timeoutMs = paymentsConfig().PAYMENT_PROVIDER_TIMEOUT_MS;
+    return callProvider(timeoutMs, (signal) => this.dispatch(path, { ...init, signal }));
+  }
+
+  private async dispatch(path: string, init: { method: string; body?: unknown; headers?: Record<string, string>; signal?: AbortSignal; accessToken: string }) {
     const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
       method: init.method,
       headers: {
@@ -482,6 +490,8 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
     const mpUserId = payload.user_id != null ? String(payload.user_id) : undefined;
     let payment;
     try {
+      // Sem signal, cada HTTP usa PAYMENT_PROVIDER_TIMEOUT_MS. O MP espera o ack em até 22s.
+      // https://www.mercadopago.com.br/developers/pt/docs/your-integrations/notifications/webhooks
       payment = await this.getCharge(dataId, { mpUserId, purpose: "settlement" });
     } catch (error) {
       if (error instanceof MpAccountNotConnectedError) throw new UnverifiableSellerPayment(dataId);

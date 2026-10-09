@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -203,6 +203,56 @@ describe("reconciliação", () => {
     expect(store.calls.refund).toBe(callsBefore + 1);
   });
 
+  it("timeout do estorno tardio solta o pagamento e a próxima passagem reusa a chave", async () => {
+    vi.stubEnv("PAYMENT_PROVIDER_TIMEOUT_MS", "400");
+    const { data } = await createBooking(slug, input(0), randomUUID(), database, provider);
+    await database.update(schema.bookings).set({ createdAt: new Date(Date.now() - 60_000), expiresAt: new Date(Date.now() - 1000), status: "expired" }).where(eq(schema.bookings.id, data.bookingId));
+    await database.update(schema.payments).set({ expiresAt: new Date(Date.now() - 1000), status: "expired" }).where(eq(schema.payments.id, data.payment!.id));
+    await createBooking(slug, input(0, "+5511999999901"), randomUUID(), database, provider);
+    const charge = provider.markPaid(data.payment!.externalId!);
+    await database.transaction(async (tx) => {
+      expect(await applyPaidEvent(tx, "fake", polledPaidEvent(charge, hash), new Date())).toMatchObject({ outcome: "ignored", reason: "late_no_slot" });
+    });
+    const keys: string[] = [];
+    provider.latencyMs = 3_000;
+    const ports = drizzleRefundPorts(database);
+    const pending = settleAutomaticLateRefund(ports, {
+      refundCharge: async (externalId, input, options) => {
+        keys.push(input.idempotencyKey);
+        return provider.refundCharge(externalId, input, options);
+      },
+    }, data.payment!.id, async () => {});
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    const started = Date.now();
+    await database.transaction(async (tx) => {
+      await tx.execute(sql`select id from payments where id = ${data.payment!.id} for update`);
+    });
+    expect(Date.now() - started).toBeLessThan(200);
+    await expect(pending).resolves.toBe("deferred");
+    const [attempt] = await database.select().from(schema.paymentRefunds).where(eq(schema.paymentRefunds.paymentId, data.payment!.id));
+    expect(attempt?.status).toBe("requested");
+    expect(attempt?.idempotencyKey).toBe(`auto_late:${data.payment!.id}`);
+    const [open] = await database.select().from(schema.payments).where(eq(schema.payments.id, data.payment!.id));
+    expect(open.status).toBe("paid");
+    expect(open.refundStatus).toBeNull();
+
+    provider.latencyMs = 0;
+    vi.stubEnv("PAYMENT_PROVIDER_TIMEOUT_MS", "8000");
+    await expect(settleAutomaticLateRefund(ports, {
+      refundCharge: async (externalId, input, options) => {
+        keys.push(input.idempotencyKey);
+        return provider.refundCharge(externalId, input, options);
+      },
+    }, data.payment!.id, async () => {})).resolves.toBe("submitted");
+    expect(keys).toEqual([`auto_late:${data.payment!.id}`, `auto_late:${data.payment!.id}`]);
+    const [closed] = await database.select().from(schema.payments).where(eq(schema.payments.id, data.payment!.id));
+    expect(closed.status).toBe("refunded");
+    expect(closed.refundStatus).toBe("refunded");
+    const attempts = await database.select().from(schema.paymentRefunds).where(eq(schema.paymentRefunds.paymentId, data.payment!.id));
+    expect(attempts).toHaveLength(1);
+    expect(attempts[0]?.status).toBe("refunded");
+  });
+
   it("pagamento tardio com rebook_if_free confirma se o horário estiver livre", async () => {
     await database.update(schema.businesses).set({ latePaymentPolicy: "rebook_if_free" }).where(eq(schema.businesses.id, businessId));
     const { data } = await createBooking(slug, input(0), randomUUID(), database, provider);
@@ -239,6 +289,8 @@ describe("reconciliação", () => {
   it("reconcilers concorrentes: só um executa o trabalho", async () => {
     const { data } = await createBooking(slug, input(0), randomUUID(), database, provider);
     provider.markPaid(data.payment!.externalId!);
+    // Segura o advisory lock durante a consulta para o outro processo observar o conflito.
+    provider.latencyMs = 250;
     const config = { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50 };
     // Duas conexões distintas para advisory locks de sessão.
     const pool2 = new Pool({ connectionString: databaseEnvSchema.parse(process.env).DATABASE_URL, max: 2 });

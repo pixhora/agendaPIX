@@ -12,8 +12,8 @@ import {
   markRefundedByExternalId,
   notifyDisconnectedConfirmation,
   recordUnverifiableSellerPayment,
-  settleAutomaticLateRefund,
 } from "./refund-flow";
+import { ProviderTimeoutError } from "./timeout";
 import { IgnoredWebhookEvent, ObservedRefundEvent, UnverifiableSellerPayment, paidEventSchema, type PaidEvent, type PaymentProvider } from "./provider";
 
 type Database = NodePgDatabase<typeof schema>;
@@ -33,6 +33,7 @@ export async function verifyWebhookDelivery(request: Request, providerName: stri
     event = paidEventSchema.parse(await paymentProvider.verifyWebhook(body, request.headers, now, request.url));
   } catch (error) {
     if (error instanceof HttpError || error instanceof IgnoredWebhookEvent || error instanceof ObservedRefundEvent || error instanceof UnverifiableSellerPayment) throw error;
+    if (error instanceof ProviderTimeoutError) throw new HttpError(503, "webhook_unavailable", "Não foi possível consultar o pagamento. Tente novamente.");
     if (error instanceof z.ZodError || error instanceof SyntaxError) throw new HttpError(400, "invalid_event", "Evento inválido.");
     throw new HttpError(401, "invalid_signature", "Assinatura inválida ou vencida.");
   }
@@ -71,15 +72,11 @@ export async function processWebhook(request: Request, providerName: string, dat
       await transaction.update(schema.webhookDeliveries).set({ outcome: result.outcome, reason: result.reason }).where(eq(schema.webhookDeliveries.id, delivery.id));
       return result;
     });
-    const paymentProvider = provider ?? getPaymentProvider();
     const ports = drizzleRefundPorts(database);
-    if (outcome.reason === "late_no_slot" && outcome.paymentId) {
-      try {
-        await settleAutomaticLateRefund(ports, paymentProvider, outcome.paymentId);
-      } catch {
-        // A reconciliação retoma. A resposta continua 200 para o gateway não reenviar o pago.
-      }
-    } else if (outcome.outcome === "processed" && outcome.paymentId) {
+    // late_no_slot fica em payment_audit. O estorno corre no reconciliador, fora desta resposta.
+    // O Mercado Pago espera HTTP 200 ou 201 em até 22 segundos; sem isso reenvia.
+    // https://www.mercadopago.com.br/developers/pt/docs/your-integrations/notifications/webhooks
+    if (outcome.outcome === "processed" && outcome.paymentId) {
       try {
         await notifyDisconnectedConfirmation(ports, outcome.paymentId);
       } catch {

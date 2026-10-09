@@ -5,6 +5,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { getPaymentProvider } from "../../lib/payments";
 import { processWebhook } from "../../lib/payments/webhook";
 import { ObservedRefundEvent, UnverifiableSellerPayment } from "../../lib/payments/provider";
+import { ProviderTimeoutError } from "../../lib/payments/timeout";
 import { MpAccountNotConnectedError, resetSellerAccountHooks } from "../../lib/payments/seller-account";
 import {
   buildMercadoPagoManifest,
@@ -23,6 +24,7 @@ const customer = { name: "Cliente Teste Silva", phone: "+5511999999999" };
 
 afterEach(() => {
   resetSellerAccountHooks();
+  vi.unstubAllEnvs();
 });
 
 type Call = { method: string; url: string; body?: Record<string, unknown>; headers?: Record<string, string> };
@@ -266,6 +268,23 @@ describe("MercadoPagoPaymentProvider: cobrança", () => {
     expect(cancelAttempts).toHaveLength(0);
   });
 
+  it("estorno sem signal do chamador aborta no prazo configurado", async () => {
+    vi.stubEnv("PAYMENT_PROVIDER_TIMEOUT_MS", "100");
+    const slow = new MercadoPagoPaymentProvider({
+      accessToken, webhookSecret, baseUrl,
+      fetchImpl: (_input, init) => new Promise((_resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error("lento")), 5_000);
+        init?.signal?.addEventListener("abort", () => {
+          clearTimeout(timer);
+          reject(init.signal?.reason ?? new Error("abort"));
+        });
+      }),
+    });
+    const started = Date.now();
+    await expect(slow.refundCharge("1001", { idempotencyKey: "pay-0001:1" })).rejects.toBeInstanceOf(ProviderTimeoutError);
+    expect(Date.now() - started).toBeLessThan(1_000);
+  });
+
   it("propaga AbortSignal e erros 5xx", async () => {
     const { mp } = provider();
     const controller = new AbortController();
@@ -416,6 +435,29 @@ describe("MercadoPagoPaymentProvider: webhook", () => {
     await expect(processWebhook(request, "mercadopago", untouchable, mp, now)).resolves.toEqual({
       outcome: "ignored", reason: "unsupported_event",
     });
+  });
+
+  it("timeout ao consultar o pagamento responde 503 sem tocar no banco", async () => {
+    vi.stubEnv("PAYMENT_PROVIDER_TIMEOUT_MS", "100");
+    const slow = new MercadoPagoPaymentProvider({
+      accessToken, webhookSecret, baseUrl,
+      fetchImpl: (_input, init) => new Promise((_resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error("lento")), 5_000);
+        init?.signal?.addEventListener("abort", () => {
+          clearTimeout(timer);
+          reject(init.signal?.reason ?? new Error("abort"));
+        });
+      }),
+    });
+    const body = JSON.stringify({ id: 1, type: "payment", action: "payment.updated", user_id: 4444, data: { id: "1001" } });
+    const request = new Request("http://localhost/api/webhooks/payments/mercadopago?data.id=1001&type=payment", {
+      method: "POST", body, headers: signedHeaders("1001"),
+    });
+    const started = Date.now();
+    await expect(processWebhook(request, "mercadopago", untouchable, slow, now)).rejects.toMatchObject({
+      status: 503, code: "webhook_unavailable",
+    });
+    expect(Date.now() - started).toBeLessThan(1_000);
   });
 
   it("tipo merchant_order autenticado → ignored", async () => {

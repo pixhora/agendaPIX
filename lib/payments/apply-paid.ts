@@ -18,7 +18,7 @@ async function audit(database: Database, input: { businessId: string; paymentId:
  * Deduplica por (provider, eventId) e aplica decidePaidEvent. Pagamento dentro do hold
  * confirma a reserva. Pagamento depois do hold não é tratado como confirmado até a
  * reserva gravar `confirmed` (`late_rebooked`, horário ainda livre). Sem horário, devolve
- * `late_no_slot` e o estorno roda depois do commit. Não há repasse: o Pix cai na conta do dono.
+ * `late_no_slot` e o estorno fica para o reconciliador, fora desta transação. Não há repasse: o Pix cai na conta do dono.
  */
 export async function applyPaidEvent(database: Database, providerName: string, event: PaidEvent, now = new Date()): Promise<PaidOutcome> {
   const payloadHash = hash(JSON.stringify(event));
