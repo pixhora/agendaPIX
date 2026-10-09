@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { handleHttp, json } from "@/lib/http";
+import { json } from "@/lib/http";
+import { respondMercadoPagoConnect } from "@/lib/mercadopago/connect-navigation";
 import { submitMercadoPagoConnect } from "@/lib/mercadopago-oauth/flow";
 import { requireBusinessOwner } from "@/lib/mercadopago-oauth/owner";
 import { MP_OAUTH_COOKIE, MP_OAUTH_COOKIE_MAX_AGE_SECONDS } from "@/lib/mercadopago-oauth/state";
@@ -20,7 +21,7 @@ export function GET() {
 }
 
 export async function POST(request: Request, context: RouteContext<"/api/businesses/[businessId]/mercadopago/connect">) {
-  return handleHttp(async () => {
+  return respondMercadoPagoConnect(request, async () => {
     const { businessId } = await context.params;
     const ownerId = await requireBusinessOwner(request, businessId);
     const result = await submitMercadoPagoConnect({ request, businessId, ownerId });
