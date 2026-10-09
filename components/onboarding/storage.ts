@@ -10,7 +10,7 @@ export const STEP_KEY = "agenda_onboarding_step";
 export const DRAFT_ID_KEY = "agenda_onboarding_draft_id";
 const COMMIT_RESULT_KEY = "agenda_onboarding_commit";
 
-export type CommitResult = { slug: string; publicPath: string };
+export type CommitResult = { slug: string; publicPath: string; businessId?: string };
 
 export function ensureOnboardingIdempotencyKey(): string {
   try {
@@ -121,7 +121,8 @@ export function readCommitResult(): CommitResult | null {
     const parsed = JSON.parse(raw) as Partial<CommitResult>;
     if (typeof parsed.slug !== "string" || typeof parsed.publicPath !== "string") return null;
     if (!parsed.publicPath.startsWith("/")) return null;
-    return { slug: parsed.slug, publicPath: parsed.publicPath };
+    const businessId = typeof parsed.businessId === "string" && parsed.businessId.length > 0 ? parsed.businessId : undefined;
+    return { slug: parsed.slug, publicPath: parsed.publicPath, businessId };
   } catch {
     return null;
   }

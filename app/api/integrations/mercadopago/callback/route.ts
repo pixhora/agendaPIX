@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { handleHttp } from "@/lib/http";
+import { respondMercadoPagoConnect } from "@/lib/mercadopago/connect-navigation";
 import { mpOAuthConfig } from "@/lib/mercadopago-oauth/config";
 import { completeMercadoPagoConnect, redirectUrl, requestClientIp } from "@/lib/mercadopago-oauth/flow";
 import { sessionOwnerId } from "@/lib/mercadopago-oauth/owner";
@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  return handleHttp(async () => {
+  return respondMercadoPagoConnect(request, async () => {
     const config = mpOAuthConfig();
     const finished = await completeMercadoPagoConnect({
       requestUrl: request.url,

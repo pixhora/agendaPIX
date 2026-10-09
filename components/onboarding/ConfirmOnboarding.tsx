@@ -141,10 +141,14 @@ export function ConfirmOnboarding({ draftId }: { draftId: string }) {
     const committed = await commitOnboardingDraft(draftId);
     setPending(false);
     if (committed.ok) {
-      writeCommitResult({ slug: committed.slug, publicPath: committed.publicPath });
+      writeCommitResult({
+        slug: committed.slug,
+        publicPath: committed.publicPath,
+        businessId: committed.businessId || undefined,
+      });
       clearOnboardingProgress();
       setStatus("success");
-      router.push("/onboarding/concluir");
+      router.push("/onboarding/recebimento");
       return;
     }
     const follow = followUpFromFailure(committed.status, committed.error);

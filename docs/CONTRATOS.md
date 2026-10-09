@@ -417,4 +417,3 @@ Quando `current_period_end` passa sem renovação, o acesso cai pela regra do #2
 O #29 tem cron de reconciliação de Pix (`lib/payments/cron.ts`), não de aviso de assinatura. O lembrete idempotente de D-3 do período pago, com botão para o mesmo checkout, fica pendente. Esta entrega não cria essa infra.
 
 Na branch de integração esta migration é a `0015_subscription_requests`, depois das duas do Pix (`0013` e `0014`). O #33 tem duas migrations, então o número não é 0014.
-

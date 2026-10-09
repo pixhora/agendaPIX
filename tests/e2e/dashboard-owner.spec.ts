@@ -46,6 +46,8 @@ test.describe("painel do dono — autenticado", () => {
 
     await page.goto(`/dashboard/settings?businessId=${meta.businessAId}`);
     await expect(page.getByRole("heading", { name: "Horários de funcionamento", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Recebimento", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Mercado Pago", exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Sua página pública", exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Aparência", exact: true })).toBeVisible();
     await expect(page.getByText("Compartilhe este link para receber reservas com sinal via Pix.")).toBeVisible();

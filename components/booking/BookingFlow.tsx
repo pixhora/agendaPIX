@@ -10,6 +10,8 @@ import type {
 } from "./types";
 import { cpfDigitsOnly, formatCurrency, normalizePhoneToE164 } from "./formatters";
 import { publicBookingPagePath, publicBookingPaymentUrl, publicBookingsUrl, publicServicesUrl } from "@/lib/public-api";
+import { showDepositUnavailableCard } from "./deposit-availability";
+import { DepositUnavailableCard } from "./DepositUnavailable";
 import { StepProgress } from "./StepProgress";
 import { StepService } from "./StepService";
 import { StepSlot } from "./StepSlot";
@@ -33,12 +35,14 @@ import { PolicySheet } from "@/components/policy/PolicySheet";
 interface BookingFlowProps {
   slug: string;
   initialBookingId?: string;
+  /** Só para a prévia de desenvolvimento. Em produção o fluxo busca a página pública. */
+  previewBusiness?: PublicBusinessData;
 }
 
-export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
+export function BookingFlow({ slug, initialBookingId, previewBusiness }: BookingFlowProps) {
   // Estado do Negócio
-  const [business, setBusiness] = useState<PublicBusinessData | null>(null);
-  const [isLoadingBusiness, setIsLoadingBusiness] = useState(true);
+  const [business, setBusiness] = useState<PublicBusinessData | null>(previewBusiness ?? null);
+  const [isLoadingBusiness, setIsLoadingBusiness] = useState(!previewBusiness);
   const [businessError, setBusinessError] = useState<string | null>(null);
 
   // Estado das Etapas
@@ -55,6 +59,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
   // Submissão da Reserva
   const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
   const [bookingError, setBookingError] = useState<{ message: string; contactHref: string | null; tone: "danger" | "calm" } | null>(null);
+  const [depositBlocked, setDepositBlocked] = useState(false);
   const [policySheet, setPolicySheet] = useState<{ open: boolean; notice: string | null; trigger: HTMLElement | null }>({
     open: false,
     notice: null,
@@ -71,9 +76,11 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
   });
 
   const [reloadCount, setReloadCount] = useState(0);
+  const noBookingFlow = Boolean(business && showDepositUnavailableCard(business.services));
 
   // Carrega serviços públicos do negócio
   useEffect(() => {
+    if (previewBusiness) return;
     let isCancelled = false;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
@@ -122,7 +129,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
       clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [slug, reloadCount]);
+  }, [slug, reloadCount, previewBusiness]);
 
   // Retoma sessão Pix ativa se cliente fechar aba e reabrir /[slug]
   useEffect(() => {
@@ -295,6 +302,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
         }
         if (failure.kind === "unavailable") {
           const contact = failure.contactWhatsapp ?? business?.contactWhatsapp ?? null;
+          setDepositBlocked(true);
           setBookingError({ message: failure.message, contactHref: whatsappHref(contact), tone: "calm" });
           if (selectedService.depositCents > 0) {
             const next = { ...selectedService, bookable: false };
@@ -318,6 +326,9 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
         }
         setBookingError({ message: failure.message, contactHref: null, tone: "danger" });
         return;
+      }
+      if (!data || !("bookingId" in data)) {
+        throw new Error("Não foi possível criar o agendamento. Tente novamente.");
       }
 
       const booking = data as BookingResponse;
@@ -360,6 +371,7 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
 
   // Reiniciar fluxo
   const handleRestart = () => {
+    setDepositBlocked(false);
     setSelectedService(null);
     setSelectedSlot(null);
     setCustomerName("");
@@ -392,10 +404,12 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
               {business?.name ?? <span aria-hidden="true" className="inline-block h-5 w-40 animate-pulse rounded bg-subtle motion-reduce:animate-none" />}
             </h1>
             <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-muted sm:text-sm">
-              <span className="inline-flex items-center gap-1.5">
-                <Icon icon={BUSINESS_HEADER_ICONS.secure} className="text-pix" />
-                Agendamento online · sinal por Pix
-              </span>
+              {noBookingFlow ? null : (
+                <span className="inline-flex items-center gap-1.5">
+                  <Icon icon={BUSINESS_HEADER_ICONS.secure} className="text-pix" />
+                  Agendamento online · sinal por Pix
+                </span>
+              )}
               {business?.address ? (
                 <span className="inline-flex items-center gap-1">
                   <Icon icon={BUSINESS_HEADER_ICONS.location} />
@@ -424,10 +438,12 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
 
   const pageFooter = (
     <footer className="mx-auto flex max-w-5xl flex-col items-center gap-3 px-4 pb-10 pt-4 text-center text-xs text-muted sm:flex-row sm:justify-between sm:px-6 sm:text-left">
-      <p className="inline-flex items-center gap-1.5">
-        <Icon icon={PIX_ICONS.lock} />
-        O sinal garante o horário. Seus dados são usados só para este agendamento.
-      </p>
+      {noBookingFlow ? null : (
+        <p className="inline-flex items-center gap-1.5">
+          <Icon icon={PIX_ICONS.lock} />
+          O sinal garante o horário. Seus dados são usados só para este agendamento.
+        </p>
+      )}
       <div className="flex items-center gap-3">
         <ThemeToggle className="sm:hidden" />
         <Link href="/" className="inline-flex min-h-11 items-center gap-2 font-semibold text-ink">
@@ -543,12 +559,22 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
       {pageHeader}
       <main id="content" className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-10 lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-10">
         <div className="min-w-0 space-y-5">
+          {noBookingFlow || depositBlocked ? (
+            <DepositUnavailableCard
+              businessName={business.name}
+              phone={business.contactWhatsapp ?? business.phone}
+              autoFocus
+            />
+          ) : (
+          <>
           <StepProgress currentStep={step} />
 
           <section key={step} aria-label="Etapa atual" className="rounded-[22px] border border-line bg-surface p-5 shadow-[var(--shadow-card)] animate-step-in sm:p-8">
             {step === 1 && (
               <StepService
                 services={business.services}
+                businessName={business.name}
+                contactPhone={business.contactWhatsapp ?? business.phone}
                 selectedServiceId={selectedService?.id ?? null}
                 onSelectService={(srv) => {
                   setSelectedService(srv);
@@ -618,15 +644,17 @@ export function BookingFlow({ slug, initialBookingId }: BookingFlowProps) {
               />
             )}
           </section>
+          </>
+          )}
         </div>
 
-        <aside aria-label="Seu pedido" className="hidden lg:sticky lg:top-6 lg:block">
+        {noBookingFlow ? null : <aside aria-label="Seu pedido" className="hidden lg:sticky lg:top-6 lg:block">
           <BookingSummary service={selectedService} slot={selectedSlot} timezone={business.timezone} />
           <p className="mt-4 flex gap-2 px-1 text-xs leading-relaxed text-muted">
             <Icon icon={BUSINESS_HEADER_ICONS.secure} className="shrink-0 text-pix" />
             Você paga só o sinal agora. O horário fica reservado enquanto o Pix é feito. O prazo para pagar aparece na cobrança.
           </p>
-        </aside>
+        </aside>}
       </main>
       {pageFooter}
       {selectedService ? (

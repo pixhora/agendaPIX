@@ -45,6 +45,8 @@
   --danger-soft: #fbe9e7;
 
   --ring: #0b0b0c;
+  --shadow-focus: 0 0 0 4px color-mix(in srgb, var(--ring) 18%, transparent);
+  --sticky-cta-height: 11rem;
 
   --duration-feedback: 120ms;
   --duration-opening: 180ms;
@@ -86,6 +88,7 @@
   --danger-soft: #3a1714;
 
   --ring: #3fd0be;
+  --shadow-focus: 0 0 0 4px color-mix(in srgb, var(--ring) 18%, transparent);
   color-scheme: dark;
 }
 
@@ -121,6 +124,7 @@
     --danger: #ff8a80;
     --danger-soft: #3a1714;
     --ring: #3fd0be;
+    --shadow-focus: 0 0 0 4px color-mix(in srgb, var(--ring) 18%, transparent);
     color-scheme: dark;
   }
 }
@@ -259,6 +263,11 @@ h1, h2, h3, h4, h5, h6, .font-display {
   color: var(--muted);
   border-color: var(--line);
   box-shadow: none;
+}
+
+/* Foco programático em título, aviso ou região. O anel fica só em controle interativo. */
+:is(h1, h2, h3, h4, h5, h6, p, main)[tabindex="-1"]:focus {
+  outline: none;
 }
 
 @keyframes stepIn {

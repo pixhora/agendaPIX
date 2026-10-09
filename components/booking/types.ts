@@ -25,6 +25,8 @@ export interface PublicService {
   depositCents: number;
   /** `false`: o serviço não aceita reserva (sem botão). Ausente: reservável. */
   bookable?: boolean;
+  /** Motivo interno quando `bookable` é false. A tela não mostra o código. */
+  reason?: string | null;
   depositPolicy?: DepositPolicy | null;
   /**
    * Linha única vinda do servidor.

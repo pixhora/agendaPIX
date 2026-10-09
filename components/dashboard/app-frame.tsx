@@ -9,8 +9,9 @@ import { BrandLink, BrandMark } from "@/components/ui/brand";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { cn } from "@/lib/utils";
 import { Logout } from "./logout";
+import { DashboardMpBanner } from "@/components/payments/mp-dashboard-banner";
 
-type FrameBusiness = { id: string; name: string; slug: string };
+type FrameBusiness = { id: string; name: string; slug: string; hasDepositService?: boolean };
 
 const routes = [
   { href: "/dashboard", label: "Agenda", Icon: DASHBOARD_NAV_ICONS.agenda },
@@ -114,7 +115,12 @@ export function AppFrame({ ownerName, businesses, children }: { ownerName: strin
           <Logout compact />
         </header>
 
-        <div className="flex-1">{children}</div>
+        <div className="flex-1">
+          <Suspense fallback={null}>
+            <DashboardMpBanner businesses={businesses.map((item) => ({ id: item.id, hasDepositService: item.hasDepositService === true }))} />
+          </Suspense>
+          {children}
+        </div>
 
         <nav aria-label="Painel" data-sticky-chrome className="sticky bottom-0 z-30 grid grid-cols-4 gap-1 border-t border-line bg-surface/95 px-2 pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-1 backdrop-blur lg:hidden">
           <Suspense fallback={fallback}><NavLinks businesses={businesses} variant="tabs" /></Suspense>
