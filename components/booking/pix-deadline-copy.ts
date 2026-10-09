@@ -1,4 +1,11 @@
 import type { LatePixPolicyChoice } from "@/lib/mercadopago/late-pix-copy";
+import {
+  LATE_PIX_AFTER_WATCH_COPY,
+  REFUNDED_TITLE,
+  REFUND_PENDING_TITLE,
+  refundPendingBody,
+  refundedBody,
+} from "./customer-copy";
 
 /** Janela extra de conferência depois que o prazo do Pix acaba. */
 export const LATE_PAYMENT_WATCH_MS = 3 * 60 * 1000;
@@ -40,17 +47,22 @@ export function expiredPixBody(policy?: LatePixPolicyChoice | null): string {
   return EXPIRED_UNKNOWN;
 }
 
+/** Enquanto confere, mantém a frase da política. Depois dos 3 minutos, a frase final. */
+export function expiredScreenBody(watching: boolean, policy?: LatePixPolicyChoice | null): string {
+  return watching ? expiredPixBody(policy) : LATE_PIX_AFTER_WATCH_COPY;
+}
+
 export function refundPendingCopy(amountLabel: string): { title: string; body: string } {
   return {
-    title: "Pagamento em devolução",
-    body: `Seu Pix chegou depois que o horário foi liberado. Estamos devolvendo ${amountLabel} para a conta que fez o pagamento.`,
+    title: REFUND_PENDING_TITLE,
+    body: refundPendingBody(amountLabel),
   };
 }
 
 export function refundedCopy(amountLabel: string): { title: string; body: string } {
   return {
-    title: "Pagamento devolvido",
-    body: `Devolvemos ${amountLabel} para a conta que fez o Pix. Confira no extrato do seu banco.`,
+    title: REFUNDED_TITLE,
+    body: refundedBody(amountLabel),
   };
 }
 

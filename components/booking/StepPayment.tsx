@@ -4,9 +4,9 @@ import React, { useEffect, useState, useCallback, useRef } from "react";
 import type { BookingResponse } from "./types";
 import { formatCurrency, formatTimeSlot } from "./formatters";
 import { CONFIRMING_PAYMENT_LABEL, pixUiPhase } from "./pix-status";
-import { FlaskConical, Info, TriangleAlert } from "lucide-react";
+import { FlaskConical, TriangleAlert } from "lucide-react";
 import { Icon } from "@/components/ui/icon";
-import { PIX_ICONS, PIX_STATUS_ICONS } from "@/lib/icons/registry";
+import { PIX_ICONS, PIX_REFUND_ICONS, PIX_STATUS_ICONS } from "@/lib/icons/registry";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ValueSlab, StatusChip } from "@/components/ui/value-slab";
@@ -36,11 +36,12 @@ import {
   LATE_PAYMENT_WATCH_LINE,
   LATE_PAYMENT_WATCH_MS,
   businessWhatsappLabel,
-  expiredPixBody,
+  expiredScreenBody,
   latePaymentChoice,
   refundPendingCopy,
   refundedCopy,
 } from "./pix-deadline-copy";
+import { WHATSAPP_CONTACT_LABEL } from "./customer-copy";
 import { createStatusPoller, isTerminalPixPhase } from "./payment-poll";
 import { parsePaymentStatusResponse, publicApiErrorSchema, type PaymentStatusResponse } from "@/lib/public/payment-status";
 
@@ -84,7 +85,7 @@ export function StepPayment({
   const [phase, setPhase] = useState(() => pixUiPhase(booking));
   const [isManualChecking, setIsManualChecking] = useState(false);
   const [latePolicy, setLatePolicy] = useState(() => latePaymentChoice(booking.policy));
-  const [lateWatching, setLateWatching] = useState(false);
+  const [lateWatching, setLateWatching] = useState(() => pixUiPhase(booking) === "expired");
   const [checkError, setCheckError] = useState<string | null>(null);
   const [isSimulating, setIsSimulating] = useState(false);
   const reducedMotion = usePrefersReducedMotion();
@@ -110,7 +111,9 @@ export function StepPayment({
   const haltClock = phase === "paid" || phase === "expired" || phase === "cancelled" || phase === "refund_pending" || phase === "refunded";
   const stopPolling = phase === "paid" || phase === "cancelled" || phase === "refund_pending" || phase === "refunded" || (phase === "expired" && !lateWatching);
   const whatsappContact = whatsappHref(contactWhatsapp);
-  const whatsappLabel = businessName?.trim() && whatsappContact ? businessWhatsappLabel(businessName.trim()) : null;
+  const whatsappLabel = whatsappContact
+    ? (businessName?.trim() ? businessWhatsappLabel(businessName.trim()) : WHATSAPP_CONTACT_LABEL)
+    : null;
 
   const applyStatus = useCallback(
     (data: PaymentStatusResponse | null | undefined, source: "manual" | "background") => {
@@ -202,8 +205,11 @@ export function StepPayment({
 
   useEffect(() => {
     if (phase !== "expired") return;
+    if (watchUntilRef.current == null) {
+      watchUntilRef.current = Date.now() + LATE_PAYMENT_WATCH_MS;
+      setLateWatching(true);
+    }
     const until = watchUntilRef.current;
-    if (until == null) return;
     const remaining = until - Date.now();
     if (remaining <= 0) {
       setLateWatching(false);
@@ -338,7 +344,7 @@ export function StepPayment({
         <div role="alert" aria-live="assertive" className="space-y-4 rounded-card border border-line bg-surface p-6 text-center">
           <Icon icon={PIX_STATUS_ICONS.expired} size="xl" className="mx-auto text-ink" />
           <h2 className="font-display text-xl font-bold text-ink">{EXPIRED_PIX_TITLE}</h2>
-          <p className="text-sm text-ink">{expiredPixBody(latePolicy)}</p>
+          <p className="text-sm text-ink">{expiredScreenBody(lateWatching, latePolicy)}</p>
         </div>
         {lateWatching ? <p className="text-center text-xs text-muted" data-testid="pix-late-watch">{LATE_PAYMENT_WATCH_LINE}</p> : null}
         {followUpActions}
@@ -349,10 +355,11 @@ export function StepPayment({
   if (phase === "refund_pending" || phase === "refunded") {
     const amountLabel = formatCurrency(payment?.amountCents ?? 0);
     const copy = phase === "refunded" ? refundedCopy(amountLabel) : refundPendingCopy(amountLabel);
+    const refundIcon = phase === "refunded" ? PIX_REFUND_ICONS.done : PIX_REFUND_ICONS.pending;
     return (
       <div className="space-y-4">
-        <div role="status" aria-live="polite" className="space-y-4 rounded-card border border-line bg-surface p-6 text-center">
-          <Info aria-hidden="true" className="mx-auto size-8 text-ink" />
+        <div role="status" aria-live="polite" data-tone="info" className="space-y-4 rounded-card border border-line bg-subtle p-6 text-center text-ink">
+          <Icon icon={refundIcon} size="xl" className="mx-auto text-ink" />
           <h2 className="font-display text-xl font-bold text-ink">{copy.title}</h2>
           <p className="text-sm text-ink">{copy.body}</p>
         </div>

@@ -28,7 +28,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { BrandMark } from "@/components/ui/brand";
 import { BookingSummary } from "./BookingSummary";
-import { GENERIC_SUBMIT_MESSAGE, OFFLINE_MESSAGE, POLICY_CHANGED_MESSAGE, isOfflineError, publicBookingErrorView, whatsappHref } from "./booking-error";
+import { GENERIC_SUBMIT_MESSAGE, OFFLINE_MESSAGE, POLICY_CHANGED_MESSAGE, businessLoadCopy, isOfflineError, publicBookingErrorView, whatsappHref } from "./booking-error";
 import { pixResumePayload, pixResumeStorageKey, readPixResume, shouldClearExpiredResume, shouldResumePix, type PixResumeSession } from "./pix-resume";
 import { buildPublicBookingBody } from "./booking-payload";
 import { PausedState } from "./PausedState";
@@ -101,10 +101,9 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
     })
       .then((res) => {
         if (!res.ok) {
-          if (res.status === 404) {
-            throw new Error("Estabelecimento não encontrado. Verifique o link informado.");
-          }
-          throw new Error("Não foi possível carregar os serviços deste estabelecimento.");
+          const error = new Error(res.status === 404 ? "not_found" : "unavailable");
+          error.name = "PublicLoadError";
+          throw error;
         }
         return res.json();
       })
@@ -117,15 +116,8 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
       })
       .catch((err: unknown) => {
         if (!isCancelled) {
-          let msg = "Erro inesperado ao carregar dados.";
-          if (err instanceof Error) {
-            if (err.name === "AbortError") {
-              msg = "A conexão demorou muito para responder. Verifique sua internet e tente novamente.";
-            } else {
-              msg = err.message;
-            }
-          }
-          setBusinessError(msg);
+          console.error(err);
+          setBusinessError(businessLoadCopy(err));
           setIsLoadingBusiness(false);
         }
       })
@@ -358,6 +350,7 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
         setStep(4);
       }
     } catch (err: unknown) {
+      console.error(err);
       const msg = isOfflineError(err) ? OFFLINE_MESSAGE : GENERIC_SUBMIT_MESSAGE;
       setBookingError({ message: msg, contactHref: null, tone: "danger" });
     } finally {

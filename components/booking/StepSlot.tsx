@@ -224,7 +224,10 @@ export function StepSlot({
               signal: controller.signal,
             }
           );
-          if (!res.ok) throw new Error(SLOTS_LOAD_MESSAGE);
+          if (!res.ok) {
+            console.error("slots load failed", res.status);
+            throw new Error("slots_unavailable");
+          }
           const data = (await res.json()) as { slots?: AvailabilitySlot[]; bookable?: boolean };
           if (depositServiceUnbookable(service.depositCents, data?.bookable)) {
             if (!isCancelled) setBlockedServiceId(service.id);
@@ -238,6 +241,7 @@ export function StepSlot({
         setErrorSlots(null);
       } catch (err: unknown) {
         if (isCancelled) return;
+        console.error(err);
         const msg = isOfflineError(err) ? OFFLINE_MESSAGE : SLOTS_LOAD_MESSAGE;
         setErrorSlots(msg);
       } finally {

@@ -1,5 +1,12 @@
 import { readPolicyChangedUpdate } from "./policy-gate";
 import type { PolicyChangedUpdate } from "./types";
+import {
+  BUSINESS_LOAD_COPY,
+  BUSINESS_NOT_FOUND_COPY,
+  BUSINESS_SLOW_COPY,
+  SLOTS_LOAD_COPY,
+  SUBMIT_RETRY_COPY,
+} from "./customer-copy";
 
 export const SERVICE_UNAVAILABLE_MESSAGE = "Este serviço não está disponível para reserva online no momento.";
 
@@ -11,11 +18,20 @@ export const POLICY_MISSING_MESSAGE = "Não conseguimos carregar as regras do si
 
 export const SLOT_TAKEN_MESSAGE = "Esse horário acabou de ser reservado. Escolha outro.";
 
-export const GENERIC_SUBMIT_MESSAGE = "Não deu para concluir agora. Tente de novo em instantes.";
+export const GENERIC_SUBMIT_MESSAGE = SUBMIT_RETRY_COPY;
 
 export const OFFLINE_MESSAGE = "Sem conexão. Verifique sua internet e tente de novo.";
 
-export const SLOTS_LOAD_MESSAGE = "Não foi possível carregar os horários. Tente de novo em instantes.";
+export const SLOTS_LOAD_MESSAGE = SLOTS_LOAD_COPY;
+
+export function businessLoadCopy(error: unknown): string {
+  if (error instanceof Error && error.name === "AbortError") return BUSINESS_SLOW_COPY;
+  if (isOfflineError(error)) return OFFLINE_MESSAGE;
+  if (error instanceof Error && error.name === "PublicLoadError" && error.message === "not_found") {
+    return BUSINESS_NOT_FOUND_COPY;
+  }
+  return BUSINESS_LOAD_COPY;
+}
 
 export type BookingFailure =
   | { kind: "paused" }
