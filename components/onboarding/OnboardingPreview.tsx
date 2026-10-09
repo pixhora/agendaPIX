@@ -4,7 +4,6 @@ import { Clock3, Eye, Lock } from "lucide-react";
 import { BusinessAvatar } from "@/components/ui/business-avatar";
 import type { OnboardingData } from "./types";
 import { formatCurrency, formatDuration } from "@/components/booking/formatters";
-import { usePublicHost } from "./parts";
 
 const DAY_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
@@ -15,8 +14,8 @@ function describeDays(days: number[]) {
 }
 
 /** Prévia ao vivo da página pública enquanto o dono preenche o cadastro (só no desktop). */
-export function OnboardingPreview({ data }: { data: OnboardingData }) {
-  const host = usePublicHost();
+export function OnboardingPreview({ data, publicHost }: { data: OnboardingData; publicHost: string }) {
+  const host = publicHost;
   const name = data.businessName.trim() || "Seu negócio";
   return (
     <aside aria-label="Prévia da sua página" className="hidden lg:sticky lg:top-10 lg:block">
@@ -24,7 +23,7 @@ export function OnboardingPreview({ data }: { data: OnboardingData }) {
       <div className="overflow-hidden rounded-frame border border-line bg-surface shadow-[var(--shadow-raised)]">
         <div className="flex items-center gap-2 border-b border-line bg-subtle/70 px-4 py-2.5 text-xs text-muted">
           <Lock aria-hidden="true" className="size-3" />
-          <span className="truncate">{host}/<strong className="text-ink">{data.slug || "seu-negocio"}</strong></span>
+          <span className="truncate">{host ? `${host}/` : ""}<strong className="text-ink">{data.slug || "seu-negocio"}</strong></span>
         </div>
         <div className="space-y-4 p-5">
           <div className="flex items-center gap-3">
@@ -40,7 +39,7 @@ export function OnboardingPreview({ data }: { data: OnboardingData }) {
                 <p className="truncate font-semibold">{data.serviceName.trim() || "Seu serviço"}</p>
                 <p className="mt-0.5 flex items-center gap-1 text-xs text-muted"><Clock3 aria-hidden="true" className="size-3" />{formatDuration(data.durationMinutes)}</p>
               </div>
-              <p className="font-display font-bold tabular-nums">{formatCurrency(data.priceCents)}</p>
+              <p className="font-display font-bold tabular-nums">{data.priceCents > 0 ? formatCurrency(data.priceCents) : "R$ —"}</p>
             </div>
             {data.depositCents > 0 && <p className="mt-3 inline-flex min-h-6 items-center rounded-full bg-pix-soft px-2.5 text-xs font-semibold text-pix">Sinal Pix {formatCurrency(data.depositCents)}</p>}
           </div>

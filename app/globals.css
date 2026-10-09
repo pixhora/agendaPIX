@@ -9,6 +9,8 @@
  * Regra: `--muted` é cor de TEXTO. Fundos sutis usam `--subtle`.
  */
 :root {
+  --sticky-cta-height: 5.25rem;
+  --shadow-focus: 0 0 0 4px color-mix(in srgb, var(--ring) 18%, transparent);
   --paper: #f6f5f2;
   --surface: #ffffff;
   --subtle: #efeeea;
@@ -26,6 +28,12 @@
   --pix-foreground: #ffffff;
   --pix-soft: #e8f6f3;
   --pix-bright: #3fd0be;
+  /* Texto sobre a faixa. Fixo nos dois modos: no escuro --ink fica claro e falha o contraste. */
+  --pix-bright-foreground: #0b0b0c;
+  /* O azulejo da marca fica escuro nos dois temas, igual ao favicon. */
+  --brand-tile: #0b0b0c;
+  --brand-tile-foreground: #f6f5f2;
+  --brand-tile-edge: transparent;
 
   --success: #156b3a;
   --success-soft: #e6f4ea;
@@ -61,6 +69,10 @@
   --pix-foreground: #0b0b0c;
   --pix-soft: #10302c;
   --pix-bright: #3fd0be;
+  --pix-bright-foreground: #0b0b0c;
+  --brand-tile: #0b0b0c;
+  --brand-tile-foreground: #f6f5f2;
+  --brand-tile-edge: rgb(255 255 255 / 0.14);
 
   --success: #6fd49a;
   --success-soft: #133222;
@@ -91,6 +103,11 @@
     --pix-hover: #5fdccc;
     --pix-foreground: #0b0b0c;
     --pix-soft: #10302c;
+    --pix-bright: #3fd0be;
+    --pix-bright-foreground: #0b0b0c;
+    --brand-tile: #0b0b0c;
+    --brand-tile-foreground: #f6f5f2;
+    --brand-tile-edge: rgb(255 255 255 / 0.14);
     --success: #6fd49a;
     --success-soft: #133222;
     --warning: #f2b25a;
@@ -119,6 +136,9 @@
   --color-pix-foreground: var(--pix-foreground);
   --color-pix-soft: var(--pix-soft);
   --color-pix-bright: var(--pix-bright);
+  --color-pix-bright-foreground: var(--pix-bright-foreground);
+  --color-brand-tile: var(--brand-tile);
+  --color-brand-tile-foreground: var(--brand-tile-foreground);
   --color-success: var(--success);
   --color-success-soft: var(--success-soft);
   --color-warning: var(--warning);
@@ -146,6 +166,7 @@
 
   --shadow-card: 0 1px 2px rgb(11 11 12 / 0.04), 0 1px 1px rgb(11 11 12 / 0.03);
   --shadow-raised: 0 12px 32px -12px rgb(11 11 12 / 0.18), 0 2px 6px rgb(11 11 12 / 0.05);
+  --shadow-focus: 0 0 0 4px color-mix(in srgb, var(--ring) 18%, transparent);
 }
 
 html {
@@ -238,6 +259,27 @@ h1, h2, h3, h4, h5, h6, .font-display {
     background-image: radial-gradient(var(--line) 1px, transparent 1px);
     background-size: 18px 18px;
   }
+}
+
+/* O anel de foco fica no invólucro. O input de dentro não desenha o retângulo nativo. */
+.onb-control:focus,
+.onb-control:focus-visible {
+  outline: none;
+  border-color: var(--ring);
+  box-shadow: var(--shadow-focus);
+}
+
+.onb-control-wrap:focus-within :is(input, textarea),
+.onb-control-wrap:focus-within :is(input, textarea):focus,
+.onb-control-wrap:focus-within :is(input, textarea):focus-visible,
+.otp-slots,
+.otp-slots:focus,
+.otp-slots:focus-visible,
+.otp-slots:focus-within,
+.otp-slots input:focus,
+.otp-slots input:focus-visible {
+  outline: none;
+  box-shadow: none;
 }
 
 /* Painel no celular: foco e âncoras nunca ficam atrás das barras fixas (WCAG 2.4.11). */

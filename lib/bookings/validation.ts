@@ -1,22 +1,8 @@
 import { z } from "zod";
 import { cpfDigits, isValidCpf } from "../validation/cpf";
+import { RESERVED_BUSINESS_SLUGS } from "../slug";
 
-/** Slugs de sistema / rotas reservados; fonte única de verdade (comparação case-insensitive). */
-export const RESERVED_BUSINESS_SLUGS = [
-  "login",
-  "onboarding",
-  "preview",
-  "dashboard",
-  "api",
-  "admin",
-  "auth",
-  "health",
-  "ready",
-  "webhooks",
-  "_next",
-  "static",
-  "favicon.ico",
-] as const;
+export { RESERVED_BUSINESS_SLUGS };
 
 const reservedSlugSet = new Set<string>(RESERVED_BUSINESS_SLUGS.map((slug) => slug.toLowerCase()));
 

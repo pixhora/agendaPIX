@@ -1,6 +1,8 @@
 import React, { Suspense } from "react";
+import { connection } from "next/server";
 import type { Metadata } from "next";
 import { OnboardingFlow } from "@/components/onboarding/OnboardingFlow";
+import { publicLinkHost } from "@/lib/public-host";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const metadata: Metadata = {
@@ -8,7 +10,8 @@ export const metadata: Metadata = {
   description: "Crie sua conta em 3 minutos e comece a receber agendamentos com sinal por Pix.",
 };
 
-export default function OnboardingPage() {
+export default async function OnboardingPage() {
+  await connection();
   return (
     <Suspense
       fallback={
@@ -17,7 +20,7 @@ export default function OnboardingPage() {
         </div>
       }
     >
-      <OnboardingFlow />
+      <OnboardingFlow legalPagesPublished={process.env.LEGAL_PAGES_PUBLISHED === "true"} publicHost={publicLinkHost(process.env.BETTER_AUTH_URL)} />
     </Suspense>
   );
 }

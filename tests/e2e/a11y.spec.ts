@@ -23,7 +23,7 @@ test.describe("acessibilidade (axe) e reflow — páginas públicas", () => {
     ["/", /Seu cliente agenda sozinho/],
     ["/login", /Entrar na sua conta/],
     ["/login?error=link", /Entrar na sua conta/],
-    ["/onboarding", /Como se chama o seu negócio/],
+    ["/onboarding", /Nome e link da sua página/],
   ] as const) {
     test(`${path} sem violações`, async ({ page }) => {
       await page.goto(path);
