@@ -53,7 +53,8 @@ export const MP_DISCONNECT_STUCK_PIX_MS = 7 * 24 * 60 * 60 * 1000;
 export type DisconnectTokenHold = {
   /**
    * Pagamento `creating`/`pending` com `expires_at` nulo ou com menos de 7 dias,
-   * ou devolução `processing` (`in_process` na API) que o reconciliador ainda observa.
+   * ou devolução ainda aberta: `payment_refunds.status` `requested` ou `processing`.
+   * `payments.refund_status = in_process` também segura. `refunded`, `rejected` e `failed` não.
    */
   hasOpenPix: boolean;
   /** Maior `expires_at` dos pagamentos deste negócio, aberto ou já encerrado. */

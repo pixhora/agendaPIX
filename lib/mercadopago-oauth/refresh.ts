@@ -38,7 +38,7 @@ function laterInstant(left: Date | null, right: Date | null): Date | null {
 
 /**
  * Sem Pix em aberto e sem vencimento ou cancelamento recente, apaga na hora.
- * `creating`/`pending` com menos de 7 dias, ou devolução `processing`, segura o token.
+ * `creating`/`pending` com menos de 7 dias, ou devolução `requested`/`processing`, segura o token.
  * Um `creating` preso há mais de 7 dias entra só como vencimento: não muda status no Mercado Pago.
  * Depois que o último `expires_at` ou `remote_cancelled_at` passou, guarda por mais 24 h.
  */

@@ -164,11 +164,12 @@ export function createDrizzleMpStore(database: Database = getDb()): MpConnection
         hasOpenPix: sql<boolean | null>`bool_or(
           (${payments.status} in ('creating', 'pending') and (${payments.expiresAt} is null or ${payments.expiresAt} >= ${freshAfter}))
           or ${payments.refundStatus} = 'in_process'
+          -- Nome da tabela de fora: a coluna interpolada vira "id" e o Postgres amarra na payment_refunds.
           or exists (
-            select 1 from payment_refunds
-            where payment_refunds.business_id = ${payments.businessId}
-              and payment_refunds.payment_id = ${payments.id}
-              and payment_refunds.status = 'processing'
+            select 1 from payment_refunds r
+            where r.business_id = payments.business_id
+              and r.payment_id = payments.id
+              and r.status in ('requested', 'processing')
           )
         )`,
         lastExpiresAt: sql<Date | string | null>`max(${payments.expiresAt})`,
