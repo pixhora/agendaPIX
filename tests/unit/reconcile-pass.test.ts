@@ -28,7 +28,7 @@ describe("orçamento da passagem", () => {
     const tight = wallClockBudget(50_000, 8_000, started, () => started + 35_000);
     expect(tight.allow("stuck")).toBe(false);
     expect(tight.allow("cancel")).toBe(false);
-    expect(tight.allow("poll")).toBe(false);
+    expect(tight.allow("poll")).toBe(true);
     expect(tight.allow("refunds")).toBe(true);
     expect(tight.allow("reminders")).toBe(true);
     expect(tight.allow("tokens")).toBe(true);

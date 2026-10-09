@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { MP_DISCONNECT_RETENTION_COPY, MP_MANUAL_REFUND_CHANNEL } from "../../lib/mercadopago/connect-copy";
+import { MP_MANUAL_REFUND_CHANNEL } from "../../lib/mercadopago/connect-copy";
 import { openPixDisconnectNote, PERMISSIONS } from "../../lib/mercadopago/contract";
 
 const COPY_ROOTS = ["app", "components", "lib", "content", "docs"];
@@ -32,13 +32,15 @@ describe("cópia do Mercado Pago", () => {
     expect(openPixDisconnectNote(0)).toBeNull();
     const note = openPixDisconnectNote(1);
     expect(note).toContain("é apagado em até 24 horas");
-    expect(note).not.toContain(MP_DISCONNECT_RETENTION_COPY);
     expect(note).not.toMatch(/45 minutos|48 horas|por mais 24 horas/);
   });
 
-  it("a permissão de devolução manual aponta para o app do Mercado Pago", () => {
-    const permission = PERMISSIONS.find((item) => item.strong.startsWith("devolver um sinal"));
-    expect(`${permission?.strong ?? ""}${permission?.rest ?? ""}`).toContain(MP_MANUAL_REFUND_CHANNEL);
-    expect(`${permission?.strong ?? ""}${permission?.rest ?? ""}`).not.toContain("Devolver pelo AgendaPix");
+  it("as permissões descrevem a conciliação e a devolução automática", () => {
+    const text = PERMISSIONS.map((item) => `${item.strong}${item.rest}`).join(" ");
+    expect(text).toContain("conciliar o pagamento");
+    expect(text).toContain("devolver sozinho o valor inteiro");
+    expect(text).not.toContain("quando você mandar");
+    expect(text).not.toContain(MP_MANUAL_REFUND_CHANNEL);
+    expect(text).not.toContain("Devolver pelo AgendaPix");
   });
 });

@@ -89,10 +89,12 @@ export async function processWebhook(request: Request, providerName: string, dat
         // O aviso não desfaz a confirmação.
       }
     }
-    try {
-      await purgeDisconnectedMercadoPagoTokens({ store: createDrizzleMpStore(database) });
-    } catch {
-      // A passagem do reconciliador apaga. A resposta continua 200 para o gateway não reenviar.
+    if (outcome.businessId) {
+      try {
+        await purgeDisconnectedMercadoPagoTokens({ store: createDrizzleMpStore(database), businessId: outcome.businessId });
+      } catch {
+        // A passagem do reconciliador apaga. A resposta continua 200 para o gateway não reenviar.
+      }
     }
     return outcome;
   } catch (error) {

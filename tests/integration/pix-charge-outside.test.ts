@@ -266,7 +266,7 @@ describe("reconciliação", () => {
     expect(emails[0]).not.toContain("não havia horário livre");
   });
 
-  it("desconectar sem Pix pendente apaga o token; com Pix pendente o reconciliador apaga depois", async () => {
+  it("desconectar sem Pix apaga na hora; depois do vencimento o token fica 24h", async () => {
     const store = createDrizzleMpStore(database);
     await disconnectMercadoPago(businessId, { store, now: new Date() });
     const [cleared] = await database.select().from(schema.mercadopagoConnections).where(eq(schema.mercadopagoConnections.businessId, businessId));
@@ -288,8 +288,14 @@ describe("reconciliação", () => {
     await reconcileOnce(database, provider, pass);
     const [held] = await database.select().from(schema.mercadopagoConnections).where(eq(schema.mercadopagoConnections.businessId, businessId));
     expect(held.accessTokenEnc).toBe("v1.fixture.access");
-    await database.update(schema.payments).set({ status: "expired", expiresAt: new Date(Date.now() - 1000) }).where(eq(schema.payments.id, data.payment!.id));
-    await database.update(schema.bookings).set({ status: "expired", expiresAt: new Date(Date.now() - 1000) }).where(eq(schema.bookings.id, data.bookingId));
+    const justExpired = new Date(Date.now() - 1000);
+    await database.update(schema.payments).set({ status: "expired", expiresAt: justExpired }).where(eq(schema.payments.id, data.payment!.id));
+    await database.update(schema.bookings).set({ status: "expired", expiresAt: justExpired }).where(eq(schema.bookings.id, data.bookingId));
+    await reconcileOnce(database, provider, pass);
+    const [keptAfterExpiry] = await database.select().from(schema.mercadopagoConnections).where(eq(schema.mercadopagoConnections.businessId, businessId));
+    expect(keptAfterExpiry.accessTokenEnc).toBe("v1.fixture.access");
+    const settledLongAgo = new Date(Date.now() - 25 * 60 * 60 * 1000);
+    await database.update(schema.payments).set({ expiresAt: settledLongAgo, remoteCancelledAt: settledLongAgo }).where(eq(schema.payments.id, data.payment!.id));
     const purged = await reconcileOnce(database, provider, pass);
     expect(purged.tokensPurged).toBeGreaterThanOrEqual(1);
     const [gone] = await database.select().from(schema.mercadopagoConnections).where(eq(schema.mercadopagoConnections.businessId, businessId));

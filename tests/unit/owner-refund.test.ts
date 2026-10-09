@@ -15,7 +15,7 @@ import {
   type RefundWriter,
 } from "../../lib/payments/refund-flow";
 import { formatBusinessDay, manualRefundDueAtFromNotice } from "../../lib/payments/manual-refund-calendar";
-import { OWNER_MANUAL_MARK_LABEL } from "../../lib/payments/refund-copy";
+import { INSUFFICIENT_BALANCE_MESSAGE } from "../../lib/payments/refund-copy";
 import { assessRefund } from "../../lib/payments/refund-eligibility";
 import {
   disconnectedConfirmedNotice,
@@ -164,7 +164,7 @@ describe("prévia e devolução do dono", () => {
       },
     };
     const input = { businessId: "biz-1", bookingId: "book-1", ownerId: "owner-1", expectedAmountCents: 1500, now, requestedOn: "2030-06-01" };
-    await expect(executeOwnerRefund(failing, broken, input)).rejects.toMatchObject({ status: 502, code: "refund_failed", message: expect.stringContaining(OWNER_MANUAL_MARK_LABEL) });
+    await expect(executeOwnerRefund(failing, broken, input)).rejects.toMatchObject({ status: 502, code: "refund_failed", message: INSUFFICIENT_BALANCE_MESSAGE });
     await expect(executeOwnerRefund(failing, broken, { ...input, requestedOn: "2099-01-01" }))
       .rejects.toSatisfy((error: HttpError) => error instanceof HttpError && error.status === 502 && !error.message.includes("insufficient") && !error.message.includes("ou devolva por outro meio") && !error.message.includes("Marcar como devolvido"));
     expect(keys).toEqual(["pay-1:1", "pay-1:2"]);

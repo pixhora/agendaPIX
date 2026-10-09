@@ -46,6 +46,16 @@ export type MpLock = {
   write(next: MpConnection): Promise<void>;
 };
 
+/** O que ainda segura o token depois de desconectar pelo AgendaPix. */
+export type DisconnectTokenHold = {
+  /** Ainda existe pagamento `creating` ou `pending`. */
+  hasOpenPix: boolean;
+  /** Maior `expires_at` dos pagamentos deste negócio, aberto ou já encerrado. */
+  lastExpiresAt: Date | null;
+  /** Maior `remote_cancelled_at`. A folga de 24 h conta a partir do mais recente dos dois. */
+  lastRemoteCancelledAt: Date | null;
+};
+
 export type MpConnectionStore = {
   findByBusinessId(businessId: string): Promise<MpConnection | null>;
   findConnectedBusinessId(mpUserId: string): Promise<string | null>;
@@ -55,7 +65,7 @@ export type MpConnectionStore = {
   markDisconnected(businessId: string, disconnectedAt: Date): Promise<void>;
   clearDisconnectedTokens(businessId: string): Promise<void>;
   listDisconnectedWithTokens(): Promise<MpConnection[]>;
-  latestPendingDepositExpiresAt(businessId: string): Promise<Date | null>;
+  disconnectTokenHold(businessId: string): Promise<DisconnectTokenHold>;
   listRefreshCandidates(expiresBefore: Date): Promise<string[]>;
   withBusinessLock<T>(businessId: string, run: (lock: MpLock) => Promise<T>): Promise<T>;
   saveOAuthState(row: MpOAuthState): Promise<void>;

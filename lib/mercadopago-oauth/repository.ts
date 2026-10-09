@@ -1,10 +1,16 @@
-import { and, desc, eq, inArray, isNotNull, lt, ne, sql } from "drizzle-orm";
+import { and, eq, isNotNull, lt, ne, sql } from "drizzle-orm";
 import { getDb } from "../../db";
 import { mercadopagoConnections, mercadopagoOauthStates, mpConnectionEvents, payments } from "../../db/schema";
-import type { MpConnection, MpConnectionStore } from "./types";
+import type { DisconnectTokenHold, MpConnection, MpConnectionStore } from "./types";
 
 type Database = Pick<ReturnType<typeof getDb>, "select" | "insert" | "update" | "delete" | "transaction" | "execute">;
 type Row = typeof mercadopagoConnections.$inferSelect;
+
+function asDate(value: Date | string | null | undefined): Date | null {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
 
 function postgresCode(error: unknown): string | undefined {
   if (typeof error !== "object" || error === null) return undefined;
@@ -152,12 +158,17 @@ export function createDrizzleMpStore(database: Database = getDb()): MpConnection
       ));
       return rows.map(fromRow);
     },
-    async latestPendingDepositExpiresAt(businessId) {
-      const [row] = await database.select({ expiresAt: payments.expiresAt }).from(payments).where(and(
-        eq(payments.businessId, businessId),
-        inArray(payments.status, ["creating", "pending"]),
-      )).orderBy(desc(payments.expiresAt)).limit(1);
-      return row?.expiresAt ?? null;
+    async disconnectTokenHold(businessId): Promise<DisconnectTokenHold> {
+      const [row] = await database.select({
+        hasOpenPix: sql<boolean | null>`bool_or(${payments.status} in ('creating', 'pending'))`,
+        lastExpiresAt: sql<Date | string | null>`max(${payments.expiresAt})`,
+        lastRemoteCancelledAt: sql<Date | string | null>`max(${payments.remoteCancelledAt})`,
+      }).from(payments).where(eq(payments.businessId, businessId));
+      return {
+        hasOpenPix: row?.hasOpenPix === true,
+        lastExpiresAt: asDate(row?.lastExpiresAt),
+        lastRemoteCancelledAt: asDate(row?.lastRemoteCancelledAt),
+      };
     },
     async saveOAuthState(row) {
       await database.insert(mercadopagoOauthStates).values(row);

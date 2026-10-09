@@ -1,6 +1,6 @@
 import { MP_CONNECT_CONSENT_VERSION } from "./consent";
 import { latePixRefundCopy } from "./late-pix-copy";
-import { MP_AUTO_REFUND_ACK_ERROR, MP_MANUAL_REFUND_CHANNEL } from "./connect-copy";
+import { MP_AUTO_REFUND_ACK_ERROR } from "./connect-copy";
 
 /** Status visto pelo dono. Campo ausente de chave antiga vale como false. */
 export const MP_CONNECTION_STATUSES = ["not_connected", "connected", "needs_reconnect"] as const;
@@ -292,7 +292,7 @@ export const PERMISSIONS: { strong: string; rest: string }[] = [
   { strong: "criar cobranças Pix", rest: " no valor do sinal dos seus agendamentos;" },
   { strong: "ver o status", rest: " dessas cobranças, para confirmar o agendamento quando o cliente pagar;" },
   { strong: "cancelar", rest: " cobranças que não foram pagas no prazo;" },
-  { strong: "devolver um sinal quando você mandar", rest: `. ${MP_MANUAL_REFUND_CHANNEL} O valor sai do saldo da sua conta Mercado Pago;` },
+  { strong: "conciliar o pagamento", rest: " quando o aviso atrasar: confirma o horário se o Pix foi pago no prazo e devolve o valor se foi pago fora do prazo;" },
   {
     strong: "devolver sozinho o valor inteiro",
     rest: ` quando um Pix chega depois do prazo. ${latePixRefundCopy("refund")} Você recebe um e-mail a cada devolução;`,

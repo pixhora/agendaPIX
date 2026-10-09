@@ -11,7 +11,7 @@ import { acceptMercadoPagoConsent, assertPlaintextAbsent, beginMercadoPagoConnec
 import { GET as connectGet } from "../../app/api/businesses/[businessId]/mercadopago/connect/route";
 import { createMemoryMpStore } from "../../lib/mercadopago-oauth/memory-store";
 import { sanitizeMpReturnTo } from "../../lib/mercadopago-oauth/return-to";
-import { disconnectedTokensReadyToPurge, purgeDisconnectedMercadoPagoTokens, refreshMercadoPagoConnection } from "../../lib/mercadopago-oauth/refresh";
+import { disconnectedTokensReadyToPurge, MP_DISCONNECT_SETTLEMENT_GRACE_MS, purgeDisconnectedMercadoPagoTokens, refreshMercadoPagoConnection } from "../../lib/mercadopago-oauth/refresh";
 import { HttpError } from "../../lib/http";
 import { register } from "../../instrumentation";
 import { openMpOAuthState, sealMpOAuthState, type MpOAuthCookie } from "../../lib/mercadopago-oauth/state";
@@ -412,26 +412,35 @@ describe("OAuth Mercado Pago por negócio", () => {
 
   it("guarda o token desconectado só enquanto o Pix pendente não venceu", async () => {
     const store = createMemoryMpStore([connection()]);
-    store.pendingExpiresAt.set(businessId, new Date(now.getTime() + 30 * 60_000));
+    store.tokenHold.set(businessId, { hasOpenPix: true, lastExpiresAt: new Date(now.getTime() + 30 * 60_000), lastRemoteCancelledAt: null });
     await disconnectMercadoPago(businessId, { store, now });
     expect((await store.findByBusinessId(businessId))?.accessTokenEnc).toContain("v1.");
     expect(await getSellerAccessTokenForSettlement(businessId, { store, env })).toEqual({ accessToken: "seller-access", mpUserId: "4242" });
     expect(await getSellerAccessToken(businessId, { store, env, now })).toBeNull();
   });
 
-  it("apaga tokens desconectados assim que o Pix vence, sem esperar 24h", async () => {
+  it("guarda tokens desconectados por 24h depois do vencimento ou do cancelamento remoto", async () => {
     const store = createMemoryMpStore([connection({ status: "disconnected", disconnectedAt: now })]);
     const pendingUntil = new Date("2026-10-08T15:00:00.000Z");
-    store.pendingExpiresAt.set(businessId, pendingUntil);
-    const before = new Date(pendingUntil.getTime() - 60_000);
-    expect(disconnectedTokensReadyToPurge(pendingUntil, before)).toBe(false);
-    expect(await purgeDisconnectedMercadoPagoTokens({ store, now: before })).toEqual({ purged: 0 });
+    const settled = { hasOpenPix: false, lastExpiresAt: pendingUntil, lastRemoteCancelledAt: null };
+    store.tokenHold.set(businessId, settled);
+    const withinGrace = new Date(pendingUntil.getTime() + 60_000);
+    expect(disconnectedTokensReadyToPurge(settled, withinGrace)).toBe(false);
+    expect(disconnectedTokensReadyToPurge({ hasOpenPix: true, lastExpiresAt: pendingUntil, lastRemoteCancelledAt: null }, pendingUntil)).toBe(false);
+    expect(await purgeDisconnectedMercadoPagoTokens({ store, now: withinGrace })).toEqual({ purged: 0 });
     expect((await store.findByBusinessId(businessId))?.accessTokenEnc).toContain("v1.");
-    expect(disconnectedTokensReadyToPurge(pendingUntil, pendingUntil)).toBe(true);
-    expect(await purgeDisconnectedMercadoPagoTokens({ store, now: pendingUntil })).toEqual({ purged: 1 });
+    expect(await getSellerAccessTokenForSettlement(businessId, { store, env })).toEqual({ accessToken: "seller-access", mpUserId: "4242" });
+    const cancelledLater = {
+      hasOpenPix: false,
+      lastExpiresAt: pendingUntil,
+      lastRemoteCancelledAt: new Date(pendingUntil.getTime() + 60 * 60_000),
+    };
+    expect(disconnectedTokensReadyToPurge(cancelledLater, new Date(pendingUntil.getTime() + MP_DISCONNECT_SETTLEMENT_GRACE_MS + 1))).toBe(false);
+    const afterGrace = new Date(pendingUntil.getTime() + MP_DISCONNECT_SETTLEMENT_GRACE_MS + 1);
+    expect(disconnectedTokensReadyToPurge(settled, afterGrace)).toBe(true);
+    expect(await purgeDisconnectedMercadoPagoTokens({ store, now: afterGrace })).toEqual({ purged: 1 });
     expect((await store.findByBusinessId(businessId))?.accessTokenEnc).toBeNull();
-    expect(await getSellerAccessTokenForSettlement(businessId, { store, env })).toBeNull();
-    expect(disconnectedTokensReadyToPurge(null, now)).toBe(true);
+    expect(disconnectedTokensReadyToPurge({ hasOpenPix: false, lastExpiresAt: null, lastRemoteCancelledAt: null }, now)).toBe(true);
   });
 
   it("revogação do MP marca needs_reconnect e não assume que o token ainda funciona", async () => {
@@ -593,6 +602,7 @@ describe("OAuth Mercado Pago por negócio", () => {
 
   it("serviço sem sinal continua agendável por este critério", () => {
     expect(getServiceBlockedReason({ depositCents: 0 }, { mpConnected: false })).toBeNull();
+    expect(getServiceBlockedReason({ depositCents: 0 }, { mpConnected: true, consentCurrent: false })).toBeNull();
     expect(getServiceBlockedReason({ depositCents: 1000 }, { mpConnected: false })).toBe("mp_account_not_connected");
     expect(getServiceBlockedReason({ depositCents: 1000 }, { mpConnected: true })).toBeNull();
     expect(getServiceBlockedReason({ depositCents: 1000 }, { mpConnected: true, consentCurrent: false })).toBe("mp_consent_outdated");

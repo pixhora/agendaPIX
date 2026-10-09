@@ -131,7 +131,7 @@ function eveItem(item: ReminderCase) {
     dueShort: labels.dueShort,
     requestedOnLabel: item.requestedOn ? formatBusinessDate(item.requestedOn, item.timezone) : "",
     paidAtLabel: item.paidAt ? formatBusinessDateTime(item.paidAt, item.timezone) : "",
-    bookingPath: `/dashboard/agenda/${item.bookingId}`,
+    bookingPath: `/dashboard?businessId=${item.businessId}&date=${localDate(item.startsAt, item.timezone)}`,
     slotOccupied: item.slotOccupied,
     disconnected: item.disconnected,
   };

@@ -140,6 +140,11 @@ describe("lembretes da devolução manual", () => {
     expect(sent).toHaveLength(1);
     expect(sent[0]?.to).toBe("dono@example.com");
     expect(sent[0]?.text).not.toContain("cliente@");
+    expect(sent[0]?.text).toContain("Abrir agenda: /dashboard?businessId=biz-1&date=2026-10-16");
+    expect(sent[0]?.text).not.toContain("/dashboard/agenda/");
+    expect(sent[0]?.text).not.toContain("Tentar de novo");
+    expect(sent[0]?.text).not.toContain("Devolvi pelo Mercado Pago");
+    expect(sent[0]?.text).not.toContain("Confirmar agendamento");
   });
 
   it("a trava do E5 está no UPDATE … RETURNING", () => {

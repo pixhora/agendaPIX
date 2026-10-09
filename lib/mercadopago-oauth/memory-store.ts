@@ -1,4 +1,4 @@
-import type { MpConnection, MpConnectionEvent, MpConnectionStore, MpOAuthState } from "./types";
+import type { DisconnectTokenHold, MpConnection, MpConnectionEvent, MpConnectionStore, MpOAuthState } from "./types";
 
 function clone(row: MpConnection): MpConnection {
   return {
@@ -12,10 +12,12 @@ function clone(row: MpConnection): MpConnection {
 }
 
 /** Store em memória com o mesmo contrato do Postgres, inclusive o lock por negócio. Só para testes. */
-export function createMemoryMpStore(seed: MpConnection[] = []): MpConnectionStore & { pendingExpiresAt: Map<string, Date | null>; consentEvents: MpConnectionEvent[] } {
+const NO_PIX: DisconnectTokenHold = { hasOpenPix: false, lastExpiresAt: null, lastRemoteCancelledAt: null };
+
+export function createMemoryMpStore(seed: MpConnection[] = []): MpConnectionStore & { tokenHold: Map<string, DisconnectTokenHold>; consentEvents: MpConnectionEvent[] } {
   const rows = new Map<string, MpConnection>();
   for (const row of seed) rows.set(row.businessId, clone(row));
-  const pendingExpiresAt = new Map<string, Date | null>();
+  const tokenHold = new Map<string, DisconnectTokenHold>();
   const oauthStates = new Map<string, MpOAuthState>();
   const consentEvents: MpConnectionEvent[] = [];
   const locks = new Map<string, Promise<void>>();
@@ -31,7 +33,7 @@ export function createMemoryMpStore(seed: MpConnection[] = []): MpConnectionStor
   }
 
   return {
-    pendingExpiresAt,
+    tokenHold,
     consentEvents,
     async findByBusinessId(businessId) {
       const row = rows.get(businessId);
@@ -83,8 +85,8 @@ export function createMemoryMpStore(seed: MpConnection[] = []): MpConnectionStor
     async listDisconnectedWithTokens() {
       return [...rows.values()].filter((row) => row.status === "disconnected" && row.accessTokenEnc && row.refreshTokenEnc).map(clone);
     },
-    async latestPendingDepositExpiresAt(businessId) {
-      return pendingExpiresAt.has(businessId) ? pendingExpiresAt.get(businessId) ?? null : null;
+    async disconnectTokenHold(businessId) {
+      return tokenHold.get(businessId) ?? NO_PIX;
     },
     async listRefreshCandidates(expiresBefore) {
       return [...rows.values()]

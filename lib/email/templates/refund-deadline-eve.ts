@@ -1,6 +1,5 @@
 import { MP_MANUAL_REFUND_CHANNEL } from "../../mercadopago/connect-copy";
 import { formatBusinessDay } from "../../payments/manual-refund-calendar";
-import { OWNER_MANUAL_MARK_LABEL } from "../../payments/refund-copy";
 
 export type EveKind = "auto_failed" | "review" | "policy";
 
@@ -19,33 +18,26 @@ export type EveItem = {
   disconnected: boolean;
 };
 
-function bookingHref(item: EveItem) {
-  return item.bookingPath.split("?")[0] ?? item.bookingPath;
+function actionLabel() {
+  return "Abrir agenda";
 }
 
-function actionLabel(item: EveItem) {
-  if (item.disconnected || item.kind === "policy") return "Abrir agendamento";
-  return item.kind === "review" ? "Conferir agendamento" : "Resolver agora";
+function manualUntil(item: EveItem) {
+  return `Devolva até ${item.dueLabel}. ${MP_MANUAL_REFUND_CHANNEL}`;
 }
 
 function steps(item: EveItem) {
   if (item.kind === "review") {
     if (item.slotOccupied) {
-      return `O horário já foi ocupado. O prazo de 7 dias para devolver vence amanhã, ${item.dueLabel}. Devolva pelo app do Mercado Pago e toque em "${OWNER_MANUAL_MARK_LABEL}".`;
+      return `O horário já foi ocupado. O prazo de 7 dias para devolver vence amanhã, ${item.dueLabel}. ${manualUntil(item)}`;
     }
     return [
-      `Viu o Pix na sua conta e vai manter o agendamento? Toque em "Confirmar agendamento".`,
-      ``,
-      `Não vai manter? O prazo de 7 dias para devolver vence amanhã, ${item.dueLabel}. Devolva pelo app do Mercado Pago e toque em "${OWNER_MANUAL_MARK_LABEL}".`,
+      "Se for manter o agendamento, ele continua na sua agenda.",
+      "",
+      `Se não for manter, devolva até ${item.dueLabel}. ${MP_MANUAL_REFUND_CHANNEL}`,
     ].join("\n");
   }
-  if (item.kind === "policy") {
-    return `Devolva até ${item.dueLabel}. ${MP_MANUAL_REFUND_CHANNEL}`;
-  }
-  const option = item.disconnected
-    ? `1. Devolva pelo app do Mercado Pago e toque em "${OWNER_MANUAL_MARK_LABEL}".`
-    : `1. Coloque saldo e toque em "Tentar de novo" no painel; ou\n2. Devolva pelo app do Mercado Pago, na venda de ${item.amountLabel} de ${item.paidAtLabel}, e toque em "${OWNER_MANUAL_MARK_LABEL}".`;
-  return `Para resolver:\n${option}`;
+  return manualUntil(item);
 }
 
 function policyLead(item: EveItem) {
@@ -128,7 +120,7 @@ export function refundDeadlineEveNotice(input: { ownerName: string | null; items
     ``,
     item.kind === "review" ? "Este é o último lembrete sobre este pagamento." : "Este é o último lembrete sobre esta devolução.",
     ``,
-    `${actionLabel(item)}: ${bookingHref(item)}`,
+    `${actionLabel()}: ${item.bookingPath}`,
   ].join("\n"));
   const text = [greeting, ``, preheader, ``, ...blocks, ``, "Você recebe este e-mail porque tem um negócio no AgendaPix."].join("\n");
   const html = `<div style="display:none;max-height:0;overflow:hidden">${escapeHtml(preheader)}</div><p>${htmlBlocks(input.ownerName, input.items)}</p>`;

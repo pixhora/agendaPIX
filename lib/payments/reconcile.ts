@@ -83,9 +83,11 @@ export function wallClockBudget(budgetMs: number, timeoutMs: number, startedAt =
   const deadline = startedAt + budgetMs;
   return {
     allow(stage) {
-      const later = RECONCILE_STAGES.length - 1 - RECONCILE_STAGES.indexOf(stage);
+      const later = RECONCILE_STAGES.slice(RECONCILE_STAGES.indexOf(stage) + 1);
+      // `tokens` não chama o gateway. Sem fila, não reserva os 2 s que fariam a poll desistir.
+      const reserve = later.reduce((sum, next) => sum + (next === "tokens" ? 0 : STAGE_RESERVE_MS), 0);
       const needed = stage === "reminders" || stage === "tokens" ? 0 : timeoutMs;
-      return clock() + needed <= deadline - later * STAGE_RESERVE_MS;
+      return clock() + needed <= deadline - reserve;
     },
   };
 }
@@ -193,13 +195,14 @@ export async function reconcileOnce(
   return report;
 }
 
-/** Mesmo apagamento do cron, dentro do orçamento da etapa `tokens`. Falha aqui não derruba o resto da passagem. */
+/** Mesmo apagamento do cron, dentro do orçamento da etapa `tokens`. Falha entra em `failures` e não derruba o resto. */
 async function purgeDisconnectedTokens(database: Database, report: ReconcileReport) {
   try {
     const { purged } = await purgeDisconnectedMercadoPagoTokens({ store: createDrizzleMpStore(database) });
     report.tokensPurged = purged;
-  } catch {
+  } catch (error) {
     report.tokensPurged = 0;
+    noteFailure(report, "tokens", null, error);
   }
 }
 

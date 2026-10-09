@@ -107,9 +107,9 @@ export async function getMercadoPagoOwnerStatus(businessId: string, deps?: Refre
 }
 
 /**
- * Desconecta do nosso lado. Sem Pix em aberto, apaga os tokens na mesma chamada.
- * Com Pix `creating`/`pending` ainda no prazo, guarda o par só para confirmar ou devolver
- * e o reconciliador (e o webhook, quando o Pix se resolve) apaga em seguida.
+ * Desconecta do nosso lado. Sem Pix em aberto e sem vencimento recente, apaga os tokens na hora.
+ * Com `creating`/`pending`, ou com o último `expires_at`/`remote_cancelled_at` há menos de 24 h,
+ * guarda o par para confirmar ou devolver. O reconciliador apaga depois; o webhook só o negócio do evento.
  */
 export async function disconnectMercadoPago(businessId: string, deps?: RefreshDeps) {
   const store = storeOf(deps);
@@ -117,8 +117,8 @@ export async function disconnectMercadoPago(businessId: string, deps?: RefreshDe
   if (!row || row.status === "disconnected") return;
   const now = deps?.now ?? new Date();
   await store.markDisconnected(businessId, now);
-  const pendingExpiresAt = await store.latestPendingDepositExpiresAt(businessId);
-  if (disconnectedTokensReadyToPurge(pendingExpiresAt, now)) await store.clearDisconnectedTokens(businessId);
+  const hold = await store.disconnectTokenHold(businessId);
+  if (disconnectedTokensReadyToPurge(hold, now)) await store.clearDisconnectedTokens(businessId);
 }
 
 /**
