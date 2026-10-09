@@ -27,7 +27,7 @@ const NO_SHOW_LABEL: Record<(typeof NO_SHOW_OUTCOMES)[number], { title: string; 
   credit: { title: "Vira crédito para outro horário", hint: "Válido por 60 dias. Por enquanto, você anota o crédito do cliente." },
   refund: {
     title: "Você devolve o sinal",
-    hint: "Não é automático. Você confirma em Devolver pelo AgendaPix, e o valor sai da sua conta Mercado Pago.",
+    hint: "Não é automático. Você devolve pelo app ou site do Mercado Pago, e o valor sai da sua conta.",
   },
 };
 
@@ -146,7 +146,7 @@ export function PolicyEditor({
       )}
 
       <ul className="grid gap-2 text-[13px] leading-snug text-muted">
-        <li className="flex items-start gap-2"><Info aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-pix" />A devolução não é automática. Você confirma em Devolver pelo AgendaPix, e o valor sai da sua conta Mercado Pago.</li>
+        <li className="flex items-start gap-2"><Info aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-pix" />A devolução não é automática. Você devolve pelo app ou site do Mercado Pago, e o valor sai da sua conta.</li>
         <li className="flex items-start gap-2"><Info aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-pix" />Mudanças valem para novas reservas. Quem já reservou continua com a regra que leu.</li>
       </ul>
     </fieldset>

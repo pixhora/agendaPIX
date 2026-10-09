@@ -79,7 +79,8 @@ describe("landing copy", () => {
     expect(rendered).not.toContain("Titular Que Não Pode Aparecer");
     expect(rendered).toContain("12 minutos");
     expect(rendered).toContain("conta Mercado Pago");
-    expect(rendered).toContain("Devolver pelo AgendaPix");
+    expect(rendered).toContain("app ou site do Mercado Pago");
+    expect(rendered).not.toContain("Devolver pelo AgendaPix");
     expect(rendered).toContain("devolvido sozinho, o valor inteiro");
     expect(rendered).toContain("você recebe um e-mail");
     expect(rendered).not.toMatch(/nada é devolvido sozinho|nada é automático|reembolsos nunca|repasse|chave Pix/i);

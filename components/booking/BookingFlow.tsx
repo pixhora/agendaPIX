@@ -28,7 +28,7 @@ import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { BrandMark } from "@/components/ui/brand";
 import { BookingSummary } from "./BookingSummary";
 import { POLICY_CHANGED_MESSAGE, publicBookingErrorView, whatsappHref } from "./booking-error";
-import { buildPublicBookingBody } from "./booking-payload";
+import { buildPublicBookingBody, publicBookingSession, stripStoredBookingCpf } from "./booking-payload";
 import { PausedState } from "./PausedState";
 import { PolicySheet } from "@/components/policy/PolicySheet";
 
@@ -137,37 +137,43 @@ export function BookingFlow({ slug, initialBookingId, previewBusiness }: Booking
     if (typeof window === "undefined") return;
 
     let stored: {
-      bookingId: string;
-      accessToken: string;
-      serviceId?: string;
-      customerName?: string;
-      customerPhone?: string;
-      expiresAt?: string;
+      bookingId?: unknown;
+      accessToken?: unknown;
+      serviceId?: unknown;
+      customerName?: unknown;
+      customerPhone?: unknown;
+      expiresAt?: unknown;
     } | null = null;
 
     try {
       const raw = sessionStorage.getItem(`booking_session_${slug}`);
       if (raw) {
-        stored = JSON.parse(raw);
+        const stripped = stripStoredBookingCpf(JSON.parse(raw));
+        stored = stripped.record;
+        if (stripped.hadCpf && stripped.record) {
+          sessionStorage.setItem(`booking_session_${slug}`, JSON.stringify(stripped.record));
+        }
       }
     } catch {
       stored = null;
     }
 
-    if (!stored?.bookingId || !stored?.accessToken) {
+    if (typeof stored?.bookingId !== "string" || typeof stored.accessToken !== "string") {
       return;
     }
+    const bookingId = stored.bookingId;
+    const accessToken = stored.accessToken;
 
     // Retoma se houver initialBookingId na URL ou se o usuário reabriu com bookingId explícito
     if (initialBookingId) {
-      if (stored.bookingId !== initialBookingId) return;
+      if (bookingId !== initialBookingId) return;
     } else {
       // Se não há bookingId na URL, não sequestra o fluxo inicial
       return;
     }
 
     // Invariante: expirado permanece expirado
-    if (stored.expiresAt && new Date(stored.expiresAt).getTime() <= Date.now()) {
+    if (typeof stored.expiresAt === "string" && new Date(stored.expiresAt).getTime() <= Date.now()) {
       try {
         sessionStorage.removeItem(`booking_session_${slug}`);
       } catch {
@@ -178,9 +184,9 @@ export function BookingFlow({ slug, initialBookingId, previewBusiness }: Booking
 
     let isCancelled = false;
 
-    fetch(publicBookingPaymentUrl(slug, stored.bookingId), {
+    fetch(publicBookingPaymentUrl(slug, bookingId), {
       headers: {
-        Authorization: `Bearer ${stored.accessToken}`,
+        Authorization: `Bearer ${accessToken}`,
       },
     })
       .then((res) => {
@@ -220,8 +226,8 @@ export function BookingFlow({ slug, initialBookingId, previewBusiness }: Booking
           });
         }
 
-        if (stored?.customerName) setCustomerName(stored.customerName);
-        if (stored?.customerPhone) setCustomerPhone(stored.customerPhone);
+        if (typeof stored?.customerName === "string") setCustomerName(stored.customerName);
+        if (typeof stored?.customerPhone === "string") setCustomerPhone(stored.customerPhone);
 
         if (paymentData.status === "confirmed") {
           setIsCompleted(true);
@@ -240,7 +246,7 @@ export function BookingFlow({ slug, initialBookingId, previewBusiness }: Booking
           startsAt: paymentData.startsAt,
           endsAt: paymentData.endsAt,
           expiresAt: paymentData.expiresAt,
-          accessToken: stored!.accessToken,
+          accessToken,
           payment: paymentData.payment,
           policy: paymentData.policy ?? null,
         };
@@ -341,14 +347,14 @@ export function BookingFlow({ slug, initialBookingId, previewBusiness }: Booking
           try {
             sessionStorage.setItem(
               `booking_session_${slug}`,
-              JSON.stringify({
+              JSON.stringify(publicBookingSession({
                 bookingId: booking.bookingId,
                 accessToken: booking.accessToken,
                 serviceId: selectedService.id,
                 customerName: customerName.trim(),
                 customerPhone: customerPhone.trim(),
                 expiresAt: booking.expiresAt,
-              })
+              })),
             );
             window.history.replaceState(null, "", publicBookingPagePath(slug, booking.bookingId));
           } catch {

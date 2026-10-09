@@ -42,11 +42,11 @@ export function lateRefundedNotice(input: { customerName: string; serviceName: s
 }
 
 const manualRefundLine = (deadlineLabel: string) =>
-  `Devolva até ${deadlineLabel} (7 dias depois deste aviso) pelo AgendaPix, no botão Devolver pelo AgendaPix, ou pelo app do Mercado Pago.`;
+  `Devolva até ${deadlineLabel} (7 dias depois deste aviso) pelo app ou site do Mercado Pago.`;
 
 export function lateRefundFailedNotice(input: { customerName: string; serviceName: string; when: string; deadlineLabel: string; cause?: LateRefundCause }): OwnerNotice {
   return {
-    subject: "Devolva um sinal pelo AgendaPix",
+    subject: "Devolva um sinal no Mercado Pago",
     text: `${latePaymentSentence(input)} Não foi possível devolver o valor automaticamente. ${manualRefundLine(input.deadlineLabel)}`,
   };
 }

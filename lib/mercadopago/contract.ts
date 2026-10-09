@@ -275,7 +275,7 @@ export const PERMISSIONS: { strong: string; rest: string }[] = [
   { strong: "criar cobranças Pix", rest: " no valor do sinal dos seus agendamentos;" },
   { strong: "ver o status", rest: " dessas cobranças, para confirmar o agendamento quando o cliente pagar;" },
   { strong: "cancelar", rest: " cobranças que não foram pagas no prazo;" },
-  { strong: "devolver um sinal quando você mandar", rest: ", pelo botão \"Devolver pelo AgendaPix\". O valor sai do saldo da sua conta Mercado Pago;" },
+  { strong: "não tirar dinheiro", rest: " fora da devolução automática. Se precisar devolver na mão, faça pelo app ou site do Mercado Pago;" },
   {
     strong: "devolver sozinho o valor inteiro",
     rest: ` quando o cliente paga depois do prazo de ${DEPOSIT_HOLD_MINUTES} minutos para reservar o horário. Você recebe um e-mail a cada devolução;`,

@@ -62,7 +62,7 @@ Pagamento atrasado com horário livre, ainda no futuro, e política `rebook_if_f
 
 ## CPF
 
-`requiresPayerCpf` vem de `MP_REQUIRES_PAYER_CPF` (padrão `false`). A referência do `POST /v1/payments` trata `payer.identification` como opcional; o guia de Pix pede o documento. Enviamos `identification` só se o cliente mandar CPF. Sem CPF, o schema aceita o pedido. O CPF não entra em `customers`, nem no `request_hash` (a idempotência usa o restante do corpo), nem no `sessionStorage` da página pública.
+`requiresPayerCpf` vem de `MP_REQUIRES_PAYER_CPF` (padrão `false`). A referência do `POST /v1/payments` trata `payer.identification` como opcional. O CPF só vai em `payer.identification` quando a flag é `true`. A tela só mostra o campo nesse caso. Não entra em `customers`, em `bookings.request_hash` nem no `sessionStorage`. Um `request_hash` antigo que ainda inclui o CPF é aceito uma vez e trocado pelo hash sem CPF.
 
 ## Webhook e reconciliação
 

@@ -267,8 +267,8 @@ function ownerOutcome(policy: DepositPolicy) {
 }
 
 function ownerClosing(policy: DepositPolicy) {
-  if (policy.noShow === "refund") return "Quando houver devolução, você faz pelo AgendaPix, depois de confirmar com o cliente.";
-  if (policy.refundUntilHours !== null) return "Quando o cliente cancelar no prazo, você devolve pelo AgendaPix, depois de confirmar o cancelamento.";
+  if (policy.noShow === "refund") return "Quando houver devolução, você faz pelo app ou site do Mercado Pago, depois de confirmar com o cliente.";
+  if (policy.refundUntilHours !== null) return "Quando o cliente cancelar no prazo, você devolve pelo app ou site do Mercado Pago, depois de confirmar o cancelamento.";
   return "";
 }
 

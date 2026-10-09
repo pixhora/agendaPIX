@@ -39,7 +39,8 @@ describe("prévia da política no painel", () => {
     expect(editor).not.toContain("confirma no painel");
     expect(form).not.toContain("confirma no painel");
     expect(editor).toContain("Para você.");
-    expect(editor).toContain("Devolver pelo AgendaPix");
+    expect(editor).toContain("app ou site do Mercado Pago");
+    expect(editor).not.toContain("Devolver pelo AgendaPix");
     expect(`${editor}\n${form}`).not.toMatch(/[`'"]O \$\{|com o \$\{/);
   });
 });

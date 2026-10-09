@@ -22,7 +22,7 @@ import { assertDepositBookable, serviceListingBookability } from "./deposit-book
 import { availabilitySchema, bookingInputSchema, requestKeySchema, slugSchema } from "./validation";
 import { depositSlotAllowed } from "./hold";
 import { bookingConfig, type BookingConfig } from "./config";
-import { getPublicBookingFacts } from "../marketing/facts";
+import { getPublicBookingFacts, payerCpfRequired } from "../marketing/facts";
 import { consumeBookingRateLimit, tenantScopedHash } from "./rate-limit";
 
 type Database = NodePgDatabase<typeof schema>;
@@ -280,7 +280,7 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
   const chargeCustomer = {
     name: input.customer.name,
     phone: input.customer.phone,
-    ...(input.customer.cpfCnpj ? { cpfCnpj: input.customer.cpfCnpj } : {}),
+    ...(payerCpfRequired() && input.customer.cpfCnpj ? { cpfCnpj: input.customer.cpfCnpj } : {}),
   };
 
   // Transação curta com lock: reserva o horário e, se houver sinal, cria pagamento em "creating" sem chamar o gateway.
@@ -323,7 +323,7 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
     if (!slot) throw new HttpError(409, "slot_unavailable", "Esse horário não está disponível. Escolha outro.");
     if (service.depositCents > 0) await enforcePendingHoldLimits(transaction, business.id, { clientHash, phone: input.customer.phone }, now, config);
     const { cpfCnpj: _cpf, ...customerRow } = input.customer;
-    void _cpf; // O CPF não entra no cadastro nem no request_hash. Segue só nesta requisição, para o Mercado Pago, se o cliente enviou.
+    void _cpf; // CPF não entra no cadastro nem no request_hash. O Mercado Pago só recebe o documento com MP_REQUIRES_PAYER_CPF=true.
     const [insertedCustomer] = await transaction.insert(schema.customers).values({ businessId: business.id, ...customerRow }).onConflictDoNothing({ target: [schema.customers.businessId, schema.customers.phone] }).returning({ id: schema.customers.id });
     const [existingCustomer] = insertedCustomer ? [] : await transaction.select({ id: schema.customers.id }).from(schema.customers).where(and(eq(schema.customers.businessId, business.id), eq(schema.customers.phone, input.customer.phone))).limit(1);
     const customerId = (insertedCustomer ?? existingCustomer).id;

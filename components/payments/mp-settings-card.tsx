@@ -199,7 +199,7 @@ export function MpConnectionCard({
           <p className="mt-4 flex items-start gap-2 text-sm leading-relaxed text-ink">
             <Undo2 aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted" />
             <span>
-              <strong className="font-semibold">Devoluções:</strong> devolva pelo agendamento, em Devolver pelo AgendaPix, ou pelo app do Mercado Pago. O valor sai do saldo da sua conta Mercado Pago. Pix pago depois do prazo para reservar o horário é devolvido sozinho, e você recebe um e-mail.
+              <strong className="font-semibold">Devoluções:</strong> devolva pelo app ou site do Mercado Pago. O valor sai do saldo da sua conta Mercado Pago. Pix pago depois do prazo para reservar o horário é devolvido sozinho, e você recebe um e-mail.
             </span>
           </p>
         ) : null}

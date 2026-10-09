@@ -271,7 +271,8 @@ describe("devolução automática só no atraso sem horário", () => {
     expect(ports.emails).toHaveLength(1);
     expect(ports.emails[0]).toContain("depois que o prazo para reservar o horário acabou");
     expect(ports.emails[0]).not.toContain("não havia horário livre");
-    expect(ports.emails[0]).toContain("Devolver pelo AgendaPix");
+    expect(ports.emails[0]).toContain("pelo app ou site do Mercado Pago");
+    expect(ports.emails[0]).not.toContain("Devolver pelo AgendaPix");
     expect(ports.emails[0]).toContain(dueLabel());
     expect(ports.emails[0]).not.toContain("horário de Brasília");
     const stored = await ports.loadByPaymentId("pay-1");

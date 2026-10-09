@@ -102,12 +102,12 @@ function dailyText(item: ReminderCase) {
   if (item.kind === "review") {
     return {
       subject: `Lembrete: confira o Pix de ${item.customerName}`,
-      text: `O horário é ${when}. A data limite para devolver continua a mesma. Devolva pelo AgendaPix ou pelo app do Mercado Pago.`,
+      text: `O horário é ${when}. A data limite para devolver continua a mesma. Devolva pelo app ou site do Mercado Pago.`,
     };
   }
   return {
     subject: `Ainda pendente: devolva ${brl(item.amountCents)} para ${item.customerName} até ${due}`,
-    text: `A devolução automática continua pendente. A data limite não mudou (${due}). Devolva pelo AgendaPix, no botão Devolver pelo AgendaPix, ou pelo app do Mercado Pago.`,
+    text: `A devolução automática continua pendente. A data limite não mudou (${due}). Devolva pelo app ou site do Mercado Pago.`,
   };
 }
 
