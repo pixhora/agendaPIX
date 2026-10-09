@@ -11,6 +11,7 @@ import { reconcileOnce } from "../../lib/payments/reconcile";
 import { applyPaidEvent } from "../../lib/payments/apply-paid";
 import { drizzleRefundPorts, settleAutomaticLateRefund } from "../../lib/payments/refund-flow";
 import { polledPaidEvent, type ChargeInput, type PaymentProvider } from "../../lib/payments/provider";
+import { PIX_APPROVAL_TOLERANCE_MS } from "../../lib/payments/rules";
 import { hash } from "../../lib/bookings/service";
 import { padraoPolicyHash } from "../helpers/deposit-policy";
 import { insertConnectedMercadoPago } from "../helpers/connected-mp";
@@ -199,7 +200,7 @@ describe("reconciliação", () => {
     await database.update(schema.payments).set({ expiresAt: new Date(Date.now() - 1000), status: "expired" }).where(eq(schema.payments.id, data.payment!.id));
     // Outro cliente pega o horário
     await createBooking(slug, input(0, "+5511999999901"), randomUUID(), database, provider);
-    const charge = provider.markPaid(data.payment!.externalId!);
+    const charge = provider.markPaid(data.payment!.externalId!, new Date(Date.now() + PIX_APPROVAL_TOLERANCE_MS));
     await database.transaction(async (tx) => {
       const result = await applyPaidEvent(tx, "fake", polledPaidEvent(charge, hash), new Date());
       expect(result).toMatchObject({ outcome: "ignored", reason: "late_no_slot" });
@@ -225,7 +226,7 @@ describe("reconciliação", () => {
     await database.update(schema.bookings).set({ createdAt: new Date(Date.now() - 60_000), expiresAt: new Date(Date.now() - 1000), status: "expired" }).where(eq(schema.bookings.id, data.bookingId));
     await database.update(schema.payments).set({ expiresAt: new Date(Date.now() - 1000), status: "expired" }).where(eq(schema.payments.id, data.payment!.id));
     await createBooking(slug, input(0, "+5511999999901"), randomUUID(), database, provider);
-    const charge = provider.markPaid(data.payment!.externalId!);
+    const charge = provider.markPaid(data.payment!.externalId!, new Date(Date.now() + PIX_APPROVAL_TOLERANCE_MS));
     await database.transaction(async (tx) => {
       expect(await applyPaidEvent(tx, "fake", polledPaidEvent(charge, hash), new Date())).toMatchObject({ outcome: "ignored", reason: "late_no_slot" });
     });
@@ -274,7 +275,7 @@ describe("reconciliação", () => {
     const { data } = await createBooking(slug, input(0), randomUUID(), database, provider);
     await database.update(schema.bookings).set({ createdAt: new Date(Date.now() - 60_000), expiresAt: new Date(Date.now() - 1000), status: "expired" }).where(eq(schema.bookings.id, data.bookingId));
     await database.update(schema.payments).set({ expiresAt: new Date(Date.now() - 1000), status: "expired" }).where(eq(schema.payments.id, data.payment!.id));
-    const charge = provider.markPaid(data.payment!.externalId!);
+    const charge = provider.markPaid(data.payment!.externalId!, new Date(Date.now() + PIX_APPROVAL_TOLERANCE_MS));
     await database.transaction(async (tx) => {
       expect(await applyPaidEvent(tx, "fake", polledPaidEvent(charge, hash), new Date())).toMatchObject({ outcome: "processed", reason: "late_rebooked" });
     });

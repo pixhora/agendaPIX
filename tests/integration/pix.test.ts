@@ -208,7 +208,8 @@ describe("webhook transacional e auditável", () => {
     await database.update(schema.bookings).set({ createdAt: new Date(Date.now() - 60000), expiresAt: new Date(Date.now() - 1000) }).where(eq(schema.bookings.id, first.data.bookingId));
     await database.update(schema.payments).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(schema.payments.id, first.data.payment!.id));
     const second = await createBooking(slugs[0], input(), randomUUID(), database, provider);
-    provider.markPaid(first.data.payment!.externalId!);
+    const paidLate = new Date(Date.now() + PIX_APPROVAL_TOLERANCE_MS);
+    provider.markPaid(first.data.payment!.externalId!, paidLate);
     let refundCalled = false;
     const hanging = {
       name: provider.name,
@@ -223,7 +224,7 @@ describe("webhook transacional e auditável", () => {
       },
     };
     const started = Date.now();
-    expect(await processWebhook(webhook(first.data.payment!.externalId!), "fake", database, hanging)).toMatchObject({ outcome: "ignored", reason: "late_no_slot" });
+    expect(await processWebhook(webhook(first.data.payment!.externalId!, { paidAt: paidLate.toISOString(), paidAtSource: "date_approved" }), "fake", database, hanging)).toMatchObject({ outcome: "ignored", reason: "late_no_slot" });
     expect(Date.now() - started).toBeLessThan(1_000);
     expect(refundCalled).toBe(false);
     const old = await getBookingPayment(slugs[0], first.data.bookingId, `Bearer ${first.data.accessToken}`, database);
@@ -276,7 +277,7 @@ describe("webhook transacional e auditável", () => {
     const first = await createBooking(slugs[0], input(), randomUUID(), database, provider);
     const holdEnds = new Date(Date.now() - 10 * 60_000);
     const paidAt = new Date(holdEnds.getTime() + PIX_APPROVAL_TOLERANCE_MS + 1000);
-    await database.update(schema.bookings).set({ createdAt: new Date(Date.now() - 60_000), expiresAt: holdEnds }).where(eq(schema.bookings.id, first.data.bookingId));
+    await database.update(schema.bookings).set({ createdAt: new Date(holdEnds.getTime() - 60_000), expiresAt: holdEnds }).where(eq(schema.bookings.id, first.data.bookingId));
     await database.update(schema.payments).set({ expiresAt: holdEnds }).where(eq(schema.payments.id, first.data.payment!.id));
     provider.markPaid(first.data.payment!.externalId!, paidAt);
     expect(await processWebhook(webhook(first.data.payment!.externalId!, { paidAt: paidAt.toISOString(), paidAtSource: "date_approved" }), "fake", database, provider)).toMatchObject({ outcome: "ignored", reason: "late_no_slot" });
