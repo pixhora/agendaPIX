@@ -12,6 +12,7 @@ import {
   markRefundedByExternalId,
   notifyDisconnectedConfirmation,
   recordUnverifiableSellerPayment,
+  settleLateRefundOutsideLock,
 } from "./refund-flow";
 import { ProviderTimeoutError } from "./timeout";
 import { IgnoredWebhookEvent, ObservedRefundEvent, UnverifiableSellerPayment, paidEventSchema, type PaidEvent, type PaymentProvider } from "./provider";
@@ -72,11 +73,14 @@ export async function processWebhook(request: Request, providerName: string, dat
       await transaction.update(schema.webhookDeliveries).set({ outcome: result.outcome, reason: result.reason }).where(eq(schema.webhookDeliveries.id, delivery.id));
       return result;
     });
+    const paymentProvider = provider ?? getPaymentProvider();
     const ports = drizzleRefundPorts(database);
-    // late_no_slot fica em payment_audit. O estorno corre no reconciliador, fora desta resposta.
-    // O Mercado Pago espera HTTP 200 ou 201 em até 22 segundos; sem isso reenvia.
+    // late_no_slot já está commitado. O estorno sai aqui, fora do lock, com o timeout do gateway.
+    // Falha ou timeout não vira 503: o Mercado Pago reenviaria o pago. O reconciliador retoma a mesma chave.
     // https://www.mercadopago.com.br/developers/pt/docs/your-integrations/notifications/webhooks
-    if (outcome.outcome === "processed" && outcome.paymentId) {
+    if (outcome.reason === "late_no_slot" && outcome.paymentId) {
+      await settleLateRefundOutsideLock(ports, paymentProvider, outcome.paymentId);
+    } else if (outcome.outcome === "processed" && outcome.paymentId) {
       try {
         await notifyDisconnectedConfirmation(ports, outcome.paymentId);
       } catch {

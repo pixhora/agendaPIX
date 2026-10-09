@@ -490,6 +490,29 @@ export async function settleAutomaticLateRefund(
   return "submitted" as const;
 }
 
+/**
+ * Estorno de `late_no_slot` depois do commit, fora de lock. A mesma chave do reconciliador.
+ * Timeout ou falha do gateway não sobe: o webhook e o GET respondem com o evento já gravado.
+ */
+export async function settleLateRefundOutsideLock(
+  ports: RefundPorts,
+  provider: Pick<PaymentProvider, "refundCharge">,
+  paymentId: string,
+) {
+  try {
+    const result = await settleAutomaticLateRefund(ports, provider, paymentId);
+    if (result === "deferred") console.error(`[payments] late_refund payment=${paymentId} code=provider_timeout`);
+  } catch (error) {
+    console.error(`[payments] late_refund payment=${paymentId} code=${lateRefundLogCode(error)}`);
+  }
+}
+
+function lateRefundLogCode(error: unknown) {
+  if (error instanceof ProviderTimeoutError) return "provider_timeout";
+  if (error instanceof HttpError && /^[a-z0-9_]{1,40}$/i.test(error.code)) return error.code;
+  return "late_refund_failed";
+}
+
 export async function recordUnverifiableSellerPayment(ports: RefundPorts, externalId: string, mailer: OwnerMailer = sendOwnerEmail, now = new Date()) {
   const view = await ports.loadByExternalId(externalId);
   if (!view) return false;
@@ -532,17 +555,34 @@ export async function markRefundedByExternalId(ports: RefundPorts, externalId: s
   return true;
 }
 
-export async function retryAutomaticLateRefunds(ports: RefundPorts, provider: Pick<PaymentProvider, "refundCharge">, limit: number, mailer?: OwnerMailer) {
+export async function retryAutomaticLateRefunds(
+  ports: RefundPorts,
+  provider: Pick<PaymentProvider, "refundCharge">,
+  limit: number,
+  mailer?: OwnerMailer,
+  onPaymentError?: (paymentId: string, error: unknown) => void,
+) {
   const ids = await ports.listLateRefundIds(limit);
   let settled = 0;
   for (const paymentId of ids) {
-    const result = await settleAutomaticLateRefund(ports, provider, paymentId, mailer);
-    if (result === "submitted") settled += 1;
+    try {
+      const result = await settleAutomaticLateRefund(ports, provider, paymentId, mailer);
+      if (result === "submitted") settled += 1;
+    } catch (error) {
+      if (!onPaymentError) throw error;
+      onPaymentError(paymentId, error);
+    }
   }
   return settled;
 }
 
-export async function observeInProcessRefunds(ports: RefundPorts, provider: Pick<PaymentProvider, "getCharge">, limit: number, now = new Date()) {
+export async function observeInProcessRefunds(
+  ports: RefundPorts,
+  provider: Pick<PaymentProvider, "getCharge">,
+  limit: number,
+  now = new Date(),
+  onPaymentError?: (paymentId: string, error: unknown) => void,
+) {
   const ids = await ports.listInProcessIds(limit);
   let observed = 0;
   for (const paymentId of ids) {
@@ -555,8 +595,9 @@ export async function observeInProcessRefunds(ports: RefundPorts, provider: Pick
       if (remote?.status !== "refunded") continue;
       const marked = await markRefundedByExternalId(ports, view.externalId, now);
       if (marked) observed += 1;
-    } catch {
+    } catch (error) {
       // Sem token ou gateway fora: o próximo ciclo tenta de novo. Não estorna daqui.
+      onPaymentError?.(paymentId, error);
     }
   }
   return observed;

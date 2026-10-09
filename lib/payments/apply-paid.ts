@@ -17,8 +17,8 @@ async function audit(database: Database, input: { businessId: string; paymentId:
  * Efeito de um pagamento confirmado, compartilhado pelo webhook e pela reconciliação.
  * Deduplica por (provider, eventId) e aplica decidePaidEvent. "No prazo" é a hora de
  * aprovação (`date_approved`), não o relógio deste processamento. Se o hold já liberou a
- * reserva e o horário segue livre, retoma (`on_time_reclaimed`). Sem horário, devolve
- * `late_no_slot` e o estorno fica para o reconciliador, fora desta transação. Pagamento
+ * reserva e o horário segue livre, retoma (`on_time_reclaimed`). Sem horário, grava
+ * `late_no_slot`; o estorno sai depois do commit, fora desta transação. Pagamento
  * de fato depois do prazo segue a política do negócio (`late_rebooked` ou `late_no_slot`).
  * Não há repasse: o Pix cai na conta do dono.
  */
@@ -80,8 +80,7 @@ export async function applyPaidEvent(database: Database, providerName: string, e
  * O UPDATE para `confirmed` pode esbarrar na exclusão `bookings_no_overlap` (23P01) quando
  * outra reserva ocupou o intervalo. O savepoint (transação aninhada do Drizzle) desfaz só
  * essa tentativa; a transação de fora grava `late_no_slot` e o estorno segue o fluxo atual.
- * O mesmo 23P01 na política de atraso (`resolveLatePayment`) fica com o PR #42: esta função
- * não altera aquele try/catch.
+ * O atraso com `rebook_if_free` usa o savepoint de `resolveLatePayment`.
  */
 async function reclaimOnTimeBooking(database: Database, input: {
   business: typeof schema.businesses.$inferSelect;
@@ -139,18 +138,25 @@ async function resolveLatePayment(database: Database, input: {
   // Só vira confirmed se o horário ainda estiver livre. Antes dessa gravação o atraso
   // não é tratado como confirmado. Não cria repasse.
   if (business.latePaymentPolicy === "rebook_if_free" && booking.startsAt > now) {
+    // Savepoint (transação aninhada do Drizzle). O 23P01 da exclusão gist aborta a transação
+    // do Postgres se o UPDATE correr no mesmo bloco: late_no_slot não grava, o webhook
+    // responde 503 em loop e o estorno não dispara. O rollback do savepoint deixa o bloco válido.
+    let rebooked = false;
     try {
-      await database.update(schema.bookings).set({ status: "confirmed", expiresAt: null })
-        .where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.id, booking.id), or(eq(schema.bookings.status, "expired"), eq(schema.bookings.status, "pending_payment"))));
-      const [current] = await database.select().from(schema.bookings)
-        .where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.id, booking.id))).limit(1);
-      if (current.status === "confirmed") {
-        await audit(database, { businessId: business.id, paymentId: payment.id, bookingId: booking.id, action: "late_payment_rebooked", detail: { eventId: event.eventId, statusDetail: event.statusDetail ?? null } });
-        return { outcome: "processed", reason: "late_rebooked", paymentId: payment.id, businessId: business.id, bookingId: booking.id };
-      }
+      rebooked = await database.transaction(async (tx) => {
+        await tx.update(schema.bookings).set({ status: "confirmed", expiresAt: null })
+          .where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.id, booking.id), or(eq(schema.bookings.status, "expired"), eq(schema.bookings.status, "pending_payment"))));
+        const [current] = await tx.select().from(schema.bookings)
+          .where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.id, booking.id))).limit(1);
+        return current.status === "confirmed";
+      });
     } catch (error) {
       const cause = error instanceof Error && error.cause ? error.cause : error;
       if (!(typeof cause === "object" && cause !== null && "code" in cause && cause.code === "23P01")) throw error;
+    }
+    if (rebooked) {
+      await audit(database, { businessId: business.id, paymentId: payment.id, bookingId: booking.id, action: "late_payment_rebooked", detail: { eventId: event.eventId, statusDetail: event.statusDetail ?? null } });
+      return { outcome: "processed", reason: "late_rebooked", paymentId: payment.id, businessId: business.id, bookingId: booking.id };
     }
   }
   await audit(database, {

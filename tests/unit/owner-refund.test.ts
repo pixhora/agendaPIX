@@ -298,6 +298,8 @@ describe("devolução automática só no atraso sem horário", () => {
     for (const file of ["lib/payments/webhook.ts", "lib/payments/reconcile.ts", "lib/payments/apply-paid.ts"]) {
       expect(readFileSync(file, "utf8")).not.toContain(".refundCharge(");
     }
+    expect(readFileSync("lib/payments/webhook.ts", "utf8")).toContain("settleLateRefundOutsideLock");
+    expect(readFileSync("lib/payments/status-poll.ts", "utf8")).toContain("settleLateRefundOutsideLock");
     expect(readFileSync("lib/payments/webhook.ts", "utf8")).not.toContain("settleAutomaticLateRefund");
     expect(readFileSync("lib/payments/refund-flow.ts", "utf8")).toContain("purpose: \"settlement\"");
     expect(readFileSync("lib/payments/manual-refund-reminders.ts", "utf8")).not.toContain("refundCharge");
