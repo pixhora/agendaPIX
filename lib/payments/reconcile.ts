@@ -145,12 +145,12 @@ async function retryStuckCreating(database: Database, provider: PaymentProvider,
         }, { signal, businessId: payment.businessId }));
         charge = { ...created, reference: payment.id, status: "pending", paidAt: null };
       }
-      if (charge.status === "paid" && charge.paidAt) {
+      if (charge.status === "paid") {
         await database.transaction(async (tx) => {
           await tx.update(schema.payments).set({
             status: "pending", externalId: charge!.externalId, qrCodeDataUrl: charge!.qrCodeDataUrl, copyPaste: charge!.copyPaste,
           }).where(and(eq(schema.payments.id, payment.id), eq(schema.payments.status, "creating")));
-          await applyPaidEvent(tx, provider.name, polledPaidEvent(charge!, hash), now);
+          await applyPaidEvent(tx, provider.name, polledPaidEvent(charge!, hash, now), now);
         });
       } else if (charge.status === "pending") {
         await database.update(schema.payments).set({
@@ -186,8 +186,8 @@ async function cancelExpiredPending(database: Database, provider: PaymentProvide
     });
     try {
       const remote = await withTimeout(config, (signal) => provider.cancelCharge(payment.externalId!, { signal, businessId: payment.businessId }));
-      if (remote?.status === "paid" && remote.paidAt) {
-        await database.transaction(async (tx) => { await applyPaidEvent(tx, provider.name, polledPaidEvent(remote, hash), now); });
+      if (remote?.status === "paid") {
+        await database.transaction(async (tx) => { await applyPaidEvent(tx, provider.name, polledPaidEvent(remote, hash, now), now); });
         continue;
       }
       await audit(database, { businessId: payment.businessId, paymentId: payment.id, bookingId: payment.bookingId, action: "expired_pending_cancelled", detail: { externalId: payment.externalId, remoteStatus: remote?.status ?? null } });
@@ -208,9 +208,9 @@ async function pollPendingForMissedWebhooks(database: Database, provider: Paymen
     if (!payment.externalId) continue;
     try {
       const remote = await withTimeout(config, (signal) => provider.getCharge(payment.externalId!, { signal, businessId: payment.businessId }));
-      if (!remote || remote.status !== "paid" || !remote.paidAt) continue;
+      if (!remote || remote.status !== "paid") continue;
       await database.transaction(async (tx) => {
-        const result = await applyPaidEvent(tx, provider.name, polledPaidEvent(remote, hash), now);
+        const result = await applyPaidEvent(tx, provider.name, polledPaidEvent(remote, hash, now), now);
         if (result.outcome === "processed" || result.reason === "late_no_slot") {
           await audit(tx, { businessId: payment.businessId, paymentId: payment.id, bookingId: payment.bookingId, action: "polled_payment_applied", detail: { outcome: result.outcome, reason: result.reason } });
           report.audits++;

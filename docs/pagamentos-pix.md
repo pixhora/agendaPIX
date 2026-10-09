@@ -41,7 +41,7 @@ refundCharge(externalId, { idempotencyKey }, { signal, businessId, mpUserId, acc
 
 `POST /v1/payments` com `payment_method_id: "pix"`, `transaction_amount`, `payer.email` (`hold-{reference}@pagador.agendapix.invalid` sem e-mail), `external_reference`, `notification_url`, `date_of_expiration` e `X-Idempotency-Key`. Sem `application_fee` (taxa zero).
 
-`date_of_expiration` = fim do hold + **2 minutos** (`MERCADOPAGO_PIX_EXPIRATION_MARGIN_MINUTES`), em ISO-8601 com offset. A doc aceita de 30 minutos a 30 dias. `BOOKING_HOLD_MINUTES` tem padrão **30** e faixa **28–43200**: 28 + 2 = 30, o mínimo do `/v1/payments`. Abaixo de 28 a reserva responde `503` `booking_unavailable`, com a mensagem `BOOKING_HOLD_MINUTES inválido`. O `expiresAt` que a tela recebe continua sendo só o hold. Pago até o hold confirma; depois disso entra no fluxo atrasado. `MP_REQUIRES_PAYER_CPF` continua com padrão `false`.
+`date_of_expiration` = fim do hold + **2 minutos** (`MERCADOPAGO_PIX_EXPIRATION_MARGIN_MINUTES`), em ISO-8601 com offset. A doc aceita de 30 minutos a 30 dias. `BOOKING_HOLD_MINUTES` tem padrão **30** e faixa **28–43200**: 28 + 2 = 30, o mínimo do `/v1/payments`. Abaixo de 28 a reserva responde `503` `booking_unavailable`, com a mensagem `BOOKING_HOLD_MINUTES inválido`. O `expiresAt` que a tela recebe continua sendo só o hold. "Pago no prazo" usa `date_approved` do `GET /v1/payments/{id}` (string ISO-8601, ex.: `2017-08-31T11:26:38.000Z`), não a hora em que o webhook ou a reconciliação processa o evento. A tolerância é a mesma margem do Pix: aprovação até `expiresAt` + 2 minutos (`PIX_APPROVAL_TOLERANCE_MS`, porque o Mercado Pago aceita o Pix até `date_of_expiration`). Doc: https://www.mercadopago.com.br/developers/en/reference/online-payments/checkout-pro/get-payment/get. Sem `date_approved` válido não usamos `date_created`: o evento segue com `paidAtSource: "fallback"` e só confirma se o hold ainda segura o horário; depois disso entra na política de atraso. `date_approved` mais de 5 minutos à frente do relógio local é rejeitado (`future_payment`). Se a aprovação foi no prazo mas a reserva já expirou, o horário livre é retomado (`on_time_reclaimed`); se outra pessoa ocupou, grava `late_no_slot` e o reconciliador estorna. O savepoint desse 23P01 fica neste caminho. O 23P01 da política `rebook_if_free` continua no PR #42, sem alterar `resolveLatePayment`. `MP_REQUIRES_PAYER_CPF` continua com padrão `false`.
 
 QR e copia-e-cola saem de `point_of_interaction.transaction_data` (`qr_code`, `qr_code_base64`, `ticket_url`) e voltam nos campos atuais: `copyPaste` e `qrCodeDataUrl`.
 
@@ -49,7 +49,7 @@ QR e copia-e-cola saem de `point_of_interaction.transaction_data` (`qr_code`, `q
 
 | Mercado Pago | Efeito |
 | --- | --- |
-| `approved` + `status_detail: accredited` | pago; confirma se ainda está no hold |
+| `approved` + `status_detail: accredited` | pago; confirma se `date_approved` ≤ hold + 2 min e o horário segue livre |
 | `pending` / `pending_waiting_transfer` | aguardando |
 | `cancelled` / `expired` | não confirma |
 | `refunded` / `charged_back` | não confirma |

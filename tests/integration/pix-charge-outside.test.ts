@@ -168,6 +168,22 @@ describe("reconciliação", () => {
     expect(payment.status).toBe("expired");
   });
 
+  it("reconciliação confirma Pix aprovado no prazo mesmo depois do hold", async () => {
+    const { data } = await createBooking(slug, input(0), randomUUID(), database, provider);
+    const holdEnds = new Date(Date.now() - 30_000);
+    const paidAt = new Date(holdEnds.getTime() - 60_000);
+    await database.update(schema.bookings).set({ createdAt: new Date(Date.now() - 60_000), expiresAt: holdEnds }).where(eq(schema.bookings.id, data.bookingId));
+    await database.update(schema.payments).set({ expiresAt: holdEnds }).where(eq(schema.payments.id, data.payment!.id));
+    provider.markPaid(data.payment!.externalId!, paidAt);
+    const report = await reconcileOnce(database, provider, { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50 });
+    expect(report.refundsSettled).toBe(0);
+    const [booking] = await database.select().from(schema.bookings).where(eq(schema.bookings.id, data.bookingId));
+    expect(booking.status).toBe("confirmed");
+    const [payment] = await database.select().from(schema.payments).where(eq(schema.payments.id, data.payment!.id));
+    expect(payment.status).toBe("paid");
+    expect(payment.refundStatus).toBeNull();
+  });
+
   it("descobre pagamento perdido pelo webhook via poll", async () => {
     const { data } = await createBooking(slug, input(0), randomUUID(), database, provider);
     provider.markPaid(data.payment!.externalId!);

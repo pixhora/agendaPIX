@@ -132,6 +132,21 @@ function constantTimeEqualHex(a: string, b: string) {
   }
 }
 
+/**
+ * `date_approved` do GET /v1/payments/{id}: string ISO-8601 (ex.: `2017-08-31T11:26:38.000Z`).
+ * Ausente ou inválido não vira data. Não usa `date_created`.
+ * https://www.mercadopago.com.br/developers/en/reference/online-payments/checkout-pro/get-payment/get
+ */
+export function parseApprovalInstant(value: string | null | undefined): Date | null {
+  if (typeof value !== "string" || value.trim() === "") return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function knownApproval(value: Date | null | undefined): value is Date {
+  return value instanceof Date && !Number.isNaN(value.getTime());
+}
+
 /** ISO-8601 com offset (`-00:00`), como a Payments API descreve `date_of_expiration`. */
 export function formatMercadoPagoDate(date: Date) {
   return date.toISOString().replace(/Z$/, "-00:00");
@@ -299,9 +314,10 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
     else if (payment.status === "expired" || expiresAt <= now) status = "expired";
     else status = "pending";
 
-    const paidAt = status === "paid"
-      ? new Date(payment.date_approved ?? payment.date_created ?? now.toISOString())
-      : null;
+    // Só `date_approved` é a hora em que o Pix foi aprovado. `date_created` é a criação da
+    // cobrança e o relógio local é o processamento: nenhum dos dois prova pagamento no prazo.
+    // https://www.mercadopago.com.br/developers/en/reference/online-payments/checkout-pro/get-payment/get
+    const paidAt = status === "paid" ? parseApprovalInstant(payment.date_approved) : null;
 
     return {
       externalId: payment.id,
@@ -506,7 +522,8 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
       type: "payment.paid",
       externalId: payment.externalId,
       amountCents: payment.amountCents,
-      paidAt: (payment.paidAt ?? now).toISOString(),
+      paidAt: (knownApproval(payment.paidAt) ? payment.paidAt! : now).toISOString(),
+      paidAtSource: knownApproval(payment.paidAt) ? "date_approved" : "fallback",
       ...(payment.statusDetail ? { statusDetail: payment.statusDetail } : {}),
     });
   }

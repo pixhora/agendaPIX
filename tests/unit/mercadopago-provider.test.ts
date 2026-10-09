@@ -395,6 +395,7 @@ describe("MercadoPagoPaymentProvider: webhook", () => {
       externalId: created.externalId,
       amountCents: 1500,
       paidAt: "2030-01-01T12:05:00.000Z",
+      paidAtSource: "date_approved",
       statusDetail: "accredited",
     });
   });
@@ -501,6 +502,7 @@ describe("MercadoPagoPaymentProvider: webhook", () => {
       externalId: created.externalId,
       amountCents: 2000,
       paidAt: "2030-01-01T12:07:00.000Z",
+      paidAtSource: "date_approved",
       statusDetail: "accredited",
     });
   });
@@ -534,6 +536,34 @@ describe("MercadoPagoPaymentProvider: webhook", () => {
       type: "payment.paid",
       externalId: created.externalId,
       amountCents: 1200,
+      paidAtSource: "date_approved",
+    });
+  });
+
+  it("sem date_approved válido não usa date_created nem o relógio como aprovação", async () => {
+    const { mock, mp } = provider();
+    const reference = randomUUID();
+    const created = await mp.createPixCharge({
+      idempotencyKey: randomUUID(), reference, amountCents: 1500,
+      expiresAt: new Date(now.getTime() + 40 * 60_000), customer,
+    });
+    const payment = mock.byId.get(created.externalId)!;
+    payment.status = "approved";
+    payment.status_detail = "accredited";
+    payment.date_created = "2030-01-01T11:00:00.000Z";
+    payment.date_approved = "nao-e-data";
+    expect(await mp.getCharge(created.externalId)).toMatchObject({ status: "paid", paidAt: null });
+
+    payment.date_approved = null;
+    const body = JSON.stringify({
+      id: 777, type: "payment", action: "payment.updated", user_id: 4444, data: { id: created.externalId },
+    });
+    const url = `http://localhost/api/webhooks/payments/mercadopago?data.id=${created.externalId}&type=payment`;
+    const event = await mp.verifyWebhook(body, signedHeaders(created.externalId), now, url);
+    expect(event).toMatchObject({
+      paidAt: now.toISOString(),
+      paidAtSource: "fallback",
+      statusDetail: "accredited",
     });
   });
 });
