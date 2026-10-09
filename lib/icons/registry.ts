@@ -1,5 +1,5 @@
 /**
- * Mapa de ícones agendaPIX — só lucide-react.
+ * Mapa de ícones AgendaPix — só lucide-react.
  * Decisão: docs/DESIGN_DECISION.md § Ícones + docs/design-refs/icons/.
  * Preferir <Icon icon={…} /> de @/components/ui/icon para stroke/tamanho.
  */
@@ -40,6 +40,7 @@ import {
   Sunrise,
   Timer,
   TimerOff,
+  Undo2,
   User,
   Users,
   Wallet,
@@ -113,6 +114,12 @@ export const PIX_STATUS_ICONS: Record<PixUiStatus, LucideIcon> = {
   cancelled: CircleX,
 };
 
+/** Devolução: nem o check de sucesso, nem o alerta de erro. */
+export const PIX_REFUND_ICONS = {
+  pending: RotateCcw,
+  done: Undo2,
+} as const;
+
 /** Status de reserva no painel. */
 export type BookingStatusValue = "pending_payment" | "confirmed" | "cancelled" | "expired" | "completed";
 
@@ -163,7 +170,6 @@ export const ACTION_ICONS = {
   link: Link2,
   hours: Clock,
   appearance: Palette,
-  pixKey: Wallet,
   back: ChevronLeft,
 } as const;
 

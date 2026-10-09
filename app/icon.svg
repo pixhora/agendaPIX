@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none" >
+<defs>
+<style>@media (prefers-color-scheme: dark){.rim{stroke-opacity:.22}}</style>
+</defs>
+<path d="M9.38 0H22.62C28.62 0 32.00 3.38 32.00 9.38V22.62C32.00 28.62 28.62 32.00 22.62 32.00H9.38C3.38 32.00 0 28.62 0 22.62V9.38C0 3.38 3.38 0 9.38 0Z" fill="#0B0B0C"/>
+<path class="rim" d="M9.38 0H22.62C28.62 0 32.00 3.38 32.00 9.38V22.62C32.00 28.62 28.62 32.00 22.62 32.00H9.38C3.38 32.00 0 28.62 0 22.62V9.38C0 3.38 3.38 0 9.38 0Z" stroke="#fff" stroke-opacity="0" stroke-width="1.00"/>
+<circle cx="16" cy="16.0" r="6" stroke="#3FD0BE" stroke-width="4"/>
+<rect x="20" y="8" width="4" height="16" rx="2.0" fill="#F6F5F2"/>
+</svg>

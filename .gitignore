@@ -1,6 +1,7 @@
 # Dependências e builds
 node_modules/
 .next/
+.next-legal/
 out/
 dist/
 *.tsbuildinfo

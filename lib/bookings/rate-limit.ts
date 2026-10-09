@@ -3,7 +3,7 @@ import { isIP } from "node:net";
 import { sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "../../db/schema";
-import { authEnvSchema } from "../env";
+import { rateLimitSecret } from "../env";
 import { HttpError } from "../http";
 import { bookingConfig, type BookingConfig } from "./config";
 
@@ -59,9 +59,9 @@ export function bookingClientIdentity(request: Request, config: BookingConfig = 
 
 /** HMAC por negócio: o endereço nunca é armazenado e não correlaciona clientes entre negócios. */
 export function tenantScopedHash(purpose: string, businessId: string, identity: string) {
-  const env = authEnvSchema.safeParse(process.env);
-  if (!env.success) throw new HttpError(503, "booking_unavailable", "Agendamento indisponível. Tente novamente mais tarde.");
-  return createHmac("sha256", env.data.BETTER_AUTH_SECRET).update(`${purpose}:${businessId}:${identity}`).digest("hex");
+  const secret = rateLimitSecret();
+  if (!secret) throw new HttpError(503, "booking_unavailable", "Agendamento indisponível. Tente novamente mais tarde.");
+  return createHmac("sha256", secret).update(`${purpose}:${businessId}:${identity}`).digest("hex");
 }
 
 const BUSINESS_BUCKET = "*business*";
@@ -77,15 +77,64 @@ async function consumeBucket(database: NodePgDatabase<typeof schema>, businessId
   return result.rows.length > 0;
 }
 
-export async function consumeBookingRateLimit(database: NodePgDatabase<typeof schema>, businessId: string, identity: string | null, config: BookingConfig = bookingConfig()) {
+async function consumeWindow(database: NodePgDatabase<typeof schema>, businessId: string, identity: string | null, purpose: string, perClient: number, perBusiness: number, clientMessage: string, businessMessage: string) {
   // Limpeza limitada; a tabela guarda somente contadores descartáveis.
   await database.execute(sql`DELETE FROM booking_rate_limits WHERE window_started_at < now() - interval '24 hours' AND (business_id, client_hash) IN
     (SELECT business_id, client_hash FROM booking_rate_limits WHERE window_started_at < now() - interval '24 hours' LIMIT 100)`);
   // Balde do cliente primeiro: tentativas recusadas de um cliente não consomem o teto compartilhado do negócio.
-  if (identity && !await consumeBucket(database, businessId, tenantScopedHash("booking-rate:v1", businessId, identity), config.BOOKING_RATE_LIMIT_PER_CLIENT)) {
-    throw new HttpError(429, "rate_limited", "Muitas tentativas. Aguarde um minuto e tente novamente.", 60);
+  if (identity && !await consumeBucket(database, businessId, tenantScopedHash(purpose, businessId, identity), perClient)) {
+    throw new HttpError(429, "rate_limited", clientMessage, 60);
   }
-  if (!await consumeBucket(database, businessId, tenantScopedHash("booking-rate:v1", businessId, BUSINESS_BUCKET), config.BOOKING_RATE_LIMIT_PER_BUSINESS)) {
-    throw new HttpError(429, "rate_limited", "Muitas tentativas neste negócio. Aguarde um minuto e tente novamente.", 60);
+  if (!await consumeBucket(database, businessId, tenantScopedHash(purpose, businessId, BUSINESS_BUCKET), perBusiness)) {
+    throw new HttpError(429, "rate_limited", businessMessage, 60);
   }
+}
+
+export async function consumeBookingRateLimit(database: NodePgDatabase<typeof schema>, businessId: string, identity: string | null, config: BookingConfig = bookingConfig()) {
+  await consumeWindow(
+    database, businessId, identity, "booking-rate:v1",
+    config.BOOKING_RATE_LIMIT_PER_CLIENT, config.BOOKING_RATE_LIMIT_PER_BUSINESS,
+    "Muitas tentativas. Aguarde um minuto e tente novamente.",
+    "Muitas tentativas neste negócio. Aguarde um minuto e tente novamente.",
+  );
+}
+
+/** Polling do Pix (a cada 4 s). Balde separado da criação de reserva, sem lock do negócio. */
+export async function consumePaymentPollRateLimit(database: NodePgDatabase<typeof schema>, businessId: string, identity: string | null, config: BookingConfig = bookingConfig()) {
+  await consumeWindow(
+    database, businessId, identity, "payment-poll:v1",
+    config.PAYMENT_POLL_RATE_LIMIT_PER_CLIENT, config.PAYMENT_POLL_RATE_LIMIT_PER_BUSINESS,
+    "Muitas consultas. Aguarde um minuto e tente novamente.",
+    "Muitas consultas neste negócio. Aguarde um minuto e tente novamente.",
+  );
+}
+
+/** Uma consulta remota por pagamento. Compartilhada entre instâncias; não é o balde HTTP de 4 s. */
+export const PAYMENT_GATEWAY_POLL_PURPOSE = "payment-gateway-poll:v1";
+export const PAYMENT_GATEWAY_POLL_INTERVAL_SECONDS = 20;
+
+export function paymentGatewayPollHash(businessId: string, paymentId: string) {
+  return tenantScopedHash(PAYMENT_GATEWAY_POLL_PURPOSE, businessId, paymentId);
+}
+
+/**
+ * Reserva a próxima consulta ao gateway deste pagamento.
+ * Fora da janela: só leitura, sem atualizar a linha.
+ * Dentro da janela: um único vencedor (INSERT atômico), para várias instâncias serverless.
+ */
+export async function claimPaymentGatewayPoll(database: NodePgDatabase<typeof schema>, businessId: string, paymentId: string) {
+  const clientHash = paymentGatewayPollHash(businessId, paymentId);
+  const fresh = await database.execute(sql`SELECT 1 AS ready FROM booking_rate_limits
+    WHERE business_id = ${businessId} AND client_hash = ${clientHash}
+      AND window_started_at > now() - (${PAYMENT_GATEWAY_POLL_INTERVAL_SECONDS}::int * interval '1 second')
+    LIMIT 1`);
+  if (fresh.rows.length > 0) return false;
+  const claimed = await database.execute(sql`INSERT INTO booking_rate_limits (business_id, client_hash, attempts)
+    VALUES (${businessId}, ${clientHash}, 1)
+    ON CONFLICT (business_id, client_hash) DO UPDATE SET
+      attempts = 1,
+      window_started_at = now()
+    WHERE booking_rate_limits.window_started_at <= now() - (${PAYMENT_GATEWAY_POLL_INTERVAL_SECONDS}::int * interval '1 second')
+    RETURNING attempts`);
+  return claimed.rows.length > 0;
 }

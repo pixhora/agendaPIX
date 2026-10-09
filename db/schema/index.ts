@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
-import { boolean, check, foreignKey, index, integer, jsonb, pgEnum, pgTable, primaryKey, text, time, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, date, foreignKey, index, integer, jsonb, pgEnum, pgTable, primaryKey, text, time, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import type { DepositPolicy } from "../../lib/policy/schema";
 import { user } from "./auth";
 
 export * from "./auth";
@@ -11,6 +12,7 @@ const timestamps = () => ({
 
 export const bookingStatus = pgEnum("booking_status", ["pending_payment", "confirmed", "cancelled", "expired", "completed"]);
 export const paymentStatus = pgEnum("payment_status", ["creating", "pending", "paid", "expired", "cancelled", "failed", "refunded", "refund_pending"]);
+export const subscriptionStatus = pgEnum("subscription_status", ["trialing", "active", "past_due", "canceled"]);
 export const latePaymentPolicies = ["refund", "rebook_if_free"] as const;
 
 export const businesses = pgTable("businesses", {
@@ -21,15 +23,17 @@ export const businesses = pgTable("businesses", {
   timezone: text("timezone").default("America/Sao_Paulo").notNull(),
   // Política de pagamento tardio (webhook/reconciliação após o hold vencer): reembolso ou reabre o mesmo horário se livre.
   latePaymentPolicy: text("late_payment_policy", { enum: latePaymentPolicies }).default("refund").notNull(),
+  // Fim do teste grátis. Negócios novos: fim do 7º dia local. Já existentes: now() + 7 dias nesta migration.
+  trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }).default(sql`(now() + interval '7 days')`).notNull(),
+  contactWhatsapp: text("contact_whatsapp"),
   ...timestamps(),
 }, (table) => [
   index("businesses_owner_idx").on(table.ownerId),
   check("businesses_name_not_empty", sql`length(trim(${table.name})) > 0`),
   check("businesses_slug_format", sql`${table.slug} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`),
   check("businesses_late_payment_policy_valid", sql`${table.latePaymentPolicy} IN ('refund', 'rebook_if_free')`),
+  check("businesses_contact_whatsapp_format", sql`${table.contactWhatsapp} IS NULL OR ${table.contactWhatsapp} ~ '^[+][1-9][0-9]{7,14}$'`),
 ]);
-
-export const pixKeyTypes = ["cpf", "cnpj", "email", "phone", "evp"] as const;
 
 export const bookingRateLimits = pgTable("booking_rate_limits", {
   businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "cascade" }),
@@ -41,6 +45,10 @@ export const bookingRateLimits = pgTable("booking_rate_limits", {
   index("booking_rate_window_idx").on(table.windowStartedAt),
   check("booking_rate_attempts_valid", sql`${table.attempts} >= 1`),
 ]);
+
+export const pixKeyTypes = ["cpf", "cnpj", "email", "phone", "evp"] as const;
+
+/** Chave Pix antiga. Toda linha fica inativa; o ciphertext permanece e não entra em cobrança nem em resposta. */
 export const businessPixKeys = pgTable("business_pix_keys", {
   businessId: uuid("business_id").primaryKey().references(() => businesses.id, { onDelete: "restrict" }),
   type: text("type", { enum: pixKeyTypes }).notNull(),
@@ -48,10 +56,13 @@ export const businessPixKeys = pgTable("business_pix_keys", {
   nonce: text("nonce").notNull(),
   keyVersion: integer("key_version").notNull(),
   hint: text("hint").notNull(),
+  deactivatedAt: timestamp("deactivated_at", { withTimezone: true }).defaultNow().notNull(),
+  deactivationReason: text("deactivation_reason").default("pix_key_retired").notNull(),
   ...timestamps(),
 }, (table) => [
   check("business_pix_keys_cipher_valid", sql`length(${table.ciphertext}) > 0 AND length(${table.nonce}) > 0 AND ${table.keyVersion} > 0`),
   check("business_pix_keys_type_valid", sql`${table.type} IN ('cpf', 'cnpj', 'email', 'phone', 'evp')`),
+  check("business_pix_keys_retired", sql`${table.deactivatedAt} IS NOT NULL AND length(trim(${table.deactivationReason})) > 0`),
 ]);
 
 export const services = pgTable("services", {
@@ -61,6 +72,7 @@ export const services = pgTable("services", {
   durationMinutes: integer("duration_minutes").notNull(),
   priceCents: integer("price_cents").notNull(),
   depositCents: integer("deposit_cents").notNull(),
+  depositPolicy: jsonb("deposit_policy").$type<DepositPolicy>().notNull().default(sql`'{"version":1,"preset":"padrao","refundUntilHours":24,"rescheduleUntilHours":24,"maxReschedules":1,"lateCancel":"retain","noShow":"retain","creditValidityDays":60}'::jsonb`),
   active: boolean("active").default(true).notNull(),
   ...timestamps(),
 }, (table) => [
@@ -68,6 +80,7 @@ export const services = pgTable("services", {
   check("services_name_not_empty", sql`length(trim(${table.name})) > 0`),
   check("services_duration_positive", sql`${table.durationMinutes} > 0`),
   check("services_money_valid", sql`${table.priceCents} >= 0 AND ${table.depositCents} >= 0 AND ${table.depositCents} <= ${table.priceCents}`),
+  check("services_deposit_policy_object", sql`jsonb_typeof(${table.depositPolicy}) = 'object'`),
 ]);
 
 export const businessHours = pgTable("business_hours", {
@@ -113,6 +126,11 @@ export const bookings = pgTable("bookings", {
   depositCents: integer("deposit_cents").notNull(),
   status: bookingStatus("status").default("pending_payment").notNull(),
   expiresAt: timestamp("expires_at", { withTimezone: true }),
+  policySnapshot: jsonb("policy_snapshot").$type<DepositPolicy>(),
+  policyText: text("policy_text"),
+  refundDeadlineAt: timestamp("refund_deadline_at", { withTimezone: true }),
+  rescheduleDeadlineAt: timestamp("reschedule_deadline_at", { withTimezone: true }),
+  policyHash: text("policy_hash"),
   ...timestamps(),
 }, (table) => [
   unique("bookings_business_id_unique").on(table.businessId, table.id),
@@ -125,6 +143,8 @@ export const bookings = pgTable("bookings", {
   check("bookings_interval_valid", sql`${table.startsAt} < ${table.endsAt}`),
   check("bookings_money_valid", sql`${table.priceCents} >= 0 AND ${table.depositCents} >= 0 AND ${table.depositCents} <= ${table.priceCents}`),
   check("bookings_pending_expiry_required", sql`${table.status} <> 'pending_payment' OR (${table.expiresAt} IS NOT NULL AND ${table.expiresAt} > ${table.createdAt})`),
+  check("bookings_policy_hash_format", sql`${table.policyHash} IS NULL OR ${table.policyHash} ~ '^[a-f0-9]{64}$'`),
+  check("bookings_policy_snapshot_pair", sql`(${table.policySnapshot} IS NULL) = (${table.policyText} IS NULL) AND (${table.policySnapshot} IS NULL) = (${table.policyHash} IS NULL)`),
 ]);
 
 export const payments = pgTable("payments", {
@@ -140,12 +160,26 @@ export const payments = pgTable("payments", {
   status: paymentStatus("status").default("creating").notNull(),
   paidAt: timestamp("paid_at", { withTimezone: true }),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  /** Devolução do sinal, separada do status da reserva e de `refund_pending`. */
+  refundStatus: text("refund_status", { enum: ["in_process", "refunded", "failed"] }),
+  refundedAt: timestamp("refunded_at", { withTimezone: true }),
+  /** Fim do 7º dia local para o dono devolver na mão. Vencer não move dinheiro nem status. */
+  manualRefundDueAt: timestamp("manual_refund_due_at", { withTimezone: true }),
+  /** Trava do e-mail da véspera. Volta a null se o envio falhar. */
+  manualRefundReminderSentAt: timestamp("manual_refund_reminder_sent_at", { withTimezone: true }),
+  /** Dia local em que o cliente pediu o cancelamento, informado pelo dono. */
+  policyRefundRequestedOn: date("policy_refund_requested_on"),
+  /** Cancelamento remoto já concluído. A reconciliação não tenta de novo. */
+  remoteCancelledAt: timestamp("remote_cancelled_at", { withTimezone: true }),
+  /** Última tentativa de cancelamento que não concluiu. Null cede a vez a quem ainda não foi tentado. */
+  remoteCancelAttemptedAt: timestamp("remote_cancel_attempted_at", { withTimezone: true }),
   ...timestamps(),
 }, (table) => [
   unique("payments_business_id_unique").on(table.businessId, table.id),
   foreignKey({ name: "payments_booking_tenant_fk", columns: [table.businessId, table.bookingId], foreignColumns: [bookings.businessId, bookings.id] }),
   index("payments_business_booking_idx").on(table.businessId, table.bookingId),
   index("payments_reconcile_status_idx").on(table.status, table.updatedAt),
+  index("payments_remote_cancel_due_idx").on(table.remoteCancelAttemptedAt, table.expiresAt, table.id).where(sql`${table.remoteCancelledAt} IS NULL AND ${table.externalId} IS NOT NULL AND ${table.status} IN ('pending', 'expired')`),
   unique("payments_provider_external_unique").on(table.provider, table.externalId),
   check("payments_amount_positive", sql`${table.amountCents} > 0`),
   check("payments_provider_not_empty", sql`length(trim(${table.provider})) > 0`),
@@ -153,6 +187,8 @@ export const payments = pgTable("payments", {
   // creating: cobrando o gateway; pending: QR anexado; demais estados finais ou de auditoria.
   check("payments_creating_has_no_qr", sql`${table.status} <> 'creating' OR (${table.qrCodeDataUrl} IS NULL AND ${table.copyPaste} IS NULL AND ${table.externalId} IS NULL)`),
   check("payments_pending_has_qr", sql`${table.status} <> 'pending' OR (${table.externalId} IS NOT NULL AND ${table.qrCodeDataUrl} IS NOT NULL AND ${table.copyPaste} IS NOT NULL)`),
+  check("payments_refund_status_valid", sql`${table.refundStatus} IS NULL OR ${table.refundStatus} IN ('in_process', 'refunded', 'failed')`),
+  check("payments_refunded_timestamp_required", sql`${table.refundStatus} IS DISTINCT FROM 'refunded' OR ${table.refundedAt} IS NOT NULL`),
 ]);
 
 
@@ -221,6 +257,155 @@ export const paymentAudit = pgTable("payment_audit", {
   check("payment_audit_action_not_empty", sql`length(trim(${table.action})) > 0`),
 ]);
 
+export const subscriptionProviderIds = ["manual", "pix_platform"] as const;
+
+export const subscriptions = pgTable("subscriptions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  businessId: uuid("business_id").notNull().unique().references(() => businesses.id, { onDelete: "restrict" }),
+  status: subscriptionStatus("status").notNull(),
+  provider: text("provider"),
+  externalId: text("external_id"),
+  currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
+  ...timestamps(),
+}, (table) => [
+  check("subscriptions_provider_valid", sql`${table.provider} IS NULL OR ${table.provider} IN ('manual', 'pix_platform')`),
+]);
+
+/** Pedido de ativação manual. No máximo um aberto (handled_at nulo) por negócio. */
+export const subscriptionRequests = pgTable("subscription_requests", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "restrict" }),
+  provider: text("provider").notNull(),
+  requestedAt: timestamp("requested_at", { withTimezone: true }).defaultNow().notNull(),
+  handledAt: timestamp("handled_at", { withTimezone: true }),
+  handledBy: text("handled_by"),
+}, (table) => [
+  uniqueIndex("subscription_requests_one_open_per_business_idx").on(table.businessId).where(sql`${table.handledAt} IS NULL`),
+  check("subscription_requests_provider_valid", sql`${table.provider} IN ('manual', 'pix_platform')`),
+  check("subscription_requests_handled_pair", sql`(${table.handledAt} IS NULL) = (${table.handledBy} IS NULL)`),
+  check("subscription_requests_handled_by_not_blank", sql`${table.handledBy} IS NULL OR length(trim(${table.handledBy})) > 0`),
+]);
+
+export const mpConnectionStatuses = ["connected", "needs_reconnect", "disconnected"] as const;
+
+// Conta Mercado Pago do próprio negócio. O Pix do sinal cai na conta do vendedor; a plataforma não repassa.
+// Tokens só existem cifrados. mp_user_id é único entre conexões ativas (status connected).
+export const mercadopagoConnections = pgTable("mercadopago_connections", {
+  businessId: uuid("business_id").primaryKey().references(() => businesses.id, { onDelete: "restrict" }),
+  mpUserId: text("mp_user_id").notNull(),
+  accessTokenEnc: text("access_token_enc"),
+  refreshTokenEnc: text("refresh_token_enc"),
+  publicKey: text("public_key"),
+  scope: text("scope"),
+  liveMode: boolean("live_mode"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  connectedAt: timestamp("connected_at", { withTimezone: true }).notNull(),
+  refreshedAt: timestamp("refreshed_at", { withTimezone: true }),
+  status: text("status", { enum: mpConnectionStatuses }).notNull(),
+  lastError: text("last_error"),
+  disconnectedAt: timestamp("disconnected_at", { withTimezone: true }),
+  consentVersion: text("consent_version"),
+  consentTextSha256: text("consent_text_sha256"),
+  autoRefundAckAt: timestamp("auto_refund_ack_at", { withTimezone: true }),
+  consentUserId: text("consent_user_id"),
+  accountDisplayName: text("account_display_name"),
+  accountEmailMasked: text("account_email_masked"),
+  ...timestamps(),
+}, (table) => [
+  uniqueIndex("mercadopago_connections_mp_user_connected_uq").on(table.mpUserId).where(sql`${table.status} = 'connected'`),
+  index("mercadopago_connections_refresh_idx").on(table.expiresAt).where(sql`${table.status} = 'connected'`),
+  check("mercadopago_connections_status_valid", sql`${table.status} IN ('connected', 'needs_reconnect', 'disconnected')`),
+  check("mercadopago_connections_mp_user_not_empty", sql`length(trim(${table.mpUserId})) > 0`),
+  check("mercadopago_connections_consent_hash", sql`${table.consentTextSha256} IS NULL OR ${table.consentTextSha256} ~ '^[0-9a-f]{64}$'`),
+  check("mercadopago_connections_account_display_name", sql`${table.accountDisplayName} IS NULL OR char_length(${table.accountDisplayName}) BETWEEN 1 AND 80`),
+  check("mercadopago_connections_account_email_masked", sql`${table.accountEmailMasked} IS NULL OR ${table.accountEmailMasked} ~ '^.{1,2}\u2022\u2022@.+$'`),
+  check("mercadopago_connections_tokens_match_status", sql`(
+    (${table.status} = 'connected' AND ${table.disconnectedAt} IS NULL AND ${table.accessTokenEnc} IS NOT NULL AND ${table.refreshTokenEnc} IS NOT NULL AND length(${table.accessTokenEnc}) > 0 AND length(${table.refreshTokenEnc}) > 0 AND ${table.expiresAt} IS NOT NULL)
+    OR (${table.status} = 'needs_reconnect' AND ${table.accessTokenEnc} IS NULL AND ${table.refreshTokenEnc} IS NULL)
+    OR (${table.status} = 'disconnected' AND ${table.disconnectedAt} IS NOT NULL AND (
+      (${table.accessTokenEnc} IS NULL AND ${table.refreshTokenEnc} IS NULL)
+      OR (${table.accessTokenEnc} IS NOT NULL AND ${table.refreshTokenEnc} IS NOT NULL AND length(${table.accessTokenEnc}) > 0 AND length(${table.refreshTokenEnc}) > 0)
+    ))
+  )`),
+]);
+
+/** State do OAuth enquanto o dono está no Mercado Pago. O verifier PKCE, quando existe, fica só no cookie. */
+export const mercadopagoOauthStates = pgTable("mercadopago_oauth_states", {
+  state: text("state").primaryKey(),
+  businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "restrict" }),
+  returnTo: text("return_to").notNull(),
+  consentVersion: text("consent_version").notNull(),
+  consentTextSha256: text("consent_text_sha256").notNull(),
+  autoRefundAckAt: timestamp("auto_refund_ack_at", { withTimezone: true }).notNull(),
+  consentUserId: text("consent_user_id").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index("mercadopago_oauth_states_business_idx").on(table.businessId),
+  check("mercadopago_oauth_states_not_empty", sql`length(trim(${table.state})) > 0 AND length(trim(${table.consentVersion})) > 0 AND length(trim(${table.consentUserId})) > 0 AND ${table.consentTextSha256} ~ '^[0-9a-f]{64}$'`),
+]);
+
+/** Eventos da conexão. O IP do consentimento fica só aqui. */
+export const mpConnectionEvents = pgTable("mp_connection_events", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "restrict" }),
+  kind: text("kind").notNull(),
+  ip: text("ip"),
+  detail: text("detail"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index("mp_connection_events_business_idx").on(table.businessId, table.createdAt),
+  check("mp_connection_events_kind_not_empty", sql`length(trim(${table.kind})) > 0`),
+  check("mp_connection_events_detail_safe", sql`${table.detail} IS NULL OR ${table.detail} ~ '^(timeout|unreachable|invalid_response|http_[1-5][0-9]{2})$'`),
+]);
+
+/**
+ * Aviso do dono. Sem reserva, uma linha por negócio e tipo. Com reserva, uma linha por reserva e tipo.
+ * Não guarda a chave Pix. `email_sent_at` marca o e-mail da véspera da devolução.
+ */
+export const ownerNotices = pgTable("owner_notices", {
+  businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "restrict" }),
+  kind: text("kind").notNull(),
+  bookingId: uuid("booking_id"),
+  dismissedAt: timestamp("dismissed_at", { withTimezone: true }).defaultNow().notNull(),
+  emailSentAt: timestamp("email_sent_at", { withTimezone: true }),
+}, (table) => [
+  uniqueIndex("owner_notices_business_kind_uq").on(table.businessId, table.kind).where(sql`${table.bookingId} IS NULL`),
+  uniqueIndex("owner_notices_booking_kind_uq").on(table.bookingId, table.kind).where(sql`${table.bookingId} IS NOT NULL`),
+  check("owner_notices_kind_not_empty", sql`length(trim(${table.kind})) > 0`),
+]);
+
+/**
+ * Uma tentativa de devolução. No máximo uma ativa por pagamento
+ * (`requested`, `processing` ou `refunded`). `failed` libera a próxima.
+ * A chave `{paymentId}:{n}` nasce aqui e vai ao Mercado Pago; o cliente não a envia.
+ */
+export const paymentRefunds = pgTable("payment_refunds", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "restrict" }),
+  paymentId: uuid("payment_id").notNull(),
+  bookingId: uuid("booking_id").notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  kind: text("kind", { enum: ["owner_api", "auto_late", "owner_manual_mark"] }).notNull(),
+  status: text("status", { enum: ["requested", "processing", "refunded", "rejected", "failed"] }).notNull(),
+  mpRefundId: text("mp_refund_id"),
+  errorCode: text("error_code"),
+  requestedByUserId: text("requested_by_user_id").references(() => user.id, { onDelete: "restrict" }),
+  idempotencyKey: text("idempotency_key").notNull(),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  unique("payment_refunds_idempotency_key_unique").on(table.idempotencyKey),
+  uniqueIndex("payment_refunds_one_active_per_payment").on(table.paymentId).where(sql`${table.status} in ('requested', 'processing', 'refunded')`),
+  foreignKey({ name: "payment_refunds_payment_tenant_fk", columns: [table.businessId, table.paymentId], foreignColumns: [payments.businessId, payments.id] }),
+  foreignKey({ name: "payment_refunds_booking_tenant_fk", columns: [table.businessId, table.bookingId], foreignColumns: [bookings.businessId, bookings.id] }),
+  index("payment_refunds_payment_idx").on(table.paymentId),
+  check("payment_refunds_amount_positive", sql`${table.amountCents} > 0`),
+  check("payment_refunds_idempotency_key_not_empty", sql`length(trim(${table.idempotencyKey})) > 0`),
+  check("payment_refunds_kind_valid", sql`${table.kind} in ('owner_api', 'auto_late', 'owner_manual_mark')`),
+  check("payment_refunds_status_valid", sql`${table.status} in ('requested', 'processing', 'refunded', 'rejected', 'failed')`),
+]);
+
 export const onboardingRequests = pgTable("onboarding_requests", {
   ownerId: text("owner_id").notNull().references(() => user.id, { onDelete: "restrict" }),
   requestKey: uuid("request_key").notNull(),
@@ -228,3 +413,39 @@ export const onboardingRequests = pgTable("onboarding_requests", {
   result: jsonb("result").$type<{ businessId: string; slug: string; publicPath: string; serviceId: string }>(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [primaryKey({ columns: [table.ownerId, table.requestKey] })]);
+
+export type OnboardingDraftData = {
+  business: { name: string; slug: string; timezone: string };
+  service: { name: string; durationMinutes: number; priceCents: number; depositCents: number };
+  hours: { weekday: number; opensAt: string; closesAt: string }[];
+};
+
+/** Rascunho do cadastro antes da conta existir. O e-mail sai na limpeza dos vencidos (LGPD). */
+export const onboardingDrafts = pgTable("onboarding_drafts", {
+  id: uuid("id").primaryKey(),
+  email: text("email").notNull(),
+  segment: text("segment"),
+  plan: text("plan"),
+  data: jsonb("data").$type<OnboardingDraftData>().notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  consumedAt: timestamp("consumed_at", { withTimezone: true }),
+  businessId: uuid("business_id").references(() => businesses.id, { onDelete: "set null" }),
+  ...timestamps(),
+}, (table) => [
+  index("onboarding_drafts_email_idx").on(table.email),
+  index("onboarding_drafts_expires_idx").on(table.expiresAt),
+  check("onboarding_drafts_email_not_empty", sql`length(trim(${table.email})) > 0`),
+  check("onboarding_drafts_expires_after_create", sql`${table.expiresAt} > ${table.createdAt}`),
+]);
+
+/** Contadores de abuso sem guardar IP ou e-mail em claro (HMAC). */
+export const abuseRateLimits = pgTable("abuse_rate_limits", {
+  scope: text("scope").notNull(),
+  clientHash: text("client_hash").notNull(),
+  windowStartedAt: timestamp("window_started_at", { withTimezone: true }).defaultNow().notNull(),
+  attempts: integer("attempts").notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.scope, table.clientHash] }),
+  check("abuse_rate_attempts_valid", sql`${table.attempts} >= 1`),
+  check("abuse_rate_scope_not_empty", sql`length(trim(${table.scope})) > 0 AND length(trim(${table.clientHash})) > 0`),
+]);

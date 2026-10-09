@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import type { PublicService, AvailabilitySlot } from "./types";
 import { formatCurrency, formatCpfMask, formatPhoneMask, isValidBrazilianPhone, isValidCpf } from "./formatters";
-import { ArrowLeft, Lock } from "lucide-react";
+import { ArrowLeft, Loader2, Lock } from "lucide-react";
 import { Icon } from "@/components/ui/icon";
 import { CUSTOMER_FIELD_ICONS } from "@/lib/icons/registry";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FieldError, FieldHint } from "@/components/ui/field";
 import { BookingSummary } from "./BookingSummary";
+import { PolicySummaryLine } from "@/components/policy/PolicySummaryLine";
+import { POLICY_MISSING_MESSAGE } from "./booking-error";
+import { policyLineTone, servicePolicyState } from "./policy-gate";
+import { privacyPolicyLink } from "@/lib/marketing/flags";
 
 interface StepCustomerProps {
   service: PublicService;
@@ -21,13 +26,21 @@ interface StepCustomerProps {
   cpf: string;
   isSubmitting: boolean;
   errorMessage: string | null;
+  errorContactHref?: string | null;
+  /** `calm` para o estabelecimento pausado: o cliente não errou o preenchimento. */
+  errorTone?: "danger" | "calm";
   onChangeName: (name: string) => void;
   onChangePhone: (phone: string) => void;
   onChangeCpf: (cpf: string) => void;
   onBack: () => void;
   onSubmit: () => void;
+  /** `false`: esconde o CPF. Ausente: o campo continua, a API atual ainda pede o documento. */
+  requiresPayerCpf?: boolean;
+  onOpenPolicy?: (trigger: HTMLElement) => void;
   /** Classes do resumo (ex.: `lg:hidden` quando a página já mostra o resumo ao lado). */
   summaryClassName?: string;
+  /** Espelha `LEGAL_PAGES_PUBLISHED`. Desligado: o link de privacidade não aparece. */
+  legalPagesPublished?: boolean;
 }
 
 export function StepCustomer({
@@ -39,19 +52,28 @@ export function StepCustomer({
   cpf,
   isSubmitting,
   errorMessage,
+  errorContactHref,
+  errorTone = "danger",
   onChangeName,
   onChangePhone,
   onChangeCpf,
   onBack,
   onSubmit,
   summaryClassName,
+  requiresPayerCpf,
+  onOpenPolicy,
+  legalPagesPublished = false,
 }: StepCustomerProps) {
   const [touched, setTouched] = useState({ name: false, phone: false, cpf: false });
+  const askCpf = requiresPayerCpf === true;
+  const policyState = servicePolicyState(service);
+  const policyBlocked = policyState === "missing";
 
   const isNameValid = name.trim().length >= 2;
   const isPhoneValid = isValidBrazilianPhone(phone);
-  const isCpfValid = isValidCpf(cpf);
-  const canSubmit = isNameValid && isPhoneValid && isCpfValid && !isSubmitting;
+  const isCpfValid = !askCpf || isValidCpf(cpf);
+  const canSubmit = isNameValid && isPhoneValid && isCpfValid && !isSubmitting && !policyBlocked;
+  const privacy = privacyPolicyLink(legalPagesPublished);
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onChangePhone(formatPhoneMask(e.target.value));
@@ -77,10 +99,21 @@ export function StepCustomer({
     <form onSubmit={handleFormSubmit} className="space-y-6" noValidate>
       <div>
         <h2 className="font-display text-xl font-bold tracking-tight text-ink sm:text-2xl">Seus dados para contato</h2>
-        <p className="mt-1 text-sm text-muted">Nome, WhatsApp e CPF. Sem cadastro e sem senha.</p>
+        <p className="mt-1 text-sm text-muted">
+          {askCpf ? "Nome, WhatsApp e CPF. Sem cadastro e sem senha." : "Nome e WhatsApp. Sem cadastro e sem senha."}
+        </p>
       </div>
 
       <BookingSummary service={service} slot={slot} timezone={timezone} variant="plain" className={summaryClassName} headingLevel="h3" />
+
+      {policyState === "ready" && service.policySummary && onOpenPolicy ? (
+        <PolicySummaryLine
+          summary={service.policySummary}
+          tone={policyLineTone(service.depositPolicy, slot.startsAt)}
+          onDetails={onOpenPolicy}
+        />
+      ) : null}
+      {policyBlocked ? <p role="alert" className="text-sm font-medium text-danger">{POLICY_MISSING_MESSAGE}</p> : null}
 
       <div className="space-y-5">
         <div className="space-y-2">
@@ -122,11 +155,11 @@ export function StepCustomer({
               className="pl-10"
             />
           </div>
-          <FieldHint id="phone-hint">Usado só para lembrar você do horário.</FieldHint>
+          <FieldHint id="phone-hint">Usado só para o estabelecimento falar com você sobre este horário.</FieldHint>
           <FieldError id="phone-error">{phoneError}</FieldError>
         </div>
 
-        <div className="space-y-2">
+        {askCpf ? <div className="space-y-2">
           <Label htmlFor="customer-cpf">CPF</Label>
           <div className="relative">
             <Icon icon={CUSTOMER_FIELD_ICONS.cpf} className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
@@ -147,12 +180,37 @@ export function StepCustomer({
           </div>
           <FieldHint id="cpf-hint">Exigido para emitir a cobrança Pix em seu nome.</FieldHint>
           <FieldError id="cpf-error">{cpfError}</FieldError>
-        </div>
+        </div> : null}
       </div>
 
+      {privacy ? (
+        <p className="text-sm text-muted">
+          <Link href={privacy.href} className="font-semibold text-ink underline underline-offset-4">
+            {privacy.label}
+          </Link>
+        </p>
+      ) : null}
+
       {errorMessage && (
-        <div role="alert" className="rounded-card border border-danger/30 bg-danger-soft p-4 text-sm font-medium text-danger">
-          {errorMessage}
+        <div
+          role="alert"
+          className={
+            errorTone === "calm"
+              ? "space-y-3 rounded-card border border-line bg-subtle p-4 text-sm text-ink"
+              : "space-y-3 rounded-card border border-danger/30 bg-danger-soft p-4 text-sm font-medium text-danger"
+          }
+        >
+          <p>{errorMessage}</p>
+          {errorContactHref ? (
+            <a
+              href={errorContactHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-11 items-center font-semibold text-ink underline decoration-line-strong underline-offset-4"
+            >
+              Falar no WhatsApp
+            </a>
+          ) : null}
         </div>
       )}
 
@@ -160,8 +218,8 @@ export function StepCustomer({
         <Button type="button" variant="ghost" disabled={isSubmitting} onClick={onBack} className="sm:-ml-3">
           <ArrowLeft aria-hidden="true" /> Voltar
         </Button>
-        <Button type="submit" size="lg" variant={service.depositCents > 0 ? "pix" : "default"} disabled={isSubmitting} className="w-full sm:w-auto">
-          {service.depositCents > 0 && <Lock aria-hidden="true" />}
+        <Button type="submit" size="lg" variant={service.depositCents > 0 ? "pix" : "default"} disabled={isSubmitting || policyBlocked} aria-busy={isSubmitting || undefined} className="w-full sm:w-auto">
+          {isSubmitting ? <Loader2 aria-hidden="true" className="animate-spin motion-reduce:animate-none" /> : service.depositCents > 0 ? <Lock aria-hidden="true" /> : null}
           {isSubmitting
             ? "Gerando Pix…"
             : service.depositCents > 0

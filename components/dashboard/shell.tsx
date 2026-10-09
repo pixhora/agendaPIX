@@ -5,7 +5,7 @@ import { ACTION_ICONS } from "@/lib/icons/registry";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-export function DashboardShell({ title, description, path, businesses, businessId, actions, children }: {
+export function DashboardShell({ title, description, path, businesses, businessId, actions, notice, children }: {
   title: string;
   description: string;
   path: string;
@@ -13,6 +13,7 @@ export function DashboardShell({ title, description, path, businesses, businessI
   businessId?: string;
   /** Ações principais da página (ex.: "Novo serviço"). */
   actions?: ReactNode;
+  notice?: ReactNode;
   children: ReactNode;
 }) {
   return <main id="content" tabIndex={-1} className="mx-auto w-full max-w-6xl min-w-0 space-y-6 px-4 py-6 outline-none sm:px-6 lg:px-10 lg:py-10">
@@ -34,7 +35,7 @@ export function DashboardShell({ title, description, path, businesses, businessI
       </div>}
     </header>
 
-    {businessId ? children : <section className="rounded-card border border-line bg-surface p-6 sm:p-8">
+    {businessId ? <>{notice}{children}</> : <section className="rounded-card border border-line bg-surface p-6 sm:p-8">
       <Icon icon={ACTION_ICONS.emptyBusiness} size="xl" className="mb-4 text-muted" />
       <h2 className="font-display text-xl font-bold">{businesses.length ? "Negócio indisponível" : "Seu negócio ainda não foi cadastrado"}</h2>
       <p className="mt-2 max-w-[60ch] text-muted">{businesses.length ? "Este negócio não está disponível para sua conta. Escolha um dos seus negócios para continuar." : "Conclua o cadastro do negócio para começar a organizar seus horários."}</p>

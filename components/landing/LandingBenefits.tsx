@@ -1,25 +1,24 @@
-import { BellRing, CalendarX2, LayoutDashboard, Smartphone } from "lucide-react";
-import { ValueSlab } from "@/components/ui/value-slab";
+import { CalendarCheckIcon, CircleCheckIcon, LayoutPanelIcon, SmartphoneIcon } from "./icons";
+import { honestBenefits } from "@/lib/marketing/landing-copy";
+import { cn } from "@/lib/utils";
+import { belowFold } from "./section";
 
-const ITEMS = [
-  { Icon: CalendarX2, title: "Fim do horário furado", text: "Quem paga sinal aparece. E se faltar, o sinal já ficou com você." },
-  { Icon: Smartphone, title: "Feito para o celular", text: "Seu cliente agenda em menos de um minuto, sem baixar aplicativo e sem criar conta." },
-  { Icon: BellRing, title: "Confirmação automática", text: "O Pix cai, a reserva confirma. Ninguém precisa mandar print de comprovante." },
-  { Icon: LayoutDashboard, title: "Seu dia num olhar", text: "Atendimentos, sinais recebidos e pendentes no mesmo painel, no celular ou no computador." },
-];
+const icons = [CalendarCheckIcon, CircleCheckIcon, SmartphoneIcon, LayoutPanelIcon];
+const items = honestBenefits.map((item, index) => ({ ...item, Icon: icons[index] ?? CircleCheckIcon }));
 
 export function LandingBenefits() {
   return (
-    <section aria-labelledby="beneficios-title" className="bg-slab py-16 text-slab-foreground sm:py-24">
-      <div className="mx-auto grid max-w-6xl gap-12 px-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:items-center">
-        <div>
-          <h2 id="beneficios-title" className="font-display text-3xl font-extrabold tracking-tight sm:text-5xl">O sinal no Pix paga a sua agenda.</h2>
-          <p className="mt-4 max-w-md text-lg leading-relaxed text-slab-muted">Cada horário vazio é dinheiro que não volta. Com o sinal, o compromisso vem antes do atendimento.</p>
-          <ValueSlab size="compact" className="mt-8 max-w-sm bg-white/[0.06] ring-white/10" label="Exemplo: sinais de hoje" value="R$ 55,00" badge="5 pagos" sublabel="Já na sua conta, antes do primeiro cliente chegar." />
-        </div>
-        <ul className="grid gap-px overflow-hidden rounded-frame bg-white/10 sm:grid-cols-2">
-          {ITEMS.map(({ Icon, title, text }) => (
-            <li key={title} className="bg-slab p-6">
+    <section aria-labelledby="beneficios-titulo" className={cn("bg-slab py-16 text-slab-foreground lg:py-28", belowFold)}>
+      <div className="mx-auto w-full max-w-[1120px] px-5">
+        <h2 id="beneficios-titulo" className="max-w-[20rem] font-display text-[1.75rem] font-bold leading-[1.08] tracking-[-0.025em] sm:max-w-[28rem] lg:text-[2.75rem]">
+          O sinal no Pix protege a sua agenda.
+        </h2>
+        <p className="mt-4 max-w-[36rem] text-base leading-relaxed text-pretty text-slab-muted lg:text-lg">
+          Cada horário vazio é dinheiro que não volta. Com o sinal, o compromisso vem antes do atendimento.
+        </p>
+        <ul className="mt-8 grid gap-px overflow-hidden rounded-frame bg-white/10 sm:grid-cols-2">
+          {items.map(({ Icon, title, text }) => (
+            <li key={title} className="bg-slab p-5 sm:p-6">
               <Icon aria-hidden="true" className="size-6 text-pix-bright" />
               <h3 className="mt-4 font-display text-lg font-bold">{title}</h3>
               <p className="mt-1.5 text-sm leading-relaxed text-slab-muted">{text}</p>

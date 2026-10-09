@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { dateSchema, hoursSchema, parseMoney, serviceFormSchema, weekDates } from "../../lib/dashboard/validation";
+import { dateSchema, formatMoneyInput, hoursSchema, parseMoney, serviceFormSchema, weekDates } from "../../lib/dashboard/validation";
 
 const mocks = vi.hoisted(() => ({ findOwnedBusiness: vi.fn(), session: vi.fn(), redirect: vi.fn(), db: { select: vi.fn(), update: vi.fn(), insert: vi.fn(), transaction: vi.fn() } }));
 vi.mock("../../lib/tenancy", () => ({ findOwnedBusiness: mocks.findOwnedBusiness }));
@@ -14,8 +14,13 @@ const businessId = "4eeb8372-55cd-4d11-910e-62d4e4374011";
 const service = { businessId, name: "Corte", durationMinutes: 30, priceCents: 5000, depositCents: 1000, active: true };
 beforeEach(() => vi.clearAllMocks());
 describe("validação do painel", () => {
-  it.each([["29,90", 2990], ["29.9", 2990], ["0", 0], ["21474836.47", 2147483647]])("converte %s sem perder centavos", (text, cents) => expect(parseMoney(text)).toBe(cents));
+  it.each([["29,90", 2990], ["29.9", 2990], ["0", 0], ["21474836.47", 2147483647], ["20,00", 2000], ["20", 2000], ["1.234,50", 123450]])("converte %s sem perder centavos", (text, cents) => expect(parseMoney(text)).toBe(cents));
   it.each(["-1", "1.001", "1e3", "", "NaN", "21474836.48"])("rejeita dinheiro inválido %s", (text) => expect(() => parseMoney(text)).toThrow());
+  it("mostra o valor do campo com vírgula", () => {
+    expect(formatMoneyInput(2000)).toBe("20,00");
+    expect(formatMoneyInput(6000)).toBe("60,00");
+    expect(formatMoneyInput(123450)).toBe("1.234,50");
+  });
   it("rejeita sinal maior que preço e campos fornecidos pelo cliente", () => {
     expect(serviceFormSchema.safeParse({ ...service, depositCents: 5001 }).success).toBe(false);
     expect(serviceFormSchema.safeParse({ ...service, ownerId: "outro-dono" }).success).toBe(false);

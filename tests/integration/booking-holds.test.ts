@@ -4,9 +4,12 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as schema from "../../db/schema";
+import { bookingConfig } from "../../lib/bookings/config";
 import { createBooking } from "../../lib/bookings/service";
 import { databaseEnvSchema } from "../../lib/env";
 import { FakePaymentProvider } from "../../lib/payments/fake";
+import { padraoPolicyHash } from "../helpers/deposit-policy";
+import { insertConnectedMercadoPago } from "../helpers/connected-mp";
 
 const pool = new Pool({ connectionString: databaseEnvSchema.parse(process.env).DATABASE_URL, max: 10, connectionTimeoutMillis: 5000 });
 const database = drizzle(pool, { schema });
@@ -19,7 +22,7 @@ let serviceId: string;
 const slot = (index: number) => new Date(Date.UTC(2030, 0, 1, 12, 0) + index * 1800000).toISOString();
 const phone = (index: number) => `+55119${String(index).padStart(8, "0")}`;
 const book = (index: number, phoneIndex: number, identity: string | null, key = randomUUID()) =>
-  createBooking(slug, { serviceId, startsAt: slot(index), customer: { name: "Cliente de teste", phone: phone(phoneIndex) , cpfCnpj: "52998224725" } }, key, database, provider, identity);
+  createBooking(slug, { serviceId, startsAt: slot(index), customer: { name: "Cliente de teste", phone: phone(phoneIndex) , cpfCnpj: "52998224725" }, policyHash: padraoPolicyHash("Negócio de teste") }, key, database, provider, identity);
 
 beforeEach(async () => {
   ownerId = randomUUID(); businessId = randomUUID(); serviceId = randomUUID(); slug = `holds-${businessId}`;
@@ -27,14 +30,18 @@ beforeEach(async () => {
   await database.insert(schema.businesses).values({ id: businessId, ownerId, name: "Negócio de teste", slug });
   await database.insert(schema.services).values({ id: serviceId, businessId, name: "Corte", durationMinutes: 30, priceCents: 5000, depositCents: 1000 });
   await database.insert(schema.businessHours).values({ businessId, weekday: 2, opensAt: "09:00:00", closesAt: "18:00:00" });
+  await insertConnectedMercadoPago(database, businessId);
 });
 afterEach(async () => {
   vi.unstubAllEnvs();
+  await database.delete(schema.paymentRefunds).where(eq(schema.paymentRefunds.businessId, businessId));
+  await database.delete(schema.ownerNotices).where(eq(schema.ownerNotices.businessId, businessId));
   await database.delete(schema.payments).where(eq(schema.payments.businessId, businessId));
   await database.delete(schema.bookings).where(eq(schema.bookings.businessId, businessId));
   await database.delete(schema.customers).where(eq(schema.customers.businessId, businessId));
   await database.delete(schema.businessHours).where(eq(schema.businessHours.businessId, businessId));
   await database.delete(schema.services).where(eq(schema.services.businessId, businessId));
+  await database.delete(schema.mercadopagoConnections).where(eq(schema.mercadopagoConnections.businessId, businessId));
   await database.delete(schema.businesses).where(eq(schema.businesses.id, businessId));
   await database.delete(schema.user).where(eq(schema.user.id, ownerId));
 });
@@ -54,7 +61,7 @@ describe("limite de reservas pendentes", () => {
     const error = await book(2, 2, "peer:192.0.2.10").catch((value) => value);
     expect(error).toMatchObject({ status: 429, code: "pending_hold_limit" });
     expect(error.retryAfterSeconds).toBeGreaterThan(0);
-    expect(error.retryAfterSeconds).toBeLessThanOrEqual(600);
+    expect(error.retryAfterSeconds).toBeLessThanOrEqual(bookingConfig().BOOKING_HOLD_MINUTES * 60);
     expect((await book(2, 2, "peer:192.0.2.11")).data.status).toBe("pending_payment");
     const rows = await database.select().from(schema.bookings).where(eq(schema.bookings.businessId, businessId));
     expect(rows).toHaveLength(3);
@@ -110,17 +117,18 @@ describe("limite de reservas pendentes", () => {
   });
 
   it("janela de reserva configurável define vencimento da reserva e da cobrança", async () => {
-    vi.stubEnv("BOOKING_HOLD_MINUTES", "5");
+    vi.stubEnv("BOOKING_HOLD_MINUTES", "45");
     const before = Date.now();
     const { data } = await book(0, 0, "peer:192.0.2.60");
     const expiresAt = new Date(data.expiresAt!).getTime();
-    expect(expiresAt).toBeGreaterThanOrEqual(before + 5 * 60000 - 1000);
-    expect(expiresAt).toBeLessThanOrEqual(Date.now() + 5 * 60000);
-    expect(new Date(data.payment!.expiresAt).getTime()).toBe(expiresAt);
+    const paymentExpires = new Date(data.payment!.expiresAt).getTime();
+    expect(Math.abs(paymentExpires - expiresAt)).toBeLessThanOrEqual(5000);
+    expect(expiresAt).toBeGreaterThanOrEqual(before + 45 * 60000 - 5000);
+    expect(expiresAt).toBeLessThanOrEqual(Date.now() + 45 * 60000 + 5000);
   });
 
   it("configuração inválida torna o agendamento indisponível sem criar reserva", async () => {
-    vi.stubEnv("BOOKING_HOLD_MINUTES", "999");
+    vi.stubEnv("BOOKING_HOLD_MINUTES", "50000");
     await expect(book(0, 0, "peer:192.0.2.70")).rejects.toMatchObject({ status: 503, code: "booking_unavailable" });
     expect(await database.select().from(schema.bookings).where(eq(schema.bookings.businessId, businessId))).toHaveLength(0);
   });

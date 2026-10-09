@@ -55,11 +55,23 @@ export function formatTimeSlot(isoString: string, timezone: string): string {
   }
 }
 
+/** Metadado curto da reserva: "qui, 15 out · 15:30". */
+export function formatAppointmentMeta(isoString: string, timezone: string): string {
+  const parts = new Intl.DateTimeFormat("pt-BR", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    timeZone: timezone,
+  }).formatToParts(new Date(isoString));
+  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value.replace(/\./g, "") ?? "";
+  return `${value("weekday")}, ${value("day")} ${value("month")} · ${formatTimeSlot(isoString, timezone)}`;
+}
+
 export function formatDateFull(isoStringOrDate: string | Date, timezone: string): string {
   try {
     return new Intl.DateTimeFormat("pt-BR", {
       weekday: "long",
-      day: "2-digit",
+      day: "numeric",
       month: "long",
       timeZone: timezone,
     }).format(typeof isoStringOrDate === "string" ? new Date(isoStringOrDate) : isoStringOrDate);

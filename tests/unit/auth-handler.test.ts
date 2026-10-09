@@ -3,7 +3,7 @@ import { APIError } from "better-auth/api";
 import { getAuth } from "../../lib/auth";
 import { sendMagicLinkEmail } from "../../lib/email";
 
-vi.mock("../../lib/email", () => ({ sendMagicLinkEmail: vi.fn() }));
+vi.mock("../../lib/email", () => ({ sendMagicLinkEmail: vi.fn(), sendSignInCodeEmail: vi.fn() }));
 
 beforeEach(() => {
   vi.stubEnv("DATABASE_URL", "postgresql://local:example@localhost/agenda");
@@ -56,7 +56,7 @@ it.each(["SMTP", "adapter", "APIError", "APIError503"])("esconde detalhes de fal
     .map((value) => value instanceof Error ? value.stack : String(value)).join(" ");
   expect(logged).not.toContain("SYNTHETIC_PRIVATE_TOKEN");
   expect(logged).not.toContain("synthetic@example.com");
-  expect(error.mock.calls).toEqual([["[Agenda auth] Authentication operation failed"]]);
+  expect(error.mock.calls).toEqual([["[AgendaPix auth] Authentication operation failed"]]);
 });
 
 it("preserva envio bem-sucedido pelo handler sem acessar banco ou SMTP reais", async () => {
@@ -118,5 +118,5 @@ it("responde indisponibilidade sem publicar configuração inválida", async () 
   expect(await response.json()).toEqual({ error: {
     code: "auth_unavailable", message: "O acesso está indisponível. Tente novamente mais tarde.",
   } });
-  expect(error.mock.calls).toEqual([["[Agenda auth] Authentication operation failed"]]);
+  expect(error.mock.calls).toEqual([["[AgendaPix auth] Authentication operation failed"]]);
 });

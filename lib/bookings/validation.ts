@@ -1,22 +1,8 @@
 import { z } from "zod";
 import { cpfDigits, isValidCpf } from "../validation/cpf";
+import { RESERVED_BUSINESS_SLUGS } from "../slug";
 
-/** Slugs de sistema / rotas reservados; fonte única de verdade (comparação case-insensitive). */
-export const RESERVED_BUSINESS_SLUGS = [
-  "login",
-  "onboarding",
-  "preview",
-  "dashboard",
-  "api",
-  "admin",
-  "auth",
-  "health",
-  "ready",
-  "webhooks",
-  "_next",
-  "static",
-  "favicon.ico",
-] as const;
+export { RESERVED_BUSINESS_SLUGS };
 
 const reservedSlugSet = new Set<string>(RESERVED_BUSINESS_SLUGS.map((slug) => slug.toLowerCase()));
 
@@ -38,8 +24,14 @@ export const bookingInputSchema = z.object({
   customer: z.object({
     name: z.string().trim().min(1).max(120),
     phone: z.string().regex(/^\+[1-9][0-9]{7,14}$/),
-    /** CPF do pagador (enviado ao gateway Pix; não persistido). Aceita máscara; normaliza para 11 dígitos. */
-    cpfCnpj: z.string().trim().min(11).max(18).transform(cpfDigits).refine(isValidCpf, "CPF inválido."),
+    /**
+     * Opcional. A referência do POST /v1/payments não marca `payer.identification` como obrigatório
+     * (o exemplo em PHP do guia de Pix envia só o e-mail). Só segue ao Mercado Pago quando
+     * `MP_REQUIRES_PAYER_CPF=true`. Não entra em `customers`, em `request_hash`, em log
+     * nem no sessionStorage do navegador.
+     */
+    cpfCnpj: z.string().trim().min(11).max(18).transform(cpfDigits).refine(isValidCpf, "CPF inválido.").optional(),
   }).strict(),
+  policyHash: z.string().regex(/^[a-f0-9]{64}$/).optional(),
 }).strict();
 export const requestKeySchema = z.uuid({ version: "v4" });

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "../../db";
 import { businesses, businessHours, onboardingRequests, services } from "../../db/schema";
+import { trialEndsAtFromCreation } from "../billing/access";
 import { requestKeySchema } from "../bookings/validation";
 import { HttpError } from "../http";
 import { onboardingInputSchema } from "./validation";
@@ -20,7 +21,14 @@ export async function provisionBusiness(ownerId: string, key: unknown, body: unk
         if (!previous.result) throw new HttpError(503, "onboarding_unavailable", "Não foi possível concluir o cadastro. Tente novamente.");
         return { result: previous.result, replay: true };
       }
-      const [business] = await tx.insert(businesses).values({ ...input.business, ownerId }).onConflictDoNothing({ target: businesses.slug }).returning();
+      const [business] = await tx.insert(businesses).values({
+        name: input.business.name,
+        slug: input.business.slug,
+        timezone: input.business.timezone,
+        contactWhatsapp: input.business.contactWhatsapp ?? null,
+        trialEndsAt: trialEndsAtFromCreation(new Date(), input.business.timezone),
+        ownerId,
+      }).onConflictDoNothing({ target: businesses.slug }).returning();
       if (!business) throw new HttpError(409, "slug_unavailable", "Esse endereço já está em uso. Escolha outro.");
       const [service] = await tx.insert(services).values({ ...input.service, businessId: business.id }).returning();
       await tx.insert(businessHours).values(input.hours.map((value) => ({ ...value, businessId: business.id })));

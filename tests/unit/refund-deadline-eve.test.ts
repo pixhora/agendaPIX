@@ -1,0 +1,86 @@
+import { describe, expect, it } from "vitest";
+import { refundDeadlineEveNotice, type EveItem } from "../../lib/email/templates/refund-deadline-eve";
+import { MP_MANUAL_REFUND_CHANNEL } from "../../lib/mercadopago/connect-copy";
+import { formatBusinessDate, formatBusinessDateTime, formatBusinessDay, manualRefundDueAt } from "../../lib/payments/manual-refund-calendar";
+
+const tz = "America/Sao_Paulo";
+
+function policyItem(overrides: Partial<EveItem> = {}): EveItem {
+  const due = manualRefundDueAt("2026-10-16", tz);
+  return {
+    kind: "policy",
+    customerName: "Ana Souza",
+    serviceName: "Design de sobrancelha",
+    whenLabel: formatBusinessDateTime(new Date("2026-10-16T18:30:00.000Z"), tz),
+    amountLabel: "R$ 20,00",
+    dueLabel: formatBusinessDay(due, tz, true),
+    dueShort: formatBusinessDay(due, tz, false),
+    requestedOnLabel: formatBusinessDate("2026-10-16", tz),
+    paidAtLabel: formatBusinessDateTime(new Date("2026-10-08T17:02:00.000Z"), tz),
+    bookingPath: "https://agendapix.example/dashboard?businessId=biz-1&date=2026-10-16",
+    slotOccupied: false,
+    disconnected: false,
+    ...overrides,
+  };
+}
+
+describe("E5 devolução pela política", () => {
+  it("usa os literais da spec 08 §4.8 v3.4.1", () => {
+    const notice = refundDeadlineEveNotice({ ownerName: "Marina", items: [policyItem()] });
+    expect(notice.subject).toBe("Prazo vence amanhã: devolva R$ 20,00 para Ana Souza");
+    expect(notice.preheader).toBe("Ana Souza pediu para cancelar dentro da regra. O prazo de 7 dias vence amanhã, sex, 23 out.");
+    expect(notice.text).toContain("Oi, Marina,");
+    expect(notice.text).toContain("Ana Souza pediu para cancelar dentro da regra do sinal em sex, 16 out. A devolução de R$ 20,00 ainda está pendente, e o prazo de 7 dias para devolver termina amanhã, sex, 23 out.");
+    expect(notice.text).toContain("Horário: sex, 16 out, 15:30 (cancelado)");
+    expect(notice.text).toContain("Pedido de cancelamento: sex, 16 out");
+    expect(notice.text).toContain("Valor a devolver: R$ 20,00");
+    expect(notice.text).toContain("Prazo: até sex, 23 out");
+    expect(notice.text).toContain(`Devolva até sex, 23 out. ${MP_MANUAL_REFUND_CHANNEL}`);
+    expect(notice.text).toContain("Este é o último lembrete sobre esta devolução.");
+    expect(notice.text).not.toContain(notice.preheader);
+    expect(notice.text).toContain("Abrir agenda: https://agendapix.example/dashboard?businessId=biz-1&date=2026-10-16");
+    expect(notice.html).toContain('<a href="https://agendapix.example/dashboard?businessId=biz-1&amp;date=2026-10-16">Abrir agenda</a>');
+    expect(notice.html).toContain(notice.preheader);
+    expect(notice.text).not.toContain("/dashboard/agenda/");
+    expect(notice.text).not.toContain("Devolver agora");
+    expect(notice.text).not.toContain("Devolver pelo AgendaPix");
+    expect(notice.text).not.toContain("?devolver=1");
+    expect(notice.text).not.toContain("Marcar como devolvido");
+    expect(notice.text).not.toContain("ou devolva por outro meio");
+    expect(notice.html).toContain("<strong>sex, 16 out</strong>");
+    expect(notice.html).toContain("<strong>R$ 20,00</strong>");
+    expect(notice.html).toContain("<strong>amanhã, sex, 23 out</strong>");
+  });
+
+  it("sem conexão mantém a devolução no app do Mercado Pago e abre o agendamento", () => {
+    const notice = refundDeadlineEveNotice({ ownerName: "Marina", items: [policyItem({ disconnected: true })] });
+    expect(notice.text).toContain(`Devolva até sex, 23 out. ${MP_MANUAL_REFUND_CHANNEL}`);
+    expect(notice.text).not.toContain("Coloque saldo");
+    expect(notice.text).not.toContain("Devolver agora");
+    expect(notice.text).not.toContain("Devolver pelo AgendaPix");
+    expect(notice.text).toContain("Abrir agenda: https://agendapix.example/dashboard?businessId=biz-1&date=2026-10-16");
+    expect(notice.html).toContain('<a href="https://agendapix.example/dashboard?businessId=biz-1&amp;date=2026-10-16">Abrir agenda</a>');
+    expect(notice.text).not.toContain("/dashboard/agenda/");
+    expect(notice.text).not.toContain("?devolver=1");
+  });
+
+  it("falha automática e conferência não citam botão inexistente", () => {
+    const failed = refundDeadlineEveNotice({ ownerName: "Marina", items: [policyItem({ kind: "auto_failed" })] });
+    const review = refundDeadlineEveNotice({ ownerName: "Marina", items: [policyItem({ kind: "review", slotOccupied: false })] });
+    const occupied = refundDeadlineEveNotice({ ownerName: "Marina", items: [policyItem({ kind: "review", slotOccupied: true })] });
+    expect(failed.text).toContain(`Devolva até sex, 23 out. ${MP_MANUAL_REFUND_CHANNEL}`);
+    expect(occupied.text).toContain(`O horário já foi ocupado. O prazo de 7 dias para devolver vence amanhã, sex, 23 out. ${MP_MANUAL_REFUND_CHANNEL}`);
+    expect(occupied.text).not.toContain("Devolva até");
+    expect(review.text).toContain(`Se não for manter, devolva até sex, 23 out. ${MP_MANUAL_REFUND_CHANNEL}`);
+    for (const notice of [failed, review, occupied]) {
+      expect(notice.text).not.toContain(notice.preheader);
+      expect(notice.text).toContain("Abrir agenda: https://agendapix.example/dashboard?businessId=biz-1&date=2026-10-16");
+      expect(notice.html).toContain('<a href="https://agendapix.example/dashboard?businessId=biz-1&amp;date=2026-10-16">Abrir agenda</a>');
+      expect(notice.text).not.toContain("Tentar de novo");
+      expect(notice.text).not.toContain("Devolvi pelo Mercado Pago");
+      expect(notice.text).not.toContain("Confirmar agendamento");
+      expect(notice.text).not.toContain("/dashboard/agenda/");
+    }
+    expect(review.text).toContain("ele continua na sua agenda");
+  });
+});

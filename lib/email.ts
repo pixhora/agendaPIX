@@ -1,7 +1,16 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import nodemailer from "nodemailer";
-import { smtpEnvSchema } from "./env";
+import { authEnvSchema, smtpEnvSchema } from "./env";
+import { HttpError } from "./http";
+import { findActiveDraftByEmail } from "./onboarding/drafts";
+
+/** Fora de produção, grava o link no arquivo do E2E. Em produção o caminho é ignorado; o boot recusa a variável. */
+export function magicLinkCapturePath(env: Readonly<Record<string, string | undefined>> = process.env): string | undefined {
+  if (env.NODE_ENV === "production") return undefined;
+  const capture = env.MAGIC_LINK_CAPTURE_FILE?.trim();
+  return capture || undefined;
+}
 
 function emailTransport() {
   const env = smtpEnvSchema.parse(process.env);
@@ -18,14 +27,19 @@ function emailTransport() {
 }
 
 export async function verifyEmailTransport() {
-  if (process.env.MAGIC_LINK_CAPTURE_FILE) return;
+  if (magicLinkCapturePath()) return;
   const { transporter } = emailTransport();
   try { await transporter.verify(); }
   finally { transporter.close(); }
 }
 
+export const magicLinkEmail = {
+  subject: "Seu link para acessar o AgendaPix",
+  text: (url: string) => `Acesse o AgendaPix pelo link abaixo. O link vale por 30 minutos e pode ser usado uma vez.\n\n${url}\n\nSe você não pediu este acesso, ignore esta mensagem.`,
+};
+
 export async function sendMagicLinkEmail(email: string, url: string) {
-  const capture = process.env.MAGIC_LINK_CAPTURE_FILE;
+  const capture = magicLinkCapturePath();
   if (capture) {
     await mkdir(path.dirname(capture), { recursive: true });
     await writeFile(capture, `${email}\n${url}\n`, "utf8");
@@ -35,7 +49,86 @@ export async function sendMagicLinkEmail(email: string, url: string) {
   await transporter.sendMail({
     from: env.SMTP_FROM,
     to: email,
-    subject: "Seu link para acessar a Agenda",
-    text: `Acesse sua conta pelo link abaixo. O link vale por 5 minutos e pode ser usado uma vez.\n\n${url}\n\nSe você não pediu este acesso, ignore esta mensagem.`,
+    subject: magicLinkEmail.subject,
+    text: magicLinkEmail.text(url),
   });
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" })[char] ?? char);
+}
+
+function sanitizeBusinessName(name: string) {
+  return name.replace(/[\r\n\t]+/g, " ").trim().slice(0, 120);
+}
+
+/** Código agrupado para o assunto e o corpo. O assunto leva o código inteiro, não uma máscara. */
+export function formatSignInCode(otp: string) {
+  const digits = otp.replace(/\D/g, "");
+  if (digits.length !== 6) return otp.trim();
+  return `${digits.slice(0, 3)} ${digits.slice(3)}`;
+}
+
+export function buildSignInCodeEmail(input: { otp: string; appOrigin: string; draftId?: string | null; businessName?: string | null }) {
+  const grouped = formatSignInCode(input.otp);
+  const origin = input.appOrigin.replace(/\/$/, "");
+  const fragment = `#c=${encodeURIComponent(input.otp)}`;
+  const buttonPath = input.draftId
+    ? `/onboarding/confirmar?d=${encodeURIComponent(input.draftId)}${fragment}`
+    : `/onboarding/confirmar${fragment}`;
+  const buttonUrl = `${origin}${buttonPath}`;
+  const business = input.businessName ? sanitizeBusinessName(input.businessName) : "";
+  const continuation = business
+    ? `Ou toque no botão para continuar o cadastro da ${business}:`
+    : "Ou toque no botão para continuar o cadastro:";
+  const subject = `Seu código do AgendaPix: ${grouped}`;
+  const text = `Oi! Seu código é ${grouped}. Ele vale por 30 minutos.\n\n${continuation}\n${buttonUrl}\n\nSe você não pediu este código, pode ignorar este e-mail.`;
+  const htmlBusiness = business ? ` da <strong>${escapeHtml(business)}</strong>` : "";
+  const html = `<p>Oi! Seu código é <strong>${escapeHtml(grouped)}</strong>. Ele vale por 30 minutos.</p><p>Ou toque no botão para continuar o cadastro${htmlBusiness}:</p><p><a href="${escapeHtml(buttonUrl)}">Entrar no AgendaPix</a></p><p>Se você não pediu este código, pode ignorar este e-mail.</p>`;
+  return { subject, text, html, buttonUrl };
+}
+
+/** URL absoluta no mesmo host dos outros e-mails. A origem é `BETTER_AUTH_URL`; o projeto não tem `APP_URL`. */
+export function appPublicHref(path: string, env: Readonly<Record<string, string | undefined>> = process.env): string {
+  const parsed = authEnvSchema.pick({ BETTER_AUTH_URL: true }).safeParse(env);
+  if (!parsed.success) return path;
+  return new URL(path, new URL(parsed.data.BETTER_AUTH_URL).origin).href;
+}
+
+function appOrigin() {
+  const env = authEnvSchema.safeParse(process.env);
+  if (!env.success) throw new HttpError(503, "auth_unavailable", "O acesso está indisponível. Tente novamente mais tarde.");
+  return new URL(env.data.BETTER_AUTH_URL).origin;
+}
+
+export async function sendSignInCodeEmail(email: string, otp: string) {
+  const draft = await findActiveDraftByEmail(email).catch(() => null);
+  const message = buildSignInCodeEmail({
+    otp,
+    appOrigin: appOrigin(),
+    draftId: draft?.id ?? null,
+    businessName: draft?.data.business.name ?? null,
+  });
+  const capture = magicLinkCapturePath();
+  if (capture) {
+    await mkdir(path.dirname(capture), { recursive: true });
+    await writeFile(capture, `${email}\n${message.buttonUrl}\n`, "utf8");
+    return;
+  }
+  const { env, transporter } = emailTransport();
+  await transporter.sendMail({ from: env.SMTP_FROM, to: email, subject: message.subject, text: message.text, html: message.html });
+}
+
+export type OwnerMailer = (to: string, subject: string, text: string) => Promise<void>;
+
+/** Mesmo transporte do link de acesso. Não há central de avisos no painel: o e-mail é o aviso. */
+export async function sendOwnerEmail(to: string, subject: string, text: string, html?: string) {
+  const capture = magicLinkCapturePath();
+  if (capture) {
+    await mkdir(path.dirname(capture), { recursive: true });
+    await writeFile(capture, `${to}\n${subject}\n${text}\n`, "utf8");
+    return;
+  }
+  const { env, transporter } = emailTransport();
+  await transporter.sendMail({ from: env.SMTP_FROM, to, subject, text, ...(html ? { html } : {}) });
 }

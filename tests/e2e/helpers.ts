@@ -46,14 +46,49 @@ function summarize(violations: Awaited<ReturnType<AxeBuilder["analyze"]>>["viola
  * Axe com as regras WCAG 2.0/2.1/2.2 A e AA. Falha listando regra, impacto, alvos e motivo.
  * `target-size` (2.5.8) roda à parte com as barras fixas do painel (`data-sticky-chrome`) no fluxo:
  * elas são sticky e o conteúdo rola por baixo delas (com scroll-padding), então não contam como obstrução.
- * Toasts transitórios também ficam de fora dessa checagem.
+ * O toaster do Sonner fica de fora das duas: a opacidade da entrada/saída faz o contraste oscilar,
+ * e o aviso que permanece na tela é o status inline.
  */
 export async function expectNoAxeViolations(page: Page, context: string) {
-  const main = await new AxeBuilder({ page }).withTags(WCAG_TAGS).disableRules(["target-size"]).exclude("nextjs-portal").analyze();
+  // O refresh do painel pode esvaziar o <title> por um instante. Axe não espera.
+  await expect(page).toHaveTitle(/.+/);
+  const main = await new AxeBuilder({ page }).withTags(WCAG_TAGS).disableRules(["target-size"]).exclude("nextjs-portal").exclude("[data-sonner-toaster]").analyze();
   const style = await page.addStyleTag({ content: "[data-sticky-chrome]{position:static!important}[data-sonner-toaster]{display:none!important}" });
-  const targets = await new AxeBuilder({ page }).withRules(["target-size"]).exclude("nextjs-portal").analyze();
+  const targets = await new AxeBuilder({ page }).withRules(["target-size"]).exclude("nextjs-portal").exclude("[data-sonner-toaster]").analyze();
   await style.evaluate((element) => (element as Element).remove());
   expect([...summarize(main.violations), ...summarize(targets.violations)], `Violações de acessibilidade em ${context}`).toEqual([]);
+}
+
+/** Acumula violações de CSP vistas no console ou como erro de página. */
+export function collectCspViolations(page: Page) {
+  const violations: string[] = [];
+  const note = (text: string) => {
+    if (/content security policy|securitypolicyviolation|refused to (?:execute|load|apply|connect)/i.test(text)) violations.push(text);
+  };
+  page.on("console", (message) => note(message.text()));
+  page.on("pageerror", (error) => note(error.message));
+  return violations;
+}
+
+/** Ouve `securitypolicyviolation` antes da página carregar e registra no console. */
+export async function installCspProbe(page: Page) {
+  await page.addInitScript(() => {
+    document.addEventListener("securitypolicyviolation", (event) => {
+      console.error(`securitypolicyviolation ${event.effectiveDirective} blocked=${event.blockedURI} sample=${(event.sample || "").slice(0, 180)}`);
+    });
+  });
+}
+
+/** O script anti-flash do tema precisa do mesmo nonce da CSP desta resposta. */
+export async function expectThemeScriptNonce(response: Awaited<ReturnType<Page["goto"]>>) {
+  expect(response, "sem resposta do documento").toBeTruthy();
+  const csp = response!.headers()["content-security-policy"] ?? "";
+  const nonce = /'nonce-([^']+)'/.exec(csp)?.[1];
+  expect(nonce, "CSP sem nonce de script").toBeTruthy();
+  const html = await response!.text();
+  const theme = /<script\b([^>]*)>([^]*?agenda-theme[^]*?)<\/script>/i.exec(html);
+  expect(theme, "script inline do tema ausente no HTML").toBeTruthy();
+  expect(theme![1], "script do tema sem o nonce da CSP").toContain(`nonce="${nonce}"`);
 }
 
 /** Reflow (WCAG 1.4.10): nada de rolagem horizontal na largura do projeto. */

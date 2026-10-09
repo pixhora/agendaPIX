@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
 const PREVIEW_LINKS = [
   { href: "/preview", label: "Hub" },
@@ -16,6 +16,7 @@ const PREVIEW_LINKS = [
 
 export function PreviewBadge() {
   const pathname = usePathname();
+  const capture = useSearchParams().get("capture") === "1";
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = React.useRef<HTMLElement>(null);
 
@@ -40,6 +41,8 @@ export function PreviewBadge() {
     };
   }, [isOpen]);
 
+  if (!pathname.startsWith("/preview") || capture) return null;
+
   return (
     <>
       {isOpen && (
@@ -52,7 +55,7 @@ export function PreviewBadge() {
       <aside
         ref={menuRef}
         aria-label="Controles do Modo Preview"
-        className="fixed top-2.5 right-2.5 sm:top-auto sm:bottom-3 sm:right-3 z-40 flex flex-col items-end gap-2 font-sans"
+        className="fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-3 z-40 flex flex-col items-start gap-2 font-sans"
       >
         {/* Menu Expandido de Navegação do Preview */}
         {isOpen && (
@@ -96,10 +99,10 @@ export function PreviewBadge() {
           type="button"
           onClick={() => setIsOpen(!isOpen)}
           aria-expanded={isOpen}
-          className="inline-flex min-h-11 items-center gap-2 rounded-full border border-border bg-surface/90 px-3.5 py-2 text-xs font-semibold text-foreground shadow-md backdrop-blur hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-all cursor-pointer"
+          className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border bg-surface/95 px-2.5 text-[11px] font-semibold text-foreground shadow-md backdrop-blur hover:bg-surface focus-visible:outline-none focus-visible:shadow-focus cursor-pointer"
         >
-          <span className="flex h-2 w-2 rounded-full bg-success animate-pulse" />
-          <span className="tracking-wide">MODO PREVIEW</span>
+          <span className="size-1.5 rounded-full bg-success" />
+          <span>Preview</span>
           <span className="text-muted-foreground text-[10px]">
             {isOpen ? "✕" : "▾"}
           </span>

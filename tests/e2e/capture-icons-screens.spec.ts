@@ -64,11 +64,12 @@ test("captura booking público (serviço → confirmado)", async ({ page, reques
   await page.getByRole("button", { name: /Continuar com \d{2}:\d{2}/ }).filter({ visible: true }).first().click();
   await page.locator("#customer-name").fill(`Cliente Icons ${testInfo.project.name}`);
   await page.locator("#customer-phone").fill("11987654321");
-  await page.locator("#customer-cpf").fill("52998224725");
+  const cpf = page.locator("#customer-cpf");
+  if (await cpf.isVisible()) await cpf.fill("52998224725");
   await shot(page, "03-slug-dados-resumo");
 
   await page.getByRole("button", { name: /Gerar Pix/ }).filter({ visible: true }).first().click();
-  await expect(page.getByRole("button", { name: /Copiar código Pix/ })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("button", { name: /Copiar código/ })).toBeVisible({ timeout: 20_000 });
   await shot(page, "04-slug-pix");
 
   const payment = await latestPayment(slug);

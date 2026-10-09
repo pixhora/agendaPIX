@@ -1,0 +1,95 @@
+import { describe, expect, it } from "vitest";
+import { migratedPixResumePayload, pixResumePayload } from "../../components/booking/pix-resume";
+import { buildPublicBookingBody, stripStoredBookingCpf } from "../../components/booking/booking-payload";
+
+const service = {
+  id: "11111111-1111-4111-8111-111111111111",
+  depositCents: 2500,
+  policySummary: "O estabelecimento pode devolver o sinal com 24 horas de antecedência.",
+  policyHash: "hash-1",
+};
+
+describe("corpo do agendamento público", () => {
+  it("omite o CPF quando o servidor manda requiresPayerCpf false e envia o hash da política", () => {
+    expect(buildPublicBookingBody({
+      service,
+      startsAt: "2030-01-01T15:00:00.000Z",
+      name: "Ana",
+      phone: "+5511987654321",
+      cpfDigits: "52998224725",
+      requiresPayerCpf: false,
+    })).toEqual({
+      serviceId: service.id,
+      startsAt: "2030-01-01T15:00:00.000Z",
+      customer: { name: "Ana", phone: "+5511987654321" },
+      policyHash: "hash-1",
+    });
+  });
+
+  it("envia o CPF só quando o servidor exige e não manda policyHash sem política", () => {
+    expect(buildPublicBookingBody({
+      service: { id: service.id, depositCents: 2500 },
+      startsAt: "2030-01-01T15:00:00.000Z",
+      name: "Ana",
+      phone: "+5511987654321",
+      cpfDigits: "52998224725",
+      requiresPayerCpf: true,
+    })).toEqual({
+      serviceId: service.id,
+      startsAt: "2030-01-01T15:00:00.000Z",
+      customer: { name: "Ana", phone: "+5511987654321", cpfCnpj: "52998224725" },
+    });
+  });
+
+  it("não manda CPF quando a flag vem ausente", () => {
+    expect(buildPublicBookingBody({
+      service: { id: service.id, depositCents: 0 },
+      startsAt: "2030-01-01T15:00:00.000Z",
+      name: "Ana",
+      phone: "+5511987654321",
+      cpfDigits: "52998224725",
+    }).customer).toEqual({ name: "Ana", phone: "+5511987654321" });
+  });
+
+  it("a sessão do navegador não guarda nome, WhatsApp nem CPF e apaga um valor antigo", () => {
+    const session = JSON.parse(pixResumePayload({
+      bookingId: "b1",
+      accessToken: "tok",
+      serviceId: service.id,
+      expiresAt: "2030-01-01T15:30:00.000Z",
+    })) as Record<string, unknown>;
+    expect(session).not.toHaveProperty("customerName");
+    expect(session).not.toHaveProperty("customerPhone");
+    expect(JSON.stringify(session)).not.toContain("cpf");
+    const stripped = stripStoredBookingCpf({ ...session, customerCpf: "529.982.247-25", customerName: "Ana" });
+    expect(stripped.hadCpf).toBe(true);
+    expect(stripped.record).not.toHaveProperty("customerCpf");
+    expect(stripStoredBookingCpf(session).hadCpf).toBe(false);
+  });
+
+  it("migra uma sessão antiga com nome, WhatsApp e CPF para só os 4 campos", () => {
+    const raw = JSON.stringify({
+      bookingId: "b1",
+      accessToken: "tok",
+      serviceId: service.id,
+      expiresAt: "2030-01-01T15:30:00.000Z",
+      customerName: "Ana",
+      customerPhone: "+5511987654321",
+      customerCpf: "52998224725",
+      name: "Ana",
+      phone: "+5511987654321",
+    });
+    const migrated = migratedPixResumePayload(raw);
+    expect(migrated).not.toBeNull();
+    const session = JSON.parse(migrated ?? "{}") as Record<string, unknown>;
+    expect(Object.keys(session).sort()).toEqual(["accessToken", "bookingId", "expiresAt", "serviceId"]);
+    expect(session).toEqual({
+      bookingId: "b1",
+      accessToken: "tok",
+      expiresAt: "2030-01-01T15:30:00.000Z",
+      serviceId: service.id,
+    });
+    expect(JSON.stringify(session)).not.toMatch(/Ana|5511987654321|52998224725/);
+    expect(migratedPixResumePayload(JSON.stringify({ customerName: "Ana", customerPhone: "+5511987654321" }))).toBeNull();
+  });
+});

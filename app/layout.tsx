@@ -1,24 +1,39 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 import { Plus_Jakarta_Sans, Inter } from "next/font/google";
+import { headers } from "next/headers";
 import { Toaster } from "@/components/ui/toaster";
+import { siteDescription, siteName, siteOpenGraph, siteOrigin, siteTitle } from "@/lib/site";
+import { MercadoPagoCallback } from "@/components/payments/mp-callback";
 import { themeInitScript } from "@/lib/theme";
 import "./globals.css";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext"],
+  weight: ["500", "600", "700", "800"],
   variable: "--font-display-family",
   display: "swap",
 });
 
+// A landing pinta com Plus Jakarta. Inter não entra no preload.
 const inter = Inter({
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext"],
   variable: "--font-sans-family",
   display: "swap",
+  preload: false,
 });
 
 export const metadata: Metadata = {
-  title: "Agenda · Agendamento online com sinal por Pix",
-  description: "Seu cliente agenda sozinho, paga o sinal por Pix e você para de perder horário.",
+  metadataBase: siteOrigin(),
+  title: { default: siteTitle, template: `%s · ${siteName}` },
+  description: siteDescription,
+  applicationName: siteName,
+  openGraph: siteOpenGraph,
+  twitter: {
+    card: "summary_large_image",
+    title: siteTitle,
+    description: siteDescription,
+  },
 };
 
 export const viewport: Viewport = {
@@ -28,15 +43,20 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  // Reading headers opts every page into dynamic rendering so the nonce matches this request.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
     <html lang="pt-BR" className={`${plusJakartaSans.variable} ${inter.variable}`} suppressHydrationWarning>
       <head>
-        {/* Aplica o tema salvo antes da primeira pintura (sem flash). */}
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        {/* Aplica o tema salvo antes da primeira pintura (sem flash). Nonce vem do proxy. */}
+        <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body className="min-h-dvh bg-paper font-sans text-ink antialiased">
         {children}
+        <Suspense fallback={null}>
+          <MercadoPagoCallback />
+        </Suspense>
         <Toaster />
       </body>
     </html>

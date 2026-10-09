@@ -1,0 +1,7 @@
+/* Fundo claro isolado da vitrine. Não entra no custo dos primitivos. */
+.motion-canvas-light {
+  --paper: #f6f5f2;
+  --ink: #0b0b0c;
+  --muted: #5b5b5f;
+  --brand-tile-edge: transparent;
+}

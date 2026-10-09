@@ -2,7 +2,8 @@ import { z } from "zod";
 import { HttpError } from "../http";
 import { FakePaymentProvider } from "./fake";
 import { getDb } from "../../db";
-import { MERCADOPAGO_BASE_URL, MercadoPagoPaymentProvider } from "./mercadopago";
+import { MERCADOPAGO_BASE_URL, MercadoPagoPaymentProvider, resolveMpAccessToken } from "./mercadopago";
+import { registerSellerAccountHooks } from "./register-seller-hooks";
 import type { PaymentProvider } from "./provider";
 import { DatabaseChargeReferenceStore } from "./reference-store";
 
@@ -26,11 +27,14 @@ export function getPaymentProvider(env: Readonly<Record<string, string | undefin
   if (requested === "mercadopago") {
     const parsed = mercadoPagoEnvSchema.safeParse(env);
     if (!parsed.success) throw unavailable();
+    registerSellerAccountHooks();
     return new MercadoPagoPaymentProvider({
       accessToken: parsed.data.MERCADOPAGO_ACCESS_TOKEN,
       webhookSecret: parsed.data.MERCADOPAGO_WEBHOOK_SECRET,
       env: parsed.data.MERCADOPAGO_ENV,
       baseUrl: parsed.data.MERCADOPAGO_BASE_URL ?? MERCADOPAGO_BASE_URL,
+      notificationUrl: env.MERCADOPAGO_NOTIFICATION_URL || undefined,
+      resolveAccessToken: (query) => resolveMpAccessToken(query, env),
       // Durável e compartilhado entre instâncias serverless; a conexão só abre no primeiro uso.
       referenceStore: new DatabaseChargeReferenceStore("mercadopago", getDb),
     });

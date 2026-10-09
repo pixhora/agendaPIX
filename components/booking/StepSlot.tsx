@@ -3,13 +3,15 @@
 import React, { useEffect, useState, useMemo } from "react";
 import type { PublicService, AvailabilitySlot } from "./types";
 import { formatTimeSlot, formatCurrency, formatDateFull } from "./formatters";
-import { ArrowLeft, ArrowRight, CalendarX2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarX2, Loader2 } from "lucide-react";
 import { Icon } from "@/components/ui/icon";
 import { PERIOD_ICONS } from "@/lib/icons/registry";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { publicAvailabilityUrl } from "@/lib/public-api";
+import { OFFLINE_MESSAGE, SLOTS_LOAD_MESSAGE, depositServiceUnbookable, isOfflineError } from "./booking-error";
+import { UnbookableNotice } from "./UnbookableNotice";
 
 interface StepSlotProps {
   slug: string;
@@ -20,6 +22,12 @@ interface StepSlotProps {
   onBack: () => void;
   onNext: () => void;
   getSlotsForDate?: (dateString: string) => Promise<AvailabilitySlot[]>;
+  /** WhatsApp publicado. Só entra no aviso de serviço indisponível. */
+  contactWhatsapp?: string | null;
+  /** Incrementa para buscar os horários de novo (horário acabou de ser reservado). */
+  slotsReload?: number;
+  /** Aviso acima da lista, por exemplo horário recém-ocupado. */
+  notice?: string | null;
 }
 
 type Period = "morning" | "afternoon" | "evening";
@@ -102,6 +110,9 @@ export function StepSlot({
   onBack,
   onNext,
   getSlotsForDate,
+  contactWhatsapp,
+  slotsReload = 0,
+  notice,
 }: StepSlotProps) {
   const days = useMemo(() => generateInitialDays(timezone), [timezone]);
   const [selectedDate, setSelectedDate] = useState<string>(() => days[0]?.dateString || "");
@@ -111,6 +122,8 @@ export function StepSlot({
   const [errorSlots, setErrorSlots] = useState<string | null>(null);
 
   const [slotsRetryCount, setSlotsRetryCount] = useState<number>(0);
+  const [blockedServiceId, setBlockedServiceId] = useState<string | null>(null);
+  const unbookable = depositServiceUnbookable(service.depositCents, service.bookable) || blockedServiceId === service.id;
 
   const rulerRef = React.useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState<boolean>(false);
@@ -160,7 +173,12 @@ export function StepSlot({
             signal: controller.signal,
           })
             .then((res) => (res.ok ? res.json() : Promise.reject()))
-            .then((data) => data.slots || [])
+            .then((data: { slots?: AvailabilitySlot[]; bookable?: boolean }) => {
+              if (!isCancelled && depositServiceUnbookable(service.depositCents, data?.bookable)) {
+                setBlockedServiceId(service.id);
+              }
+              return data?.slots || [];
+            })
             .finally(() => clearTimeout(timeoutId));
 
       promise
@@ -179,7 +197,7 @@ export function StepSlot({
       isCancelled = true;
       controllers.forEach((c) => c.abort());
     };
-  }, [slug, service.id, days]);
+  }, [slug, service.id, service.depositCents, days]);
 
   // Carrega horários detalhados da data selecionada
   useEffect(() => {
@@ -192,6 +210,8 @@ export function StepSlot({
     }, 10000);
 
     const loadSlots = async () => {
+      setIsLoadingSlots(true);
+      setErrorSlots(null);
       try {
         let loadedSlots: AvailabilitySlot[] = [];
         const fetchFn = getSlotsRef.current;
@@ -204,23 +224,25 @@ export function StepSlot({
               signal: controller.signal,
             }
           );
-          if (!res.ok) throw new Error("Não foi possível carregar os horários.");
-          const data = await res.json();
-          loadedSlots = data.slots || [];
+          if (!res.ok) {
+            console.error("slots load failed", res.status);
+            throw new Error("slots_unavailable");
+          }
+          const data = (await res.json()) as { slots?: AvailabilitySlot[]; bookable?: boolean };
+          if (depositServiceUnbookable(service.depositCents, data?.bookable)) {
+            if (!isCancelled) setBlockedServiceId(service.id);
+            loadedSlots = [];
+          } else {
+            loadedSlots = data.slots || [];
+          }
         }
         if (isCancelled) return;
         setSlots(loadedSlots);
         setErrorSlots(null);
       } catch (err: unknown) {
         if (isCancelled) return;
-        let msg = "Erro ao consultar horários.";
-        if (err instanceof Error) {
-          if (err.name === "AbortError") {
-            msg = "A consulta de horários demorou muito. Tente novamente.";
-          } else {
-            msg = err.message;
-          }
-        }
+        console.error(err);
+        const msg = isOfflineError(err) ? OFFLINE_MESSAGE : SLOTS_LOAD_MESSAGE;
         setErrorSlots(msg);
       } finally {
         clearTimeout(timeoutId);
@@ -237,7 +259,7 @@ export function StepSlot({
       clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [slug, service.id, selectedDate, slotsRetryCount]);
+  }, [slug, service.id, service.depositCents, selectedDate, slotsRetryCount, slotsReload]);
 
   const handleSelectDay = (dateStr: string) => {
     if (dateStr === selectedDate) return;
@@ -272,6 +294,17 @@ export function StepSlot({
         </p>
       </div>
 
+      {unbookable ? (
+        <>
+          <UnbookableNotice contactWhatsapp={contactWhatsapp} />
+          <div className="border-t border-line pt-5">
+            <Button type="button" variant="ghost" onClick={onBack} className="sm:-ml-3">
+              <ArrowLeft aria-hidden="true" /> Voltar
+            </Button>
+          </div>
+        </>
+      ) : (
+      <>
       {/* Faixa horizontal de dias (pills) */}
       <section aria-label="Régua de datas disponíveis">
         <div className="relative -mx-1">
@@ -308,7 +341,7 @@ export function StepSlot({
                 >
                   <span className={cn("text-xs font-semibold uppercase tracking-wide", isCurrent ? "text-paper/80" : "text-muted")}>{day.dayLabel}</span>
                   <span className="font-display text-xl font-bold tabular-nums leading-none">{dd}</span>
-                  <span aria-hidden="true" className={cn("mt-1 h-1.5 w-1.5 rounded-full", count == null ? "bg-line" : isZero ? "bg-transparent ring-1 ring-line-strong" : isCurrent ? "bg-pix-bright" : "bg-pix")} />
+                  <span aria-hidden="true" className={cn("mt-1 h-1.5 w-1.5 rounded-full", count == null ? "bg-line" : isZero ? "bg-transparent ring-1 ring-line-strong" : isCurrent ? "bg-pix-bright text-pix-bright-foreground" : "bg-pix")} />
                 </button>
               );
             })}
@@ -321,6 +354,11 @@ export function StepSlot({
       </section>
 
       {/* Horários agrupados por período */}
+      {notice ? (
+        <p role="alert" className="rounded-card border border-line bg-subtle p-4 text-sm font-medium text-ink">
+          {notice}
+        </p>
+      ) : null}
       <section aria-label="Horários disponíveis no dia" className="space-y-5" aria-busy={isLoadingSlots}>
         {isLoadingSlots ? (
           <div role="status" className="space-y-3">
@@ -328,13 +366,13 @@ export function StepSlot({
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
               {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-12 rounded-xl" />)}
             </div>
-            <span className="sr-only">Carregando horários disponíveis...</span>
+            <p className="inline-flex items-center gap-2 text-sm text-muted"><Loader2 aria-hidden="true" className="size-4 animate-spin motion-reduce:animate-none" />Carregando horários…</p>
           </div>
         ) : errorSlots ? (
           <div role="alert" className="rounded-card border border-danger/30 bg-danger-soft p-4 text-center">
             <p className="text-sm font-semibold text-danger">{errorSlots}</p>
             <Button type="button" variant="outline" onClick={handleRetrySlots} className="mt-3">
-              Tentar novamente
+              Tentar de novo
             </Button>
           </div>
         ) : slots.length === 0 ? (
@@ -393,6 +431,8 @@ export function StepSlot({
           <ArrowRight aria-hidden="true" />
         </Button>
       </div>
+      </>
+      )}
     </div>
   );
 }

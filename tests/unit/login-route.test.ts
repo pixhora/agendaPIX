@@ -8,8 +8,8 @@ vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
 vi.mock("@/lib/dashboard/auth-session", () => ({ getOwnerSession: mocks.session }));
 
-import DashboardLoginRedirect from "../../app/dashboard/login/page";
-import LoginPage from "../../app/login/page";
+import DashboardLoginRedirect from "../../app/(product)/dashboard/login/page";
+import LoginPage from "../../app/(product)/login/page";
 
 type Node = { props?: Record<string, unknown> } | Node[] | string | null | undefined;
 function findProps(node: Node, key: string): Record<string, unknown> | undefined {

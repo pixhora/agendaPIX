@@ -1,11 +1,15 @@
 "use client";
 
 import React, { useMemo } from "react";
-import type { PublicService, AvailabilitySlot } from "./types";
+import type { AvailabilitySlot, BookingPolicyView, PublicService } from "./types";
 import { formatCurrency, formatDateFull, formatTimeSlot, formatDuration } from "./formatters";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { CONFIRMATION_ICONS } from "@/lib/icons/registry";
+import { TriangleAlert } from "lucide-react";
+import { ReservedTimeBand } from "./ReservedTimeBand";
+import { confirmationCardTone, confirmationPolicyText, isFutureInstant, policyReceiptRefund } from "./policy-copy";
+import { REMAINDER_LABEL } from "@/lib/copy/booking-summary";
 
 interface BookingConfirmationProps {
   businessName: string;
@@ -14,7 +18,18 @@ interface BookingConfirmationProps {
   timezone: string;
   customerName: string;
   customerPhone: string;
+  /** Snapshot gravado na reserva. `policy.text` entra como o servidor mandou. */
+  policy?: BookingPolicyView | null;
+  /** Mesmo valor de `policy.text`. O #29 passa os dois no comprovante. */
+  policyText?: string | null;
+  /** `policy.refundWindowClosedAtBooking`. Liga o tom de aviso. */
+  refundWindowClosedAtBooking?: boolean;
+  contactWhatsapp?: string | null;
   onNewBooking: () => void;
+}
+
+function icsText(value: string) {
+  return value.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
 }
 
 function buildIcs({
@@ -22,21 +37,24 @@ function buildIcs({
   service,
   slot,
   customerName,
+  policyLine,
 }: {
   businessName: string;
   service: PublicService;
   slot: AvailabilitySlot;
   customerName: string;
+  policyLine: string | null;
 }) {
   const stamp = (iso: string) =>
     new Date(iso).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
   const uid = `agendapix-${stamp(slot.startsAt)}@agendapix`;
   const summary = `${service.name} · ${businessName}`;
-  const description = `Agendamento de ${customerName} em ${businessName}. Sinal pago via Pix.`;
+  const namedGuest = customerName.trim();
+  const description = [`${namedGuest ? `Agendamento de ${namedGuest} em ${businessName}` : `Agendamento em ${businessName}`}. Sinal pago via Pix.`, policyLine].filter(Boolean).join(" ");
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//agendaPIX//PT",
+    "PRODID:-//AgendaPix//PT",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
     "BEGIN:VEVENT",
@@ -45,7 +63,7 @@ function buildIcs({
     `DTSTART:${stamp(slot.startsAt)}`,
     `DTEND:${stamp(slot.endsAt)}`,
     `SUMMARY:${summary}`,
-    `DESCRIPTION:${description}`,
+    `DESCRIPTION:${icsText(description)}`,
     "END:VEVENT",
     "END:VCALENDAR",
   ];
@@ -59,19 +77,38 @@ export function BookingConfirmation({
   timezone,
   customerName,
   customerPhone,
+  policy,
+  policyText: policyTextProp,
+  refundWindowClosedAtBooking,
+  contactWhatsapp,
   onNewBooking,
 }: BookingConfirmationProps) {
   const remainingCents = Math.max(0, service.priceCents - service.depositCents);
+  const windowClosed = Boolean(refundWindowClosedAtBooking ?? policy?.refundWindowClosedAtBooking);
+  const refundDeadlineAt = policy?.refundDeadlineAt;
+  const datedRefund = !windowClosed && refundDeadlineAt && isFutureInstant(refundDeadlineAt)
+    ? policyReceiptRefund(
+        businessName,
+        formatDateFull(refundDeadlineAt, timezone).replace(/^./, (letter) => letter.toLowerCase()),
+        formatTimeSlot(refundDeadlineAt, timezone),
+      )
+    : null;
+  const policyText = confirmationPolicyText(policyTextProp ?? policy?.text, datedRefund);
+  const policyTone = confirmationCardTone(windowClosed);
+  const rescheduleOpen = !windowClosed && isFutureInstant(policy?.rescheduleDeadlineAt);
   const icsHref = useMemo(
-    () => buildIcs({ businessName, service, slot, customerName }),
-    [businessName, service, slot, customerName],
+    () => buildIcs({ businessName, service, slot, customerName, policyLine: policyText }),
+    [businessName, service, slot, customerName, policyText],
   );
 
+  const whatsappNumber = contactWhatsapp?.replace(/^\+/, "") ?? "";
+  const guestName = customerName.trim();
+  const guestPhone = customerPhone.trim();
   const whatsappMessage = encodeURIComponent(
     `Olá ${businessName}! Acabei de agendar ${service.name} para ${formatDateFull(
       slot.startsAt,
       timezone
-    )} às ${formatTimeSlot(slot.startsAt, timezone)} no nome de ${customerName}.`
+    )} às ${formatTimeSlot(slot.startsAt, timezone)}${guestName ? ` no nome de ${guestName}` : ""}.`
   );
 
   return (
@@ -85,6 +122,8 @@ export function BookingConfirmation({
           Sinal recebido. Seu horário em <span className="font-semibold text-ink">{businessName}</span> está garantido.
         </p>
       </div>
+
+      <ReservedTimeBand startsAt={slot.startsAt} timezone={timezone} paid={service.depositCents > 0} />
 
       <article aria-label="Comprovante do agendamento" className="overflow-hidden rounded-card border border-line bg-surface">
         <div className="p-5">
@@ -104,7 +143,16 @@ export function BookingConfirmation({
             <div className="flex items-start gap-2 sm:col-span-2">
               <Icon icon={CONFIRMATION_ICONS.customer} className="mt-0.5 size-4 text-muted" />
               <dt className="sr-only">Cliente</dt>
-              <dd className="text-ink"><span className="font-semibold">{customerName}</span> <span className="text-muted">· {customerPhone}</span></dd>
+              <dd className="text-ink">
+                {guestName || guestPhone ? (
+                  <>
+                    {guestName ? <span className="font-semibold">{guestName}</span> : null}
+                    {guestPhone ? <span className="text-muted">{guestName ? " · " : ""}{guestPhone}</span> : null}
+                  </>
+                ) : (
+                  <span className="font-semibold">Horário confirmado</span>
+                )}
+              </dd>
             </div>
           </dl>
         </div>
@@ -116,9 +164,23 @@ export function BookingConfirmation({
             {service.depositCents > 0 && (
               <div className="flex justify-between font-semibold text-success"><dt className="inline-flex items-center gap-1.5"><Icon icon={CONFIRMATION_ICONS.success} className="size-3.5" />Sinal pago no Pix</dt><dd className="tabular-nums">{formatCurrency(service.depositCents)}</dd></div>
             )}
-            <div className="flex justify-between border-t border-line pt-2 font-bold text-ink"><dt>Restante no local</dt><dd className="tabular-nums">{formatCurrency(remainingCents)}</dd></div>
+            <div className="flex justify-between border-t border-line pt-2 font-bold text-ink"><dt>{REMAINDER_LABEL}</dt><dd className="tabular-nums">{formatCurrency(remainingCents)}</dd></div>
           </dl>
         </div>
+        {policyText || (rescheduleOpen && policy?.rescheduleDeadlineAt) ? (
+          <div className="border-t border-line p-5" data-testid="policy-snapshot" data-tone={policyTone}>
+            <p className="text-sm font-semibold text-ink">Política do sinal</p>
+            {policyText ? (
+              <p className={policyTone === "warn" ? "mt-2 flex items-start gap-2 text-sm font-medium text-warning" : "mt-2 text-sm text-muted"}>
+                {policyTone === "warn" ? <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" /> : null}
+                <span>{policyText}</span>
+              </p>
+            ) : null}
+            {rescheduleOpen && policy?.rescheduleDeadlineAt ? (
+              <p className="mt-1 text-sm text-muted">Remarcação até {formatDateFull(policy.rescheduleDeadlineAt, timezone).replace(/^./, (letter) => letter.toLowerCase())}, às {formatTimeSlot(policy.rescheduleDeadlineAt, timezone)}.</p>
+            ) : null}
+          </div>
+        ) : null}
       </article>
 
       <p className="rounded-card border border-line bg-surface p-4 text-sm text-muted">
@@ -127,7 +189,7 @@ export function BookingConfirmation({
 
       <div className="grid gap-3 sm:grid-cols-2">
         <Button asChild size="lg">
-          <a href={`https://wa.me/?text=${whatsappMessage}`} target="_blank" rel="noopener noreferrer">
+          <a href={`https://wa.me/${whatsappNumber}?text=${whatsappMessage}`} target="_blank" rel="noopener noreferrer">
             <Icon icon={CONFIRMATION_ICONS.whatsapp} size="md" /> Enviar no WhatsApp
           </a>
         </Button>

@@ -9,6 +9,7 @@ import {
   normalizePhoneToE164,
   formatTimeSlot,
   formatDateFull,
+  formatAppointmentMeta,
 } from "../../components/booking/formatters";
 
 describe("Booking UI formatters and helpers", () => {
@@ -71,6 +72,12 @@ describe("Booking UI formatters and helpers", () => {
 
     const dateFormatted = formatDateFull(iso, timezone);
     expect(dateFormatted).toContain("outubro");
+    expect(formatDateFull("2026-10-09T14:30:00.000Z", timezone)).toBe("sexta-feira, 9 de outubro");
+    expect(formatDateFull("2026-10-09T14:30:00.000Z", timezone)).not.toContain("09");
+  });
+
+  it("formats the short appointment metadata", () => {
+    expect(formatAppointmentMeta("2026-10-15T18:30:00.000Z", "America/Sao_Paulo")).toBe("qui, 15 out · 15:30");
   });
 });
 
@@ -80,7 +87,12 @@ describe("Pix UI status helpers (contrato PixCharge)", () => {
   it("maps booking/payment statuses to pending|paid|expired|cancelled", () => {
     expect(pixUiPhase({ status: "pending_payment", payment: { status: "pending" } as never })).toBe("pending");
     expect(pixUiPhase({ status: "confirmed", payment: { status: "paid" } as never })).toBe("paid");
-    expect(pixUiPhase({ status: "pending_payment", payment: { status: "paid" } as never })).toBe("paid");
+    expect(pixUiPhase({ status: "pending_payment", payment: { status: "paid" } as never })).toBe("confirming");
+    expect(pixUiPhase({ status: "expired", payment: { status: "paid" } as never })).toBe("refund_pending");
+    expect(pixUiPhase({ status: "cancelled", payment: { status: "paid" } as never })).toBe("refund_pending");
+    expect(pixUiPhase({ status: "completed", payment: { status: "paid" } as never })).toBe("paid");
+    expect(pixUiPhase({ status: "expired", payment: { status: "refunded" } as never })).toBe("refunded");
+    expect(pixUiPhase({ status: "expired", payment: { status: "refund_pending" } as never })).toBe("refund_pending");
     expect(pixUiPhase({ status: "expired", payment: { status: "expired" } as never })).toBe("expired");
     expect(pixUiPhase({ status: "pending_payment", payment: { status: "expired" } as never })).toBe("expired");
     expect(pixUiPhase({ status: "cancelled", payment: { status: "cancelled" } as never })).toBe("cancelled");

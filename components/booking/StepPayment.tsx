@@ -1,26 +1,49 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useRef } from "react";
-import type { BookingResponse, PaymentStatusResponse } from "./types";
-import { formatCurrency } from "./formatters";
-import { pixUiPhase } from "./pix-status";
-import { FlaskConical } from "lucide-react";
+import type { BookingResponse } from "./types";
+import { formatCurrency, formatTimeSlot } from "./formatters";
+import { CONFIRMING_PAYMENT_LABEL, pixUiPhase } from "./pix-status";
+import { FlaskConical, TriangleAlert } from "lucide-react";
 import { Icon } from "@/components/ui/icon";
-import { PIX_ICONS, PIX_STATUS_ICONS } from "@/lib/icons/registry";
-import { toast } from "sonner";
+import { PIX_ICONS, PIX_REFUND_ICONS, PIX_STATUS_ICONS } from "@/lib/icons/registry";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ValueSlab, StatusChip } from "@/components/ui/value-slab";
 import type { AvailabilitySlot, PublicService } from "./types";
-import { formatDateFull, formatTimeSlot } from "./formatters";
 import { devSimulatePixUrl, publicBookingPaymentUrl } from "@/lib/public-api";
 import {
-  PAYMENT_CHECK_ERROR_MESSAGE,
-  PAYMENT_CHECK_TIMEOUT_MESSAGE,
-  PAYMENT_CHECK_TIMEOUT_MS,
   canShowDevSimulatePix,
   pendingMessageForAttempts,
-  withPaymentCheckTimeout,
 } from "./payment-check";
+import {
+  formatCountdown,
+  isDeadlineClose,
+  nextDeadlineAnnouncement,
+  paymentDeadlineIso,
+  type PixDeadlineMilestone,
+} from "./pix-deadline";
+import { ReservedTimeBand } from "./ReservedTimeBand";
+import { PixQr } from "./PixQr";
+import { PolicySummaryLine } from "@/components/policy/PolicySummaryLine";
+import { pixPaymentPolicy } from "./policy-copy";
+import { usePrefersReducedMotion } from "./use-prefers-reduced-motion";
+import { cn } from "@/lib/utils";
+import { whatsappHref } from "./booking-error";
+import {
+  CHOOSE_ANOTHER_SLOT_LABEL,
+  EXPIRED_PIX_TITLE,
+  LATE_PAYMENT_WATCH_LINE,
+  LATE_PAYMENT_WATCH_MS,
+  businessWhatsappLabel,
+  expiredScreenBody,
+  latePaymentChoice,
+  refundPendingCopy,
+  refundedCopy,
+} from "./pix-deadline-copy";
+import { WHATSAPP_CONTACT_LABEL } from "./customer-copy";
+import { createStatusPoller, isTerminalPixPhase, persistedRateLimitUntil, rateLimitHint, retryAfterFrom429 } from "./payment-poll";
+import { parsePaymentStatusResponse, type PaymentStatusResponse } from "@/lib/public/payment-status";
 
 interface StepPaymentProps {
   slug: string;
@@ -30,6 +53,13 @@ interface StepPaymentProps {
   checkStatusFn?: () => Promise<PaymentStatusResponse | null>;
   /** Dados do pedido para o resumo acima do QR. */
   summary?: { service: PublicService; slot: AvailabilitySlot; timezone: string };
+  /** Nome de quem recebe o Pix, vindo do servidor. */
+  pixRecipientDisplayName?: string | null;
+  /** Nome do negócio na frase da política e no WhatsApp. */
+  businessName?: string | null;
+  /** WhatsApp do negócio. Sem número, o botão de contato não aparece. */
+  contactWhatsapp?: string | null;
+  onOpenPolicy?: (trigger: HTMLElement) => void;
 }
 
 export function StepPayment({
@@ -39,26 +69,56 @@ export function StepPayment({
   onRestart,
   checkStatusFn,
   summary,
+  pixRecipientDisplayName,
+  businessName,
+  contactWhatsapp,
+  onOpenPolicy,
 }: StepPaymentProps) {
+  const payment = booking.payment;
+  const timezone = summary?.timezone ?? "America/Sao_Paulo";
+  const deadlineIso = paymentDeadlineIso(booking);
+  const deadlineMs = deadlineIso ? new Date(deadlineIso).getTime() : null;
+  const untilLabel = deadlineIso ? formatTimeSlot(deadlineIso, timezone) : null;
   const [copied, setCopied] = useState(false);
-  const [timeLeft, setTimeLeft] = useState<string>("");
+  const [now, setNow] = useState<number | null>(null);
+  const [announcement, setAnnouncement] = useState("");
   const [phase, setPhase] = useState(() => pixUiPhase(booking));
-  /** Spinner do botão "Já paguei" — só em verificação manual. */
   const [isManualChecking, setIsManualChecking] = useState(false);
-  /** Indicador suave no status (polling em segundo plano). */
-  const [isBackgroundChecking, setIsBackgroundChecking] = useState(false);
+  const [latePolicy, setLatePolicy] = useState(() => latePaymentChoice(booking.policy));
+  const [lateWatching, setLateWatching] = useState(() => pixUiPhase(booking) === "expired");
   const [checkError, setCheckError] = useState<string | null>(null);
+  const [rateLimitedUntil, setRateLimitedUntil] = useState(0);
   const [isSimulating, setIsSimulating] = useState(false);
+  const reducedMotion = usePrefersReducedMotion();
+  const pixPolicy = summary
+    ? pixPaymentPolicy({
+        businessName: businessName ?? "",
+        refundUntilHours: summary.service.depositPolicy?.refundUntilHours,
+        lateCancel: summary.service.depositPolicy?.lateCancel,
+        startsAt: summary.slot.startsAt,
+        refundWindowClosedAtBooking: booking.policy?.refundWindowClosedAtBooking,
+      })
+    : { warn: null, summary: null };
+  const lateNotice = pixPolicy.warn;
 
-  const isCheckingRef = useRef(false);
+  const phaseRef = useRef(phase);
+  const pollerRef = useRef<ReturnType<typeof createStatusPoller<PaymentStatusResponse | null>> | null>(null);
+  const watchUntilRef = useRef<number | null>(null);
   const hasCheckedOnExpireRef = useRef(false);
   const manualAttemptsRef = useRef(0);
-  const abortRef = useRef<AbortController | null>(null);
-
-  const payment = booking.payment;
-  const expiresAt = payment?.expiresAt || booking.expiresAt;
+  const announcedRef = useRef<Set<PixDeadlineMilestone>>(new Set());
+  const lastMinuteRef = useRef<number | null>(null);
   const showDevSimulate = canShowDevSimulatePix(payment?.provider);
-  const isTerminal = phase === "expired" || phase === "cancelled";
+  const haltClock = phase === "paid" || phase === "expired" || phase === "cancelled" || phase === "refund_pending" || phase === "refunded";
+  const stopPolling = phase === "paid" || phase === "cancelled" || phase === "refund_pending" || phase === "refunded" || (phase === "expired" && !lateWatching);
+  const whatsappContact = whatsappHref(contactWhatsapp);
+  const whatsappLabel = whatsappContact
+    ? (businessName?.trim() ? businessWhatsappLabel(businessName.trim()) : WHATSAPP_CONTACT_LABEL)
+    : null;
+  const rateLimited = rateLimitedUntil > 0 && (now == null || now < rateLimitedUntil);
+  const waitSeconds = rateLimited && now != null
+    ? Math.max(1, Math.ceil((rateLimitedUntil - now) / 1000))
+    : rateLimited ? 1 : 0;
 
   const applyStatus = useCallback(
     (data: PaymentStatusResponse | null | undefined, source: "manual" | "background") => {
@@ -71,15 +131,21 @@ export function StepPayment({
       }
 
       const next = pixUiPhase(data);
+      phaseRef.current = next;
       setPhase(next);
+      setLatePolicy(latePaymentChoice(data.policy));
+      if (next === "expired" && watchUntilRef.current == null) {
+        watchUntilRef.current = Date.now() + LATE_PAYMENT_WATCH_MS;
+        setLateWatching(true);
+      }
 
-      if (next === "paid" || data.status === "confirmed") {
+      if (next === "paid") {
         setCheckError(null);
         onPaymentConfirmed(data);
         return;
       }
 
-      if (next === "expired" || next === "cancelled") {
+      if (next === "confirming" || next === "expired" || next === "cancelled" || next === "refund_pending" || next === "refunded") {
         setCheckError(null);
         return;
       }
@@ -92,129 +158,162 @@ export function StepPayment({
     [onPaymentConfirmed],
   );
 
-  const checkStatus = useCallback(
-    async (source: "manual" | "background" = "background") => {
-      if (isCheckingRef.current) return;
-      isCheckingRef.current = true;
-      if (source === "manual") {
-        setIsManualChecking(true);
-        setCheckError(null);
-      } else {
-        setIsBackgroundChecking(true);
+  const statusInput = useRef({
+    slug,
+    bookingId: booking.bookingId,
+    accessToken: booking.accessToken,
+    checkStatusFn,
+  });
+  const applyRef = useRef(applyStatus);
+  useEffect(() => {
+    statusInput.current = { slug, bookingId: booking.bookingId, accessToken: booking.accessToken, checkStatusFn };
+    applyRef.current = applyStatus;
+    phaseRef.current = phase;
+  });
+
+  // Relógio visual. O texto acessível fica no horário-limite; o ao vivo só muda nos marcos.
+  useEffect(() => {
+    announcedRef.current = new Set();
+    lastMinuteRef.current = null;
+  }, [deadlineIso]);
+
+  useEffect(() => {
+    if (deadlineMs == null || haltClock) return;
+
+    const tick = () => {
+      const current = Date.now();
+      const remaining = deadlineMs - current;
+      const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const minute = Math.floor(current / 60000);
+      if (!reduced || lastMinuteRef.current !== minute || remaining <= 0) {
+        lastMinuteRef.current = minute;
+        setNow(current);
       }
 
-      abortRef.current?.abort();
-      const controller = new AbortController();
-      abortRef.current = controller;
-      const timeoutId = setTimeout(() => controller.abort(), PAYMENT_CHECK_TIMEOUT_MS);
+      const label = formatTimeSlot(new Date(deadlineMs).toISOString(), timezone);
+      const next = nextDeadlineAnnouncement(remaining, announcedRef.current, label);
+      if (!next) return;
+      announcedRef.current.add(next.milestone);
+      if (next.milestone === "one" || next.milestone === "expired") announcedRef.current.add("five");
+      if (next.milestone === "expired") announcedRef.current.add("one");
+      setAnnouncement(next.message);
+      if (next.milestone === "expired" && !hasCheckedOnExpireRef.current) {
+        hasCheckedOnExpireRef.current = true;
+        void pollerRef.current?.start();
+      }
+    };
 
-      try {
-        let data: PaymentStatusResponse | null | undefined;
+    tick();
+    const interval = window.setInterval(tick, 1000);
+    return () => window.clearInterval(interval);
+  }, [deadlineMs, timezone, haltClock]);
 
-        if (checkStatusFn) {
-          data = await withPaymentCheckTimeout(checkStatusFn(), controller.signal);
-        } else {
-          if (!booking.accessToken) {
-            if (source === "manual") {
-              setCheckError(PAYMENT_CHECK_ERROR_MESSAGE);
-            }
-            return;
+  useEffect(() => {
+    if (phase !== "expired") return;
+    if (watchUntilRef.current == null) {
+      watchUntilRef.current = Date.now() + LATE_PAYMENT_WATCH_MS;
+      setLateWatching(true);
+    }
+    const until = watchUntilRef.current;
+    const remaining = until - Date.now();
+    if (remaining <= 0) {
+      setLateWatching(false);
+      return;
+    }
+    const id = window.setTimeout(() => setLateWatching(false), remaining);
+    return () => window.clearTimeout(id);
+  }, [phase, lateWatching]);
+
+  // Próxima consulta 4s depois que a anterior assenta. Timeout de ~10s não segura o ciclo nem o clique manual.
+  useEffect(() => {
+    if (stopPolling) return;
+    const bookingKey = statusInput.current.bookingId;
+    const held = persistedRateLimitUntil(bookingKey);
+    if (held > 0) {
+      setRateLimitedUntil(held);
+      setNow(Date.now());
+    }
+    const poller = createStatusPoller<PaymentStatusResponse | null>({
+      rateLimitKey: bookingKey,
+      request: async (signal) => {
+        const input = statusInput.current;
+        try {
+          if (input.checkStatusFn) {
+            const data = await input.checkStatusFn();
+            if (!data) return { kind: "ok", terminal: false, data: null };
+            const next = pixUiPhase(data);
+            const watching = next === "expired" && (watchUntilRef.current == null || watchUntilRef.current > Date.now());
+            return { kind: "ok", data, terminal: isTerminalPixPhase(next) && !watching };
           }
-
-          const res = await fetch(publicBookingPaymentUrl(slug, booking.bookingId), {
-            headers: { Authorization: `Bearer ${booking.accessToken}` },
-            signal: controller.signal,
+          if (!input.accessToken) return { kind: "error", aborted: false };
+          const res = await fetch(publicBookingPaymentUrl(input.slug, input.bookingId), {
+            cache: "no-store",
+            headers: { Authorization: `Bearer ${input.accessToken}` },
+            signal,
           });
-
-          if (!res.ok) {
-            throw new Error("Erro ao verificar pagamento.");
+          if (res.status === 429) {
+            const body: unknown = await res.text().then((text) => (text.length > 0 ? text : null)).catch(() => null);
+            const retryAfter = retryAfterFrom429(res.status, body, res.headers.get("Retry-After"));
+            return { kind: "rate_limited", retryAfterHeader: retryAfter ?? null };
           }
-
-          data = (await res.json()) as PaymentStatusResponse;
+          if (!res.ok) return { kind: "error", aborted: false };
+          const data = parsePaymentStatusResponse(await res.json());
+          const next = pixUiPhase(data);
+          const watching = next === "expired" && (watchUntilRef.current == null || watchUntilRef.current > Date.now());
+          return { kind: "ok", data, terminal: isTerminalPixPhase(next) && !watching };
+        } catch (error) {
+          const aborted = signal.aborted || (error instanceof Error && error.name === "AbortError");
+          return { kind: "error", aborted };
         }
-
-        applyStatus(data, source);
-      } catch (error) {
-        const aborted = error instanceof DOMException
-          ? error.name === "AbortError"
-          : error instanceof Error && error.name === "AbortError";
-        if (source === "manual") {
-          setCheckError(aborted ? PAYMENT_CHECK_TIMEOUT_MESSAGE : PAYMENT_CHECK_ERROR_MESSAGE);
-        } else if (aborted) {
-          // Polling silencioso: não sobrescreve mensagem manual com timeout de fundo.
-        } else {
-          setCheckError((prev) => prev ?? PAYMENT_CHECK_ERROR_MESSAGE);
-        }
-      } finally {
-        clearTimeout(timeoutId);
-        if (abortRef.current === controller) abortRef.current = null;
-        setIsManualChecking(false);
-        setIsBackgroundChecking(false);
-        isCheckingRef.current = false;
-      }
-    },
-    [slug, booking.bookingId, booking.accessToken, checkStatusFn, applyStatus],
-  );
-
-  // Atualiza contador regressivo a cada segundo
-  useEffect(() => {
-    if (!expiresAt || isTerminal) return;
-
-    const targetTime = new Date(expiresAt).getTime();
-
-    const updateTimer = () => {
-      const now = Date.now();
-      const diff = targetTime - now;
-
-      if (diff <= 0) {
-        setTimeLeft("00:00");
-        // Consulta o servidor antes de anunciar a expiração local
-        if (!hasCheckedOnExpireRef.current) {
-          hasCheckedOnExpireRef.current = true;
-          void checkStatus("background");
-        }
-        return;
-      }
-
-      const totalSeconds = Math.floor(diff / 1000);
-      const minutes = Math.floor(totalSeconds / 60);
-      const seconds = totalSeconds % 60;
-      setTimeLeft(
-        `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`,
-      );
+      },
+      onOk: (data, source) => {
+        setRateLimitedUntil(0);
+        applyRef.current(data, source);
+      },
+      onRateLimited: (view) => {
+        setRateLimitedUntil(view.until);
+        setNow(Date.now());
+        setCheckError(view.message);
+      },
+      onFailure: (view) => {
+        if (view.message) setCheckError(view.message);
+      },
+      onFeedback: setIsManualChecking,
+    });
+    pollerRef.current = poller;
+    void poller.start();
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") poller.hide();
+      else void poller.show();
     };
-
-    updateTimer();
-    const interval = setInterval(updateTimer, 1000);
-    return () => clearInterval(interval);
-  }, [expiresAt, checkStatus, isTerminal]);
-
-  // Polling automático a cada 4 segundos
-  useEffect(() => {
-    if (isTerminal) return;
-
-    const interval = setInterval(() => {
-      void checkStatus("background");
-    }, 4000);
-
-    return () => clearInterval(interval);
-  }, [checkStatus, isTerminal]);
-
-  useEffect(() => {
+    document.addEventListener("visibilitychange", onVisibility);
     return () => {
-      abortRef.current?.abort();
+      poller.stop();
+      if (pollerRef.current === poller) pollerRef.current = null;
+      document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, []);
+  }, [stopPolling]);
+
+  useEffect(() => {
+    if (rateLimitedUntil <= 0) return;
+    const tick = () => {
+      const current = Date.now();
+      setNow(current);
+      if (current >= rateLimitedUntil) setRateLimitedUntil(0);
+    };
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [rateLimitedUntil]);
 
   const handleCopy = async () => {
     if (!payment?.copyPaste) return;
     try {
       await navigator.clipboard.writeText(payment.copyPaste);
       setCopied(true);
-      toast.success("Código Pix copiado", { description: "Cole no app do seu banco, em Pix › Copia e Cola." });
       setTimeout(() => setCopied(false), 2500);
     } catch {
-      // Fallback: o input readonly abaixo permite seleção manual
+      document.getElementById("pix-copypaste")?.focus();
     }
   };
 
@@ -236,10 +335,11 @@ export function StepPayment({
       }
       // Lê o status fora do mutex do polling para avançar mesmo se houver verificação em curso.
       const statusRes = await fetch(publicBookingPaymentUrl(slug, booking.bookingId), {
+        cache: "no-store",
         headers: { Authorization: `Bearer ${booking.accessToken}` },
       });
       if (!statusRes.ok) throw new Error("Falha ao ler status");
-      const data = (await statusRes.json()) as PaymentStatusResponse;
+      const data = parsePaymentStatusResponse(await statusRes.json());
       applyStatus(data, "manual");
     } catch {
       setCheckError("Não foi possível simular o pagamento. Verifique o ambiente de desenvolvimento.");
@@ -248,47 +348,97 @@ export function StepPayment({
     }
   };
 
+  const remainingMs = now != null && deadlineMs != null ? deadlineMs - now : null;
+  const countdown = remainingMs != null ? formatCountdown(remainingMs) : null;
+  const close = remainingMs != null && isDeadlineClose(remainingMs);
+
+  const followUpActions = (
+    <div className="space-y-2">
+      <Button onClick={onRestart} size="lg" className="w-full">
+        {CHOOSE_ANOTHER_SLOT_LABEL}
+      </Button>
+      {whatsappLabel && whatsappContact ? (
+        <Button asChild variant="outline" size="lg" className="w-full">
+          <a href={whatsappContact} target="_blank" rel="noopener noreferrer">
+            {whatsappLabel}
+          </a>
+        </Button>
+      ) : null}
+    </div>
+  );
+
   if (phase === "expired") {
     return (
-      <div role="alert" aria-live="assertive" className="space-y-4 rounded-card border border-danger/30 bg-danger-soft p-6 text-center">
-        <Icon icon={PIX_STATUS_ICONS.expired} size="xl" className="mx-auto text-danger" />
-        <h2 className="font-display text-xl font-bold text-ink">Tempo de reserva esgotado</h2>
-        <p className="text-sm text-ink">O prazo para pagar o sinal acabou e o horário foi liberado para outros clientes.</p>
-        <Button onClick={onRestart} size="lg" className="w-full">
-          Fazer novo agendamento
-        </Button>
+      <div className="space-y-4">
+        <div role="alert" aria-live="assertive" className="space-y-4 rounded-card border border-line bg-surface p-6 text-center">
+          <Icon icon={PIX_STATUS_ICONS.expired} size="xl" className="mx-auto text-ink" />
+          <h2 className="font-display text-xl font-bold text-ink">{EXPIRED_PIX_TITLE}</h2>
+          <p className="text-sm text-ink">{expiredScreenBody(lateWatching, latePolicy)}</p>
+        </div>
+        {lateWatching ? <p className="text-center text-xs text-muted" data-testid="pix-late-watch">{LATE_PAYMENT_WATCH_LINE}</p> : null}
+        {followUpActions}
+      </div>
+    );
+  }
+
+  if (phase === "refund_pending" || phase === "refunded") {
+    const amountLabel = formatCurrency(payment?.amountCents ?? 0);
+    const copy = phase === "refunded" ? refundedCopy(amountLabel) : refundPendingCopy(amountLabel);
+    const refundIcon = phase === "refunded" ? PIX_REFUND_ICONS.done : PIX_REFUND_ICONS.pending;
+    return (
+      <div className="space-y-4">
+        <div role="status" aria-live="polite" data-tone="info" className="space-y-4 rounded-card border border-line bg-subtle p-6 text-center text-ink">
+          <Icon icon={refundIcon} size="xl" className="mx-auto text-ink" />
+          <h2 className="font-display text-xl font-bold text-ink">{copy.title}</h2>
+          <p className="text-sm text-ink">{copy.body}</p>
+        </div>
+        {followUpActions}
       </div>
     );
   }
 
   if (phase === "cancelled") {
     return (
-      <div role="alert" aria-live="assertive" className="space-y-4 rounded-card border border-danger/30 bg-danger-soft p-6 text-center">
-        <Icon icon={PIX_STATUS_ICONS.cancelled} size="xl" className="mx-auto text-danger" />
-        <h2 className="font-display text-xl font-bold text-ink">Pagamento cancelado</h2>
-        <p className="text-sm text-ink">Esta cobrança Pix foi cancelada. Escolha outro horário para gerar um novo sinal.</p>
-        <Button onClick={onRestart} size="lg" className="w-full">
-          Fazer novo agendamento
-        </Button>
+      <div className="space-y-4">
+        <div role="alert" aria-live="assertive" className="space-y-4 rounded-card border border-line bg-surface p-6 text-center">
+          <Icon icon={PIX_STATUS_ICONS.cancelled} size="xl" className="mx-auto text-ink" />
+          <h2 className="font-display text-xl font-bold text-ink">Pagamento cancelado</h2>
+          <p className="text-sm text-ink">Esta cobrança Pix foi cancelada. Escolha outro horário para gerar um novo sinal.</p>
+        </div>
+        {followUpActions}
       </div>
     );
   }
 
-  const expiresLabel = expiresAt ? formatTimeSlot(expiresAt, summary?.timezone ?? "America/Sao_Paulo") : null;
-  const statusBusy = isManualChecking || isBackgroundChecking;
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="pix-step">
       <div>
         <h2 className="font-display text-xl font-bold tracking-tight text-ink sm:text-2xl">Pague o sinal por Pix</h2>
-        <p role="status" aria-live="polite" aria-atomic="true" className="mt-2 flex items-center gap-2 text-sm text-ink">
+        <p className="mt-2 flex items-center gap-2 text-sm text-ink">
           <span className="relative flex size-2.5" aria-hidden="true">
             <span className="absolute inline-flex size-full animate-ping rounded-full bg-pix opacity-60 motion-reduce:animate-none" />
             <span className="relative inline-flex size-2.5 rounded-full bg-pix" />
           </span>
-          {statusBusy ? "Verificando o pagamento…" : "Horário pré-reservado. Aguardando o pagamento do Pix."}
+          <span role="status" aria-live="polite" aria-atomic="true">
+            {phase === "confirming"
+              ? CONFIRMING_PAYMENT_LABEL
+              : isManualChecking
+                ? "Verificando o pagamento…"
+                : "Horário pré-reservado. Aguardando o pagamento do Pix."}
+          </span>
         </p>
       </div>
+
+      <p className="sr-only" aria-live="polite" aria-atomic="true" data-testid="pix-deadline-live">
+        {announcement}
+      </p>
+
+      {untilLabel ? (
+        <div className={cn("rounded-card px-4 py-3", close ? "bg-warning-soft" : "bg-pix-soft")} data-testid="pix-pay-until">
+          <p className={cn("text-sm font-semibold", close ? "text-warning" : "text-ink")}>Pague até {untilLabel}</p>
+          {close ? <p className="mt-1 text-sm text-warning">O prazo para pagar está acabando.</p> : null}
+        </div>
+      ) : null}
 
       {payment?.provider === "fake" && (
         <div role="note" className="flex gap-3 rounded-card border border-warning/30 bg-warning-soft p-4 text-sm text-warning">
@@ -299,63 +449,88 @@ export function StepPayment({
         </div>
       )}
 
-      {/* Resumo estilo Stripe: valor em destaque antes do QR */}
+      {summary ? <ReservedTimeBand startsAt={summary.slot.startsAt} timezone={summary.timezone} /> : null}
+
       <ValueSlab
         size="compact"
         label="Sinal a pagar por Pix"
         value={formatCurrency(payment?.amountCents ?? 0)}
         badge={
-          timeLeft ? (
-            <StatusChip active tone="slab">
+          countdown && remainingMs != null && remainingMs > 0 && !reducedMotion ? (
+            <StatusChip active tone="slab" className={close ? "bg-warning-soft text-warning" : undefined}>
               <Icon icon={PIX_ICONS.timer} className="size-3.5" />
-              <span aria-hidden="true" className="font-mono tabular-nums">{timeLeft}</span>
-              <span className="sr-only">{expiresLabel ? `Expira às ${expiresLabel}` : "Prazo em andamento"}</span>
+              <span aria-hidden="true" className="font-mono tabular-nums">{countdown}</span>
             </StatusChip>
           ) : undefined
         }
-        sublabel={
-          summary
-            ? `${summary.service.name} · ${formatDateFull(summary.slot.startsAt, summary.timezone)}, ${formatTimeSlot(summary.slot.startsAt, summary.timezone)}`
-            : "O horário é confirmado assim que o Pix cair."
-        }
+        sublabel={summary
+          ? pixRecipientDisplayName
+            ? `${summary.service.name} · para ${pixRecipientDisplayName}`
+            : summary.service.name
+          : "O horário é confirmado assim que o Pix cair."}
       />
+      {pixPolicy.summary && onOpenPolicy ? (
+        <PolicySummaryLine
+          summary={pixPolicy.summary}
+          tone="ok"
+          compact
+          onDetails={onOpenPolicy}
+        />
+      ) : null}
+
+      {lateNotice ? (
+        <div role="note" data-testid="late-window-notice" className="flex items-start gap-2 rounded-card border border-warning/30 bg-warning-soft p-4 text-sm font-medium text-warning">
+          <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+          <p>
+            {lateNotice}
+            {onOpenPolicy ? (
+              <>
+                {" "}
+                <button
+                  type="button"
+                  data-testid="policy-details"
+                  className="relative inline bg-transparent p-0 font-semibold text-ink underline decoration-line-strong underline-offset-4 before:absolute before:-inset-x-2 before:-inset-y-3 before:content-[''] focus-visible:outline-none focus-visible:shadow-focus"
+                  onClick={(event) => onOpenPolicy(event.currentTarget)}
+                >
+                  Ver detalhes
+                </button>
+              </>
+            ) : null}
+          </p>
+        </div>
+      ) : null}
 
       <div className="rounded-card border border-line bg-surface p-5 sm:p-6">
-        <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-start">
-          {payment?.qrCodeDataUrl?.startsWith("data:image/png;base64,") ? (
-            <div className="shrink-0 rounded-2xl border border-line bg-white p-3">
-              {/* QR sempre sobre branco, inclusive no modo escuro. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={payment.qrCodeDataUrl} alt="QR Code do Pix para pagar o sinal" width={208} height={208} className="block size-44 object-contain sm:size-52" />
-            </div>
-          ) : (
-            <div className="flex size-44 shrink-0 items-center justify-center rounded-2xl bg-subtle text-sm text-muted">QR Code indisponível</div>
-          )}
-          <div className="w-full min-w-0 space-y-4">
-            <ol className="space-y-2 text-sm text-ink">
-              <li className="flex gap-2"><span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-subtle text-xs font-bold">1</span>Abra o app do seu banco e vá em Pix.</li>
-              <li className="flex gap-2"><span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-subtle text-xs font-bold">2</span>Escaneie o QR ou use o Pix copia e cola.</li>
-              <li className="flex gap-2"><span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-subtle text-xs font-bold">3</span>Confirme o valor. A confirmação aparece aqui sozinha.</li>
-            </ol>
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
+          <div className="order-1 min-w-0 flex-1 space-y-4 sm:order-2">
             {payment?.copyPaste && (
               <div className="space-y-2">
-                <Button type="button" variant="pix" size="lg" onClick={handleCopy} className="w-full" data-testid="pix-copy-button">
+                <Button type="button" variant="pix" size="lg" onClick={() => void handleCopy()} className="w-full" data-testid="pix-copy-button">
                   {copied ? <Icon icon={PIX_ICONS.copied} size="md" /> : <Icon icon={PIX_ICONS.copy} size="md" />}
-                  {copied ? "Código copiado" : "Copiar código Pix"}
+                  {copied ? "Copiado" : "Copiar código"}
                 </Button>
-                <span className="sr-only" aria-live="polite">{copied ? "Código Pix copiado." : ""}</span>
+                <p className="sr-only" aria-live="polite" aria-atomic="true">{copied ? "Copiado." : ""}</p>
                 <label htmlFor="pix-copypaste" className="block text-xs font-semibold text-muted">Pix copia e cola</label>
-                <input
+                <Input
                   id="pix-copypaste"
                   data-testid="pix-copypaste"
                   type="text"
                   readOnly
                   value={payment.copyPaste}
                   onFocus={(e) => e.currentTarget.select()}
-                  className="min-h-11 w-full truncate rounded-field border border-line bg-subtle px-3 font-mono text-xs text-ink"
+                  className="truncate font-mono"
                 />
               </div>
             )}
+            <ol className="space-y-2 text-sm text-ink">
+              <li className="flex gap-2"><span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-subtle text-xs font-bold">1</span>Toque em Copiar código.</li>
+              <li className="flex gap-2"><span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-subtle text-xs font-bold">2</span>No app do banco, abra Pix e cole o código. Se preferir, escaneie o QR.</li>
+              <li className="flex gap-2"><span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-subtle text-xs font-bold">3</span>Confirme o valor. A confirmação aparece aqui sozinha.</li>
+            </ol>
+          </div>
+
+          <div className="order-2 mx-auto w-full max-w-[200px] shrink-0 sm:order-1 sm:mx-0">
+            <PixQr value={payment?.qrCodeDataUrl} />
           </div>
         </div>
       </div>
@@ -370,16 +545,21 @@ export function StepPayment({
         <Button
           type="button"
           variant="outline"
-          disabled={isManualChecking || isSimulating}
-          onClick={() => void checkStatus("manual")}
+          disabled={isManualChecking || isSimulating || rateLimited}
+          aria-busy={isManualChecking || undefined}
+          aria-describedby={rateLimited ? "pix-rate-limit-hint" : undefined}
+          onClick={() => void pollerRef.current?.manual()}
           className="w-full"
         >
-          {isManualChecking ? <Icon icon={PIX_ICONS.loading} size="md" className="animate-spin" /> : <Icon icon={PIX_ICONS.refresh} size="md" />}
+          {isManualChecking ? <Icon icon={PIX_ICONS.loading} size="md" className="animate-spin motion-reduce:animate-none" /> : <Icon icon={PIX_ICONS.refresh} size="md" />}
           {isManualChecking ? "Verificando confirmação…" : "Já paguei, verificar agora"}
         </Button>
-        <p className="text-center text-xs text-muted">Verificamos automaticamente a cada poucos segundos. Guarde o comprovante.</p>
+        {rateLimited ? (
+          <p id="pix-rate-limit-hint" className="text-center text-xs text-muted">{rateLimitHint(waitSeconds)}</p>
+        ) : (
+          <p className="text-center text-xs text-muted">A conferência do pagamento se repete a cada poucos segundos. Guarde o comprovante.</p>
+        )}
       </div>
-
 
       <p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted">
         <Icon icon={PIX_ICONS.secure} />

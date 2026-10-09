@@ -9,7 +9,10 @@
  * Em produção: systemd/cron a cada minuto com --once, ou um serviço contínuo.
  */
 import "dotenv/config";
+import { assertProductionSafeEnv } from "../lib/env";
 import { getDb } from "../db/index";
+
+assertProductionSafeEnv();
 import { paymentsConfig } from "../lib/payments/config";
 import { getPaymentProvider } from "../lib/payments/index";
 import { reconcileOnce } from "../lib/payments/reconcile";
@@ -29,7 +32,7 @@ async function pass() {
   if (asJson) process.stdout.write(`${JSON.stringify({ at: new Date().toISOString(), ...report })}\n`);
   else {
     if (report.skippedLock) process.stdout.write("reconcile: outro processo segura o lock; saindo\n");
-    else process.stdout.write(`reconcile: stuckRetried=${report.stuckRetried} stuckCancelled=${report.stuckCancelled} expiredCancelled=${report.expiredCancelled} polledPaid=${report.polledPaid} audits=${report.audits}\n`);
+    else process.stdout.write(`reconcile: stuckRetried=${report.stuckRetried} stuckCancelled=${report.stuckCancelled} expiredCancelled=${report.expiredCancelled} polledPaid=${report.polledPaid} audits=${report.audits} tokensPurged=${report.tokensPurged} failures=${report.failures} deferred=${report.deferred} stagesSkipped=${report.stagesSkipped}\n`);
   }
   return report;
 }

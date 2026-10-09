@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import { FakePaymentProvider, signFakeWebhook } from "../../lib/payments/fake";
 import { getPaymentProvider } from "../../lib/payments";
-import { decidePaidEvent } from "../../lib/payments/rules";
+import { decidePaidEvent, PIX_APPROVAL_TOLERANCE_MS } from "../../lib/payments/rules";
 import { paidEventSchema } from "../../lib/payments/provider";
 
 const secret = "test-only-fake-webhook-secret-32-characters";
@@ -68,17 +68,76 @@ describe("regras do evento pago", () => {
   it("pagamento já pago não tem segundo efeito", () => {
     expect(decidePaidEvent({ ...payment, status: "paid" }, booking, event, now)).toMatchObject({ outcome: "duplicate", recordPaid: false, confirm: false });
   });
-  it.each(["cancelled", "expired", "completed", "confirmed"])("não reabre reserva %s", (status) => {
-    expect(decidePaidEvent(payment, { ...booking, status }, event, now)).toMatchObject({ outcome: "ignored", recordPaid: true, confirm: false });
+  it.each(["cancelled", "completed", "confirmed"])("não reabre reserva %s", (status) => {
+    expect(decidePaidEvent(payment, { ...booking, status }, event, now)).toMatchObject({ outcome: "ignored", reason: "late_payment", recordPaid: true, confirm: false });
   });
-  it("vencimento exato registra dinheiro sem reservar novamente", () => {
-    expect(decidePaidEvent(payment, booking, { ...event, paidAt: payment.expiresAt.toISOString() }, payment.expiresAt)).toMatchObject({ outcome: "ignored", reason: "late_payment", recordPaid: true, confirm: false });
+  it("vencimento exato do hold ainda é no prazo", () => {
+    expect(decidePaidEvent(payment, booking, { ...event, paidAt: payment.expiresAt.toISOString(), paidAtSource: "date_approved" }, payment.expiresAt)).toMatchObject({ outcome: "processed", reason: null, recordPaid: true, confirm: true });
   });
   it.each(["failed", "refunded"])("não sobrescreve pagamento %s", (status) => {
     expect(decidePaidEvent({ ...payment, status }, booking, event, now)).toMatchObject({ outcome: "rejected", recordPaid: false, confirm: false });
   });
+  it("pago aos 29:59 do hold de 30 min confirma", () => {
+    const expiresAt = new Date("2030-01-01T12:30:00.000Z");
+    const paidAt = new Date(expiresAt.getTime() - 1000);
+    expect(decidePaidEvent(
+      { ...payment, expiresAt },
+      { ...booking, expiresAt, startsAt: new Date("2030-01-01T14:00:00.000Z") },
+      { ...event, paidAt: paidAt.toISOString() },
+      paidAt,
+    )).toMatchObject({ outcome: "processed", confirm: true, recordPaid: true });
+  });
+  it("pago dentro da margem de 2 min do Mercado Pago confirma", () => {
+    const expiresAt = new Date("2030-01-01T12:30:00.000Z");
+    const paidAt = new Date(expiresAt.getTime() + PIX_APPROVAL_TOLERANCE_MS);
+    expect(decidePaidEvent(
+      { ...payment, expiresAt },
+      { ...booking, expiresAt, startsAt: new Date("2030-01-01T14:00:00.000Z") },
+      { ...event, paidAt: paidAt.toISOString(), paidAtSource: "date_approved" },
+      paidAt,
+    )).toMatchObject({ outcome: "processed", confirm: true, recordPaid: true });
+  });
+  it("pago depois da margem de 2 min segue atraso", () => {
+    const expiresAt = new Date("2030-01-01T12:30:00.000Z");
+    const paidAt = new Date(expiresAt.getTime() + PIX_APPROVAL_TOLERANCE_MS + 1000);
+    expect(decidePaidEvent(
+      { ...payment, status: "expired", expiresAt },
+      { ...booking, status: "expired", expiresAt, startsAt: new Date("2030-01-01T14:00:00.000Z") },
+      { ...event, paidAt: paidAt.toISOString(), paidAtSource: "date_approved" },
+      paidAt,
+    )).toMatchObject({ outcome: "ignored", reason: "late_payment", confirm: false, recordPaid: true });
+  });
+  it("aprovação no prazo processada depois do hold pede retomada e não é atraso", () => {
+    const expiresAt = new Date("2030-01-01T12:30:00.000Z");
+    const paidAt = new Date(expiresAt.getTime() - 1000);
+    const processingNow = new Date(expiresAt.getTime() + 10 * 60_000);
+    expect(decidePaidEvent(
+      { ...payment, status: "expired", expiresAt },
+      { ...booking, status: "expired", expiresAt, startsAt: new Date("2030-01-01T14:00:00.000Z") },
+      { ...event, paidAt: paidAt.toISOString(), paidAtSource: "date_approved" },
+      processingNow,
+    )).toMatchObject({ outcome: "ignored", reason: "on_time_hold_released", confirm: false, recordPaid: true });
+  });
+  it("sem paidAt válido confirma só com o hold ainda aberto", () => {
+    expect(decidePaidEvent(payment, booking, { ...event, paidAtSource: "fallback" }, now)).toMatchObject({ outcome: "processed", confirm: true, recordPaid: true });
+    expect(decidePaidEvent(payment, booking, { ...event, paidAt: "not-a-date" }, now)).toMatchObject({ outcome: "processed", confirm: true, recordPaid: true });
+    const expiresAt = payment.expiresAt;
+    const processingNow = new Date(expiresAt.getTime() + 60_000);
+    expect(decidePaidEvent(
+      { ...payment, status: "expired" },
+      { ...booking, status: "expired" },
+      { ...event, paidAt: new Date(expiresAt.getTime() - 1000).toISOString(), paidAtSource: "fallback" },
+      processingNow,
+    )).toMatchObject({ outcome: "ignored", reason: "late_payment", confirm: false, recordPaid: true });
+    expect(decidePaidEvent(
+      { ...payment, status: "expired" },
+      { ...booking, status: "expired" },
+      { ...event, paidAt: "not-a-date" },
+      processingNow,
+    )).toMatchObject({ outcome: "ignored", reason: "late_payment", confirm: false, recordPaid: true });
+  });
   it("rejeita data de pagamento no futuro além da tolerância", () => {
-    expect(decidePaidEvent(payment, booking, { ...event, paidAt: "2030-01-01T12:06:00Z" }, now)).toMatchObject({ outcome: "rejected", reason: "future_payment" });
+    expect(decidePaidEvent(payment, booking, { ...event, paidAt: "2030-01-01T12:06:00Z", paidAtSource: "date_approved" }, now)).toMatchObject({ outcome: "rejected", reason: "future_payment" });
   });
 });
 
