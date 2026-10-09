@@ -10,9 +10,9 @@ export function Toaster() {
       closeButton
       toastOptions={{
         classNames: {
-          toast: "rounded-card! border! border-line! bg-surface! text-ink! shadow-[var(--shadow-raised)]! font-sans!",
-          description: "text-muted!",
-          closeButton: "bg-surface! border-line! text-ink!",
+          toast: "!rounded-card !border !border-line !bg-surface !text-ink !shadow-[var(--shadow-raised)] !font-sans",
+          description: "!text-muted",
+          closeButton: "!bg-surface !border-line !text-ink",
         },
       }}
     />

@@ -14,8 +14,7 @@
   --subtle: #efeeea;
   --ink: #0b0b0c;
   --ink-hover: #26262a;
-  /* Cinza neutro mais claro que ainda passa 4,5:1 sobre --subtle (#efeeea). */
-  --muted: #6c6c6c;
+  --muted: #5b5b5f;
   --line: #dedcd6;
   --line-strong: #8d8c88;
   --slab: #0b0b0c;
@@ -287,12 +286,15 @@ h1, h2, h3, h4, h5, h6, .font-display {
   html:has([data-app-frame]) { scroll-padding-block: 5rem; }
 }
 
-/*
- * O Sonner anima a opacidade dos avisos empilhados (400ms). No meio do fade o
- * título vira um cinza composto (~#989898 sobre branco, 2,88:1) e o axe reprova.
- * A opacidade fica só em 0 (aviso recolhido) ou 1 (tinta legível).
- */
-[data-sonner-toast],
-[data-sonner-toast] > * {
-  transition-property: transform, height, box-shadow !important;
+/* O Sonner anima a opacidade do toast (entrada) e do texto de trás (400ms).
+   No meio do fade o axe lê um cinza abaixo de 4,5:1. A opacidade troca na hora. */
+[data-sonner-toast] {
+  transition: transform 400ms, height 400ms, box-shadow 200ms !important;
+}
+[data-sonner-toast][data-mounted="true"] {
+  opacity: 1 !important;
+}
+[data-sonner-toast][data-expanded="false"][data-front="false"] > * {
+  opacity: 0 !important;
+  transition: none !important;
 }
