@@ -12,7 +12,6 @@ import { isAutoRefundAck, MP_CONNECT_CONSENT_TEXT, MP_CONNECT_CONSENT_VERSION } 
 import {
   MP_AUTO_REFUND_ACK_ERROR,
   MP_AUTO_REFUND_ACK_HINT,
-  MP_DISCONNECT_RETENTION_COPY,
   MP_GOOD_TO_KNOW,
   MP_MOCK_FRIDAY_2,
   MP_MOCK_FRIDAY_25,
@@ -31,6 +30,7 @@ import {
   legacyNoticeVisible,
   legacyPixDismissUrl,
   mpAccountIdentity,
+  depositUnavailable,
   parseMpOwnerStatus,
   presentMpCallback,
   reconnectRequiresAck,
@@ -113,6 +113,8 @@ describe("Mercado Pago connect consent", () => {
 
   it("keeps the published consent version and the other screen strings", () => {
     expect(MP_CONNECT_CONSENT_VERSION).toBe("2026-10-09.v4");
+    expect(MP_CONNECT_CONSENT_TEXT).toContain("depois do prazo para reservar o horário");
+    expect(MP_CONNECT_CONSENT_TEXT).not.toContain("horário já estiver ocupado");
     expect(MP_AUTO_REFUND_ACK_ERROR).toBe("Marque a autorização da devolução automática para continuar.");
     expect(MP_GOOD_TO_KNOW).toHaveLength(5);
     expect(MP_GOOD_TO_KNOW[1]).toContain("em até 7 dias corridos, contados do aviso.");
@@ -122,6 +124,11 @@ describe("Mercado Pago connect consent", () => {
   it("leaves continue focusable and lets skip ignore the checkbox", () => {
     const html = renderToStaticMarkup(createElement(MpOnboardingStep, { businessId: "biz" }));
     expect(html).not.toMatch(/<button\b[^>]*\sdisabled[\s=>]/);
+    expect(html).toContain("o AgendaPix pede a devolução do valor ao Mercado Pago");
+    expect(html).toContain("Na política padrão, todo Pix atrasado é devolvido.");
+    expect(html).not.toContain("Se você escolher remarcar");
+    expect(html).not.toContain("único caso");
+    expect(html).not.toContain("horário já está ocupado");
     expect(html).toContain("Continuar para o Mercado Pago");
     expect(html).toContain('href="/onboarding/concluir"');
     expect(html).toContain("Agora não");
@@ -243,6 +250,27 @@ describe("Mercado Pago connect consent", () => {
     expect(settingsButton).toContain("border");
     expect(settingsButton).not.toContain("bg-pix ");
 
+    const stale = renderToStaticMarkup(createElement(MpSettingsCard, {
+      businessId: "biz",
+      status: MP_STATUS_FIXTURES.stale_consent,
+      timezone: "America/Sao_Paulo",
+      onStatus: () => undefined,
+    }));
+    expect(stale).toContain("Aceite o texto novo para voltar a receber sinal");
+    expect(stale).toContain("Não precisa entrar de novo no Mercado Pago.");
+    expect(stale).toContain("Aceitar e voltar a receber sinal");
+    expect(stale).toContain("Entendi e autorizo:");
+    expect(stale).not.toContain(">Reconectar<");
+
+    const staleReconnect = renderToStaticMarkup(createElement(MpSettingsCard, {
+      businessId: "biz",
+      status: MP_STATUS_FIXTURES.needs_reconnect_stale,
+      timezone: "America/Sao_Paulo",
+      onStatus: () => undefined,
+    }));
+    expect(staleReconnect).toContain("Para aceitar o texto novo, entre de novo no Mercado Pago.");
+    expect(staleReconnect).toContain("Sem reconectar, o aceite não vale.");
+
     const paused = renderToStaticMarkup(createElement(MpSettingsCard, {
       businessId: "biz",
       status: MP_STATUS_FIXTURES.needs_reconnect,
@@ -274,9 +302,24 @@ describe("Mercado Pago connect consent", () => {
     expect(html).toContain("(abre em nova aba)");
     expect(html).not.toContain("desvincule o AgendaPix");
     expect(html).toContain("2 clientes estão com Pix em aberto.");
-    expect(html).toContain(MP_DISCONNECT_RETENTION_COPY);
-    expect(html).not.toMatch(/45 minutos|48 horas|Devolver pelo AgendaPix/);
+    expect(html).toContain("em até 24 horas depois que eles forem pagos, vencerem ou forem cancelados");
+    expect(html).toContain("Enquanto houver Pix em aberto, o AgendaPix guarda o acesso");
+    expect(html).not.toContain("45 minutos");
+    expect(html).not.toContain("apaga agora");
+    expect(html).not.toContain("por mais 24 horas");
+    expect(html).not.toContain("Devolver pelo AgendaPix");
     expect(html).toContain(">Cancelar<");
+    const now = renderToStaticMarkup(createElement(MpDisconnectDialog, {
+      open: true,
+      pending: false,
+      pendingPixCount: 0,
+      onCancel: () => undefined,
+      onConfirm: () => undefined,
+    }));
+    expect(now).toContain("O AgendaPix apaga agora o acesso à sua conta.");
+    expect(now).toContain("Devoluções, a partir de agora, inclusive as de Pix pago fora do prazo, você faz direto no Mercado Pago.");
+    expect(now).not.toContain("45 minutos");
+    expect(now).not.toContain("com Pix em aberto");
   });
 });
 
@@ -454,6 +497,10 @@ describe("Mercado Pago status mapping", () => {
   it("picks banners from connection status only", () => {
     expect(selectMpBanners({ status: "needs_reconnect", hasDepositService: false })).toEqual(["mp-reauth"]);
     expect(selectMpBanners({ status: "connected", hasDepositService: true })).toEqual([]);
+    expect(selectMpBanners({ status: "connected", hasDepositService: true, consentOutdated: true })).toEqual(["mp-consent"]);
+    expect(depositUnavailable({ bookable: false, blockedReason: "mp_consent_outdated" })).toBe(true);
+    expect(depositUnavailable({ bookable: false, blockedReason: "mp_account_not_connected" })).toBe(true);
+    expect(depositUnavailable({ bookable: false, reason: "bookings_paused" })).toBe(false);
     expect(selectMpBanners({ status: "not_connected", hasDepositService: true })).toEqual(["mp-not-connected"]);
     expect(selectMpBanners({ status: "not_connected", hasDepositService: false, blockedReasons: ["mp_account_not_connected"] })).toEqual(["mp-not-connected"]);
     expect(selectMpBanners({ status: "not_connected", hasDepositService: false })).toEqual([]);

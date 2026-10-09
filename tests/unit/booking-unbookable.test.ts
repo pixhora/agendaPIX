@@ -30,6 +30,21 @@ describe("serviço com sinal sem conta conectada", () => {
       contactWhatsapp: "11987654321",
     });
     expect(view.kind === "unavailable" ? view.message : "").not.toMatch(/mercado pago|mp_account|reason/i);
+  });
+
+  it("responde 409 mp_consent_outdated com o mesmo texto neutro", () => {
+    const view = publicBookingErrorView(409, {
+      error: {
+        code: "mp_consent_outdated",
+        message: "Aceite o texto novo da devolução automática para voltar a receber sinal.",
+      },
+    });
+    expect(view).toEqual({
+      kind: "unavailable",
+      message: SERVICE_UNAVAILABLE_MESSAGE,
+      contactWhatsapp: null,
+    });
+    expect(view.kind === "unavailable" ? view.message : "").not.toMatch(/aceite o texto|mercado pago/i);
     expect(whatsappHref("11987654321")).toBe("https://wa.me/5511987654321");
   });
 

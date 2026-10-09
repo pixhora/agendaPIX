@@ -5,6 +5,8 @@ import { Pool } from "pg";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as schema from "../../db/schema";
 import { createBooking, lockBusiness } from "../../lib/bookings/service";
+import { disconnectMercadoPago } from "../../lib/mercadopago-oauth/credentials";
+import { createDrizzleMpStore } from "../../lib/mercadopago-oauth/repository";
 import { databaseEnvSchema } from "../../lib/env";
 import { FakeChargeStore, FakePaymentProvider } from "../../lib/payments/fake";
 import { reconcileOnce } from "../../lib/payments/reconcile";
@@ -218,6 +220,87 @@ describe("reconciliação", () => {
     expect(audits.some((a) => a.action === "automatic_refund")).toBe(true);
     expect(await settleAutomaticLateRefund(drizzleRefundPorts(database), provider, data.payment!.id, async () => {})).toBe("done");
     expect(store.calls.refund).toBe(callsBefore + 1);
+  });
+
+  it("pagamento tardio com rebook_if_free e horário ocupado estorna sem abortar a transação", async () => {
+    await database.update(schema.businesses).set({ latePaymentPolicy: "rebook_if_free" }).where(eq(schema.businesses.id, businessId));
+    const { data } = await createBooking(slug, input(0), randomUUID(), database, provider);
+    await database.update(schema.bookings).set({ createdAt: new Date(Date.now() - 60_000), expiresAt: new Date(Date.now() - 1000), status: "expired" }).where(eq(schema.bookings.id, data.bookingId));
+    await database.update(schema.payments).set({ expiresAt: new Date(Date.now() - 1000), status: "expired" }).where(eq(schema.payments.id, data.payment!.id));
+    await createBooking(slug, input(0, "+5511999999901"), randomUUID(), database, provider);
+    const charge = provider.markPaid(data.payment!.externalId!, new Date(Date.now() + PIX_APPROVAL_TOLERANCE_MS));
+    const emails: string[] = [];
+    await database.transaction(async (tx) => {
+      const result = await applyPaidEvent(tx, "fake", polledPaidEvent(charge, hash), new Date());
+      expect(result).toMatchObject({ outcome: "ignored", reason: "late_no_slot" });
+      await tx.insert(schema.paymentAudit).values({
+        businessId, paymentId: data.payment!.id, bookingId: data.bookingId, action: "late_payment_tx_still_open", detail: { ok: true },
+      });
+    });
+    const [lateBooking] = await database.select().from(schema.bookings).where(eq(schema.bookings.id, data.bookingId));
+    expect(lateBooking.status).toBe("expired");
+    const audits = await database.select().from(schema.paymentAudit).where(eq(schema.paymentAudit.paymentId, data.payment!.id));
+    expect(audits.some((row) => row.action === "late_no_slot" && (row.detail as { cause?: string } | null)?.cause === "slot_taken")).toBe(true);
+    expect(audits.some((row) => row.action === "late_payment_tx_still_open")).toBe(true);
+    expect(await settleAutomaticLateRefund(drizzleRefundPorts(database), provider, data.payment!.id, async (_to, _subject, text) => { emails.push(text); })).toBe("submitted");
+    expect(emails[0]).toContain("depois do prazo e o horário já estava ocupado");
+    expect(emails[0]).not.toContain("não havia horário livre");
+    const [payment] = await database.select().from(schema.payments).where(eq(schema.payments.id, data.payment!.id));
+    expect(payment.refundStatus).toBe("refunded");
+  });
+
+  it("política refund devolve mesmo com o horário livre e o e-mail fala do prazo", async () => {
+    const { data } = await createBooking(slug, input(0), randomUUID(), database, provider);
+    await database.update(schema.bookings).set({ createdAt: new Date(Date.now() - 60_000), expiresAt: new Date(Date.now() - 1000), status: "expired" }).where(eq(schema.bookings.id, data.bookingId));
+    await database.update(schema.payments).set({ expiresAt: new Date(Date.now() - 1000), status: "expired" }).where(eq(schema.payments.id, data.payment!.id));
+    const charge = provider.markPaid(data.payment!.externalId!, new Date(Date.now() + PIX_APPROVAL_TOLERANCE_MS));
+    const emails: string[] = [];
+    await database.transaction(async (tx) => {
+      expect(await applyPaidEvent(tx, "fake", polledPaidEvent(charge, hash), new Date())).toMatchObject({ outcome: "ignored", reason: "late_no_slot" });
+    });
+    const audits = await database.select().from(schema.paymentAudit).where(eq(schema.paymentAudit.paymentId, data.payment!.id));
+    expect(audits.some((row) => row.action === "late_no_slot" && (row.detail as { cause?: string } | null)?.cause === "window_expired")).toBe(true);
+    expect(await settleAutomaticLateRefund(drizzleRefundPorts(database), provider, data.payment!.id, async (_to, _subject, text) => { emails.push(text); })).toBe("submitted");
+    expect(emails[0]).toContain("depois que o prazo para reservar o horário acabou");
+    expect(emails[0]).not.toContain("horário já estava ocupado");
+    expect(emails[0]).not.toContain("não havia horário livre");
+  });
+
+  it("desconectar sem Pix apaga na hora; depois do vencimento o token fica 24h", async () => {
+    const store = createDrizzleMpStore(database);
+    await disconnectMercadoPago(businessId, { store, now: new Date() });
+    const [cleared] = await database.select().from(schema.mercadopagoConnections).where(eq(schema.mercadopagoConnections.businessId, businessId));
+    expect(cleared.status).toBe("disconnected");
+    expect(cleared.accessTokenEnc).toBeNull();
+    expect(cleared.refreshTokenEnc).toBeNull();
+    await database.update(schema.mercadopagoConnections).set({
+      status: "connected",
+      disconnectedAt: null,
+      accessTokenEnc: "v1.fixture.access",
+      refreshTokenEnc: "v1.fixture.refresh",
+      expiresAt: new Date("2099-01-01T00:00:00.000Z"),
+    }).where(eq(schema.mercadopagoConnections.businessId, businessId));
+    const { data } = await createBooking(slug, input(0), randomUUID(), database, provider);
+    await disconnectMercadoPago(businessId, { store, now: new Date() });
+    const [kept] = await database.select().from(schema.mercadopagoConnections).where(eq(schema.mercadopagoConnections.businessId, businessId));
+    expect(kept.accessTokenEnc).toBe("v1.fixture.access");
+    const pass = { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50, RECONCILE_BUDGET_MS: 50_000 };
+    await reconcileOnce(database, provider, pass);
+    const [held] = await database.select().from(schema.mercadopagoConnections).where(eq(schema.mercadopagoConnections.businessId, businessId));
+    expect(held.accessTokenEnc).toBe("v1.fixture.access");
+    const justExpired = new Date(Date.now() - 1000);
+    await database.update(schema.payments).set({ status: "expired", expiresAt: justExpired }).where(eq(schema.payments.id, data.payment!.id));
+    await database.update(schema.bookings).set({ status: "expired", expiresAt: justExpired }).where(eq(schema.bookings.id, data.bookingId));
+    await reconcileOnce(database, provider, pass);
+    const [keptAfterExpiry] = await database.select().from(schema.mercadopagoConnections).where(eq(schema.mercadopagoConnections.businessId, businessId));
+    expect(keptAfterExpiry.accessTokenEnc).toBe("v1.fixture.access");
+    const settledLongAgo = new Date(Date.now() - 25 * 60 * 60 * 1000);
+    await database.update(schema.payments).set({ expiresAt: settledLongAgo, remoteCancelledAt: settledLongAgo }).where(eq(schema.payments.id, data.payment!.id));
+    const purged = await reconcileOnce(database, provider, pass);
+    expect(purged.tokensPurged).toBeGreaterThanOrEqual(1);
+    const [gone] = await database.select().from(schema.mercadopagoConnections).where(eq(schema.mercadopagoConnections.businessId, businessId));
+    expect(gone.accessTokenEnc).toBeNull();
+    expect(gone.refreshTokenEnc).toBeNull();
   });
 
   it("timeout do estorno tardio solta o pagamento e a próxima passagem reusa a chave", async () => {

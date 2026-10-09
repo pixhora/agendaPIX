@@ -1,5 +1,5 @@
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { and, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import * as schema from "../../db/schema";
 import { HttpError } from "../http";
 import { sendOwnerEmail, type OwnerMailer } from "../email";
@@ -20,6 +20,7 @@ import {
   lateRefundedNotice,
   maskEmail,
   unverifiableSellerNotice,
+  type LateRefundCause,
 } from "./notices";
 import { isSellerDisconnected, settlementAvailable } from "./seller-account";
 
@@ -77,6 +78,7 @@ export type RefundWriter = {
   setRefund(patch: RefundPatch): Promise<void>;
   audit(action: string, detail: Record<string, unknown>): Promise<void>;
   hasAudit(action: string): Promise<boolean>;
+  auditDetail(action: string): Promise<Record<string, unknown> | null>;
   listAttempts(): Promise<RefundAttempt[]>;
   beginAttempt(input: { kind: RefundAttemptKind; idempotencyKey: string; amountCents: number; requestedByUserId: string | null }): Promise<RefundAttempt>;
   finishAttempt(id: string, patch: { status: RefundAttemptStatus; mpRefundId: string | null; errorCode: string | null }): Promise<void>;
@@ -378,13 +380,13 @@ export async function executeOwnerRefund(
   return { status: result.status, refundId: result.refundId };
 }
 
-function lateNotice(type: "submitted" | "done" | "failed_now" | "failed_already" | "no_token" | "no_token_already" | "deferred", view: RefundView) {
+function lateNotice(type: "submitted" | "done" | "failed_now" | "failed_already" | "no_token" | "no_token_already" | "deferred", view: RefundView, cause: LateRefundCause) {
   const when = formatAppointment(view.startsAt, view.timezone);
   const names = {
     customerName: view.customerName,
     serviceName: view.serviceName,
     when,
-    cause: lateRefundCause(view.latePaymentPolicy),
+    cause,
   };
   if (type === "submitted" || type === "done") return { action: "notice_late_refunded", notice: lateRefundedNotice(names) };
   if (type === "failed_now" || type === "failed_already") return { action: "notice_late_refund_failed", notice: lateRefundFailedNotice({ ...names, deadlineLabel: deadlineLabel(view) }) };
@@ -401,8 +403,10 @@ export async function settleAutomaticLateRefund(
 ) {
   const loaded = await ports.loadByPaymentId(paymentId);
   if (!loaded) return "missing" as const;
+  let cause: LateRefundCause = "window_expired";
   const available = await settlementAvailable(loaded.businessId);
   const prepared = await ports.withPaymentLock(paymentId, async (current, writer) => {
+    cause = lateRefundCause(await writer.auditDetail("late_no_slot"));
     if (current.refundStatus === "in_process" || current.refundStatus === "refunded") return { type: "done" as const, view: current };
     if (current.refundStatus === "failed") return { type: "failed_already" as const, view: current };
     if (await writer.hasAudit("late_no_slot_no_token")) return { type: "no_token_already" as const, view: current };
@@ -438,7 +442,7 @@ export async function settleAutomaticLateRefund(
   });
   if (prepared.type === "in_flight") return "done" as const;
   if (prepared.type !== "charge") {
-    const notice = lateNotice(prepared.type, prepared.view);
+    const notice = lateNotice(prepared.type, prepared.view, cause);
     if (notice) await safeNotify(ports, prepared.view, notice.action, mailer, notice.notice);
     return prepared.type;
   }
@@ -452,17 +456,17 @@ export async function settleAutomaticLateRefund(
       catch { /* processing antigo é retomado na próxima passagem, com a mesma chave. */ }
       return "deferred" as const;
     }
-    const cause = error instanceof Error ? error.message : "erro";
+    const failureCause = error instanceof Error ? error.message : "erro";
     const view = await ports.withPaymentLock(paymentId, async (current, writer) => {
       const deadline = keepDeadline(current, now);
       await writer.finishAttempt(prepared.attemptId, { status: "failed", mpRefundId: null, errorCode: "refund_failed" });
       await writer.setRefund({ refundStatus: "failed", refundedAt: null, manualRefundDueAt: deadline });
       await writer.audit("automatic_refund", auditDetail(current, {
-        actor: "system", status: "failed", mpRefundId: null, failureCause: cause, reason: "late_no_slot",
+        actor: "system", status: "failed", mpRefundId: null, failureCause, reason: "late_no_slot",
       }));
       return { ...current, refundStatus: "failed" as const, manualRefundDueAt: deadline };
     });
-    const notice = lateNotice("failed_now", view);
+    const notice = lateNotice("failed_now", view, cause);
     if (notice) await safeNotify(ports, view, notice.action, mailer, notice.notice);
     return "failed_now" as const;
   }
@@ -493,7 +497,7 @@ export async function settleAutomaticLateRefund(
     catch { /* A mesma chave retoma quando processing deixar de ser recente. */ }
     return "deferred" as const;
   }
-  const notice = lateNotice("submitted", view);
+  const notice = lateNotice("submitted", view, cause);
   if (notice) await safeNotify(ports, view, notice.action, mailer, notice.notice);
   return "submitted" as const;
 }
@@ -725,6 +729,13 @@ export function createDrizzleRefundPorts(database: Database): RefundPorts {
               eq(schema.paymentAudit.action, action),
             )).limit(1);
             return Boolean(found);
+          },
+          async auditDetail(action) {
+            const [found] = await tx.select({ detail: schema.paymentAudit.detail }).from(schema.paymentAudit).where(and(
+              eq(schema.paymentAudit.paymentId, paymentId),
+              eq(schema.paymentAudit.action, action),
+            )).orderBy(desc(schema.paymentAudit.createdAt)).limit(1);
+            return found?.detail ?? null;
           },
           async listAttempts() {
             return tx.select({

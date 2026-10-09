@@ -80,7 +80,8 @@ describe("landing copy", () => {
     expect(rendered).toContain("12 minutos");
     expect(rendered).toContain("conta Mercado Pago");
     expect(rendered).toContain("você devolve pelo app do Mercado Pago");
-    expect(rendered).toContain("O Pix pago depois do prazo é devolvido para quem pagou, no valor inteiro");
+    expect(rendered).not.toContain("Devolver pelo AgendaPix");
+    expect(rendered).toContain("devolvido sozinho, o valor inteiro");
     expect(rendered).toContain("você recebe um e-mail");
     expect(rendered).not.toMatch(/nada é devolvido sozinho|nada é automático|reembolsos nunca|repasse|chave Pix/i);
   });

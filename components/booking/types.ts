@@ -27,6 +27,8 @@ export interface PublicService {
   bookable?: boolean;
   /** Motivo interno quando `bookable` é false. A tela não mostra o código. */
   reason?: string | null;
+  /** Mesmo papel de `reason`, no nome que a API pública devolve. */
+  blockedReason?: string | null;
   depositPolicy?: DepositPolicy | null;
   /**
    * Linha única vinda do servidor.

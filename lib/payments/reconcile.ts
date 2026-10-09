@@ -10,6 +10,8 @@ import { getPaymentProvider } from "./index";
 import { polledPaidEvent, type PaymentProvider, type ProviderCharge } from "./provider";
 import { createDrizzleReminderPorts, runManualRefundReminders } from "./manual-refund-reminders";
 import { drizzleRefundPorts, observeInProcessRefunds, retryAutomaticLateRefunds } from "./refund-flow";
+import { createDrizzleMpStore } from "../mercadopago-oauth/repository";
+import { purgeDisconnectedMercadoPagoTokens } from "../mercadopago-oauth/refresh";
 import { MpAccountNotConnectedError } from "./seller-account";
 import { callProvider, ProviderTimeoutError } from "./timeout";
 
@@ -24,6 +26,7 @@ export type ReconcileReport = {
   polledPaid: number;
   refundsSettled: number;
   audits: number;
+  tokensPurged: number;
   skippedLock: boolean;
   /** Falhas isoladas nesta passagem. O relatório só leva a contagem; o detalhe fica no log, sem PII. */
   failures: number;
@@ -33,7 +36,7 @@ export type ReconcileReport = {
   stagesSkipped: number;
 };
 
-export const RECONCILE_STAGES = ["stuck", "cancel", "poll", "refunds", "observe", "reminders"] as const;
+export const RECONCILE_STAGES = ["stuck", "cancel", "poll", "refunds", "observe", "reminders", "tokens"] as const;
 export type ReconcileStage = typeof RECONCILE_STAGES[number];
 
 /** Tempo guardado para cada etapa que ainda não rodou, para uma fila de cancelamento não engolir o resto. */
@@ -70,7 +73,7 @@ function isMercadoPagoHttpError(error: unknown): error is { status: number } {
 
 function emptyReport(): ReconcileReport {
   return {
-    stuckRetried: 0, stuckCancelled: 0, expiredCancelled: 0, polledPaid: 0, refundsSettled: 0, audits: 0, skippedLock: false,
+    stuckRetried: 0, stuckCancelled: 0, expiredCancelled: 0, polledPaid: 0, refundsSettled: 0, audits: 0, tokensPurged: 0, skippedLock: false,
     failures: 0, deferred: 0, stagesSkipped: 0,
   };
 }
@@ -80,9 +83,11 @@ export function wallClockBudget(budgetMs: number, timeoutMs: number, startedAt =
   const deadline = startedAt + budgetMs;
   return {
     allow(stage) {
-      const later = RECONCILE_STAGES.length - 1 - RECONCILE_STAGES.indexOf(stage);
-      const needed = stage === "reminders" ? 0 : timeoutMs;
-      return clock() + needed <= deadline - later * STAGE_RESERVE_MS;
+      const later = RECONCILE_STAGES.slice(RECONCILE_STAGES.indexOf(stage) + 1);
+      // `tokens` não chama o gateway. Sem fila, não reserva os 2 s que fariam a poll desistir.
+      const reserve = later.reduce((sum, next) => sum + (next === "tokens" ? 0 : STAGE_RESERVE_MS), 0);
+      const needed = stage === "reminders" || stage === "tokens" ? 0 : timeoutMs;
+      return clock() + needed <= deadline - reserve;
     },
   };
 }
@@ -161,6 +166,7 @@ export async function reconcileOnce(
       if (!activeProvider) {
         await isolateStage(report, "stuck", () => expireLocalHolds(scoped, now, config, report, activeBudget));
         await gateStage(activeBudget, report, "reminders", () => sendManualRefundReminders(scoped, now));
+        await gateStage(activeBudget, report, "tokens", () => purgeDisconnectedTokens(scoped, report));
         return report;
       }
       await isolateStage(report, "stuck", () => retryStuckCreating(scoped, activeProvider, config, now, report, activeBudget));
@@ -179,6 +185,7 @@ export async function reconcileOnce(
         });
       });
       await gateStage(activeBudget, report, "reminders", () => sendManualRefundReminders(scoped, now));
+      await gateStage(activeBudget, report, "tokens", () => purgeDisconnectedTokens(scoped, report));
     } finally {
       await client.query("SELECT pg_advisory_unlock($1)", [RECONCILE_LOCK_KEY]);
     }
@@ -186,6 +193,17 @@ export async function reconcileOnce(
     client.release();
   }
   return report;
+}
+
+/** Mesmo apagamento do cron, dentro do orçamento da etapa `tokens`. Falha entra em `failures` e não derruba o resto. */
+async function purgeDisconnectedTokens(database: Database, report: ReconcileReport) {
+  try {
+    const { purged } = await purgeDisconnectedMercadoPagoTokens({ store: createDrizzleMpStore(database) });
+    report.tokensPurged = purged;
+  } catch (error) {
+    report.tokensPurged = 0;
+    noteFailure(report, "tokens", null, error);
+  }
 }
 
 /** Só e-mail. A etapa é isolada: falha aqui não estorna e não derruba o resto da passagem. */

@@ -1,24 +1,24 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { MP_DISCONNECT_RETENTION_COPY, MP_MANUAL_REFUND_CHANNEL } from "../../lib/mercadopago/connect-copy";
+import { MP_MANUAL_REFUND_CHANNEL } from "../../lib/mercadopago/connect-copy";
 import { openPixDisconnectNote, PERMISSIONS } from "../../lib/mercadopago/contract";
 
-const COPY_ROOTS = ["app", "components", "lib"];
-const FORBIDDEN = ["45 minutos", "Devolver pelo AgendaPix"] as const;
+const COPY_ROOTS = ["app", "components", "lib", "content", "docs"];
+const FORBIDDEN = ["45 minutos", "Devolver agora", "Devolver pelo AgendaPix"] as const;
 
 function copyFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
     const path = join(dir, name);
     const parts = path.split("/");
-    if (parts.includes("node_modules") || parts.includes("content")) return [];
+    if (parts.includes("node_modules") || parts.includes(".git")) return [];
     if (statSync(path).isDirectory()) return copyFiles(path);
-    return path.endsWith(".ts") || path.endsWith(".tsx") ? [path] : [];
+    return path.endsWith(".ts") || path.endsWith(".tsx") || path.endsWith(".md") ? [path] : [];
   });
 }
 
 describe("cópia do Mercado Pago", () => {
-  it("não promete apagar em 45 minutos nem o botão Devolver pelo AgendaPix", () => {
+  it("não promete apagar em 45 minutos nem Devolver agora ou Devolver pelo AgendaPix", () => {
     const hits = COPY_ROOTS.flatMap((root) =>
       copyFiles(root).flatMap((file) => {
         const source = readFileSync(file, "utf8");
@@ -31,13 +31,19 @@ describe("cópia do Mercado Pago", () => {
   it("a desconexão com Pix em aberto usa a frase atual da tela", () => {
     expect(openPixDisconnectNote(0)).toBeNull();
     const note = openPixDisconnectNote(1);
-    expect(note).toContain(MP_DISCONNECT_RETENTION_COPY);
-    expect(note).not.toMatch(/45 minutos|48 horas|é apagado/);
+    expect(note).toContain("é apagado em até 24 horas");
+    expect(note).not.toMatch(/45 minutos|48 horas|por mais 24 horas/);
   });
 
-  it("a permissão de devolução manual aponta para o app do Mercado Pago", () => {
-    const permission = PERMISSIONS.find((item) => item.strong.startsWith("devolver um sinal"));
-    expect(`${permission?.strong ?? ""}${permission?.rest ?? ""}`).toContain(MP_MANUAL_REFUND_CHANNEL);
-    expect(`${permission?.strong ?? ""}${permission?.rest ?? ""}`).not.toContain("Devolver pelo AgendaPix");
+  it("as permissões descrevem a conciliação e a devolução automática", () => {
+    const text = PERMISSIONS.map((item) => `${item.strong}${item.rest}`).join(" ");
+    expect(text).toContain("conciliar o pagamento");
+    expect(text).toContain("confirma o horário se o Pix foi pago no prazo");
+    expect(text).toContain("devolver sozinho o valor inteiro");
+    expect(text).not.toContain("devolve o valor se foi pago fora do prazo");
+    expect(text).not.toContain("quando um Pix chega depois do prazo. Quando um Pix");
+    expect(text).not.toContain("quando você mandar");
+    expect(text).not.toContain(MP_MANUAL_REFUND_CHANNEL);
+    expect(text).not.toContain("Devolver pelo AgendaPix");
   });
 });

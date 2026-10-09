@@ -32,7 +32,7 @@ async function pass() {
   if (asJson) process.stdout.write(`${JSON.stringify({ at: new Date().toISOString(), ...report })}\n`);
   else {
     if (report.skippedLock) process.stdout.write("reconcile: outro processo segura o lock; saindo\n");
-    else process.stdout.write(`reconcile: stuckRetried=${report.stuckRetried} stuckCancelled=${report.stuckCancelled} expiredCancelled=${report.expiredCancelled} polledPaid=${report.polledPaid} audits=${report.audits} failures=${report.failures} deferred=${report.deferred} stagesSkipped=${report.stagesSkipped}\n`);
+    else process.stdout.write(`reconcile: stuckRetried=${report.stuckRetried} stuckCancelled=${report.stuckCancelled} expiredCancelled=${report.expiredCancelled} polledPaid=${report.polledPaid} audits=${report.audits} tokensPurged=${report.tokensPurged} failures=${report.failures} deferred=${report.deferred} stagesSkipped=${report.stagesSkipped}\n`);
   }
   return report;
 }

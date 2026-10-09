@@ -214,7 +214,7 @@ Usamos apenas recursos **necessários** ao funcionamento. Não usamos cookies de
 
 | Chave | Conteúdo e finalidade |
 |---|---|
-| `booking_session_<negócio>` | Permitir que o Cliente final retome o pagamento se recarregar a página: identificador do agendamento, código de acesso, serviço, nome, WhatsApp e prazo do Pix (sem CPF). Também é apagado quando o Cliente final recomeça o agendamento ou reabre a página depois do prazo |
+| `booking_session_<negócio>` | Permitir que o Cliente final retome o pagamento se recarregar a página: só `bookingId`, `accessToken`, `serviceId` e `expiresAt`. Sem nome, WhatsApp ou CPF. Também é apagado quando o Cliente final recomeça o agendamento ou reabre a página depois do prazo |
 | `agendapix.mp.callback` | Resultado da volta do Mercado Pago (conectado ou erro), para mostrar a mensagem certa |
 | `agenda_onboarding_commit` | Resultado da criação do negócio no fim do cadastro |
 | `agendapix-subscription-pending:<negócio>` | Marcar que há um pedido de assinatura em andamento, para avisar quando for ativado |

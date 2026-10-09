@@ -27,7 +27,8 @@ export const bookingInputSchema = z.object({
     /**
      * Opcional. A referência do POST /v1/payments não marca `payer.identification` como obrigatório
      * (o exemplo em PHP do guia de Pix envia só o e-mail). Só segue ao Mercado Pago quando
-     * `MP_REQUIRES_PAYER_CPF=true`. Não entra em `customers`, em `request_hash` nem em log.
+     * `MP_REQUIRES_PAYER_CPF=true`. Não entra em `customers`, em `request_hash`, em log
+     * nem no sessionStorage do navegador.
      */
     cpfCnpj: z.string().trim().min(11).max(18).transform(cpfDigits).refine(isValidCpf, "CPF inválido.").optional(),
   }).strict(),

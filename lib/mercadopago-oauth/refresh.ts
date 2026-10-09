@@ -4,7 +4,7 @@ import { mpOAuthConfig } from "./config";
 import { decryptMpToken, encryptMpToken } from "./crypto";
 import { createDrizzleMpStore } from "./repository";
 import { requestMpToken, type MpFetch } from "./token-client";
-import type { MpConnection, MpConnectionStore } from "./types";
+import type { DisconnectTokenHold, MpConnection, MpConnectionStore } from "./types";
 
 export const MP_REFRESH_CRON_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 export const MP_REFRESH_ON_DEMAND_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -27,12 +27,26 @@ function needsReconnect(connection: MpConnection, lastError: string): MpConnecti
   return { ...connection, status: "needs_reconnect", accessTokenEnc: null, refreshTokenEnc: null, lastError, disconnectedAt: null };
 }
 
-/** Margem depois do date_of_expiration local (`payments.expires_at`) para a reconciliação ainda achar o pagamento. */
+/** Folga depois que o Pix vence, é pago ou é cancelado, para o webhook atrasado ainda conciliar. */
 export const MP_DISCONNECT_SETTLEMENT_GRACE_MS = 24 * 60 * 60 * 1000;
 
-export function disconnectedTokensReadyToPurge(pendingExpiresAt: Date | null, now: Date) {
-  if (!pendingExpiresAt) return true;
-  return pendingExpiresAt.getTime() + MP_DISCONNECT_SETTLEMENT_GRACE_MS <= now.getTime();
+function laterInstant(left: Date | null, right: Date | null): Date | null {
+  if (!left) return right;
+  if (!right) return left;
+  return left.getTime() >= right.getTime() ? left : right;
+}
+
+/**
+ * Sem Pix em aberto e sem vencimento ou cancelamento recente, apaga na hora.
+ * `creating`/`pending` com menos de 7 dias, ou devolução `processing`, segura o token.
+ * Um `creating` preso há mais de 7 dias entra só como vencimento: não muda status no Mercado Pago.
+ * Depois que o último `expires_at` ou `remote_cancelled_at` passou, guarda por mais 24 h.
+ */
+export function disconnectedTokensReadyToPurge(hold: DisconnectTokenHold, now: Date) {
+  if (hold.hasOpenPix) return false;
+  const anchor = laterInstant(hold.lastExpiresAt, hold.lastRemoteCancelledAt);
+  if (!anchor) return true;
+  return now.getTime() - anchor.getTime() > MP_DISCONNECT_SETTLEMENT_GRACE_MS;
 }
 
 /**
@@ -125,15 +139,18 @@ export async function refreshDueMercadoPagoConnections(deps: RefreshDeps = {}) {
   return counts;
 }
 
-/** Apaga tokens de contas desconectadas por nós quando não há mais sinal pendente dentro da margem. */
-export async function purgeDisconnectedMercadoPagoTokens(deps: RefreshDeps = {}) {
+/** Apaga tokens desconectados. Com `businessId`, só esse negócio; senão, todos. */
+export async function purgeDisconnectedMercadoPagoTokens(deps: RefreshDeps & { businessId?: string } = {}) {
   const now = deps.now ?? new Date();
   const store = deps.store ?? createDrizzleMpStore();
-  const rows = await store.listDisconnectedWithTokens();
+  const listed = deps.businessId
+    ? [await store.findByBusinessId(deps.businessId)]
+    : await store.listDisconnectedWithTokens();
+  const rows = listed.filter((row): row is MpConnection => Boolean(row && row.status === "disconnected" && row.accessTokenEnc && row.refreshTokenEnc));
   let purged = 0;
   for (const row of rows) {
-    const pendingExpiresAt = await store.latestPendingDepositExpiresAt(row.businessId);
-    if (!disconnectedTokensReadyToPurge(pendingExpiresAt, now)) continue;
+    const hold = await store.disconnectTokenHold(row.businessId, now);
+    if (!disconnectedTokensReadyToPurge(hold, now)) continue;
     await store.clearDisconnectedTokens(row.businessId);
     purged += 1;
   }

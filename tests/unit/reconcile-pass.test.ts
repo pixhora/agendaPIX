@@ -29,7 +29,9 @@ describe("orçamento da passagem", () => {
     expect(tight.allow("stuck")).toBe(false);
     expect(tight.allow("cancel")).toBe(false);
     expect(tight.allow("poll")).toBe(true);
+    expect(tight.allow("refunds")).toBe(true);
     expect(tight.allow("reminders")).toBe(true);
+    expect(tight.allow("tokens")).toBe(true);
     expect(wallClockBudget(50_000, 8_000, started, () => started).allow("stuck")).toBe(true);
   });
 });

@@ -53,6 +53,7 @@ export default async function ServicesPage({ searchParams }: { searchParams: Pro
                 <p className="text-sm font-semibold text-pix">{service.depositCents > 0 ? `Sinal Pix ${money.format(service.depositCents / 100)}` : "Sem sinal"}</p>
                 <p className="text-sm text-muted">{policyListLabel(service.depositPolicy, service.depositCents)}</p>
                 {service.blockedReason === "mp_account_not_connected" ? <p className="mt-1 max-w-prose text-sm text-ink">Conecte a conta Mercado Pago no AgendaPix para o cliente pagar o sinal deste serviço.</p> : null}
+                {service.blockedReason === "mp_consent_outdated" ? <p className="mt-1 max-w-prose text-sm text-ink"><Link href={`/dashboard/settings?businessId=${business.id}#recebimento`} className="font-semibold underline underline-offset-4">Aceite o texto novo em Recebimento</Link> para voltar a receber sinal. Não precisa reconectar o Mercado Pago.</p> : null}
               </div>
             </div>
             <ServiceBlockNotice reason={service.blockedReason} />

@@ -1,5 +1,5 @@
+import { MP_MANUAL_REFUND_CHANNEL } from "../../mercadopago/connect-copy";
 import { formatBusinessDay } from "../../payments/manual-refund-calendar";
-import { OWNER_MANUAL_MARK_LABEL } from "../../payments/refund-copy";
 
 export type EveKind = "auto_failed" | "review" | "policy";
 
@@ -18,42 +18,26 @@ export type EveItem = {
   disconnected: boolean;
 };
 
-function bookingHref(item: EveItem) {
-  const path = item.bookingPath.split("?")[0] ?? item.bookingPath;
-  if (item.disconnected || item.kind !== "policy") return path;
-  return `${path}?devolver=1`;
+function actionLabel() {
+  return "Abrir agenda";
 }
 
-function actionLabel(item: EveItem) {
-  if (item.disconnected) return "Abrir agendamento";
-  if (item.kind === "policy") return "Devolver agora";
-  return item.kind === "review" ? "Conferir agendamento" : "Resolver agora";
+function manualUntil(item: EveItem) {
+  return `Devolva até ${item.dueLabel}. ${MP_MANUAL_REFUND_CHANNEL}`;
 }
 
 function steps(item: EveItem) {
   if (item.kind === "review") {
     if (item.slotOccupied) {
-      return `O horário já foi ocupado. O prazo de 7 dias para devolver vence amanhã, ${item.dueLabel}. Devolva pelo app do Mercado Pago e toque em "${OWNER_MANUAL_MARK_LABEL}".`;
+      return `O horário já foi ocupado. O prazo de 7 dias para devolver vence amanhã, ${item.dueLabel}. ${MP_MANUAL_REFUND_CHANNEL}`;
     }
     return [
-      `Viu o Pix na sua conta e vai manter o agendamento? Toque em "Confirmar agendamento".`,
-      ``,
-      `Não vai manter? O prazo de 7 dias para devolver vence amanhã, ${item.dueLabel}. Devolva pelo app do Mercado Pago e toque em "${OWNER_MANUAL_MARK_LABEL}".`,
+      "Se for manter o agendamento, ele continua na sua agenda.",
+      "",
+      `Se não for manter, devolva até ${item.dueLabel}. ${MP_MANUAL_REFUND_CHANNEL}`,
     ].join("\n");
   }
-  if (item.kind === "policy") {
-    const manual = `Devolva pelo app do Mercado Pago, na venda de ${item.amountLabel} de ${item.paidAtLabel}, e toque em "${OWNER_MANUAL_MARK_LABEL}".`;
-    if (item.disconnected) return `Para resolver:\n1. ${manual}`;
-    return [
-      `Para resolver:`,
-      `1. Coloque saldo e toque em "Devolver agora"; ou`,
-      `2. ${manual}`,
-    ].join("\n");
-  }
-  const option = item.disconnected
-    ? `1. Devolva pelo app do Mercado Pago e toque em "${OWNER_MANUAL_MARK_LABEL}".`
-    : `1. Coloque saldo e toque em "Tentar de novo" no painel; ou\n2. Devolva pelo app do Mercado Pago, na venda de ${item.amountLabel} de ${item.paidAtLabel}, e toque em "${OWNER_MANUAL_MARK_LABEL}".`;
-  return `Para resolver:\n${option}`;
+  return manualUntil(item);
 }
 
 function policyLead(item: EveItem) {
@@ -136,9 +120,9 @@ export function refundDeadlineEveNotice(input: { ownerName: string | null; items
     ``,
     item.kind === "review" ? "Este é o último lembrete sobre este pagamento." : "Este é o último lembrete sobre esta devolução.",
     ``,
-    `${actionLabel(item)}: ${bookingHref(item)}`,
+    `${actionLabel()}: ${item.bookingPath}`,
   ].join("\n"));
-  const text = [greeting, ``, preheader, ``, ...blocks, ``, "Você recebe este e-mail porque tem um negócio no AgendaPix."].join("\n");
+  const text = [greeting, ``, ...blocks, ``, "Você recebe este e-mail porque tem um negócio no AgendaPix."].join("\n");
   const html = `<div style="display:none;max-height:0;overflow:hidden">${escapeHtml(preheader)}</div><p>${htmlBlocks(input.ownerName, input.items)}</p>`;
   return { subject, preheader, text, html };
 }
@@ -148,14 +132,22 @@ function htmlBlocks(ownerName: string | null, items: EveItem[]) {
   return [greeting, ...items.map(htmlItem), "Você recebe este e-mail porque tem um negócio no AgendaPix."].join("<br><br>");
 }
 
+function agendaLink(item: EveItem) {
+  return `<a href="${escapeHtml(item.bookingPath)}">${escapeHtml(actionLabel())}</a>`;
+}
+
 function htmlItem(item: EveItem) {
-  if (item.kind !== "policy") return escapeHtml([lead(item), ...frame(item), steps(item)].join("\n")).replaceAll("\n", "<br>");
+  const link = agendaLink(item);
+  if (item.kind !== "policy") {
+    const body = escapeHtml([lead(item), ...frame(item), steps(item)].join("\n")).replaceAll("\n", "<br>");
+    return `${body}<br><br>${link}`;
+  }
   const requested = `<strong>${escapeHtml(item.requestedOnLabel)}</strong>`;
   const amount = `<strong>${escapeHtml(item.amountLabel)}</strong>`;
   const due = `<strong>amanhã, ${escapeHtml(item.dueLabel)}</strong>`;
   const opening = `${escapeHtml(item.customerName)} pediu para cancelar dentro da regra do sinal em ${requested}. A devolução de ${amount} ainda está pendente, e o prazo de 7 dias para devolver termina ${due}.`;
   const lines = frame(item).map((line) => escapeHtml(line)).join("<br>");
-  return [opening, lines, escapeHtml(steps(item)).replaceAll("\n", "<br>"), escapeHtml("Este é o último lembrete sobre esta devolução.")].join("<br><br>");
+  return [opening, lines, escapeHtml(steps(item)).replaceAll("\n", "<br>"), escapeHtml("Este é o último lembrete sobre esta devolução."), link].join("<br><br>");
 }
 
 function escapeHtml(value: string) {

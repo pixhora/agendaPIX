@@ -32,7 +32,7 @@ describe("rota de cron do reconciliador", () => {
 });
 
 const quietReport = (): ReconcileReport => ({
-  stuckRetried: 0, stuckCancelled: 0, expiredCancelled: 0, polledPaid: 0, refundsSettled: 0, audits: 0, skippedLock: false,
+  stuckRetried: 0, stuckCancelled: 0, expiredCancelled: 0, polledPaid: 0, refundsSettled: 0, audits: 0, tokensPurged: 0, skippedLock: false,
   failures: 0, deferred: 0, stagesSkipped: 0,
 });
 

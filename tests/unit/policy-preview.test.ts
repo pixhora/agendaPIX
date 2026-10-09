@@ -40,6 +40,7 @@ describe("prévia da política no painel", () => {
     expect(form).not.toContain("confirma no painel");
     expect(editor).toContain("Para você.");
     expect(editor).toContain("Você devolve pelo app do Mercado Pago");
+    expect(editor).not.toContain("Devolver pelo AgendaPix");
     expect(`${editor}\n${form}`).not.toMatch(/[`'"]O \$\{|com o \$\{/);
   });
 });

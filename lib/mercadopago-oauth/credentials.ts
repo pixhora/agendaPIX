@@ -1,8 +1,9 @@
+import { storedConsentIsCurrent } from "../mercadopago/consent";
 import { accountIdLast4 } from "./account-profile";
 import { mpOAuthConfig } from "./config";
 import { decryptMpToken } from "./crypto";
 import { createDrizzleMpStore } from "./repository";
-import { MP_REFRESH_ON_DEMAND_WINDOW_MS, refreshMercadoPagoConnection, type RefreshDeps } from "./refresh";
+import { disconnectedTokensReadyToPurge, MP_REFRESH_ON_DEMAND_WINDOW_MS, refreshMercadoPagoConnection, type RefreshDeps } from "./refresh";
 import type { MpConnection, MpConnectionStore } from "./types";
 
 function storeOf(deps?: RefreshDeps): MpConnectionStore {
@@ -35,17 +36,26 @@ export async function isMpConnected(businessId: string, deps?: RefreshDeps): Pro
   return connectionCanCharge(row, deps?.now ?? new Date());
 }
 
-/** Conexão usada na reserva com sinal. `liveMode` null não é modo de teste. */
-export async function readMpDepositGate(businessId: string, deps?: RefreshDeps): Promise<{ mpConnected: boolean; liveMode: boolean | null }> {
+/** Conexão usada na reserva com sinal. `liveMode` null não é modo de teste. `consentCurrent` só entra na cobrança nova. */
+export async function readMpDepositGate(businessId: string, deps?: RefreshDeps): Promise<{ mpConnected: boolean; liveMode: boolean | null; consentCurrent: boolean }> {
   const row = await storeOf(deps).findByBusinessId(businessId);
+  const now = deps?.now ?? new Date();
+  const gate = depositGate(row, now);
   return {
-    mpConnected: connectionCanCharge(row, deps?.now ?? new Date()),
+    mpConnected: gate.connected,
     liveMode: row?.liveMode ?? null,
+    consentCurrent: gate.consentCurrent,
   };
 }
 
 function connectionCanCharge(row: MpConnection | null, now: Date) {
   return Boolean(row && row.status === "connected" && row.accessTokenEnc && row.refreshTokenEnc && row.expiresAt && row.expiresAt.getTime() > now.getTime());
+}
+
+/** Conta ligada para liquidar Pix. `consentCurrent` só entra na cobrança nova. */
+export function depositGate(row: MpConnection | null, now: Date) {
+  const connected = connectionCanCharge(row, now);
+  return { connected, consentCurrent: connected && storedConsentIsCurrent(row?.consentVersion, row?.autoRefundAckAt) };
 }
 
 export type MpOwnerStatus = {
@@ -90,21 +100,25 @@ export async function getMercadoPagoOwnerStatus(businessId: string, deps?: Refre
     connectedAt: row.connectedAt.toISOString(),
     expiresAt: row.expiresAt?.toISOString() ?? null,
     liveMode: row.liveMode,
-    canReceiveDeposits: connectionCanCharge(row, now),
+    canReceiveDeposits: depositGate(row, now).consentCurrent,
     consentVersion,
     ...account,
   };
 }
 
 /**
- * Desconecta do nosso lado sem apagar os tokens na hora.
- * Eles ficam só para liquidar sinais já emitidos e somem no cron depois da margem.
+ * Desconecta do nosso lado. Sem Pix em aberto e sem vencimento recente, apaga os tokens na hora.
+ * `creating`/`pending` recente, devolução `processing`, ou o último `expires_at`/`remote_cancelled_at`
+ * há menos de 24 h, guarda o par para confirmar ou devolver. O reconciliador apaga depois; o webhook só o negócio do evento.
  */
 export async function disconnectMercadoPago(businessId: string, deps?: RefreshDeps) {
   const store = storeOf(deps);
   const row = await store.findByBusinessId(businessId);
   if (!row || row.status === "disconnected") return;
-  await store.markDisconnected(businessId, deps?.now ?? new Date());
+  const now = deps?.now ?? new Date();
+  await store.markDisconnected(businessId, now);
+  const hold = await store.disconnectTokenHold(businessId, now);
+  if (disconnectedTokensReadyToPurge(hold, now)) await store.clearDisconnectedTokens(businessId);
 }
 
 /**

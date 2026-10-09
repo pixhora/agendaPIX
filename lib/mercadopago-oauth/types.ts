@@ -46,6 +46,22 @@ export type MpLock = {
   write(next: MpConnection): Promise<void>;
 };
 
+/** `creating`/`pending` mais velho que isto não segura o token. O status no Mercado Pago não muda. */
+export const MP_DISCONNECT_STUCK_PIX_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** O que ainda segura o token depois de desconectar pelo AgendaPix. */
+export type DisconnectTokenHold = {
+  /**
+   * Pagamento `creating`/`pending` com `expires_at` nulo ou com menos de 7 dias,
+   * ou devolução `processing` (`in_process` na API) que o reconciliador ainda observa.
+   */
+  hasOpenPix: boolean;
+  /** Maior `expires_at` dos pagamentos deste negócio, aberto ou já encerrado. */
+  lastExpiresAt: Date | null;
+  /** Maior `remote_cancelled_at`. A folga de 24 h conta a partir do mais recente dos dois. */
+  lastRemoteCancelledAt: Date | null;
+};
+
 export type MpConnectionStore = {
   findByBusinessId(businessId: string): Promise<MpConnection | null>;
   findConnectedBusinessId(mpUserId: string): Promise<string | null>;
@@ -55,7 +71,7 @@ export type MpConnectionStore = {
   markDisconnected(businessId: string, disconnectedAt: Date): Promise<void>;
   clearDisconnectedTokens(businessId: string): Promise<void>;
   listDisconnectedWithTokens(): Promise<MpConnection[]>;
-  latestPendingDepositExpiresAt(businessId: string): Promise<Date | null>;
+  disconnectTokenHold(businessId: string, now?: Date): Promise<DisconnectTokenHold>;
   listRefreshCandidates(expiresBefore: Date): Promise<string[]>;
   withBusinessLock<T>(businessId: string, run: (lock: MpLock) => Promise<T>): Promise<T>;
   saveOAuthState(row: MpOAuthState): Promise<void>;

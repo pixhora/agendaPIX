@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { bookingRequestDigest, bookingRequestMatches, legacyBookingRequestDigest } from "../../lib/bookings/service";
 
@@ -20,5 +21,13 @@ describe("digest da reserva", () => {
     expect(bookingRequestMatches(bookingRequestDigest(withCpf), otherCpf)).toBe(true);
     expect(bookingRequestMatches(legacyBookingRequestDigest(withCpf), { ...base, customer: { ...base.customer, name: "Bia" } })).toBe(false);
     expect(bookingRequestMatches(null, withCpf)).toBe(false);
+  });
+
+  it("a página pública não grava o CPF no sessionStorage", () => {
+    const source = readFileSync("components/booking/BookingFlow.tsx", "utf8");
+    expect(source).not.toContain("customerCpf:");
+    expect(source).not.toContain("stored?.customerCpf");
+    expect(source).not.toContain("stored.customerCpf");
+    expect(source).toContain("pixResumePayload");
   });
 });

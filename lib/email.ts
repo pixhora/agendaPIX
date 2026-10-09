@@ -88,6 +88,13 @@ export function buildSignInCodeEmail(input: { otp: string; appOrigin: string; dr
   return { subject, text, html, buttonUrl };
 }
 
+/** URL absoluta no mesmo host dos outros e-mails. A origem é `BETTER_AUTH_URL`; o projeto não tem `APP_URL`. */
+export function appPublicHref(path: string, env: Readonly<Record<string, string | undefined>> = process.env): string {
+  const parsed = authEnvSchema.pick({ BETTER_AUTH_URL: true }).safeParse(env);
+  if (!parsed.success) return path;
+  return new URL(path, new URL(parsed.data.BETTER_AUTH_URL).origin).href;
+}
+
 function appOrigin() {
   const env = authEnvSchema.safeParse(process.env);
   if (!env.success) throw new HttpError(503, "auth_unavailable", "O acesso está indisponível. Tente novamente mais tarde.");

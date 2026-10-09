@@ -198,7 +198,7 @@ O tratamento de dados pessoais está descrito na [Política de Privacidade](/pri
 
 15.2. Mudanças relevantes serão avisadas pelo e-mail da conta com antecedência mínima de 25 dias. Se você continuar usando o serviço depois disso, entenderemos que aceitou. Se não concordar, pode cancelar conforme o item 5.7.
 
-15.3. Se o texto de autorização do Mercado Pago (item 5-A.6) mudar, um novo aceite só é pedido quando você conectar ou reconectar a conta e a versão aceita antes for diferente da atual. Conexões já ativas continuam funcionando com base no aceite anterior.
+15.3. Quem aceitou uma versão anterior do texto de autorização do Mercado Pago (item 5-A.6) precisa aceitar a versão atual pelo painel. Enquanto a conta continua conectada, esse aceite não pede uma nova entrada no Mercado Pago. Se o Mercado Pago já encerrou a conexão, o aceite só vale depois de reconectar. Até aceitar a versão atual, o negócio não recebe novos agendamentos com sinal. Pix já pago ou em andamento segue normalmente.
 
 ## 16. Lei aplicável e foro
 

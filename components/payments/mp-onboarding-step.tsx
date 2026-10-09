@@ -191,7 +191,7 @@ export function MpOnboardingStep({
                   ))}
                 </ul>
                 <p className="mt-3 text-[13px] leading-relaxed text-muted">
-                  O AgendaPix não vê sua senha, não faz transferências nem saques e não cobra taxa sobre o sinal. Só tira dinheiro da sua conta nas duas devoluções acima.
+                  O AgendaPix não vê sua senha, não faz transferências nem saques e não cobra taxa sobre o sinal. Só tira dinheiro da sua conta na devolução automática acima.
                 </p>
               </div>}
               {errorView ? null : <KnowList />}

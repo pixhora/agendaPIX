@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "../../db/schema";
-import { sendOwnerEmail } from "../email";
+import { appPublicHref, sendOwnerEmail } from "../email";
 import { refundDeadlineEveNotice, type EveKind } from "../email/templates/refund-deadline-eve";
 import { MP_MANUAL_REFUND_CHANNEL } from "../mercadopago/connect-copy";
 import { formatAppointment } from "./notices";
@@ -112,7 +112,7 @@ function dailyText(item: ReminderCase) {
   }
   return {
     subject: `Ainda pendente: devolva ${brl(item.amountCents)} para ${item.customerName} até ${due}`,
-    text: `A devolução automática continua pendente. A data limite não mudou (${due}). Você devolve pelo app do Mercado Pago.`,
+    text: `A devolução automática continua pendente. A data limite não mudou (${due}). ${MP_MANUAL_REFUND_CHANNEL}`,
   };
 }
 
@@ -131,7 +131,7 @@ function eveItem(item: ReminderCase) {
     dueShort: labels.dueShort,
     requestedOnLabel: item.requestedOn ? formatBusinessDate(item.requestedOn, item.timezone) : "",
     paidAtLabel: item.paidAt ? formatBusinessDateTime(item.paidAt, item.timezone) : "",
-    bookingPath: `/dashboard/agenda/${item.bookingId}`,
+    bookingPath: appPublicHref(`/dashboard?businessId=${encodeURIComponent(item.businessId)}&date=${encodeURIComponent(localDate(item.startsAt, item.timezone))}`),
     slotOccupied: item.slotOccupied,
     disconnected: item.disconnected,
   };

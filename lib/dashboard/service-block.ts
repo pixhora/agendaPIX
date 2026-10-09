@@ -12,6 +12,12 @@ export function serviceBlockCopy(reason: string | null) {
       body: "Serviços com sinal precisam de uma conta Mercado Pago conectada. O Pix do sinal cai direto nessa conta.",
     };
   }
+  if (reason === "mp_consent_outdated") {
+    return {
+      title: "Texto da devolução desatualizado",
+      body: "Reservas novas com sinal ficam pausadas até você aceitar o texto novo em Recebimento. Pix já gerado e sinais já pagos continuam. A conta Mercado Pago segue conectada.",
+    };
+  }
   if (reason === "mp_account_test_mode") {
     return {
       title: "Conta Mercado Pago em modo de teste",

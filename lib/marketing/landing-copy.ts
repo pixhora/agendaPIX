@@ -50,7 +50,7 @@ export function demoSteps(requiresPayerCpf: boolean): readonly string[] {
 export type FaqItem = { id: string; question: string; answer: string };
 
 const refundAnswer =
-  "Você escolhe a regra de cada serviço: até quando o cliente pode cancelar ou remarcar e o que acontece se ele faltar. Ele lê essa regra antes de pagar e ela aparece no comprovante. Se a regra manda devolver, você devolve pelo app do Mercado Pago. O Pix pago depois do prazo é devolvido para quem pagou, no valor inteiro, e você recebe um e-mail.";
+  "Você escolhe a regra de cada serviço: até quando o cliente pode cancelar ou remarcar e o que acontece se ele faltar. Ele lê essa regra antes de pagar e ela aparece no comprovante. Se a regra manda devolver, você devolve pelo app do Mercado Pago. O valor sai do saldo da sua conta Mercado Pago. Pix pago depois do prazo para reservar o horário é devolvido sozinho, o valor inteiro, e você recebe um e-mail.";
 
 /** A copy não lê pixRecipientDisplayName: na landing ele vem null. */
 export function faqItems(facts: PublicBookingFacts): FaqItem[] {
@@ -96,7 +96,7 @@ export function faqItems(facts: PublicBookingFacts): FaqItem[] {
     items.push({
       id: "cpf",
       question: "Por que o cliente informa o CPF?",
-      answer: "O AgendaPix envia o CPF ao Mercado Pago na cobrança do Pix e não guarda esse dado no cadastro nem no navegador.",
+      answer: "Quando o Mercado Pago exige o CPF de quem paga, o AgendaPix envia o CPF direto para o Mercado Pago e não guarda esse dado, nem no banco nem no navegador.",
     });
   }
 

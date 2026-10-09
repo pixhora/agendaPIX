@@ -1,6 +1,6 @@
 import { MP_CONNECT_CONSENT_VERSION } from "./consent";
 import { latePixRefundCopy } from "./late-pix-copy";
-import { MP_AUTO_REFUND_ACK_ERROR, MP_DISCONNECT_RETENTION_COPY, MP_MANUAL_REFUND_CHANNEL } from "./connect-copy";
+import { MP_AUTO_REFUND_ACK_ERROR } from "./connect-copy";
 
 /** Status visto pelo dono. Campo ausente de chave antiga vale como false. */
 export const MP_CONNECTION_STATUSES = ["not_connected", "connected", "needs_reconnect"] as const;
@@ -32,6 +32,8 @@ export type MpOwnerStatus = {
 };
 
 export const MP_ACCOUNT_NOT_CONNECTED = "mp_account_not_connected";
+
+export const MP_CONSENT_OUTDATED = "mp_consent_outdated";
 
 export const AUTO_REFUND_ACK_ERROR = MP_AUTO_REFUND_ACK_ERROR;
 
@@ -144,6 +146,11 @@ export function mpConnectionUrl(businessId: string): string {
   return `/api/businesses/${encodeURIComponent(businessId)}/mercadopago`;
 }
 
+/** Aceite da versão vigente sem abrir o Mercado Pago de novo. */
+export function mpConsentUrl(businessId: string): string {
+  return `/api/businesses/${encodeURIComponent(businessId)}/mercadopago/consent`;
+}
+
 export function legacyPixDismissUrl(businessId: string): string {
   return `/api/businesses/${encodeURIComponent(businessId)}/notices/pix_key_retired/dismiss`;
 }
@@ -169,7 +176,7 @@ export function statusBadge(status: MpConnectionStatus): { tone: MpStatusBadgeTo
   return { tone: "not_connected", label: "Não conectado" };
 }
 
-export type MpBannerId = "mp-reauth" | "mp-not-connected";
+export type MpBannerId = "mp-reauth" | "mp-not-connected" | "mp-consent";
 
 /**
  * Banners que dependem só do status da conexão ou de `blockedReason`.
@@ -179,9 +186,11 @@ export function selectMpBanners(input: {
   status: MpConnectionStatus;
   hasDepositService: boolean;
   blockedReasons?: readonly string[];
+  /** Conta ainda conectada, mas o texto aceito não é o vigente. */
+  consentOutdated?: boolean;
 }): MpBannerId[] {
   if (input.status === "needs_reconnect") return ["mp-reauth"];
-  if (input.status === "connected") return [];
+  if (input.status === "connected") return input.consentOutdated ? ["mp-consent"] : [];
   const blocked = input.blockedReasons?.includes(MP_ACCOUNT_NOT_CONNECTED) ?? false;
   if (input.hasDepositService || blocked) return ["mp-not-connected"];
   return [];
@@ -213,21 +222,49 @@ export function formatConnectedSince(iso: string | null, timeZone = "America/Sao
   return new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "long", year: "numeric", timeZone }).format(date);
 }
 
+/**
+ * Teto que a tela pode prometer. Os crons da Vercel rodam uma vez por dia
+ * (`vercel.json`: reconcile às 06:00 UTC, refresh às 07:15 UTC). O worker Docker
+ * chama o mesmo apagamento em cada passagem do reconciliador.
+ */
+export const MP_DISCONNECT_TOKEN_MAX_HOURS = 24;
+
+/** Sem Pix em aberto o acesso some na hora. Com Pix em aberto, o aviso abaixo diz o teto. */
+export function disconnectAccessSentence(pendingPixCount: number): string {
+  if (pendingPixCount > 0) {
+    return "Enquanto houver Pix em aberto, o AgendaPix guarda o acesso à sua conta só para confirmar o pagamento ou devolver o sinal se ele chegar fora do prazo. Quando esses Pix forem pagos, vencerem ou forem cancelados, o acesso é apagado.";
+  }
+  return "O AgendaPix apaga agora o acesso à sua conta. Devoluções, a partir de agora, inclusive as de Pix pago fora do prazo, você faz direto no Mercado Pago.";
+}
+
 export function openPixDisconnectNote(count: number): string | null {
   if (!Number.isInteger(count) || count <= 0) return null;
-  const lead = count === 1 ? "1 cliente está" : `${count} clientes estão`;
-  return `${lead} com Pix em aberto. Se pagarem dentro do prazo, o agendamento é confirmado, o dinheiro cai na sua conta Mercado Pago e avisamos você. ${MP_DISCONNECT_RETENTION_COPY}`;
+  const one = count === 1;
+  const lead = one ? "1 cliente está" : `${count} clientes estão`;
+  const pay = one ? "Se pagar" : "Se pagarem";
+  const pix = one ? "esse Pix" : "esses Pix";
+  const after = one
+    ? "ele for pago, vencer ou for cancelado"
+    : "eles forem pagos, vencerem ou forem cancelados";
+  return `${lead} com Pix em aberto. ${pay} dentro do prazo, o agendamento é confirmado, o dinheiro cai na sua conta Mercado Pago e avisamos você. O acesso à sua conta fica guardado só para conferir ${pix} e é apagado em até ${MP_DISCONNECT_TOKEN_MAX_HOURS} horas depois que ${after}.`;
 }
 
-export function depositUnavailable(service: { bookable?: boolean; reason?: string | null }): boolean {
-  return service.bookable === false && service.reason === MP_ACCOUNT_NOT_CONNECTED;
+type DepositFlag = { bookable?: boolean; reason?: string | null; blockedReason?: string | null };
+
+function depositBlockReason(service: DepositFlag): string | null {
+  return service.reason ?? service.blockedReason ?? null;
 }
 
-export function showDepositUnavailableCard(services: readonly { depositCents: number; bookable?: boolean; reason?: string | null }[]): boolean {
+export function depositUnavailable(service: DepositFlag): boolean {
+  const reason = depositBlockReason(service);
+  return service.bookable === false && (reason === MP_ACCOUNT_NOT_CONNECTED || reason === MP_CONSENT_OUTDATED || reason === "mp_account_test_mode");
+}
+
+export function showDepositUnavailableCard(services: readonly (DepositFlag & { depositCents: number })[]): boolean {
   return services.length > 0 && services.every((service) => service.depositCents > 0 && depositUnavailable(service));
 }
 
-export function hasBookableService(services: readonly { bookable?: boolean; reason?: string | null }[]): boolean {
+export function hasBookableService(services: readonly DepositFlag[]): boolean {
   return services.some((service) => !depositUnavailable(service));
 }
 
@@ -255,10 +292,10 @@ export const PERMISSIONS: { strong: string; rest: string }[] = [
   { strong: "criar cobranças Pix", rest: " no valor do sinal dos seus agendamentos;" },
   { strong: "ver o status", rest: " dessas cobranças, para confirmar o agendamento quando o cliente pagar;" },
   { strong: "cancelar", rest: " cobranças que não foram pagas no prazo;" },
-  { strong: "devolver um sinal quando você mandar", rest: `. ${MP_MANUAL_REFUND_CHANNEL} O valor sai do saldo da sua conta Mercado Pago;` },
+  { strong: "conciliar o pagamento", rest: " quando o aviso atrasar: confirma o horário se o Pix foi pago no prazo;" },
   {
-    strong: "pedir a devolução ao Mercado Pago",
-    rest: ` quando um Pix chega depois do prazo. ${latePixRefundCopy()} Você recebe um e-mail a cada devolução;`,
+    strong: "devolver sozinho o valor inteiro",
+    rest: `. ${latePixRefundCopy()} Você recebe um e-mail a cada devolução;`,
   },
   { strong: "manter a conexão ativa", rest: " sem pedir sua autorização de novo a cada renovação." },
 ];
