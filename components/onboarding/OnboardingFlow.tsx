@@ -325,6 +325,10 @@ export function OnboardingFlow({ legalPagesPublished = false, publicHost }: { le
       setEmailAlert({ kind: "offline" });
       return;
     }
+    if (outcome.type === "validation") {
+      setEmailAlert({ kind: "validation", message: outcome.message });
+      return;
+    }
     setEmailAlert({ kind: "generic" });
   }
 

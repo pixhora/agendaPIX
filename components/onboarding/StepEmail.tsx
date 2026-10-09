@@ -15,6 +15,7 @@ export type EmailAlert =
   | { kind: "otp" }
   | { kind: "offline" }
   | { kind: "generic" }
+  | { kind: "validation"; message: string }
   | { kind: "expired" }
   | { kind: "not_found" }
   | null;
@@ -27,6 +28,7 @@ function alertText(alert: EmailAlert): string | null {
   if (alert.kind === "offline") return "Sem internet. Seus dados estão salvos neste aparelho. Quando a conexão voltar, toque em Enviar código.";
   if (alert.kind === "expired") return "Seu cadastro guardado venceu, mas os dados ainda estão neste aparelho.";
   if (alert.kind === "not_found") return "Não encontramos o cadastro guardado. Toque em Enviar código de novo.";
+  if (alert.kind === "validation") return alert.message;
   return "Algo deu errado do nosso lado. Seus dados estão guardados; tente de novo.";
 }
 

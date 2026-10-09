@@ -52,9 +52,10 @@ export function restoreOnboardingDraft(raw: unknown, plan: "base" | "completo"):
   const base = createOnboardingData(plan);
   if (!raw || typeof raw !== "object") return base;
   const record = raw as Partial<OnboardingData>;
+  const storedPlan = record.plan === "base" || record.plan === "completo" ? record.plan : plan;
   const next: OnboardingData = {
     ...base,
-    plan: record.plan === "base" || record.plan === "completo" ? record.plan : base.plan,
+    plan: plan === "base" ? "base" : storedPlan,
     businessName: typeof record.businessName === "string" ? record.businessName : base.businessName,
     slug: typeof record.slug === "string" ? record.slug : base.slug,
     serviceName: typeof record.serviceName === "string" ? record.serviceName : base.serviceName,
@@ -148,7 +149,11 @@ export type DraftSaveOutcome =
   | { type: "expired" }
   | { type: "not_found" }
   | { type: "offline"; draftId: string | null }
+  | { type: "validation"; message: string; draftId: string | null }
   | { type: "generic"; draftId: string | null };
+
+const PLAN_UNAVAILABLE_MESSAGE = "O plano completo ainda não está à venda. Comece pelo plano AgendaPix.";
+const CHECK_INPUT_MESSAGE = "Confira os dados enviados.";
 
 function fromDraftError(status: number, error: ApiErrorBody, draftId: string | null): DraftSaveOutcome {
   if (status === 0 || error.code === "network") return { type: "offline", draftId };
@@ -158,6 +163,13 @@ function fromDraftError(status: number, error: ApiErrorBody, draftId: string | n
   if (error.code === "draft_expired" || status === 410) return { type: "expired" };
   if (error.code === "not_found" || status === 404) return { type: "not_found" };
   if (status >= 500 || error.code === "onboarding_unavailable") return { type: "draft_failed" };
+  if (status === 400) {
+    return {
+      type: "validation",
+      message: error.code === "plan_unavailable" ? PLAN_UNAVAILABLE_MESSAGE : CHECK_INPUT_MESSAGE,
+      draftId,
+    };
+  }
   return { type: "generic", draftId };
 }
 

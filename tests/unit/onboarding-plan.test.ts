@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { assertOnboardingPlanForSale, createOnboardingDraft } from "../../lib/onboarding/drafts";
-import { onboardingPlanForEnv } from "../../lib/onboarding/flow";
+import { draftBodyFromOnboarding, onboardingPlanForEnv, restoreOnboardingDraft } from "../../lib/onboarding/flow";
 
 const completo = {
   email: "dona@example.com",
@@ -25,5 +25,31 @@ describe("plano completo", () => {
     expect(onboardingPlanForEnv("completo", "production")).toBe("base");
     expect(onboardingPlanForEnv(null, "development")).toBe("completo");
     expect(onboardingPlanForEnv("base", "development")).toBe("base");
+  });
+
+  it("no passo 4 de ?plano=base manda base e HH:mm mesmo com completo e segundos guardados", () => {
+    const stored = {
+      plan: "completo" as const,
+      businessName: "Studio Repro",
+      slug: "studio-repro",
+      serviceName: "Corte",
+      durationMinutes: 45,
+      priceCents: 5000,
+      depositCents: 0,
+      depositMode: "30" as const,
+      openDays: [1, 2, 3, 4, 5, 6],
+      opensAt: "09:00:00",
+      closesAt: "19:00:00",
+      email: "dona@studio.com.br",
+    };
+    const data = restoreOnboardingDraft(stored, onboardingPlanForEnv("base", "production"));
+    const body = draftBodyFromOnboarding(data);
+    expect(body.plan).toBe("base");
+    expect(body.segment).toBe("outro");
+    expect(body.email).toBe("dona@studio.com.br");
+    expect(body.data.business).toMatchObject({ name: "Studio Repro", slug: "studio-repro", timezone: "America/Sao_Paulo" });
+    expect(body.data.service).toEqual({ name: "Corte", durationMinutes: 45, priceCents: 5000, depositCents: 1500 });
+    expect(body.data.hours[0]).toEqual({ weekday: 1, opensAt: "09:00", closesAt: "19:00" });
+    expect(body.data.hours).toHaveLength(6);
   });
 });
