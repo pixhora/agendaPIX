@@ -443,17 +443,34 @@ export async function markRefundedByExternalId(ports: RefundPorts, externalId: s
   return true;
 }
 
-export async function retryAutomaticLateRefunds(ports: RefundPorts, provider: Pick<PaymentProvider, "refundCharge">, limit: number, mailer?: OwnerMailer) {
+export async function retryAutomaticLateRefunds(
+  ports: RefundPorts,
+  provider: Pick<PaymentProvider, "refundCharge">,
+  limit: number,
+  mailer?: OwnerMailer,
+  onPaymentError?: (paymentId: string, error: unknown) => void,
+) {
   const ids = await ports.listLateRefundIds(limit);
   let settled = 0;
   for (const paymentId of ids) {
-    const result = await settleAutomaticLateRefund(ports, provider, paymentId, mailer);
-    if (result === "submitted") settled += 1;
+    try {
+      const result = await settleAutomaticLateRefund(ports, provider, paymentId, mailer);
+      if (result === "submitted") settled += 1;
+    } catch (error) {
+      if (!onPaymentError) throw error;
+      onPaymentError(paymentId, error);
+    }
   }
   return settled;
 }
 
-export async function observeInProcessRefunds(ports: RefundPorts, provider: Pick<PaymentProvider, "getCharge">, limit: number, now = new Date()) {
+export async function observeInProcessRefunds(
+  ports: RefundPorts,
+  provider: Pick<PaymentProvider, "getCharge">,
+  limit: number,
+  now = new Date(),
+  onPaymentError?: (paymentId: string, error: unknown) => void,
+) {
   const ids = await ports.listInProcessIds(limit);
   let observed = 0;
   for (const paymentId of ids) {
@@ -464,8 +481,9 @@ export async function observeInProcessRefunds(ports: RefundPorts, provider: Pick
       if (remote?.status !== "refunded") continue;
       const marked = await markRefundedByExternalId(ports, view.externalId, now);
       if (marked) observed += 1;
-    } catch {
+    } catch (error) {
       // Sem token ou gateway fora: o próximo ciclo tenta de novo. Não estorna daqui.
+      onPaymentError?.(paymentId, error);
     }
   }
   return observed;

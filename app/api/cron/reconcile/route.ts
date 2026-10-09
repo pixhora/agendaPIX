@@ -1,6 +1,6 @@
 import { handleHttp, json } from "@/lib/http";
 import { deleteExpiredOnboardingDrafts } from "@/lib/onboarding/drafts";
-import { authorizeCron, runReconcilePass } from "@/lib/payments/cron";
+import { authorizeCron, runCronTick, runReconcilePass } from "@/lib/payments/cron";
 
 // Substitui o worker `reconcile` (loop) em ambiente sem servidor: Vercel Cron chama GET; agendadores externos podem usar POST.
 export const runtime = "nodejs";
@@ -10,8 +10,13 @@ export const maxDuration = 60;
 async function handle(request: Request) {
   return handleHttp(async () => {
     authorizeCron(request.headers.get("authorization"));
-    const expiredDraftsDeleted = await deleteExpiredOnboardingDrafts();
-    return json({ at: new Date().toISOString(), expiredDraftsDeleted, ...(await runReconcilePass()) });
+    return json(await runCronTick({
+      deleteExpiredDrafts: () => deleteExpiredOnboardingDrafts(),
+      reconcile: () => runReconcilePass(),
+      onDraftCleanupError: (code) => {
+        console.error(`[reconcile] stage=draft_cleanup code=${code}`);
+      },
+    }));
   });
 }
 

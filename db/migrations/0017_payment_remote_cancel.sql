@@ -1,0 +1,3 @@
+ALTER TABLE "payments" ADD COLUMN "remote_cancelled_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "payments" ADD COLUMN "remote_cancel_attempted_at" timestamp with time zone;--> statement-breakpoint
+CREATE INDEX "payments_remote_cancel_due_idx" ON "payments" USING btree ("remote_cancel_attempted_at","expires_at","id") WHERE "payments"."remote_cancelled_at" IS NULL AND "payments"."external_id" IS NOT NULL AND "payments"."status" IN ('pending', 'expired');

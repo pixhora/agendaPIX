@@ -119,7 +119,7 @@ O reconciliador (`scripts/reconcile.ts`, PR #7) recupera cobranças órfãs (pre
 
 Alternativa: cron/systemd timer/*Scheduled Task* do Coolify rodando `node reconcile.mjs --once` a cada minuto (sem o serviço `worker`).
 Mais de uma instância é segura (advisory lock: uma trabalha, as outras pulam a passagem). Variáveis: `PAYMENT_PROVIDER_TIMEOUT_MS`,
-`RECONCILE_INTERVAL_SECONDS`, `RECONCILE_STUCK_SECONDS`, `RECONCILE_BATCH_SIZE` (padrões em `.env.example`).
+`RECONCILE_INTERVAL_SECONDS`, `RECONCILE_STUCK_SECONDS`, `RECONCILE_BATCH_SIZE`, `RECONCILE_BUDGET_MS` (padrões em `.env.example`).
 Na imagem (`NODE_ENV=production`) o provedor Pix fake é recusado, então cada passagem registra falha até existir um gateway real.
 
 ## CI
@@ -205,7 +205,7 @@ pnpm reconcile                 # loop contínuo
 pnpm reconcile --once --json   # report estruturado
 ```
 
-Variáveis: `RECONCILE_INTERVAL_SECONDS`, `RECONCILE_STUCK_SECONDS`, `RECONCILE_BATCH_SIZE`. Em produção use `--once` a cada minuto atrás de um scheduler; vários processos são seguros (advisory lock de sessão). Política de pagamento tardio por negócio: `businesses.late_payment_policy` = `refund` (padrão) ou `rebook_if_free`.
+Variáveis: `RECONCILE_INTERVAL_SECONDS`, `RECONCILE_STUCK_SECONDS`, `RECONCILE_BATCH_SIZE`, `RECONCILE_BUDGET_MS`. Em produção use `--once` a cada minuto atrás de um scheduler; vários processos são seguros (advisory lock de sessão). Política de pagamento tardio por negócio: `businesses.late_payment_policy` = `refund` (padrão) ou `rebook_if_free`.
 
 Migrations `0008` (enum) e `0009` (schema) exigem o migrador em `scripts/migrate.mjs` (`pnpm db:migrate`), que aplica cada arquivo na própria transação — necessário porque o Postgres só libera valores novos de ENUM após o COMMIT.
 

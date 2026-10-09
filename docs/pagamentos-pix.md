@@ -70,7 +70,7 @@ Tópico `payment`. Manifesto `id:{data.id};request-id:{x-request-id};ts:{ts};` e
 
 `findChargeByReference` lê `provider_charge_references` (e `payments.external_id`) e, se faltar, `GET /v1/payments/search`.
 
-`/api/cron/reconcile` consulta `/v1/payments`, retoma a devolução automática que ficou sem resposta e promove `refundStatus: in_process` para `refunded` quando o gateway confirma. Não estorna por nenhum outro motivo. O agendador externo que chama `POST /api/cron/reconcile` com `Authorization: Bearer $CRON_SECRET` continua válido. No plano Hobby o cron da Vercel segue diário.
+`/api/cron/reconcile` consulta `/v1/payments`, retoma a devolução automática que ficou sem resposta e promove `refundStatus: in_process` para `refunded` quando o gateway confirma. Não estorna por nenhum outro motivo. O agendador externo que chama `POST /api/cron/reconcile` com `Authorization: Bearer $CRON_SECRET` continua válido. No plano Hobby o cron da Vercel segue diário. A consulta de webhook perdido só inclui cobrança `pending` ainda dentro do hold; no Hobby isso fica para o agendador externo, mais frequente que `BOOKING_HOLD_MINUTES`.
 
 ## Nome do recebedor
 
