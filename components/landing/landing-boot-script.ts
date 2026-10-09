@@ -127,8 +127,11 @@ export const landingBootScript = `(function(){
     node.classList.toggle("translate-y-0", visible);
     node.classList.toggle("translate-y-full", !visible);
     node.classList.toggle("pointer-events-none", !visible);
+    var pad = visible ? node.offsetHeight + 16 + "px" : "0px";
     document.documentElement.style.setProperty("--sticky-cta-height", visible ? node.offsetHeight + "px" : "0px");
-    document.documentElement.style.setProperty("--sticky-cta-pad", visible ? node.offsetHeight + 16 + "px" : "0px");
+    document.documentElement.style.setProperty("--sticky-cta-pad", pad);
+    var main = document.getElementById("content");
+    if(main) main.style.paddingBottom = pad;
   }
   var armed = false;
   function arm(){
@@ -154,6 +157,7 @@ export const landingBootScript = `(function(){
       observer.observe(footer);
     }
     window.addEventListener("scroll", updateBar, { passive: true });
+    if(window.MutationObserver) new MutationObserver(function(){ updateBar(); }).observe(document.body, { childList: true, subtree: true });
     window.addEventListener("resize", updateBar);
     window.addEventListener("focusin", updateBar);
     window.addEventListener("focusout", updateBar);

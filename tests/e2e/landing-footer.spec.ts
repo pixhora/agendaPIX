@@ -120,14 +120,13 @@ test.describe("barra fixa da landing", () => {
     });
     await expect(bar).toHaveAttribute("data-visible", "true");
 
-    const measured = await page.evaluate(() => {
-      const main = document.querySelector("main");
+    await expect.poll(async () => page.evaluate(() => {
+      const main = document.getElementById("content");
       const node = document.getElementById("sticky-cta");
-      if (!main || !node) return null;
-      return { pad: Number.parseFloat(getComputedStyle(main).paddingBottom), height: node.offsetHeight };
-    });
-    expect(measured).not.toBeNull();
-    expect(measured!.pad).toBe(measured!.height + 16);
+      if (!main || !node || node.dataset.visible !== "true") return null;
+      const pad = Number.parseFloat(getComputedStyle(main).paddingBottom);
+      return pad === node.offsetHeight + 16 ? pad : null;
+    })).not.toBeNull();
 
     await page.locator("#cta-final").evaluate((element) => element.scrollIntoView({ block: "center", inline: "nearest" }));
     await expect(bar).toHaveAttribute("data-visible", "false");
