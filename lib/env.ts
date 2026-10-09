@@ -42,6 +42,53 @@ export const smtpEnvSchema = z.object({
   SMTP_PASSWORD: z.string().optional(),
 }).refine((value) => Boolean(value.SMTP_USER) === Boolean(value.SMTP_PASSWORD), "Configure usuário e senha SMTP juntos.");
 
+/** Domínio de exemplo (e subdomínios). Não inclui o endereço na mensagem de erro. */
+export function smtpFromUsesExampleDomain(from: string): boolean {
+  const wrapped = from.match(/<([^>]+)>/);
+  const address = (wrapped?.[1] ?? from).trim().toLowerCase();
+  const at = address.lastIndexOf("@");
+  if (at < 0) return false;
+  const domain = address.slice(at + 1).replace(/\.+$/, "");
+  return domain === "example.com" || domain.endsWith(".example.com");
+}
+
+const productionBootMessage = {
+  capture: "MAGIC_LINK_CAPTURE_FILE não pode estar definido em produção.",
+  fixtures: "MP_CAPTURE não pode estar definido em produção.",
+  from: "SMTP_FROM não pode usar o domínio example.com em produção.",
+} as const;
+
+/**
+ * Boot de produção. O `next build` (NEXT_PHASE=phase-production-build) não é boot:
+ * o .env local de desenvolvimento pode ter remetente de exemplo.
+ * A mensagem não repete caminho, flag nem endereço.
+ */
+export const productionRuntimeEnvSchema = z.object({
+  NODE_ENV: z.string().optional(),
+  NEXT_PHASE: z.string().optional(),
+  MAGIC_LINK_CAPTURE_FILE: z.string().optional(),
+  MP_CAPTURE: z.string().optional(),
+  SMTP_FROM: z.string().optional(),
+}).superRefine((value, ctx) => {
+  if (value.NODE_ENV !== "production" || value.NEXT_PHASE === "phase-production-build") return;
+  if (value.MAGIC_LINK_CAPTURE_FILE?.trim()) ctx.addIssue({ code: "custom", message: productionBootMessage.capture });
+  if (value.MP_CAPTURE?.trim()) ctx.addIssue({ code: "custom", message: productionBootMessage.fixtures });
+  if (value.SMTP_FROM?.trim() && smtpFromUsesExampleDomain(value.SMTP_FROM)) ctx.addIssue({ code: "custom", message: productionBootMessage.from });
+});
+
+export function assertProductionSafeEnv(env: Readonly<Record<string, string | undefined>> = process.env) {
+  const parsed = productionRuntimeEnvSchema.safeParse({
+    NODE_ENV: env.NODE_ENV,
+    NEXT_PHASE: env.NEXT_PHASE,
+    MAGIC_LINK_CAPTURE_FILE: env.MAGIC_LINK_CAPTURE_FILE,
+    MP_CAPTURE: env.MP_CAPTURE,
+    SMTP_FROM: env.SMTP_FROM,
+  });
+  if (parsed.success) return;
+  const messages = [...new Set(parsed.error.issues.map((issue) => issue.message))];
+  throw new Error(messages.join(" "));
+}
+
 const staticRedirectUri = z.url().refine((value) => {
   const url = new URL(value);
   const https = url.protocol === "https:";

@@ -5,7 +5,7 @@ export const chargeCustomerSchema = z.object({
   name: z.string().trim().min(1).max(120),
   phone: z.string().regex(/^\+[1-9][0-9]{7,14}$/),
   email: z.email().max(120).optional(),
-  /** Só vai em `payer.identification` quando o cliente antigo ainda manda CPF. */
+  /** Só vai em `payer.identification` quando `MP_REQUIRES_PAYER_CPF=true`. */
   cpfCnpj: z.string().regex(/^\d{11}$/).optional(),
 }).strict();
 

@@ -5,6 +5,13 @@ import { authEnvSchema, smtpEnvSchema } from "./env";
 import { HttpError } from "./http";
 import { findActiveDraftByEmail } from "./onboarding/drafts";
 
+/** Fora de produção, grava o link no arquivo do E2E. Em produção o caminho é ignorado; o boot recusa a variável. */
+export function magicLinkCapturePath(env: Readonly<Record<string, string | undefined>> = process.env): string | undefined {
+  if (env.NODE_ENV === "production") return undefined;
+  const capture = env.MAGIC_LINK_CAPTURE_FILE?.trim();
+  return capture || undefined;
+}
+
 function emailTransport() {
   const env = smtpEnvSchema.parse(process.env);
   const transporter = nodemailer.createTransport({
@@ -20,7 +27,7 @@ function emailTransport() {
 }
 
 export async function verifyEmailTransport() {
-  if (process.env.MAGIC_LINK_CAPTURE_FILE) return;
+  if (magicLinkCapturePath()) return;
   const { transporter } = emailTransport();
   try { await transporter.verify(); }
   finally { transporter.close(); }
@@ -32,7 +39,7 @@ export const magicLinkEmail = {
 };
 
 export async function sendMagicLinkEmail(email: string, url: string) {
-  const capture = process.env.MAGIC_LINK_CAPTURE_FILE;
+  const capture = magicLinkCapturePath();
   if (capture) {
     await mkdir(path.dirname(capture), { recursive: true });
     await writeFile(capture, `${email}\n${url}\n`, "utf8");
@@ -95,7 +102,7 @@ export async function sendSignInCodeEmail(email: string, otp: string) {
     draftId: draft?.id ?? null,
     businessName: draft?.data.business.name ?? null,
   });
-  const capture = process.env.MAGIC_LINK_CAPTURE_FILE;
+  const capture = magicLinkCapturePath();
   if (capture) {
     await mkdir(path.dirname(capture), { recursive: true });
     await writeFile(capture, `${email}\n${message.buttonUrl}\n`, "utf8");
@@ -109,7 +116,7 @@ export type OwnerMailer = (to: string, subject: string, text: string) => Promise
 
 /** Mesmo transporte do link de acesso. Não há central de avisos no painel: o e-mail é o aviso. */
 export async function sendOwnerEmail(to: string, subject: string, text: string, html?: string) {
-  const capture = process.env.MAGIC_LINK_CAPTURE_FILE;
+  const capture = magicLinkCapturePath();
   if (capture) {
     await mkdir(path.dirname(capture), { recursive: true });
     await writeFile(capture, `${to}\n${subject}\n${text}\n`, "utf8");

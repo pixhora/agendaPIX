@@ -1,4 +1,5 @@
 import { buttonVariants } from "@/components/ui/button";
+import { isDevExampleOpen } from "@/components/preview/preview-badge-gate";
 import type { PublicBookingFacts } from "@/lib/marketing/facts";
 import { demoSteps, minutesUnit } from "@/lib/marketing/landing-copy";
 import { Eyebrow, Section, SectionTitle } from "./section";
@@ -12,7 +13,9 @@ export function DemoSection({ facts }: { facts: PublicBookingFacts }) {
           <Eyebrow>Página de exemplo</Eyebrow>
           <SectionTitle id="exemplo-titulo">Veja como seu cliente agenda.</SectionTitle>
           <p className="mt-4 max-w-[46rem] text-base leading-relaxed text-pretty text-muted lg:text-lg">
-            Esta é a página que seu cliente abre pelo link. Toque e faça uma reserva de teste, do serviço até o Pix.
+            {isDevExampleOpen()
+              ? "Esta é a página que seu cliente abre pelo link. Toque e faça uma reserva de teste, do serviço até o Pix."
+              : "Esta é a página que seu cliente abre pelo link. Ele escolhe o serviço, o horário e paga o sinal por Pix."}
           </p>
           <ol className="mt-6 grid gap-3">
             {steps.map((step, index) => (
@@ -24,10 +27,18 @@ export function DemoSection({ facts }: { facts: PublicBookingFacts }) {
               </li>
             ))}
           </ol>
-          <a href="/preview/booking" className={buttonVariants({ size: "lg", className: "mt-6 w-full sm:w-auto" })}>
-            Abrir a página de exemplo
-          </a>
-          <p className="mt-3 text-[13px] text-muted">Exemplo com dados fictícios. Nenhum Pix de verdade é gerado.</p>
+          {isDevExampleOpen() ? (
+            <>
+              <a href="/preview/booking" className={buttonVariants({ size: "lg", className: "mt-6 w-full sm:w-auto" })}>
+                Abrir a página de exemplo
+              </a>
+              <p className="mt-3 text-[13px] text-muted">Exemplo com dados fictícios. Nenhum Pix de verdade é gerado.</p>
+            </>
+          ) : (
+            <a href="/onboarding" className={buttonVariants({ size: "lg", className: "mt-6 w-full sm:w-auto" })}>
+              Criar minha agenda grátis
+            </a>
+          )}
         </div>
         <ExamplePhone holdMinutes={facts.holdMinutes} />
       </div>

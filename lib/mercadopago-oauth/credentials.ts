@@ -35,6 +35,15 @@ export async function isMpConnected(businessId: string, deps?: RefreshDeps): Pro
   return connectionCanCharge(row, deps?.now ?? new Date());
 }
 
+/** Conexão usada na reserva com sinal. `liveMode` null não é modo de teste. */
+export async function readMpDepositGate(businessId: string, deps?: RefreshDeps): Promise<{ mpConnected: boolean; liveMode: boolean | null }> {
+  const row = await storeOf(deps).findByBusinessId(businessId);
+  return {
+    mpConnected: connectionCanCharge(row, deps?.now ?? new Date()),
+    liveMode: row?.liveMode ?? null,
+  };
+}
+
 function connectionCanCharge(row: MpConnection | null, now: Date) {
   return Boolean(row && row.status === "connected" && row.accessTokenEnc && row.refreshTokenEnc && row.expiresAt && row.expiresAt.getTime() > now.getTime());
 }

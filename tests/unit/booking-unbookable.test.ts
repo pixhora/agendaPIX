@@ -33,6 +33,21 @@ describe("serviço com sinal sem conta conectada", () => {
     expect(whatsappHref("11987654321")).toBe("https://wa.me/5511987654321");
   });
 
+  it("responde 409 mp_account_test_mode com o mesmo texto neutro", () => {
+    const view = publicBookingErrorView(409, {
+      error: {
+        code: "mp_account_test_mode",
+        message: "A conta Mercado Pago conectada está em modo de teste. Conecte a conta de produção para o cliente pagar o sinal.",
+      },
+    });
+    expect(view).toEqual({
+      kind: "unavailable",
+      message: SERVICE_UNAVAILABLE_MESSAGE,
+      contactWhatsapp: null,
+    });
+    expect(view.kind === "unavailable" ? view.message : "").not.toMatch(/teste|mercado pago/i);
+  });
+
   it("não trata payout_key_missing como indisponível", () => {
     const view = publicBookingErrorView(409, {
       error: { code: "payout_key_missing", message: "Falta a chave de repasse." },

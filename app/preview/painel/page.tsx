@@ -1,3 +1,5 @@
+import { notFound } from "next/navigation";
+import { isDevExampleOpen } from "@/components/preview/preview-badge-gate";
 import { ServiceForm } from "@/components/dashboard/forms";
 import { ServiceBlockNotice } from "@/components/dashboard/service-block-notice";
 import { TrialBanner } from "@/components/dashboard/trial-banner";
@@ -66,6 +68,7 @@ const BLOCKS = [
 ] as const;
 
 export default async function PreviewPainelPage({ searchParams }: { searchParams: Promise<{ scene?: string; preset?: string; tone?: string; checkout?: string }> }) {
+  if (!isDevExampleOpen()) notFound();
   const query = await searchParams;
   const scene = query.scene ?? "politica";
   const policy = policyFor(query.preset);

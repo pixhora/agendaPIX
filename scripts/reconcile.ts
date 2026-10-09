@@ -9,7 +9,10 @@
  * Em produção: systemd/cron a cada minuto com --once, ou um serviço contínuo.
  */
 import "dotenv/config";
+import { assertProductionSafeEnv } from "../lib/env";
 import { getDb } from "../db/index";
+
+assertProductionSafeEnv();
 import { paymentsConfig } from "../lib/payments/config";
 import { getPaymentProvider } from "../lib/payments/index";
 import { reconcileOnce } from "../lib/payments/reconcile";
