@@ -158,6 +158,7 @@ test("Pix pendente expira e a tela anuncia reserva esgotada", async ({ page }, t
   await expireLatestHold(meta.businessASlug);
   await page.getByRole("button", { name: /Já paguei, verificar agora/ }).click();
 
-  await expect(page.getByRole("heading", { name: "Tempo de reserva esgotado" })).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByRole("button", { name: /Fazer novo agendamento/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "O prazo para pagar terminou" })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("Conferindo pagamentos recentes…")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Escolher outro horário" })).toBeVisible();
 });

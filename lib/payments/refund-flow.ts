@@ -8,6 +8,7 @@ import { paymentsConfig } from "./config";
 import { callProvider, ProviderTimeoutError } from "./timeout";
 import { z } from "zod";
 import { assessPolicyRequestedOn, formatBusinessDay, localDate, manualRefundDueAtFromNotice } from "./manual-refund-calendar";
+import { MP_MANUAL_REFUND_CHANNEL } from "../mercadopago/connect-copy";
 import { INSUFFICIENT_BALANCE_MESSAGE, insufficientBalance } from "./refund-copy";
 import { assessRefund, refundBlockMessage, type RefundBlockReason, type RefundStatus } from "./refund-eligibility";
 import {
@@ -112,7 +113,7 @@ export type RefundPreview = {
   manualRefundDueAt: string | null;
 };
 
-const REFUND_FAILED = "Não foi possível devolver o sinal pelo AgendaPix. Tente de novo.";
+const REFUND_FAILED = `Não foi possível devolver o sinal. Tente de novo. ${MP_MANUAL_REFUND_CHANNEL}`;
 
 function previewOf(view: RefundView, decision: { eligible: boolean; reason: RefundBlockReason | null }, now: Date): RefundPreview {
   return {

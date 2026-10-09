@@ -13,7 +13,7 @@ import { requestWantsJson, subscriptionCheckoutResponse } from "../../lib/billin
 
 const timezone = "America/Sao_Paulo";
 const now = new Date("2026-10-08T15:00:00.000Z");
-const fictionalNumber = "5500000000000";
+const fictionalNumber = "5511912345678";
 const env = { SUPPORT_WHATSAPP_NUMBER: fictionalNumber, SUBSCRIPTION_MANUAL_ACTIVATION_HOURS: "5", BETTER_AUTH_URL: "http://localhost:3000" };
 
 function filesUnder(dir: string): string[] {
@@ -99,8 +99,10 @@ describe("contrato e script", () => {
     const contracts = readFileSync(join(import.meta.dirname, "../../docs/CONTRATOS.md"), "utf8");
     expect(contracts).toContain("Recebemos seu pedido. Ativamos em até {activationHours} h.");
     const example = readFileSync(join(import.meta.dirname, "../../.env.example"), "utf8");
-    expect(example).toContain(`SUPPORT_WHATSAPP_NUMBER=${fictionalNumber}`);
-    expect(example).toContain("SUBSCRIPTION_MANUAL_ACTIVATION_HOURS=2");
+    expect(example).toMatch(/^SUPPORT_WHATSAPP_NUMBER=$/m);
+    expect(example).toMatch(/^SUPPORT_EMAIL=$/m);
+    expect(example).not.toContain("5500000000000");
+    expect(example).toContain("SUBSCRIPTION_MANUAL_ACTIVATION_HOURS=1");
   });
 
   it("exige operador e banco, e o mês padrão é 1", async () => {

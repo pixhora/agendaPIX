@@ -12,6 +12,7 @@ import { isAutoRefundAck, MP_CONNECT_CONSENT_TEXT, MP_CONNECT_CONSENT_VERSION } 
 import {
   MP_AUTO_REFUND_ACK_ERROR,
   MP_AUTO_REFUND_ACK_HINT,
+  MP_DISCONNECT_RETENTION_COPY,
   MP_GOOD_TO_KNOW,
   MP_MOCK_FRIDAY_2,
   MP_MOCK_FRIDAY_25,
@@ -111,7 +112,7 @@ describe("Mercado Pago connect consent", () => {
   });
 
   it("keeps the published consent version and the other screen strings", () => {
-    expect(MP_CONNECT_CONSENT_VERSION).toBe("2026-10-08.v3.2");
+    expect(MP_CONNECT_CONSENT_VERSION).toBe("2026-10-09.v4");
     expect(MP_AUTO_REFUND_ACK_ERROR).toBe("Marque a autorização da devolução automática para continuar.");
     expect(MP_GOOD_TO_KNOW).toHaveLength(5);
     expect(MP_GOOD_TO_KNOW[1]).toContain("em até 7 dias corridos, contados do aviso.");
@@ -273,6 +274,8 @@ describe("Mercado Pago connect consent", () => {
     expect(html).toContain("(abre em nova aba)");
     expect(html).not.toContain("desvincule o AgendaPix");
     expect(html).toContain("2 clientes estão com Pix em aberto.");
+    expect(html).toContain(MP_DISCONNECT_RETENTION_COPY);
+    expect(html).not.toMatch(/45 minutos|48 horas|Devolver pelo AgendaPix/);
     expect(html).toContain(">Cancelar<");
   });
 });
@@ -354,7 +357,7 @@ describe("legacy Pix notice", () => {
       expiresAt: "2027-04-06T20:02:00.000Z",
       liveMode: false,
       canReceiveDeposits: true,
-      consentVersion: "2026-10-08.v3.2",
+      consentVersion: "2026-10-09.v4",
       accountName: "Ana S.",
       accountEmailMasked: "an••@gmail.com",
       accountIdLast4: "7766",

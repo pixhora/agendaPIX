@@ -164,6 +164,14 @@ jobs:
           echo
           curl -fsS http://localhost:3000/api/health | grep -q '"ok"'
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/)" = 200
+          # /preview fecha em produção. A flag PREVIEW_ROUTES_ENABLED não vai na imagem.
+          # /exemplo fica público: é a demonstração da landing, sem Pix real.
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/preview)" = 404
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/preview/booking)" = 404
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/preview/painel)" = 404
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/preview/motion)" = 404
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/exemplo)" = 200
+          curl -fsS http://localhost:3000/exemplo | grep -q "Demonstração com dados fictícios"
           # Rota que consulta o banco: negócio inexistente deve responder 404 (não 500).
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/public/nao-existe/services)" = 404
           # /api/ready (banco + SMTP) chega com o backend integrado (PR #4); antes disso responde 404.
@@ -278,6 +286,8 @@ jobs:
       - name: Run Playwright e2e
         if: steps.suite.outputs.full == 'true'
         run: pnpm test:e2e
+      - name: Legal pages with the publication flag
+        run: pnpm exec playwright test --config=playwright.legal.config.ts
       - name: Install WebKit (Playwright)
         if: steps.suite.outputs.full == 'true'
         run: pnpm exec playwright install --with-deps webkit

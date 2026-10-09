@@ -1,3 +1,5 @@
+import { MP_MANUAL_REFUND_CHANNEL } from "../mercadopago/connect-copy";
+
 export function formatAppointment(startsAt: Date, timezone: string) {
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: timezone }).format(startsAt);
 }
@@ -39,11 +41,11 @@ export function lateRefundedNotice(input: { customerName: string; serviceName: s
 }
 
 const manualRefundLine = (deadlineLabel: string) =>
-  `Devolva até ${deadlineLabel} (7 dias depois deste aviso) pelo AgendaPix, no botão Devolver pelo AgendaPix, ou pelo app do Mercado Pago.`;
+  `Devolva até ${deadlineLabel} (7 dias depois deste aviso). ${MP_MANUAL_REFUND_CHANNEL}`;
 
 export function lateRefundFailedNotice(input: { customerName: string; serviceName: string; when: string; deadlineLabel: string; cause: LateRefundCause }): OwnerNotice {
   return {
-    subject: "Devolva um sinal pelo AgendaPix",
+    subject: "Devolva um sinal pelo app do Mercado Pago",
     text: `${latePaymentSentence(input)} Não foi possível devolver o valor automaticamente. ${manualRefundLine(input.deadlineLabel)}`,
   };
 }

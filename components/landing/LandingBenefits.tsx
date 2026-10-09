@@ -1,13 +1,10 @@
 import { CalendarCheckIcon, CircleCheckIcon, LayoutPanelIcon, SmartphoneIcon } from "./icons";
+import { honestBenefits } from "@/lib/marketing/landing-copy";
 import { cn } from "@/lib/utils";
 import { belowFold } from "./section";
 
-const items = [
-  { Icon: CalendarCheckIcon, title: "Menos horário furado", text: "Quem paga para reservar assume o compromisso com o horário." },
-  { Icon: SmartphoneIcon, title: "Feito para o celular", text: "Seu cliente agenda pelo navegador, sem baixar aplicativo e sem criar conta." },
-  { Icon: CircleCheckIcon, title: "Confirmação automática", text: "O Pix cai direto na sua conta Mercado Pago e a reserva confirma. Você não confere comprovante." },
-  { Icon: LayoutPanelIcon, title: "Seu dia num olhar", text: "Atendimentos, sinais pagos e pendentes no mesmo painel, no celular ou no computador." },
-];
+const icons = [CalendarCheckIcon, CircleCheckIcon, SmartphoneIcon, LayoutPanelIcon];
+const items = honestBenefits.map((item, index) => ({ ...item, Icon: icons[index] ?? CircleCheckIcon }));
 
 export function LandingBenefits() {
   return (

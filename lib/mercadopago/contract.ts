@@ -1,5 +1,6 @@
 import { MP_CONNECT_CONSENT_VERSION } from "./consent";
-import { MP_AUTO_REFUND_ACK_ERROR } from "./connect-copy";
+import { latePixRefundCopy } from "./late-pix-copy";
+import { MP_AUTO_REFUND_ACK_ERROR, MP_DISCONNECT_RETENTION_COPY, MP_MANUAL_REFUND_CHANNEL } from "./connect-copy";
 
 /** Status visto pelo dono. Campo ausente de chave antiga vale como false. */
 export const MP_CONNECTION_STATUSES = ["not_connected", "connected", "needs_reconnect"] as const;
@@ -50,11 +51,11 @@ const CALLBACK_COPY: Record<MpCallbackReason, { tone: "danger" | "warning" | "ac
   },
   state_mismatch: {
     tone: "warning",
-    message: "A conexão não foi concluída a tempo. Nenhuma permissão foi salva. Tente de novo; leva menos de um minuto.",
+    message: "A conexão não foi concluída a tempo. Nenhuma permissão foi salva. Tente de novo.",
   },
   expired_code: {
     tone: "warning",
-    message: "A conexão não foi concluída a tempo. Nenhuma permissão foi salva. Tente de novo; leva menos de um minuto.",
+    message: "A conexão não foi concluída a tempo. Nenhuma permissão foi salva. Tente de novo.",
   },
   exchange_failed: {
     tone: "danger",
@@ -215,7 +216,7 @@ export function formatConnectedSince(iso: string | null, timeZone = "America/Sao
 export function openPixDisconnectNote(count: number): string | null {
   if (!Number.isInteger(count) || count <= 0) return null;
   const lead = count === 1 ? "1 cliente está" : `${count} clientes estão`;
-  return `${lead} com Pix em aberto. Se pagarem dentro do prazo, o agendamento é confirmado, o dinheiro cai na sua conta Mercado Pago e avisamos você. Até lá, o acesso à sua conta fica guardado só para conferir esses Pix e é apagado em até 45 minutos.`;
+  return `${lead} com Pix em aberto. Se pagarem dentro do prazo, o agendamento é confirmado, o dinheiro cai na sua conta Mercado Pago e avisamos você. ${MP_DISCONNECT_RETENTION_COPY}`;
 }
 
 export function depositUnavailable(service: { bookable?: boolean; reason?: string | null }): boolean {
@@ -254,10 +255,10 @@ export const PERMISSIONS: { strong: string; rest: string }[] = [
   { strong: "criar cobranças Pix", rest: " no valor do sinal dos seus agendamentos;" },
   { strong: "ver o status", rest: " dessas cobranças, para confirmar o agendamento quando o cliente pagar;" },
   { strong: "cancelar", rest: " cobranças que não foram pagas no prazo;" },
-  { strong: "devolver um sinal quando você mandar", rest: ", pelo botão \"Devolver pelo AgendaPix\". O valor sai do saldo da sua conta Mercado Pago;" },
+  { strong: "devolver um sinal quando você mandar", rest: `. ${MP_MANUAL_REFUND_CHANNEL} O valor sai do saldo da sua conta Mercado Pago;` },
   {
-    strong: "devolver sozinho o valor inteiro",
-    rest: ` em um único caso: quando o cliente paga depois do prazo de ${DEPOSIT_HOLD_MINUTES} minutos e o horário já está ocupado. Você recebe um e-mail a cada devolução;`,
+    strong: "pedir a devolução ao Mercado Pago",
+    rest: ` quando um Pix chega depois do prazo. ${latePixRefundCopy()} Você recebe um e-mail a cada devolução;`,
   },
   { strong: "manter a conexão ativa", rest: " sem pedir sua autorização de novo a cada renovação." },
 ];

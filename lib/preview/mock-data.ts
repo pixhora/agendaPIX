@@ -20,8 +20,8 @@ export const MOCK_BUSINESS_INFO = {
   name: "Studio Bella",
   slug: "studio-bella",
   city: "São Paulo, SP",
-  address: "Rua Oscar Freire, 1420 - Jardins, São Paulo - SP",
-  phone: "(11) 98765-4321",
+  address: "Endereço de exemplo",
+  phone: "(00) 00000-0000",
   timezone: "America/Sao_Paulo",
   opensAt: "09:00",
   closesAt: "19:00",
@@ -65,7 +65,7 @@ export const MOCK_PUBLIC_BUSINESS: PublicBusinessData = {
   name: MOCK_BUSINESS_INFO.name,
   timezone: MOCK_BUSINESS_INFO.timezone,
   services: MOCK_SERVICES,
-  address: MOCK_BUSINESS_INFO.city,
+  address: MOCK_BUSINESS_INFO.address,
   phone: MOCK_BUSINESS_INFO.phone,
 };
 
@@ -109,7 +109,7 @@ export const MOCK_BOOKINGS: MockBookingItem[] = [
   {
     id: "bk-101",
     customerName: "Camila Rodrigues",
-    customerPhone: "(11) 99123-4567",
+    customerPhone: "(00) 00000-0000",
     serviceId: "srv-corte-fem",
     serviceName: "Corte feminino",
     durationMinutes: 60,
@@ -124,7 +124,7 @@ export const MOCK_BOOKINGS: MockBookingItem[] = [
   {
     id: "bk-102",
     customerName: "Juliana Mendes",
-    customerPhone: "(11) 98234-5678",
+    customerPhone: "(00) 00000-0000",
     serviceId: "srv-corte-escova",
     serviceName: "Corte + escova",
     durationMinutes: 90,
@@ -139,7 +139,7 @@ export const MOCK_BOOKINGS: MockBookingItem[] = [
   {
     id: "bk-103",
     customerName: "Beatriz Costa",
-    customerPhone: "(11) 97345-6789",
+    customerPhone: "(00) 00000-0000",
     serviceId: "srv-manicure",
     serviceName: "Manicure",
     durationMinutes: 45,
@@ -154,7 +154,7 @@ export const MOCK_BOOKINGS: MockBookingItem[] = [
   {
     id: "bk-104",
     customerName: "Fernanda Lima",
-    customerPhone: "(11) 96456-7890",
+    customerPhone: "(00) 00000-0000",
     serviceId: "srv-corte-fem",
     serviceName: "Corte feminino",
     durationMinutes: 60,
@@ -169,7 +169,7 @@ export const MOCK_BOOKINGS: MockBookingItem[] = [
   {
     id: "bk-105",
     customerName: "Larissa Souza",
-    customerPhone: "(11) 95567-8901",
+    customerPhone: "(00) 00000-0000",
     serviceId: "srv-manicure",
     serviceName: "Manicure",
     durationMinutes: 45,

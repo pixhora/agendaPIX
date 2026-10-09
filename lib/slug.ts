@@ -30,6 +30,7 @@ export const RESERVED_BUSINESS_SLUGS = [
   "privacidade",
   "contato",
   "exemplo",
+  "studio-bella",
   "entrar",
   "precos",
   "ajuda",

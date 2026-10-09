@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import type { PublicService, AvailabilitySlot } from "./types";
 import { formatCurrency, formatCpfMask, formatPhoneMask, isValidBrazilianPhone, isValidCpf } from "./formatters";
 import { ArrowLeft, Loader2, Lock } from "lucide-react";
@@ -14,6 +15,7 @@ import { BookingSummary } from "./BookingSummary";
 import { PolicySummaryLine } from "@/components/policy/PolicySummaryLine";
 import { POLICY_MISSING_MESSAGE } from "./booking-error";
 import { policyLineTone, servicePolicyState } from "./policy-gate";
+import { privacyPolicyLink } from "@/lib/marketing/flags";
 
 interface StepCustomerProps {
   service: PublicService;
@@ -37,6 +39,8 @@ interface StepCustomerProps {
   onOpenPolicy?: (trigger: HTMLElement) => void;
   /** Classes do resumo (ex.: `lg:hidden` quando a página já mostra o resumo ao lado). */
   summaryClassName?: string;
+  /** Espelha `LEGAL_PAGES_PUBLISHED`. Desligado: o link de privacidade não aparece. */
+  legalPagesPublished?: boolean;
 }
 
 export function StepCustomer({
@@ -58,6 +62,7 @@ export function StepCustomer({
   summaryClassName,
   requiresPayerCpf,
   onOpenPolicy,
+  legalPagesPublished = false,
 }: StepCustomerProps) {
   const [touched, setTouched] = useState({ name: false, phone: false, cpf: false });
   const askCpf = requiresPayerCpf === true;
@@ -68,6 +73,7 @@ export function StepCustomer({
   const isPhoneValid = isValidBrazilianPhone(phone);
   const isCpfValid = !askCpf || isValidCpf(cpf);
   const canSubmit = isNameValid && isPhoneValid && isCpfValid && !isSubmitting && !policyBlocked;
+  const privacy = privacyPolicyLink(legalPagesPublished);
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onChangePhone(formatPhoneMask(e.target.value));
@@ -149,7 +155,7 @@ export function StepCustomer({
               className="pl-10"
             />
           </div>
-          <FieldHint id="phone-hint">Usado só para lembrar você do horário.</FieldHint>
+          <FieldHint id="phone-hint">Usado só para o estabelecimento falar com você sobre este horário.</FieldHint>
           <FieldError id="phone-error">{phoneError}</FieldError>
         </div>
 
@@ -176,6 +182,14 @@ export function StepCustomer({
           <FieldError id="cpf-error">{cpfError}</FieldError>
         </div> : null}
       </div>
+
+      {privacy ? (
+        <p className="text-sm text-muted">
+          <Link href={privacy.href} className="font-semibold text-ink underline underline-offset-4">
+            {privacy.label}
+          </Link>
+        </p>
+      ) : null}
 
       {errorMessage && (
         <div

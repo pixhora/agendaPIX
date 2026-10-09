@@ -49,7 +49,8 @@ function buildIcs({
     new Date(iso).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
   const uid = `agendapix-${stamp(slot.startsAt)}@agendapix`;
   const summary = `${service.name} · ${businessName}`;
-  const description = [`Agendamento de ${customerName} em ${businessName}. Sinal pago via Pix.`, policyLine].filter(Boolean).join(" ");
+  const namedGuest = customerName.trim();
+  const description = [`${namedGuest ? `Agendamento de ${namedGuest} em ${businessName}` : `Agendamento em ${businessName}`}. Sinal pago via Pix.`, policyLine].filter(Boolean).join(" ");
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
@@ -101,11 +102,13 @@ export function BookingConfirmation({
   );
 
   const whatsappNumber = contactWhatsapp?.replace(/^\+/, "") ?? "";
+  const guestName = customerName.trim();
+  const guestPhone = customerPhone.trim();
   const whatsappMessage = encodeURIComponent(
     `Olá ${businessName}! Acabei de agendar ${service.name} para ${formatDateFull(
       slot.startsAt,
       timezone
-    )} às ${formatTimeSlot(slot.startsAt, timezone)} no nome de ${customerName}.`
+    )} às ${formatTimeSlot(slot.startsAt, timezone)}${guestName ? ` no nome de ${guestName}` : ""}.`
   );
 
   return (
@@ -140,7 +143,16 @@ export function BookingConfirmation({
             <div className="flex items-start gap-2 sm:col-span-2">
               <Icon icon={CONFIRMATION_ICONS.customer} className="mt-0.5 size-4 text-muted" />
               <dt className="sr-only">Cliente</dt>
-              <dd className="text-ink"><span className="font-semibold">{customerName}</span> <span className="text-muted">· {customerPhone}</span></dd>
+              <dd className="text-ink">
+                {guestName || guestPhone ? (
+                  <>
+                    {guestName ? <span className="font-semibold">{guestName}</span> : null}
+                    {guestPhone ? <span className="text-muted">{guestName ? " · " : ""}{guestPhone}</span> : null}
+                  </>
+                ) : (
+                  <span className="font-semibold">Horário confirmado</span>
+                )}
+              </dd>
             </div>
           </dl>
         </div>

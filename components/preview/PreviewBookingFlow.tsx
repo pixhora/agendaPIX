@@ -8,6 +8,7 @@ import type {
   PaymentStatusResponse,
 } from "@/components/booking/types";
 import {
+  MOCK_BUSINESS_INFO,
   MOCK_PUBLIC_BUSINESS,
   MOCK_SERVICES,
   getMockAvailabilitySlots,
@@ -88,12 +89,15 @@ export function PreviewBookingFlow({
   scene = "fluxo",
   capture = false,
   variant,
+  mode = "preview",
 }: {
   scene?: PreviewScene;
   /** Esconde a barra do hub só no modo de captura. A página normal continua com ela. */
   capture?: boolean;
   /** Uma variante da cena em cima da hora. Sem isto, o preview mostra as duas. */
   variant?: "retain" | "credit";
+  /** `demo` é a página pública `/exemplo`: sem hub e sem Pix real. */
+  mode?: "preview" | "demo";
 }) {
   const paymentLate = scene === "pix-cima-hora" || scene === "pix-cima-hora-credito";
   const openingSlot = scene === "cima-da-hora" ? previewLateSlot() : paymentLate ? previewInsideRefundSlot() : previewOpeningSlot();
@@ -127,7 +131,7 @@ export function PreviewBookingFlow({
         { id: "srv-sem-sinal", name: "Ajuste de franja", durationMinutes: 20, priceCents: 3000, depositCents: 0, bookable: false },
       ]
     : previewServices;
-  const contactWhatsapp = scene === "indisponivel" || scene === "pausada" ? "5511987654321" : null;
+  const contactWhatsapp = scene === "indisponivel" || scene === "pausada" ? "5500000000000" : null;
   const openingService = services.find((service) => service.bookable !== false) ?? services[0];
   const [step, setStep] = useState<1 | 2 | 3 | 4>(() => previewStep(scene));
   const lateScene = scene === "cima-da-hora";
@@ -136,7 +140,7 @@ export function PreviewBookingFlow({
   const [selectedService, setSelectedService] = useState<PublicService | null>(openingService);
   const [selectedSlot, setSelectedSlot] = useState<AvailabilitySlot | null>(openingSlot);
   const [customerName, setCustomerName] = useState("Juliana Mendes");
-  const [customerPhone, setCustomerPhone] = useState("(11) 98234-5678");
+  const [customerPhone, setCustomerPhone] = useState("(00) 00000-0000");
   const [customerCpf, setCustomerCpf] = useState("529.982.247-25");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -213,7 +217,7 @@ export function PreviewBookingFlow({
         </h1>
         <p className="flex items-center justify-center gap-1.5 text-xs font-medium text-muted-foreground">
           <span className="inline-block h-1.5 w-1.5 rounded-full bg-success" />
-          São Paulo, SP · Agendamento com sinal Pix garantido
+          {MOCK_BUSINESS_INFO.address} · Agendamento com sinal Pix garantido
         </p>
       </div>
     </header>
@@ -237,7 +241,12 @@ export function PreviewBookingFlow({
   return (
     <div data-scene={scene} data-capture={capture ? "1" : undefined} className="min-h-screen bg-background text-foreground pt-6 pb-24 sm:py-8 px-4 sm:px-6">
       <div className="mx-auto w-full max-w-[560px] space-y-6">
-        {capture ? null : (
+        {mode === "demo" ? (
+          <p role="note" className="rounded-card border border-line bg-subtle px-4 py-3 text-sm font-medium text-ink">
+            Demonstração com dados fictícios. Nenhum Pix real é gerado.
+          </p>
+        ) : null}
+        {capture || mode === "demo" ? null : (
         <div className="flex items-center justify-between text-xs text-muted-foreground pb-2 border-b border-border">
           <Link href="/preview" className="font-bold text-pix dark:text-primary hover:underline">
             ← Voltar ao Hub Preview
@@ -354,9 +363,13 @@ export function PreviewBookingFlow({
                         return {
                           bookingId: bookingResponse.bookingId,
                           status: "confirmed",
+                          startsAt: bookingResponse.startsAt,
+                          endsAt: bookingResponse.endsAt,
                           expiresAt: null,
+                          policy: null,
                           payment: {
                             ...bookingResponse.payment!,
+                            expiresAt: bookingResponse.payment?.expiresAt ?? null,
                             status: "paid",
                           },
                         };
@@ -370,18 +383,24 @@ export function PreviewBookingFlow({
                   />
 
                   {scene === "fluxo" ? <div className="rounded-xl border border-success/30 bg-success-soft p-3 text-center space-y-2">
+                    {mode === "demo" ? null : (
                     <p className="text-xs font-semibold text-success ">
                       Simulador de Pagamento Instantâneo (Preview)
                     </p>
+                    )}
                     <Button
                       type="button"
                       onClick={() => {
                         const updated: PaymentStatusResponse = {
                           bookingId: bookingResponse.bookingId,
                           status: "confirmed",
+                          startsAt: bookingResponse.startsAt,
+                          endsAt: bookingResponse.endsAt,
                           expiresAt: null,
+                          policy: null,
                           payment: {
                             ...bookingResponse.payment!,
+                            expiresAt: bookingResponse.payment?.expiresAt ?? null,
                             status: "paid",
                           },
                         };
@@ -398,16 +417,18 @@ export function PreviewBookingFlow({
                       }}
                       className="w-full bg-success hover:bg-ink-hover text-white min-h-11 text-xs font-bold shadow-sm cursor-pointer"
                     >
-                      ⚡ Simular Pix Pago no Banco
+                      {mode === "demo" ? "Simular pagamento (demonstração)" : "⚡ Simular Pix Pago no Banco"}
                     </Button>
                   </div> : null}
                 </div>
               )}
             </div>
 
+            {mode === "demo" ? null : (
             <footer className="text-center text-[11px] text-muted-foreground pt-1">
               <span>🔒 Ambiente de Preview determinístico com dados locais.</span>
             </footer>
+            )}
           </>
         )}
       </div>

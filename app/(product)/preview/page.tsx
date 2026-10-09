@@ -11,7 +11,7 @@ const PREVIEW_CARDS = [
   {
     href: "/preview/landing",
     title: "1. Landing Page",
-    desc: "Página de vendas focada em conversão, promessa central, benefícios, demo interativa e preços reais (R$ 49 e R$ 79).",
+    desc: "Página de vendas focada em conversão, promessa central, benefícios, demo interativa e o preço real (R$ 49 por mês).",
     badge: "Pública",
   },
   {

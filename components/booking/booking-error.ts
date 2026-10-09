@@ -1,5 +1,12 @@
 import { readPolicyChangedUpdate } from "./policy-gate";
 import type { PolicyChangedUpdate } from "./types";
+import {
+  BUSINESS_LOAD_COPY,
+  BUSINESS_NOT_FOUND_COPY,
+  BUSINESS_SLOW_COPY,
+  SLOTS_LOAD_COPY,
+  SUBMIT_RETRY_COPY,
+} from "./customer-copy";
 
 export const SERVICE_UNAVAILABLE_MESSAGE = "Este serviço não está disponível para reserva online no momento.";
 
@@ -9,11 +16,35 @@ export const POLICY_CHANGED_MESSAGE = "As regras do sinal mudaram. Confira antes
 
 export const POLICY_MISSING_MESSAGE = "Não conseguimos carregar as regras do sinal. Tente de novo.";
 
+export const SLOT_TAKEN_MESSAGE = "Esse horário acabou de ser reservado. Escolha outro.";
+
+export const GENERIC_SUBMIT_MESSAGE = SUBMIT_RETRY_COPY;
+
+export const OFFLINE_MESSAGE = "Sem conexão. Verifique sua internet e tente de novo.";
+
+export const SLOTS_LOAD_MESSAGE = SLOTS_LOAD_COPY;
+
+export function businessLoadCopy(error: unknown): string {
+  if (error instanceof Error && error.name === "AbortError") return BUSINESS_SLOW_COPY;
+  if (isOfflineError(error)) return OFFLINE_MESSAGE;
+  if (error instanceof Error && error.name === "PublicLoadError" && error.message === "not_found") {
+    return BUSINESS_NOT_FOUND_COPY;
+  }
+  return BUSINESS_LOAD_COPY;
+}
+
 export type BookingFailure =
   | { kind: "paused" }
   | { kind: "policy_changed"; update: PolicyChangedUpdate }
   | { kind: "unavailable"; message: string; contactWhatsapp: string | null }
+  | { kind: "slot_unavailable"; message: string }
   | { kind: "message"; message: string };
+
+/** Falha de rede do `fetch` (TypeError ou mensagem de conexão). */
+export function isOfflineError(error: unknown): boolean {
+  if (error instanceof TypeError) return true;
+  return error instanceof Error && /failed to fetch|networkerror|load failed|sem conexão/i.test(error.message);
+}
 
 export function readApiErrorCode(body: unknown): string | null {
   if (!body || typeof body !== "object") return null;
@@ -84,10 +115,10 @@ export function publicBookingErrorView(status: number, body: unknown): BookingFa
   if (code === "mp_account_not_connected" || code === "mp_account_test_mode" || readBookableFalse(body)) {
     return { kind: "unavailable", message: SERVICE_UNAVAILABLE_MESSAGE, contactWhatsapp: readContactWhatsapp(body) };
   }
+  if (status === 409 && code === "slot_unavailable") {
+    return { kind: "slot_unavailable", message: SLOT_TAKEN_MESSAGE };
+  }
   const serverMessage = readApiErrorMessage(body);
   if (serverMessage) return { kind: "message", message: serverMessage };
-  if (status === 409) {
-    return { kind: "message", message: "Esse horário acabou de ser reservado por outra pessoa. Por favor, escolha outro horário." };
-  }
-  return { kind: "message", message: "Não foi possível criar o agendamento. Tente novamente." };
+  return { kind: "message", message: GENERIC_SUBMIT_MESSAGE };
 }

@@ -547,7 +547,7 @@ describe("OAuth Mercado Pago por negócio", () => {
     expect(new URL(referer.location).searchParams.has("scope")).toBe(false);
     const state = new URL(referer.location).searchParams.get("state");
     const pending = await store.findOAuthState(state ?? "");
-    expect(MP_CONNECT_CONSENT_TEXT).toBe("Entendi e autorizo: quando um Pix chegar depois do prazo e o horário já estiver ocupado, o AgendaPix devolve sozinho o valor inteiro, do saldo da minha conta Mercado Pago, e me avisa por e-mail. Se essa devolução falhar, eu devolvo manualmente em até 7 dias corridos, contados do aviso.");
+    expect(MP_CONNECT_CONSENT_TEXT).toBe("Entendi e autorizo: quando um Pix chegar depois do prazo para reservar o horário, o AgendaPix devolve sozinho o valor inteiro, do saldo da minha conta Mercado Pago, e me avisa por e-mail. Se essa devolução falhar, eu devolvo manualmente em até 7 dias corridos, contados do aviso.");
     expect(pending?.consentVersion).toBe(MP_CONNECT_CONSENT_VERSION);
     expect(pending?.consentTextSha256).toBe(createHash("sha256").update(MP_CONNECT_CONSENT_TEXT).digest("hex"));
     expect(pending?.consentUserId).toBe("owner");

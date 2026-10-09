@@ -10,6 +10,7 @@ import type {
 } from "./types";
 import { cpfDigitsOnly, formatCurrency, normalizePhoneToE164 } from "./formatters";
 import { publicBookingPagePath, publicBookingPaymentUrl, publicBookingsUrl, publicServicesUrl } from "@/lib/public-api";
+import { parsePaymentStatusResponse } from "@/lib/public/payment-status";
 import { showDepositUnavailableCard } from "./deposit-availability";
 import { DepositUnavailableCard } from "./DepositUnavailable";
 import { StepProgress } from "./StepProgress";
@@ -27,22 +28,27 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { BrandMark } from "@/components/ui/brand";
 import { BookingSummary } from "./BookingSummary";
-import { POLICY_CHANGED_MESSAGE, publicBookingErrorView, whatsappHref } from "./booking-error";
-import { buildPublicBookingBody, publicBookingSession, stripStoredBookingCpf } from "./booking-payload";
+import { GENERIC_SUBMIT_MESSAGE, OFFLINE_MESSAGE, POLICY_CHANGED_MESSAGE, businessLoadCopy, isOfflineError, publicBookingErrorView, whatsappHref } from "./booking-error";
+import { pixResumePayload, pixResumeStorageKey, readPixResume, shouldClearExpiredResume, shouldResumePix, type PixResumeSession } from "./pix-resume";
+import { buildPublicBookingBody, stripStoredBookingCpf } from "./booking-payload";
 import { PausedState } from "./PausedState";
 import { PolicySheet } from "@/components/policy/PolicySheet";
 
 interface BookingFlowProps {
   slug: string;
   initialBookingId?: string;
+  /** Dados já carregados no servidor. O primeiro render não busca de novo. */
+  initialBusiness?: PublicBusinessData;
   /** Só para a prévia de desenvolvimento. Em produção o fluxo busca a página pública. */
   previewBusiness?: PublicBusinessData;
+  /** Espelha `LEGAL_PAGES_PUBLISHED`. Desligado: sem link de privacidade. */
+  legalPagesPublished?: boolean;
 }
 
-export function BookingFlow({ slug, initialBookingId, previewBusiness }: BookingFlowProps) {
+export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBusiness, legalPagesPublished = false }: BookingFlowProps) {
   // Estado do Negócio
-  const [business, setBusiness] = useState<PublicBusinessData | null>(previewBusiness ?? null);
-  const [isLoadingBusiness, setIsLoadingBusiness] = useState(!previewBusiness);
+  const [business, setBusiness] = useState<PublicBusinessData | null>(previewBusiness ?? initialBusiness ?? null);
+  const [isLoadingBusiness, setIsLoadingBusiness] = useState(!(previewBusiness || initialBusiness));
   const [businessError, setBusinessError] = useState<string | null>(null);
 
   // Estado das Etapas
@@ -76,11 +82,14 @@ export function BookingFlow({ slug, initialBookingId, previewBusiness }: Booking
   });
 
   const [reloadCount, setReloadCount] = useState(0);
+  const [slotsReload, setSlotsReload] = useState(0);
+  const [slotNotice, setSlotNotice] = useState<string | null>(null);
   const noBookingFlow = Boolean(business && showDepositUnavailableCard(business.services));
 
   // Carrega serviços públicos do negócio
   useEffect(() => {
     if (previewBusiness) return;
+    if (reloadCount === 0 && initialBusiness) return;
     let isCancelled = false;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
@@ -92,10 +101,9 @@ export function BookingFlow({ slug, initialBookingId, previewBusiness }: Booking
     })
       .then((res) => {
         if (!res.ok) {
-          if (res.status === 404) {
-            throw new Error("Estabelecimento não encontrado. Verifique o link informado.");
-          }
-          throw new Error("Não foi possível carregar os serviços deste estabelecimento.");
+          const error = new Error(res.status === 404 ? "not_found" : "unavailable");
+          error.name = "PublicLoadError";
+          throw error;
         }
         return res.json();
       })
@@ -108,15 +116,8 @@ export function BookingFlow({ slug, initialBookingId, previewBusiness }: Booking
       })
       .catch((err: unknown) => {
         if (!isCancelled) {
-          let msg = "Erro inesperado ao carregar dados.";
-          if (err instanceof Error) {
-            if (err.name === "AbortError") {
-              msg = "A conexão demorou muito para responder. Verifique sua internet e tente novamente.";
-            } else {
-              msg = err.message;
-            }
-          }
-          setBusinessError(msg);
+          console.error(err);
+          setBusinessError(businessLoadCopy(err));
           setIsLoadingBusiness(false);
         }
       })
@@ -129,69 +130,50 @@ export function BookingFlow({ slug, initialBookingId, previewBusiness }: Booking
       clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [slug, reloadCount, previewBusiness]);
+  }, [slug, reloadCount, previewBusiness, initialBusiness]);
 
-  // Retoma sessão Pix ativa se cliente fechar aba e reabrir /[slug]
+  // Recarregar ou voltar neste separador retoma o Pix. Fechar a aba apaga o sessionStorage.
   useEffect(() => {
     if (!business || step !== 1 || isCompleted || bookingResponse) return;
     if (typeof window === "undefined") return;
 
-    let stored: {
-      bookingId?: unknown;
-      accessToken?: unknown;
-      serviceId?: unknown;
-      customerName?: unknown;
-      customerPhone?: unknown;
-      expiresAt?: unknown;
-    } | null = null;
-
+    const storageKey = pixResumeStorageKey(slug);
+    let stored: PixResumeSession | null = null;
     try {
-      const raw = sessionStorage.getItem(`booking_session_${slug}`);
+      const raw = sessionStorage.getItem(storageKey);
       if (raw) {
         const stripped = stripStoredBookingCpf(JSON.parse(raw));
-        stored = stripped.record;
+        stored = readPixResume(JSON.stringify(stripped.record ?? null));
         if (stripped.hadCpf && stripped.record) {
-          sessionStorage.setItem(`booking_session_${slug}`, JSON.stringify(stripped.record));
+          sessionStorage.setItem(storageKey, stored ? pixResumePayload(stored) : JSON.stringify(stripped.record));
         }
       }
     } catch {
       stored = null;
     }
 
-    if (typeof stored?.bookingId !== "string" || typeof stored.accessToken !== "string") {
-      return;
-    }
-    const bookingId = stored.bookingId;
-    const accessToken = stored.accessToken;
-
-    // Retoma se houver initialBookingId na URL ou se o usuário reabriu com bookingId explícito
-    if (initialBookingId) {
-      if (bookingId !== initialBookingId) return;
-    } else {
-      // Se não há bookingId na URL, não sequestra o fluxo inicial
-      return;
-    }
-
-    // Invariante: expirado permanece expirado
-    if (typeof stored.expiresAt === "string" && new Date(stored.expiresAt).getTime() <= Date.now()) {
+    if (shouldClearExpiredResume(stored, initialBookingId)) {
       try {
-        sessionStorage.removeItem(`booking_session_${slug}`);
+        sessionStorage.removeItem(storageKey);
       } catch {
         // ignore
       }
       return;
     }
 
+    if (!shouldResumePix(stored, initialBookingId) || !stored) return;
+
     let isCancelled = false;
 
-    fetch(publicBookingPaymentUrl(slug, bookingId), {
+    fetch(publicBookingPaymentUrl(slug, stored.bookingId), {
+      cache: "no-store",
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${stored.accessToken}`,
       },
     })
-      .then((res) => {
+      .then(async (res) => {
         if (!res.ok) throw new Error("Reserva não encontrada ou expirada");
-        return res.json();
+        return parsePaymentStatusResponse(await res.json());
       })
       .then((paymentData) => {
         if (isCancelled) return;
@@ -204,7 +186,7 @@ export function BookingFlow({ slug, initialBookingId, previewBusiness }: Booking
           || paymentData.payment?.status === "cancelled"
         ) {
           try {
-            sessionStorage.removeItem(`booking_session_${slug}`);
+            sessionStorage.removeItem(storageKey);
             window.history.replaceState(null, "", publicBookingPagePath(slug));
           } catch {
             // ignore
@@ -212,12 +194,8 @@ export function BookingFlow({ slug, initialBookingId, previewBusiness }: Booking
           return;
         }
 
-        const matchedService =
-          business.services.find((s) => s.id === stored!.serviceId) ||
-          business.services[0];
-        if (matchedService) {
-          setSelectedService(matchedService);
-        }
+        const matchedService = business.services.find((s) => s.id === stored.serviceId) ?? null;
+        if (matchedService) setSelectedService(matchedService);
 
         if (paymentData.startsAt && paymentData.endsAt) {
           setSelectedSlot({
@@ -226,13 +204,10 @@ export function BookingFlow({ slug, initialBookingId, previewBusiness }: Booking
           });
         }
 
-        if (typeof stored?.customerName === "string") setCustomerName(stored.customerName);
-        if (typeof stored?.customerPhone === "string") setCustomerPhone(stored.customerPhone);
-
         if (paymentData.status === "confirmed") {
           setIsCompleted(true);
           try {
-            sessionStorage.removeItem(`booking_session_${slug}`);
+            sessionStorage.removeItem(storageKey);
             window.history.replaceState(null, "", publicBookingPagePath(slug));
           } catch {
             // ignore
@@ -246,9 +221,19 @@ export function BookingFlow({ slug, initialBookingId, previewBusiness }: Booking
           startsAt: paymentData.startsAt,
           endsAt: paymentData.endsAt,
           expiresAt: paymentData.expiresAt,
-          accessToken,
-          payment: paymentData.payment,
-          policy: paymentData.policy ?? null,
+          accessToken: stored.accessToken,
+          payment: paymentData.payment
+            ? { ...paymentData.payment, expiresAt: paymentData.payment.expiresAt ?? null }
+            : null,
+          policy: paymentData.policy
+            ? {
+                text: paymentData.policy.text ?? null,
+                latePaymentPolicy: paymentData.policy.latePaymentPolicy ?? null,
+                refundDeadlineAt: paymentData.policy.refundDeadlineAt ?? null,
+                rescheduleDeadlineAt: paymentData.policy.rescheduleDeadlineAt ?? null,
+                refundWindowClosedAtBooking: paymentData.policy.refundWindowClosedAtBooking,
+              }
+            : null,
         };
 
         setBookingResponse(fullResponse);
@@ -257,7 +242,7 @@ export function BookingFlow({ slug, initialBookingId, previewBusiness }: Booking
       .catch(() => {
         if (isCancelled) return;
         try {
-          sessionStorage.removeItem(`booking_session_${slug}`);
+          sessionStorage.removeItem(storageKey);
           window.history.replaceState(null, "", publicBookingPagePath(slug));
         } catch {
           // ignore
@@ -315,6 +300,15 @@ export function BookingFlow({ slug, initialBookingId, previewBusiness }: Booking
           }
           return;
         }
+        if (failure.kind === "slot_unavailable") {
+          setSelectedSlot(null);
+          setSlotNotice(failure.message);
+          setBookingError(null);
+          setStep(2);
+          setSlotsReload((count) => count + 1);
+          if (typeof crypto !== "undefined" && crypto.randomUUID) setIdempotencyKey(crypto.randomUUID());
+          return;
+        }
         if (failure.kind === "policy_changed") {
           setSelectedService((current) => (current ? {
             ...current,
@@ -332,7 +326,7 @@ export function BookingFlow({ slug, initialBookingId, previewBusiness }: Booking
         return;
       }
       if (!data || typeof data !== "object" || !("bookingId" in data)) {
-        throw new Error("Não foi possível criar o agendamento. Tente novamente.");
+        throw new Error(GENERIC_SUBMIT_MESSAGE);
       }
 
       const booking = data as BookingResponse;
@@ -342,19 +336,17 @@ export function BookingFlow({ slug, initialBookingId, previewBusiness }: Booking
       if (booking.status === "confirmed" || !booking.payment) {
         setIsCompleted(true);
       } else {
-        // Persiste sessão ativa no sessionStorage para permitir retomar se aba for fechada
+        // Recarregar esta aba retoma o Pix. Fechar a aba apaga a sessão. Sem nome, telefone ou CPF.
         if (typeof window !== "undefined") {
           try {
             sessionStorage.setItem(
-              `booking_session_${slug}`,
-              JSON.stringify(publicBookingSession({
+              pixResumeStorageKey(slug),
+              pixResumePayload({
                 bookingId: booking.bookingId,
                 accessToken: booking.accessToken,
                 serviceId: selectedService.id,
-                customerName: customerName.trim(),
-                customerPhone: customerPhone.trim(),
                 expiresAt: booking.expiresAt,
-              })),
+              }),
             );
             window.history.replaceState(null, "", publicBookingPagePath(slug, booking.bookingId));
           } catch {
@@ -365,7 +357,8 @@ export function BookingFlow({ slug, initialBookingId, previewBusiness }: Booking
         setStep(4);
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Erro ao agendar.";
+      console.error(err);
+      const msg = isOfflineError(err) ? OFFLINE_MESSAGE : GENERIC_SUBMIT_MESSAGE;
       setBookingError({ message: msg, contactHref: null, tone: "danger" });
     } finally {
       setIsSubmittingBooking(false);
@@ -385,7 +378,7 @@ export function BookingFlow({ slug, initialBookingId, previewBusiness }: Booking
     setStep(1);
     if (typeof window !== "undefined") {
       try {
-        sessionStorage.removeItem(`booking_session_${slug}`);
+        sessionStorage.removeItem(pixResumeStorageKey(slug));
         window.history.replaceState(null, "", publicBookingPagePath(slug));
       } catch {
         // ignore
@@ -593,10 +586,15 @@ export function BookingFlow({ slug, initialBookingId, previewBusiness }: Booking
                 service={selectedService}
                 timezone={business.timezone}
                 selectedStartsAt={selectedSlot?.startsAt ?? null}
-                onSelectSlot={(slot) => setSelectedSlot(slot)}
+                onSelectSlot={(slot) => {
+                  setSelectedSlot(slot);
+                  setSlotNotice(null);
+                }}
                 onBack={() => setStep(1)}
                 onNext={() => setStep(3)}
                 contactWhatsapp={business.contactWhatsapp}
+                slotsReload={slotsReload}
+                notice={slotNotice}
               />
             )}
 
@@ -620,6 +618,7 @@ export function BookingFlow({ slug, initialBookingId, previewBusiness }: Booking
                 summaryClassName="lg:hidden"
                 requiresPayerCpf={business.requiresPayerCpf}
                 onOpenPolicy={(trigger) => setPolicySheet({ open: true, notice: null, trigger })}
+                legalPagesPublished={legalPagesPublished}
               />
             )}
 
@@ -630,11 +629,12 @@ export function BookingFlow({ slug, initialBookingId, previewBusiness }: Booking
                 summary={selectedService && selectedSlot ? { service: selectedService, slot: selectedSlot, timezone: business.timezone } : undefined}
                 pixRecipientDisplayName={business.pixRecipientDisplayName}
                 businessName={business.name}
+                contactWhatsapp={business.contactWhatsapp ?? business.phone}
                 onOpenPolicy={(trigger) => setPolicySheet({ open: true, notice: null, trigger })}
                 onPaymentConfirmed={() => {
                   if (typeof window !== "undefined") {
                     try {
-                      sessionStorage.removeItem(`booking_session_${slug}`);
+                      sessionStorage.removeItem(pixResumeStorageKey(slug));
                       window.history.replaceState(null, "", publicBookingPagePath(slug));
                     } catch {
                       // ignore
