@@ -42,8 +42,8 @@ import {
   refundedCopy,
 } from "./pix-deadline-copy";
 import { WHATSAPP_CONTACT_LABEL } from "./customer-copy";
-import { createStatusPoller, isTerminalPixPhase, rateLimitHint } from "./payment-poll";
-import { parsePaymentStatusResponse, publicApiErrorSchema, type PaymentStatusResponse } from "@/lib/public/payment-status";
+import { createStatusPoller, isTerminalPixPhase, persistedRateLimitUntil, rateLimitHint, retryAfterFrom429 } from "./payment-poll";
+import { parsePaymentStatusResponse, type PaymentStatusResponse } from "@/lib/public/payment-status";
 
 interface StepPaymentProps {
   slug: string;
@@ -227,7 +227,14 @@ export function StepPayment({
   // Próxima consulta 4s depois que a anterior assenta. Timeout de ~10s não segura o ciclo nem o clique manual.
   useEffect(() => {
     if (stopPolling) return;
+    const bookingKey = statusInput.current.bookingId;
+    const held = persistedRateLimitUntil(bookingKey);
+    if (held > 0) {
+      setRateLimitedUntil(held);
+      setNow(Date.now());
+    }
     const poller = createStatusPoller<PaymentStatusResponse | null>({
+      rateLimitKey: bookingKey,
       request: async (signal) => {
         const input = statusInput.current;
         try {
@@ -245,11 +252,9 @@ export function StepPayment({
             signal,
           });
           if (res.status === 429) {
-            const body: unknown = await res.json().catch(() => null);
-            const parsed = publicApiErrorSchema.safeParse(body);
-            if (parsed.success && parsed.data.error.code === "rate_limited") {
-              return { kind: "rate_limited", retryAfterHeader: res.headers.get("Retry-After") };
-            }
+            const body: unknown = await res.text().then((text) => (text.length > 0 ? text : null)).catch(() => null);
+            const retryAfter = retryAfterFrom429(res.status, body, res.headers.get("Retry-After"));
+            return { kind: "rate_limited", retryAfterHeader: retryAfter ?? null };
           }
           if (!res.ok) return { kind: "error", aborted: false };
           const data = parsePaymentStatusResponse(await res.json());

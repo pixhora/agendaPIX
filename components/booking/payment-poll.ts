@@ -11,21 +11,63 @@ export const PAYMENT_POLL_BACKOFF_MAX_MS = 30_000;
 /** Compatível com o nome antigo do intervalo. */
 export const PAYMENT_POLL_INTERVAL_MS = PAYMENT_POLL_GAP_MS;
 
-export const RATE_LIMIT_FALLBACK_MS = 10_000;
+/** Acima deste valor, ou inválido, a espera cai no fallback. */
+export const RATE_LIMIT_RETRY_MAX_MS = 120_000;
+
+/** `Retry-After` ausente, inválido ou maior que 120s. */
+export const RATE_LIMIT_FALLBACK_MS = 60_000;
 
 export const RATE_LIMIT_ERROR_AFTER_MS = 60_000;
 
-/** `Retry-After` em segundos ou em data HTTP. Data no passado espera 0. */
+const rateLimitUntilByKey = new Map<string, number>();
+
+/** Espera de 429 que sobrevive a um poller novo, no remount, no `start` e no `show`. */
+export function persistedRateLimitUntil(key: string, now = Date.now()): number {
+  const until = rateLimitUntilByKey.get(key) ?? 0;
+  if (until <= now) {
+    rateLimitUntilByKey.delete(key);
+    return 0;
+  }
+  return until;
+}
+
+export function persistRateLimitUntil(key: string, until: number, now = Date.now()): void {
+  if (until > now) rateLimitUntilByKey.set(key, until);
+  else rateLimitUntilByKey.delete(key);
+}
+
+export function clearPersistedRateLimits(): void {
+  rateLimitUntilByKey.clear();
+}
+
+/**
+ * 429 devolve o `Retry-After` mesmo com corpo vazio ou que não seja JSON.
+ * Fora de 429, devolve `undefined`.
+ */
+export function retryAfterFrom429(status: number, body: unknown, retryAfterHeader: string | null): string | null | undefined {
+  if (status !== 429) return undefined;
+  void body;
+  return retryAfterHeader;
+}
+
+/** `Retry-After` em segundos ou em data HTTP. Data no passado espera 0. Acima de 120s, ou inválido, espera 60s. */
 export function readRetryAfterMs(header: string | null | undefined, now = Date.now()): number {
-  if (!header) return RATE_LIMIT_FALLBACK_MS;
+  const parsed = parseRetryAfterMs(header, now);
+  if (parsed == null || parsed > RATE_LIMIT_RETRY_MAX_MS) return RATE_LIMIT_FALLBACK_MS;
+  return parsed;
+}
+
+function parseRetryAfterMs(header: string | null | undefined, now: number): number | null {
+  if (!header) return null;
   const trimmed = header.trim();
+  if (!trimmed) return null;
   if (/^\d+$/.test(trimmed)) {
     const seconds = Number.parseInt(trimmed, 10);
-    if (!Number.isFinite(seconds) || seconds < 0) return RATE_LIMIT_FALLBACK_MS;
+    if (!Number.isFinite(seconds) || seconds < 0) return null;
     return seconds * 1000;
   }
   const at = Date.parse(trimmed);
-  if (!Number.isFinite(at)) return RATE_LIMIT_FALLBACK_MS;
+  if (!Number.isFinite(at)) return null;
   return Math.max(0, at - now);
 }
 
@@ -84,6 +126,7 @@ export function createStatusPoller<T>(options: {
   schedule?: (fn: () => void, ms: number) => Timer;
   gapMs?: number;
   abortMs?: number;
+  rateLimitKey?: string;
   request: (signal: AbortSignal, source: "background" | "manual") => Promise<StatusPollOutcome<T>>;
   onFeedback?: (checking: boolean) => void;
   onRateLimited?: (view: { showError: boolean; message: string | null; until: number }) => void;
@@ -105,7 +148,12 @@ export function createStatusPoller<T>(options: {
   let hidden = false;
   let stopped = false;
   let rateSince: number | null = null;
-  let rateLimitedUntil = 0;
+  let rateLimitedUntil = options.rateLimitKey ? persistedRateLimitUntil(options.rateLimitKey, now()) : 0;
+
+  function rememberRateLimit(until: number) {
+    rateLimitedUntil = until;
+    if (options.rateLimitKey) persistRateLimitUntil(options.rateLimitKey, until, now());
+  }
   let failureSince: number | null = null;
   let failureStreak = 0;
   const starts: number[] = [];
@@ -192,13 +240,13 @@ export function createStatusPoller<T>(options: {
     if (outcome.kind === "rate_limited") {
       const view = rateLimitView(now(), rateSince, outcome.retryAfterHeader);
       rateSince = view.since;
-      rateLimitedUntil = now() + view.delayMs;
+      rememberRateLimit(now() + view.delayMs);
       options.onRateLimited?.({ ...view, until: rateLimitedUntil });
       arm(view.delayMs);
       return;
     }
     rateSince = null;
-    rateLimitedUntil = 0;
+    rememberRateLimit(0);
     failureSince = null;
     failureStreak = 0;
     options.onOk?.(outcome.data, source);

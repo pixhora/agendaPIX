@@ -4,11 +4,14 @@ import {
   PAYMENT_POLL_BACKOFF_MAX_MS,
   PAYMENT_POLL_GAP_MS,
   RATE_LIMIT_FALLBACK_MS,
+  RATE_LIMIT_RETRY_MAX_MS,
+  clearPersistedRateLimits,
   createStatusPoller,
   pollBackoffMs,
   pollFailureView,
   rateLimitHint,
   readRetryAfterMs,
+  retryAfterFrom429,
   type StatusPollOutcome,
 } from "../../components/booking/payment-poll";
 import { PAYMENT_CHECK_TIMEOUT_MS } from "../../components/booking/payment-check";
@@ -174,6 +177,59 @@ describe("consulta do Pix", () => {
     expect(readRetryAfterMs("não é data", now)).toBe(RATE_LIMIT_FALLBACK_MS);
     expect(readRetryAfterMs(new Date(now + 15_000).toUTCString(), now)).toBe(15_000);
     expect(readRetryAfterMs(new Date(now - 5_000).toUTCString(), now)).toBe(0);
+    expect(readRetryAfterMs("120", now)).toBe(RATE_LIMIT_RETRY_MAX_MS);
+    expect(readRetryAfterMs("121", now)).toBe(60_000);
+    expect(readRetryAfterMs(new Date(now + 121_000).toUTCString(), now)).toBe(60_000);
+    expect(readRetryAfterMs("", now)).toBe(60_000);
+    expect(RATE_LIMIT_FALLBACK_MS).toBe(60_000);
     expect(rateLimitHint(10)).toBe("Aguarde 10 s para verificar de novo.");
+  });
+
+  it("um poller novo, o start e o show não perdem a espera do 429", async () => {
+    vi.useFakeTimers();
+    clearPersistedRateLimits();
+    let calls = 0;
+    const first = createStatusPoller<number>({
+      rateLimitKey: "booking-hold",
+      request: async () => {
+        calls += 1;
+        return { kind: "rate_limited", retryAfterHeader: "10" };
+      },
+    });
+    void first.start();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(calls).toBe(1);
+    first.stop();
+
+    const second = createStatusPoller<number>({
+      rateLimitKey: "booking-hold",
+      request: async () => {
+        calls += 1;
+        return { kind: "ok", terminal: true, data: 1 };
+      },
+    });
+    void second.start();
+    second.hide();
+    void second.show();
+    void second.manual();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(calls).toBe(1);
+    await vi.advanceTimersByTimeAsync(9_999);
+    expect(calls).toBe(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(calls).toBe(2);
+    second.stop();
+    clearPersistedRateLimits();
+    vi.useRealTimers();
+  });
+
+  it("429 sem corpo rate_limited ainda devolve o Retry-After", () => {
+    expect(retryAfterFrom429(429, null, "30")).toBe("30");
+    expect(retryAfterFrom429(429, "", "30")).toBe("30");
+    expect(retryAfterFrom429(429, "não é json", "15")).toBe("15");
+    expect(retryAfterFrom429(429, { oops: true }, "15")).toBe("15");
+    expect(retryAfterFrom429(429, { error: { code: "other", message: "x" } }, "8")).toBe("8");
+    expect(retryAfterFrom429(500, null, "30")).toBeUndefined();
+    expect(retryAfterFrom429(200, "", null)).toBeUndefined();
   });
 });
