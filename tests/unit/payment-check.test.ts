@@ -13,7 +13,10 @@ function status(partial: Partial<PaymentStatusResponse>): PaymentStatusResponse 
   return {
     bookingId: "11111111-1111-4111-8111-111111111111",
     status: "pending_payment",
+    startsAt: "2030-01-01T12:00:00.000Z",
+    endsAt: "2030-01-01T12:30:00.000Z",
     expiresAt: "2030-01-01T12:15:00.000Z",
+    policy: null,
     payment: {
       id: "22222222-2222-4222-8222-222222222222",
       provider: "fake",
@@ -77,8 +80,8 @@ describe("mensagens e simulação de desenvolvimento", () => {
   });
 
   it("define timeout finito para evitar spinner infinito", () => {
-    expect(PAYMENT_CHECK_TIMEOUT_MS).toBeGreaterThan(0);
-    expect(PAYMENT_CHECK_TIMEOUT_MS).toBeLessThanOrEqual(30_000);
+    expect(PAYMENT_CHECK_TIMEOUT_MS).toBeGreaterThanOrEqual(8_000);
+    expect(PAYMENT_CHECK_TIMEOUT_MS).toBeLessThanOrEqual(10_000);
   });
 });
 

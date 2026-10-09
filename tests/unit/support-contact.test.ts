@@ -16,13 +16,15 @@ function filesUnder(dir: string): string[] {
 
 describe("WhatsApp de apoio", () => {
   it("lê SUPPORT_WHATSAPP_NUMBER com a mesma regra do checkout e usa o padrão só no link", () => {
-    const env = { SUPPORT_WHATSAPP_NUMBER: "5500000000000" };
-    expect(readSupportWhatsappNumber(env)).toBe("5500000000000");
-    expect(supportWhatsappUrl(env)).toBe("https://wa.me/5500000000000");
-    expect(readManualCheckoutConfig({ ...env, SUBSCRIPTION_MANUAL_ACTIVATION_HOURS: "2" })).toMatchObject({
+    const env = { SUPPORT_WHATSAPP_NUMBER: "5511912345678" };
+    expect(readSupportWhatsappNumber(env)).toBe("5511912345678");
+    expect(supportWhatsappUrl(env)).toBe("https://wa.me/5511912345678");
+    expect(readManualCheckoutConfig({ ...env, SUBSCRIPTION_MANUAL_ACTIVATION_HOURS: "1" })).toMatchObject({
       available: true,
-      whatsappNumber: "5500000000000",
+      whatsappNumber: "5511912345678",
     });
+    expect(readSupportWhatsappNumber({ SUPPORT_WHATSAPP_NUMBER: "5500000000000" })).toBeNull();
+    expect(readSupportWhatsappNumber({ SUPPORT_WHATSAPP_NUMBER: fallbackDigits })).toBe(fallbackDigits);
 
     for (const missing of [{}, { SUPPORT_WHATSAPP_NUMBER: "" }, { SUPPORT_WHATSAPP_NUMBER: "+5500000000000" }, { SUPPORT_WHATSAPP_NUMBER: "123" }]) {
       expect(readSupportWhatsappNumber(missing)).toBeNull();

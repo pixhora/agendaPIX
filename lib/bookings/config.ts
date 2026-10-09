@@ -32,7 +32,12 @@ export const bookingEnvSchema = z.object({
   BOOKING_MAX_PENDING_PER_CLIENT: z.preprocess(blankAsUndefined, int(1, 100, 3)),
   BOOKING_MAX_PENDING_PER_PHONE: z.preprocess(blankAsUndefined, int(1, 100, 2)),
   BOOKING_MAX_PENDING_PER_BUSINESS: z.preprocess(blankAsUndefined, int(1, 10000, 50)),
-}).refine((value) => value.BOOKING_RATE_LIMIT_PER_BUSINESS >= value.BOOKING_RATE_LIMIT_PER_CLIENT, "O teto por negócio deve ser maior ou igual ao limite por cliente.");
+  // Consulta do Pix a cada 4 s = 15/min. 120 cabe essa cadência, outra aba e o botão de verificar.
+  PAYMENT_POLL_RATE_LIMIT_PER_CLIENT: z.preprocess(blankAsUndefined, int(1, 100000, 120)),
+  // 50 sinais pendentes × 15/min = 750. 2400 deixa folga e ainda corta rajada no negócio.
+  PAYMENT_POLL_RATE_LIMIT_PER_BUSINESS: z.preprocess(blankAsUndefined, int(1, 100000, 2400)),
+}).refine((value) => value.BOOKING_RATE_LIMIT_PER_BUSINESS >= value.BOOKING_RATE_LIMIT_PER_CLIENT, "O teto por negócio deve ser maior ou igual ao limite por cliente.")
+  .refine((value) => value.PAYMENT_POLL_RATE_LIMIT_PER_BUSINESS >= value.PAYMENT_POLL_RATE_LIMIT_PER_CLIENT, "O teto de consulta do Pix por negócio deve ser maior ou igual ao limite por cliente.");
 
 export type BookingConfig = z.infer<typeof bookingEnvSchema>;
 

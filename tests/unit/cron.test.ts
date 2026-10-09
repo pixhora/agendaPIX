@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { HttpError } from "../../lib/http";
-import { authorizeCron, reconcileDatabaseUrl } from "../../lib/payments/cron";
+import { authorizeCron, reconcileDatabaseUrl, runCronTick } from "../../lib/payments/cron";
+import type { ReconcileReport } from "../../lib/payments/reconcile";
 
 const secret = "s".repeat(40);
 
@@ -27,5 +28,28 @@ describe("rota de cron do reconciliador", () => {
     expect(reconcileDatabaseUrl({ DATABASE_URL: pooled, DATABASE_URL_UNPOOLED: direct })).toBe(direct);
     expect(reconcileDatabaseUrl({ DATABASE_URL: pooled, DATABASE_URL_UNPOOLED: "" })).toBe(pooled);
     expect(status(() => reconcileDatabaseUrl({}))).toBe(503);
+  });
+});
+
+const quietReport = (): ReconcileReport => ({
+  stuckRetried: 0, stuckCancelled: 0, expiredCancelled: 0, polledPaid: 0, refundsSettled: 0, audits: 0, tokensPurged: 0, skippedLock: false,
+  failures: 0, deferred: 0, stagesSkipped: 0,
+});
+
+describe("limpeza de rascunhos na rota de cron", () => {
+  it("segue para a reconciliação quando a limpeza falha, sem devolver dado pessoal", async () => {
+    const reconcile = vi.fn(async () => quietReport());
+    const seen: string[] = [];
+    const result = await runCronTick({
+      deleteExpiredDrafts: async () => { throw new Error("rascunho dono@salao.com token Bearer abc"); },
+      reconcile,
+      now: new Date("2026-10-09T06:00:00.000Z"),
+      onDraftCleanupError: (code) => { seen.push(code); },
+    });
+    expect(reconcile).toHaveBeenCalledOnce();
+    expect(result).toMatchObject({ at: "2026-10-09T06:00:00.000Z", expiredDraftsDeleted: 0, draftCleanupFailed: true, polledPaid: 0 });
+    expect(seen).toEqual(["reconcile_failed"]);
+    expect(JSON.stringify(result)).not.toContain("dono@salao.com");
+    expect(seen.join(" ")).not.toContain("Bearer");
   });
 });

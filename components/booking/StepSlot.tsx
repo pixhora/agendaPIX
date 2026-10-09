@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { publicAvailabilityUrl } from "@/lib/public-api";
-import { depositServiceUnbookable } from "./booking-error";
+import { OFFLINE_MESSAGE, SLOTS_LOAD_MESSAGE, depositServiceUnbookable, isOfflineError } from "./booking-error";
 import { UnbookableNotice } from "./UnbookableNotice";
 
 interface StepSlotProps {
@@ -24,6 +24,10 @@ interface StepSlotProps {
   getSlotsForDate?: (dateString: string) => Promise<AvailabilitySlot[]>;
   /** WhatsApp publicado. Só entra no aviso de serviço indisponível. */
   contactWhatsapp?: string | null;
+  /** Incrementa para buscar os horários de novo (horário acabou de ser reservado). */
+  slotsReload?: number;
+  /** Aviso acima da lista, por exemplo horário recém-ocupado. */
+  notice?: string | null;
 }
 
 type Period = "morning" | "afternoon" | "evening";
@@ -107,6 +111,8 @@ export function StepSlot({
   onNext,
   getSlotsForDate,
   contactWhatsapp,
+  slotsReload = 0,
+  notice,
 }: StepSlotProps) {
   const days = useMemo(() => generateInitialDays(timezone), [timezone]);
   const [selectedDate, setSelectedDate] = useState<string>(() => days[0]?.dateString || "");
@@ -204,6 +210,8 @@ export function StepSlot({
     }, 10000);
 
     const loadSlots = async () => {
+      setIsLoadingSlots(true);
+      setErrorSlots(null);
       try {
         let loadedSlots: AvailabilitySlot[] = [];
         const fetchFn = getSlotsRef.current;
@@ -216,7 +224,10 @@ export function StepSlot({
               signal: controller.signal,
             }
           );
-          if (!res.ok) throw new Error("Não foi possível carregar os horários.");
+          if (!res.ok) {
+            console.error("slots load failed", res.status);
+            throw new Error("slots_unavailable");
+          }
           const data = (await res.json()) as { slots?: AvailabilitySlot[]; bookable?: boolean };
           if (depositServiceUnbookable(service.depositCents, data?.bookable)) {
             if (!isCancelled) setBlockedServiceId(service.id);
@@ -230,14 +241,8 @@ export function StepSlot({
         setErrorSlots(null);
       } catch (err: unknown) {
         if (isCancelled) return;
-        let msg = "Erro ao consultar horários.";
-        if (err instanceof Error) {
-          if (err.name === "AbortError") {
-            msg = "A consulta de horários demorou muito. Tente novamente.";
-          } else {
-            msg = err.message;
-          }
-        }
+        console.error(err);
+        const msg = isOfflineError(err) ? OFFLINE_MESSAGE : SLOTS_LOAD_MESSAGE;
         setErrorSlots(msg);
       } finally {
         clearTimeout(timeoutId);
@@ -254,7 +259,7 @@ export function StepSlot({
       clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [slug, service.id, service.depositCents, selectedDate, slotsRetryCount]);
+  }, [slug, service.id, service.depositCents, selectedDate, slotsRetryCount, slotsReload]);
 
   const handleSelectDay = (dateStr: string) => {
     if (dateStr === selectedDate) return;
@@ -349,6 +354,11 @@ export function StepSlot({
       </section>
 
       {/* Horários agrupados por período */}
+      {notice ? (
+        <p role="alert" className="rounded-card border border-line bg-subtle p-4 text-sm font-medium text-ink">
+          {notice}
+        </p>
+      ) : null}
       <section aria-label="Horários disponíveis no dia" className="space-y-5" aria-busy={isLoadingSlots}>
         {isLoadingSlots ? (
           <div role="status" className="space-y-3">
@@ -362,7 +372,7 @@ export function StepSlot({
           <div role="alert" className="rounded-card border border-danger/30 bg-danger-soft p-4 text-center">
             <p className="text-sm font-semibold text-danger">{errorSlots}</p>
             <Button type="button" variant="outline" onClick={handleRetrySlots} className="mt-3">
-              Tentar novamente
+              Tentar de novo
             </Button>
           </div>
         ) : slots.length === 0 ? (

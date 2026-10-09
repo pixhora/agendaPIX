@@ -124,7 +124,9 @@ describe("Mercado Pago connect consent", () => {
   it("leaves continue focusable and lets skip ignore the checkbox", () => {
     const html = renderToStaticMarkup(createElement(MpOnboardingStep, { businessId: "biz" }));
     expect(html).not.toMatch(/<button\b[^>]*\sdisabled[\s=>]/);
-    expect(html).toContain("quando o cliente paga depois do prazo de 30 minutos para reservar o horário");
+    expect(html).toContain("o AgendaPix pede a devolução do valor ao Mercado Pago");
+    expect(html).toContain("Na política padrão, todo Pix atrasado é devolvido.");
+    expect(html).not.toContain("Se você escolher remarcar");
     expect(html).not.toContain("único caso");
     expect(html).not.toContain("horário já está ocupado");
     expect(html).toContain("Continuar para o Mercado Pago");
@@ -304,6 +306,8 @@ describe("Mercado Pago connect consent", () => {
     expect(html).toContain("Enquanto houver Pix em aberto, o AgendaPix guarda o acesso");
     expect(html).not.toContain("45 minutos");
     expect(html).not.toContain("apaga agora");
+    expect(html).not.toContain("por mais 24 horas");
+    expect(html).not.toContain("Devolver pelo AgendaPix");
     expect(html).toContain(">Cancelar<");
     const now = renderToStaticMarkup(createElement(MpDisconnectDialog, {
       open: true,
@@ -396,7 +400,7 @@ describe("legacy Pix notice", () => {
       expiresAt: "2027-04-06T20:02:00.000Z",
       liveMode: false,
       canReceiveDeposits: true,
-      consentVersion: "2026-10-08.v3.2",
+      consentVersion: "2026-10-09.v4",
       accountName: "Ana S.",
       accountEmailMasked: "an••@gmail.com",
       accountIdLast4: "7766",

@@ -2,13 +2,15 @@ import { randomUUID } from "node:crypto";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
-import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as schema from "../../db/schema";
-import { bookingRequestHash, createBooking, getAvailability, getBookingPayment, hash, listPublicServices } from "../../lib/bookings/service";
+import { bookingRequestDigest, createBooking, getAvailability, getBookingPayment, hash, legacyBookingRequestDigest, listPublicServices } from "../../lib/bookings/service";
 import { bookingInputSchema } from "../../lib/bookings/validation";
 import { databaseEnvSchema } from "../../lib/env";
 import { FakePaymentProvider, signFakeWebhook } from "../../lib/payments/fake";
+import { PIX_APPROVAL_TOLERANCE_MS } from "../../lib/payments/rules";
 import { processWebhook } from "../../lib/payments/webhook";
+import { reconcileOnce } from "../../lib/payments/reconcile";
 import { simulateDevFakePayment } from "../../lib/payments/simulate-dev";
 import { padraoPolicyHash } from "../helpers/deposit-policy";
 import { insertConnectedMercadoPago } from "../helpers/connected-mp";
@@ -110,21 +112,22 @@ describe("reserva e cobrança do sinal", () => {
     const created = await createBooking(slugs[0], body, key, database, provider);
     const [booking] = await database.select().from(schema.bookings).where(eq(schema.bookings.id, created.data.bookingId));
     const parsed = bookingInputSchema.parse(body);
-    expect(booking.requestHash).toBe(bookingRequestHash(parsed));
-    expect(booking.requestHash).not.toBe(hash(JSON.stringify(parsed)));
+    expect(booking.requestHash).toBe(bookingRequestDigest(parsed));
+    expect(booking.requestHash).not.toBe(legacyBookingRequestDigest(parsed));
     expect(JSON.stringify(booking)).not.toContain("52998224725");
     const [customer] = await database.select().from(schema.customers).where(eq(schema.customers.id, booking.customerId));
     expect(JSON.stringify(customer)).not.toContain("52998224725");
-    const legacy = hash(JSON.stringify(parsed));
-    await database.update(schema.bookings).set({ requestHash: legacy }).where(eq(schema.bookings.id, booking.id));
-    const sameCpf = await createBooking(slugs[0], body, key, database, provider);
-    expect(sameCpf.replayed).toBe(true);
-    const [rewritten] = await database.select().from(schema.bookings).where(eq(schema.bookings.id, booking.id));
-    expect(rewritten.requestHash).toBe(bookingRequestHash(parsed));
     const otherCpf = { ...body, customer: { ...body.customer, cpfCnpj: "39053344705" } };
     const replay = await createBooking(slugs[0], otherCpf, key, database, provider);
     expect(replay.replayed).toBe(true);
     expect(replay.data.bookingId).toBe(created.data.bookingId);
+    const legacy = legacyBookingRequestDigest(parsed);
+    await database.update(schema.bookings).set({ requestHash: legacy }).where(eq(schema.bookings.id, booking.id));
+    const sameCpf = await createBooking(slugs[0], body, key, database, provider);
+    expect(sameCpf.replayed).toBe(true);
+    const [kept] = await database.select().from(schema.bookings).where(eq(schema.bookings.id, booking.id));
+    expect(kept.requestHash).toBe(legacy);
+    await expect(createBooking(slugs[0], otherCpf, key, database, provider)).rejects.toMatchObject({ status: 409, code: "idempotency_conflict" });
     const [after] = await database.select().from(schema.bookings).where(eq(schema.bookings.id, booking.id));
     expect(JSON.stringify(after)).not.toContain("39053344705");
     expect(JSON.stringify(after)).not.toContain("52998224725");
@@ -247,11 +250,126 @@ describe("webhook transacional e auditável", () => {
     await database.update(schema.bookings).set({ createdAt: new Date(Date.now() - 60000), expiresAt: new Date(Date.now() - 1000) }).where(eq(schema.bookings.id, first.data.bookingId));
     await database.update(schema.payments).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(schema.payments.id, first.data.payment!.id));
     const second = await createBooking(slugs[0], input(), randomUUID(), database, provider);
-    provider.markPaid(first.data.payment!.externalId!);
-    expect(await processWebhook(webhook(first.data.payment!.externalId!), "fake", database, provider)).toMatchObject({ outcome: "ignored", reason: "late_no_slot" });
+    const paidLate = new Date(Date.now() + PIX_APPROVAL_TOLERANCE_MS);
+    provider.markPaid(first.data.payment!.externalId!, paidLate);
+    let refundCalled = false;
+    const hanging = {
+      name: provider.name,
+      createPixCharge: provider.createPixCharge.bind(provider),
+      getCharge: provider.getCharge.bind(provider),
+      findChargeByReference: provider.findChargeByReference.bind(provider),
+      cancelCharge: provider.cancelCharge.bind(provider),
+      verifyWebhook: provider.verifyWebhook.bind(provider),
+      refundCharge: async () => {
+        refundCalled = true;
+        return { status: "refunded" as const, refundId: "nao" };
+      },
+    };
+    expect(await processWebhook(webhook(first.data.payment!.externalId!, { paidAt: paidLate.toISOString(), paidAtSource: "date_approved" }), "fake", database, hanging)).toMatchObject({ outcome: "ignored", reason: "late_no_slot" });
+    expect(refundCalled).toBe(true);
     const old = await getBookingPayment(slugs[0], first.data.bookingId, `Bearer ${first.data.accessToken}`, database);
-    expect(old.status).toBe("expired"); expect(old.payment?.status).toBe("refunded");
+    expect(old.status).toBe("expired");
+    expect(old.payment?.status).toBe("refunded");
+    const audits = await database.select().from(schema.paymentAudit).where(eq(schema.paymentAudit.paymentId, first.data.payment!.id));
+    expect(audits.some((row) => row.action === "late_no_slot")).toBe(true);
+    expect(audits.some((row) => row.action === "automatic_refund")).toBe(true);
+    const report = await reconcileOnce(database, provider, { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50, RECONCILE_BUDGET_MS: 50_000 });
+    expect(report.refundsSettled).toBe(0);
+    const refunded = await getBookingPayment(slugs[0], first.data.bookingId, `Bearer ${first.data.accessToken}`, database);
+    expect(refunded.payment?.status).toBe("refunded");
+    const attempts = await database.select().from(schema.paymentRefunds).where(eq(schema.paymentRefunds.paymentId, first.data.payment!.id));
+    expect(attempts).toHaveLength(1);
     expect((await getBookingPayment(slugs[0], second.data.bookingId, `Bearer ${second.data.accessToken}`, database)).status).toBe("pending_payment");
+  });
+  it("timeout do estorno no webhook responde 200 e o reconciliador estorna uma vez", async () => {
+    vi.stubEnv("PAYMENT_PROVIDER_TIMEOUT_MS", "400");
+    const first = await createBooking(slugs[0], input(), randomUUID(), database, provider);
+    await database.update(schema.bookings).set({ createdAt: new Date(Date.now() - 60000), expiresAt: new Date(Date.now() - 1000) }).where(eq(schema.bookings.id, first.data.bookingId));
+    await database.update(schema.payments).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(schema.payments.id, first.data.payment!.id));
+    await createBooking(slugs[0], input(), randomUUID(), database, provider);
+    const paidLate = new Date(Date.now() + PIX_APPROVAL_TOLERANCE_MS);
+    provider.markPaid(first.data.payment!.externalId!, paidLate);
+    provider.latencyMs = 3_000;
+    try {
+      await expect(processWebhook(webhook(first.data.payment!.externalId!, { paidAt: paidLate.toISOString(), paidAtSource: "date_approved" }), "fake", database, provider)).resolves.toMatchObject({ outcome: "ignored", reason: "late_no_slot" });
+      const open = await getBookingPayment(slugs[0], first.data.bookingId, `Bearer ${first.data.accessToken}`, database);
+      expect(open.payment?.status).toBe("paid");
+      const [attempt] = await database.select().from(schema.paymentRefunds).where(eq(schema.paymentRefunds.paymentId, first.data.payment!.id));
+      expect(attempt?.status).toBe("requested");
+      expect(attempt?.idempotencyKey).toBe(`auto_late:${first.data.payment!.id}`);
+      provider.latencyMs = 0;
+      vi.stubEnv("PAYMENT_PROVIDER_TIMEOUT_MS", "8000");
+      const report = await reconcileOnce(database, provider, { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50, RECONCILE_BUDGET_MS: 50_000 });
+      expect(report.refundsSettled).toBe(1);
+      const closed = await getBookingPayment(slugs[0], first.data.bookingId, `Bearer ${first.data.accessToken}`, database);
+      expect(closed.payment?.status).toBe("refunded");
+      const attempts = await database.select().from(schema.paymentRefunds).where(eq(schema.paymentRefunds.paymentId, first.data.payment!.id));
+      expect(attempts).toHaveLength(1);
+      expect(attempts[0]?.status).toBe("refunded");
+      expect(attempts[0]?.idempotencyKey).toBe(`auto_late:${first.data.payment!.id}`);
+    } finally {
+      provider.latencyMs = 0;
+      vi.unstubAllEnvs();
+    }
+  });
+  it("Pix aprovado no prazo e processado depois do hold confirma e não estorna", async () => {
+    const first = await createBooking(slugs[0], input(), randomUUID(), database, provider);
+    const holdEnds = new Date(Date.now() - 30_000);
+    const paidAt = new Date(holdEnds.getTime() - 60_000);
+    await database.update(schema.bookings).set({ createdAt: new Date(Date.now() - 60_000), expiresAt: holdEnds }).where(eq(schema.bookings.id, first.data.bookingId));
+    await database.update(schema.payments).set({ expiresAt: holdEnds }).where(eq(schema.payments.id, first.data.payment!.id));
+    provider.markPaid(first.data.payment!.externalId!, paidAt);
+    expect(await processWebhook(webhook(first.data.payment!.externalId!, { paidAt: paidAt.toISOString(), paidAtSource: "date_approved" }), "fake", database, provider)).toMatchObject({ outcome: "processed", reason: "on_time_reclaimed" });
+    const booking = await getBookingPayment(slugs[0], first.data.bookingId, `Bearer ${first.data.accessToken}`, database);
+    expect(booking.status).toBe("confirmed");
+    expect(booking.payment?.status).toBe("paid");
+    const audits = await database.select().from(schema.paymentAudit).where(eq(schema.paymentAudit.paymentId, first.data.payment!.id));
+    expect(audits.some((row) => row.action === "late_no_slot")).toBe(false);
+    expect(audits.some((row) => row.action === "automatic_refund")).toBe(false);
+    const report = await reconcileOnce(database, provider, { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50, RECONCILE_BUDGET_MS: 50_000 });
+    expect(report.refundsSettled).toBe(0);
+    expect((await getBookingPayment(slugs[0], first.data.bookingId, `Bearer ${first.data.accessToken}`, database)).payment?.status).toBe("paid");
+  });
+  it("Pix aprovado no prazo com horário já ocupado estorna sem perder o evento", async () => {
+    const first = await createBooking(slugs[0], input(), randomUUID(), database, provider);
+    const holdEnds = new Date(Date.now() - 30_000);
+    const paidAt = new Date(holdEnds.getTime() + PIX_APPROVAL_TOLERANCE_MS);
+    await database.update(schema.bookings).set({ createdAt: new Date(Date.now() - 60_000), expiresAt: holdEnds }).where(eq(schema.bookings.id, first.data.bookingId));
+    await database.update(schema.payments).set({ expiresAt: holdEnds }).where(eq(schema.payments.id, first.data.payment!.id));
+    const second = await createBooking(slugs[0], input(), randomUUID(), database, provider);
+    provider.markPaid(first.data.payment!.externalId!, paidAt);
+    await expect(processWebhook(webhook(first.data.payment!.externalId!, { paidAt: paidAt.toISOString(), paidAtSource: "date_approved" }), "fake", database, provider)).resolves.toMatchObject({ outcome: "ignored", reason: "late_no_slot" });
+    const old = await getBookingPayment(slugs[0], first.data.bookingId, `Bearer ${first.data.accessToken}`, database);
+    expect(old.status).toBe("expired");
+    expect(old.payment?.status).toBe("refunded");
+    expect((await getBookingPayment(slugs[0], second.data.bookingId, `Bearer ${second.data.accessToken}`, database)).status).toBe("pending_payment");
+    const report = await reconcileOnce(database, provider, { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50, RECONCILE_BUDGET_MS: 50_000 });
+    expect(report.refundsSettled).toBe(0);
+    const attempts = await database.select().from(schema.paymentRefunds).where(eq(schema.paymentRefunds.paymentId, first.data.payment!.id));
+    expect(attempts).toHaveLength(1);
+  });
+  it("Pix aprovado depois da margem segue a política de atraso", async () => {
+    const first = await createBooking(slugs[0], input(), randomUUID(), database, provider);
+    const holdEnds = new Date(Date.now() - 10 * 60_000);
+    const paidAt = new Date(holdEnds.getTime() + PIX_APPROVAL_TOLERANCE_MS + 1000);
+    await database.update(schema.bookings).set({ createdAt: new Date(holdEnds.getTime() - 60_000), expiresAt: holdEnds }).where(eq(schema.bookings.id, first.data.bookingId));
+    await database.update(schema.payments).set({ expiresAt: holdEnds }).where(eq(schema.payments.id, first.data.payment!.id));
+    provider.markPaid(first.data.payment!.externalId!, paidAt);
+    expect(await processWebhook(webhook(first.data.payment!.externalId!, { paidAt: paidAt.toISOString(), paidAtSource: "date_approved" }), "fake", database, provider)).toMatchObject({ outcome: "ignored", reason: "late_no_slot" });
+    const booking = await getBookingPayment(slugs[0], first.data.bookingId, `Bearer ${first.data.accessToken}`, database);
+    expect(booking.status).toBe("expired");
+    expect(booking.payment?.status).toBe("refunded");
+  });
+  it("sem hora de aprovação depois do hold cai no atraso", async () => {
+    const first = await createBooking(slugs[0], input(), randomUUID(), database, provider);
+    const holdEnds = new Date(Date.now() - 30_000);
+    await database.update(schema.bookings).set({ createdAt: new Date(Date.now() - 60_000), expiresAt: holdEnds }).where(eq(schema.bookings.id, first.data.bookingId));
+    await database.update(schema.payments).set({ expiresAt: holdEnds }).where(eq(schema.payments.id, first.data.payment!.id));
+    provider.markPaid(first.data.payment!.externalId!);
+    expect(await processWebhook(webhook(first.data.payment!.externalId!, { paidAtSource: "fallback" }), "fake", database, provider)).toMatchObject({ outcome: "ignored", reason: "late_no_slot" });
+    const booking = await getBookingPayment(slugs[0], first.data.bookingId, `Bearer ${first.data.accessToken}`, database);
+    expect(booking.status).toBe("expired");
+    expect(booking.payment?.status).toBe("refunded");
   });
   it("pagamento tardio com rebook_if_free e horário ocupado registra late_no_slot e estorna", async () => {
     await database.update(schema.businesses).set({ latePaymentPolicy: "rebook_if_free" }).where(eq(schema.businesses.id, businessIds[0]));
@@ -259,8 +377,9 @@ describe("webhook transacional e auditável", () => {
     await database.update(schema.bookings).set({ createdAt: new Date(Date.now() - 60000), expiresAt: new Date(Date.now() - 1000) }).where(eq(schema.bookings.id, first.data.bookingId));
     await database.update(schema.payments).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(schema.payments.id, first.data.payment!.id));
     const second = await createBooking(slugs[0], input(), randomUUID(), database, provider);
-    provider.markPaid(first.data.payment!.externalId!);
-    const request = webhook(first.data.payment!.externalId!);
+    const paidLate = new Date(Date.now() + PIX_APPROVAL_TOLERANCE_MS);
+    provider.markPaid(first.data.payment!.externalId!, paidLate);
+    const request = webhook(first.data.payment!.externalId!, { paidAt: paidLate.toISOString(), paidAtSource: "date_approved" });
     const bodyHash = bodyHashes.at(-1)!;
     await expect(processWebhook(request.clone(), "fake", database, provider)).resolves.toMatchObject({ outcome: "ignored", reason: "late_no_slot" });
     const old = await getBookingPayment(slugs[0], first.data.bookingId, `Bearer ${first.data.accessToken}`, database);
@@ -273,6 +392,8 @@ describe("webhook transacional e auditável", () => {
     const [delivery] = await database.select().from(schema.webhookDeliveries).where(eq(schema.webhookDeliveries.bodyHash, bodyHash));
     expect(delivery).toMatchObject({ outcome: "ignored", reason: "late_no_slot" });
     await expect(processWebhook(request.clone(), "fake", database, provider)).resolves.toMatchObject({ outcome: "duplicate", reason: "late_no_slot" });
+    const attempts = await database.select().from(schema.paymentRefunds).where(eq(schema.paymentRefunds.paymentId, first.data.payment!.id));
+    expect(attempts).toHaveLength(1);
   });
   it("evento de um negócio não altera a reserva do outro", async () => {
     const first = await createBooking(slugs[0], input(), randomUUID(), database, provider);

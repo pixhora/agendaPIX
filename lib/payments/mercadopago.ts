@@ -4,6 +4,8 @@ import { z } from "zod";
 import { PIX_EXPIRATION_MARGIN_MINUTES, PIX_EXPIRATION_MIN_MINUTES } from "../bookings/config";
 import { payerCpfRequired } from "../marketing/facts";
 import { HttpError } from "../http";
+import { paymentsConfig } from "./config";
+import { callProvider } from "./timeout";
 import { MpAccountNotConnectedError, resolveMpAccessToken, type MpAccessTokenQuery } from "./seller-account";
 import {
   chargeInputSchema,
@@ -130,6 +132,21 @@ function constantTimeEqualHex(a: string, b: string) {
   }
 }
 
+/**
+ * `date_approved` do GET /v1/payments/{id}: string ISO-8601 (ex.: `2017-08-31T11:26:38.000Z`).
+ * Ausente ou inválido não vira data. Não usa `date_created`.
+ * https://www.mercadopago.com.br/developers/en/reference/online-payments/checkout-pro/get-payment/get
+ */
+export function parseApprovalInstant(value: string | null | undefined): Date | null {
+  if (typeof value !== "string" || value.trim() === "") return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function knownApproval(value: Date | null | undefined): value is Date {
+  return value instanceof Date && !Number.isNaN(value.getTime());
+}
+
 /** ISO-8601 com offset (`-00:00`), como a Payments API descreve `date_of_expiration`. */
 export function formatMercadoPagoDate(date: Date) {
   return date.toISOString().replace(/Z$/, "-00:00");
@@ -253,6 +270,12 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
 
   private async request(path: string, init: { method: string; body?: unknown; headers?: Record<string, string>; signal?: AbortSignal; accessToken: string }) {
     if (init.signal?.aborted) throw init.signal.reason ?? new Error("Aborted");
+    if (init.signal) return this.dispatch(path, init);
+    const timeoutMs = paymentsConfig().PAYMENT_PROVIDER_TIMEOUT_MS;
+    return callProvider(timeoutMs, (signal) => this.dispatch(path, { ...init, signal }));
+  }
+
+  private async dispatch(path: string, init: { method: string; body?: unknown; headers?: Record<string, string>; signal?: AbortSignal; accessToken: string }) {
     const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
       method: init.method,
       headers: {
@@ -291,9 +314,10 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
     else if (payment.status === "expired" || expiresAt <= now) status = "expired";
     else status = "pending";
 
-    const paidAt = status === "paid"
-      ? new Date(payment.date_approved ?? payment.date_created ?? now.toISOString())
-      : null;
+    // Só `date_approved` é a hora em que o Pix foi aprovado. `date_created` é a criação da
+    // cobrança e o relógio local é o processamento: nenhum dos dois prova pagamento no prazo.
+    // https://www.mercadopago.com.br/developers/en/reference/online-payments/checkout-pro/get-payment/get
+    const paidAt = status === "paid" ? parseApprovalInstant(payment.date_approved) : null;
 
     return {
       externalId: payment.id,
@@ -483,6 +507,8 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
     const mpUserId = payload.user_id != null ? String(payload.user_id) : undefined;
     let payment;
     try {
+      // Sem signal, cada HTTP usa PAYMENT_PROVIDER_TIMEOUT_MS. O MP espera o ack em até 22s.
+      // https://www.mercadopago.com.br/developers/pt/docs/your-integrations/notifications/webhooks
       payment = await this.getCharge(dataId, { mpUserId, purpose: "settlement" });
     } catch (error) {
       if (error instanceof MpAccountNotConnectedError) throw new UnverifiableSellerPayment(dataId);
@@ -497,7 +523,8 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
       type: "payment.paid",
       externalId: payment.externalId,
       amountCents: payment.amountCents,
-      paidAt: (payment.paidAt ?? now).toISOString(),
+      paidAt: (knownApproval(payment.paidAt) ? payment.paidAt! : now).toISOString(),
+      paidAtSource: knownApproval(payment.paidAt) ? "date_approved" : "fallback",
       ...(payment.statusDetail ? { statusDetail: payment.statusDetail } : {}),
     });
   }

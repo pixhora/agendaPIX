@@ -79,7 +79,7 @@ describe("landing copy", () => {
     expect(rendered).not.toContain("Titular Que Não Pode Aparecer");
     expect(rendered).toContain("12 minutos");
     expect(rendered).toContain("conta Mercado Pago");
-    expect(rendered).toContain("app ou site do Mercado Pago");
+    expect(rendered).toContain("você devolve pelo app do Mercado Pago");
     expect(rendered).not.toContain("Devolver pelo AgendaPix");
     expect(rendered).toContain("devolvido sozinho, o valor inteiro");
     expect(rendered).toContain("você recebe um e-mail");
@@ -114,19 +114,10 @@ describe("landing copy", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("uses the October 2026 day strip on the hero", () => {
-    const hero = readFileSync("components/landing/LandingHero.tsx", "utf8");
-    for (const label of ["Qua 14", "Qui 15", "Sex 16", "Sáb 17"]) {
-      expect(hero).toContain(label);
-    }
-    expect(hero).not.toContain("Dom 18");
-  });
-
-  it("shows the 15:30 slot as selected while the phone still asks to pay", () => {
-    const hero = readFileSync("components/landing/LandingHero.tsx", "utf8");
-    expect(hero).toContain("Selecionado");
-    expect(hero).toContain("Pagar sinal de R$ 20,00 no Pix");
-    expect(hero).not.toContain("Reservado · sinal pago");
+  it("does not ship invented customers or sample businesses on the landing", () => {
+    const files = ["components/landing/LandingHero.tsx", "components/landing/LandingSteps.tsx", "components/landing/DemoSection.tsx"];
+    const rendered = files.map((file) => readFileSync(file, "utf8")).join("\n");
+    expect(rendered).not.toMatch(/Studio Bella|Nova reserva · Ana|Bruna|Exemplo ilustrativo|R\$ 80,00|4 reservas/);
   });
 
   it("says the deposit lands in the owner's Mercado Pago account", () => {
@@ -138,10 +129,9 @@ describe("landing copy", () => {
       "components/landing/LandingFooter.tsx",
       "components/landing/LandingHero.tsx",
       "components/landing/LandingSteps.tsx",
-      "components/landing/DemoSection.tsx",
       "components/landing/LandingPricing.tsx",
       "components/landing/LandingFinalCta.tsx",
-      "components/landing/LandingBenefits.tsx",
+      "lib/marketing/landing-copy.ts",
       "components/landing/Roadmap.tsx",
     ]) {
       expect(readFileSync(file, "utf8"), file).toMatch(/conta Mercado Pago/);

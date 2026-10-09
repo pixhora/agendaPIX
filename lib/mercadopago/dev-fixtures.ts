@@ -76,9 +76,9 @@ export const MP_STATUS_FIXTURES = {
 
 export type MpFixtureName = keyof typeof MP_STATUS_FIXTURES;
 
-/** Em produção a rota fica fechada. O build de captura liga com MP_CAPTURE=1. */
-export function mpFixturesAllowed(): boolean {
-  return process.env.NODE_ENV !== "production" || process.env.MP_CAPTURE === "1";
+/** Em produção a rota fica fechada. MP_CAPTURE não reabre: o boot recusa a variável. */
+export function mpFixturesAllowed(nodeEnv: string | undefined = process.env.NODE_ENV): boolean {
+  return nodeEnv !== "production";
 }
 
 export function readMpFixture(name: string | null | undefined): MpOwnerStatus | null {

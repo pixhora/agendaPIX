@@ -14,8 +14,9 @@ import {
   markRefundedByExternalId,
   notifyDisconnectedConfirmation,
   recordUnverifiableSellerPayment,
-  settleAutomaticLateRefund,
+  settleLateRefundOutsideLock,
 } from "./refund-flow";
+import { ProviderTimeoutError } from "./timeout";
 import { IgnoredWebhookEvent, ObservedRefundEvent, UnverifiableSellerPayment, paidEventSchema, type PaidEvent, type PaymentProvider } from "./provider";
 
 type Database = NodePgDatabase<typeof schema>;
@@ -35,6 +36,7 @@ export async function verifyWebhookDelivery(request: Request, providerName: stri
     event = paidEventSchema.parse(await paymentProvider.verifyWebhook(body, request.headers, now, request.url));
   } catch (error) {
     if (error instanceof HttpError || error instanceof IgnoredWebhookEvent || error instanceof ObservedRefundEvent || error instanceof UnverifiableSellerPayment) throw error;
+    if (error instanceof ProviderTimeoutError) throw new HttpError(503, "webhook_unavailable", "Não foi possível consultar o pagamento. Tente novamente.");
     if (error instanceof z.ZodError || error instanceof SyntaxError) throw new HttpError(400, "invalid_event", "Evento inválido.");
     throw new HttpError(401, "invalid_signature", "Assinatura inválida ou vencida.");
   }
@@ -75,12 +77,11 @@ export async function processWebhook(request: Request, providerName: string, dat
     });
     const paymentProvider = provider ?? getPaymentProvider();
     const ports = drizzleRefundPorts(database);
+    // late_no_slot já está commitado. O estorno sai aqui, fora do lock, com o timeout do gateway.
+    // Falha ou timeout não vira 503: o Mercado Pago reenviaria o pago. O reconciliador retoma a mesma chave.
+    // https://www.mercadopago.com.br/developers/pt/docs/your-integrations/notifications/webhooks
     if (outcome.reason === "late_no_slot" && outcome.paymentId) {
-      try {
-        await settleAutomaticLateRefund(ports, paymentProvider, outcome.paymentId);
-      } catch {
-        // A reconciliação retoma. A resposta continua 200 para o gateway não reenviar o pago.
-      }
+      await settleLateRefundOutsideLock(ports, paymentProvider, outcome.paymentId);
     } else if (outcome.outcome === "processed" && outcome.paymentId) {
       try {
         await notifyDisconnectedConfirmation(ports, outcome.paymentId);

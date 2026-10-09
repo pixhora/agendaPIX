@@ -303,6 +303,7 @@ describe("movimento: acessibilidade e movimento reduzido", () => {
 describe("vitrine de movimento", () => {
   it("fica fechada em produção e fora do índice", () => {
     expect(isMotionPreviewOpen("production")).toBe(false);
+    expect(isMotionPreviewOpen("production", "true")).toBe(true);
     expect(isMotionPreviewOpen("development")).toBe(true);
     expect(isMotionPreviewOpen("test")).toBe(true);
     const rules = robots().rules;

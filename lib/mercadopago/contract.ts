@@ -1,5 +1,6 @@
 import { MP_CONNECT_CONSENT_VERSION } from "./consent";
-import { MP_AUTO_REFUND_ACK_ERROR } from "./connect-copy";
+import { latePixRefundCopy } from "./late-pix-copy";
+import { MP_AUTO_REFUND_ACK_ERROR, MP_MANUAL_REFUND_CHANNEL } from "./connect-copy";
 
 /** Status visto pelo dono. Campo ausente de chave antiga vale como false. */
 export const MP_CONNECTION_STATUSES = ["not_connected", "connected", "needs_reconnect"] as const;
@@ -52,11 +53,11 @@ const CALLBACK_COPY: Record<MpCallbackReason, { tone: "danger" | "warning" | "ac
   },
   state_mismatch: {
     tone: "warning",
-    message: "A conexão não foi concluída a tempo. Nenhuma permissão foi salva. Tente de novo; leva menos de um minuto.",
+    message: "A conexão não foi concluída a tempo. Nenhuma permissão foi salva. Tente de novo.",
   },
   expired_code: {
     tone: "warning",
-    message: "A conexão não foi concluída a tempo. Nenhuma permissão foi salva. Tente de novo; leva menos de um minuto.",
+    message: "A conexão não foi concluída a tempo. Nenhuma permissão foi salva. Tente de novo.",
   },
   exchange_failed: {
     tone: "danger",
@@ -256,7 +257,7 @@ function depositBlockReason(service: DepositFlag): string | null {
 
 export function depositUnavailable(service: DepositFlag): boolean {
   const reason = depositBlockReason(service);
-  return service.bookable === false && (reason === MP_ACCOUNT_NOT_CONNECTED || reason === MP_CONSENT_OUTDATED);
+  return service.bookable === false && (reason === MP_ACCOUNT_NOT_CONNECTED || reason === MP_CONSENT_OUTDATED || reason === "mp_account_test_mode");
 }
 
 export function showDepositUnavailableCard(services: readonly (DepositFlag & { depositCents: number })[]): boolean {
@@ -291,10 +292,10 @@ export const PERMISSIONS: { strong: string; rest: string }[] = [
   { strong: "criar cobranças Pix", rest: " no valor do sinal dos seus agendamentos;" },
   { strong: "ver o status", rest: " dessas cobranças, para confirmar o agendamento quando o cliente pagar;" },
   { strong: "cancelar", rest: " cobranças que não foram pagas no prazo;" },
-  { strong: "não tirar dinheiro", rest: " fora da devolução automática. Se precisar devolver na mão, faça pelo app ou site do Mercado Pago;" },
+  { strong: "devolver um sinal quando você mandar", rest: `. ${MP_MANUAL_REFUND_CHANNEL} O valor sai do saldo da sua conta Mercado Pago;` },
   {
     strong: "devolver sozinho o valor inteiro",
-    rest: ` quando o cliente paga depois do prazo de ${DEPOSIT_HOLD_MINUTES} minutos para reservar o horário. Você recebe um e-mail a cada devolução;`,
+    rest: ` quando um Pix chega depois do prazo. ${latePixRefundCopy("refund")} Você recebe um e-mail a cada devolução;`,
   },
   { strong: "manter a conexão ativa", rest: " sem pedir sua autorização de novo a cada renovação." },
 ];

@@ -3,10 +3,11 @@ export const MP_CONNECT_CONSENT_VERSION = "2026-10-09.v4";
 
 /**
  * Texto exato aceito pelo dono. O servidor grava o SHA-256 hex deste valor, sem markdown.
- * A política efetiva hoje é `refund`: todo Pix pago depois do prazo da reserva é devolvido,
- * mesmo com o horário livre. O dono não tem tela para mudar isso.
+ * Igual à citação dos Termos, seção 5-A.6. A política efetiva hoje é `refund`: todo Pix pago
+ * depois do prazo da reserva é devolvido, mesmo com o horário livre. O dono não tem tela para mudar isso.
  */
-export const MP_CONNECT_CONSENT_TEXT = "Entendi e autorizo: quando um Pix chegar depois do prazo para reservar o horário, o AgendaPix devolve sozinho o valor inteiro, do saldo da minha conta Mercado Pago, e me avisa por e-mail. Se essa devolução falhar, eu devolvo manualmente em até 7 dias corridos, contados do aviso.";
+export const MP_CONNECT_CONSENT_TEXT =
+  "Entendi e autorizo: quando um Pix chegar depois do prazo para reservar o horário, o AgendaPix devolve sozinho o valor inteiro, do saldo da minha conta Mercado Pago, e me avisa por e-mail. Se essa devolução falhar, eu devolvo manualmente em até 7 dias corridos, contados do aviso.";
 
 /** A versão gravada na conexão é a atual e houve um aceite com data. */
 export function storedConsentIsCurrent(version: string | null | undefined, acknowledgedAt: Date | string | null | undefined) {

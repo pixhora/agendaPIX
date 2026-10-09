@@ -18,8 +18,12 @@ export const SUBSCRIPTION_ACTIVE_TOAST = "Assinatura ativa. Seus agendamentos on
 export const SUBSCRIPTION_ALREADY_ACTIVE_COPY = "Sua assinatura já está ativa.";
 export const SUBSCRIPTION_WHATSAPP_LABEL = "Falar no WhatsApp de novo";
 export const SUBSCRIPTION_PENDING_TITLE = "Pedido recebido";
-/** A prévia usa 2 h, a decisão do Teteu. A tela lê o `activationHours` que o back mandar. */
-export const SUBSCRIPTION_MANUAL_ACTIVATION_HOURS = 2;
+/** A prévia promete até 1 hora. A tela lê o `activationHours` que o back mandar. */
+export const SUBSCRIPTION_MANUAL_ACTIVATION_HOURS = 1;
+
+export function activationDelayPhrase(hours: number): string {
+  return hours === 1 ? "1 hora" : `${hours} horas`;
+}
 export const SUBSCRIPTION_LOGIN_PATH = "/login";
 
 /** Renovação aparece com 3 dias corridos ou menos no fuso do negócio. Com 4, o botão some. */
@@ -97,12 +101,12 @@ export function pendingRequestCopy(when: string, activationHours: number | null)
   if (activationHours == null) {
     return `Recebemos seu pedido ${when}. Seus agendamentos online voltam assim que a assinatura for ativada.`;
   }
-  return `Recebemos seu pedido ${when}. Ativamos em até ${activationHours} h, e seus agendamentos online voltam sozinhos.`;
+  return `Recebemos seu pedido ${when}. Ativamos em até ${activationDelayPhrase(activationHours)}, e seus agendamentos online voltam sozinhos.`;
 }
 
 export function subscribeHelpCopy(activationHours: number | null) {
   if (activationHours == null) return "Abre o WhatsApp com o pedido pronto.";
-  return `Abre o WhatsApp com o pedido pronto. Ativamos em até ${activationHours} h.`;
+  return `Abre o WhatsApp com o pedido pronto. Ativamos em até ${activationDelayPhrase(activationHours)}.`;
 }
 
 /** "quinta, 15 de outubro" no fuso informado. */

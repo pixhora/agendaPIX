@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { HttpError } from "../../lib/http";
 import {
   executeOwnerRefund,
@@ -20,6 +20,7 @@ import { assessRefund } from "../../lib/payments/refund-eligibility";
 import {
   disconnectedConfirmedNotice,
   lateRefundFailedNotice,
+  lateRefundNoTokenNotice,
   lateRefundedNotice,
   unverifiableSellerNotice,
 } from "../../lib/payments/notices";
@@ -57,6 +58,7 @@ function view(overrides: Partial<RefundView> = {}): RefundView {
     policyText: null,
     policyHash: null,
     policyRefundDeadlineAt: null,
+    latePaymentPolicy: "refund",
     ...overrides,
   };
 }
@@ -86,7 +88,7 @@ function memory(initial: RefundView): RefundPorts & { audits: { action: string; 
     },
     async listAttempts() { return attempts.map((row) => ({ ...row })); },
     async beginAttempt(input) {
-      const created: RefundAttempt = { id: `attempt-${attempts.length + 1}`, status: "requested", mpRefundId: null, ...input };
+      const created: RefundAttempt = { id: `attempt-${attempts.length + 1}`, status: "requested", mpRefundId: null, createdAt: new Date(), ...input };
       attempts.push(created);
       return { ...created };
     },
@@ -271,7 +273,7 @@ describe("devolução automática só no atraso sem horário", () => {
     expect(ports.emails).toHaveLength(1);
     expect(ports.emails[0]).toContain("depois que o prazo para reservar o horário acabou");
     expect(ports.emails[0]).not.toContain("não havia horário livre");
-    expect(ports.emails[0]).toContain("pelo app ou site do Mercado Pago");
+    expect(ports.emails[0]).toContain("Você devolve pelo app do Mercado Pago");
     expect(ports.emails[0]).not.toContain("Devolver pelo AgendaPix");
     expect(ports.emails[0]).toContain(dueLabel());
     expect(ports.emails[0]).not.toContain("horário de Brasília");
@@ -320,10 +322,102 @@ describe("devolução automática só no atraso sem horário", () => {
     for (const file of ["lib/payments/webhook.ts", "lib/payments/reconcile.ts", "lib/payments/apply-paid.ts"]) {
       expect(readFileSync(file, "utf8")).not.toContain(".refundCharge(");
     }
+    expect(readFileSync("lib/payments/webhook.ts", "utf8")).toContain("settleLateRefundOutsideLock");
+    expect(readFileSync("lib/payments/status-poll.ts", "utf8")).toContain("settleLateRefundOutsideLock");
+    expect(readFileSync("lib/payments/webhook.ts", "utf8")).not.toContain("settleAutomaticLateRefund");
     expect(readFileSync("lib/payments/refund-flow.ts", "utf8")).toContain("purpose: \"settlement\"");
     expect(readFileSync("lib/payments/manual-refund-reminders.ts", "utf8")).not.toContain("refundCharge");
   });
+
+  it("timeout não marca failed, solta o lock e a próxima tentativa reusa a chave", async () => {
+    vi.stubEnv("PAYMENT_PROVIDER_TIMEOUT_MS", "100");
+    const ports = memory(view());
+    let locked = false;
+    const original = ports.withPaymentLock.bind(ports);
+    ports.withPaymentLock = async (paymentId, run) => {
+      locked = true;
+      try { return await original(paymentId, run); }
+      finally { locked = false; }
+    };
+    const keys: string[] = [];
+    let mailedWhileLocked = false;
+    const hanging = {
+      refundCharge: async (_externalId: string, input: { idempotencyKey: string }, options?: { signal?: AbortSignal }) => {
+        keys.push(input.idempotencyKey);
+        expect(locked).toBe(false);
+        await new Promise<void>((_resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error("não deveria concluir")), 1_000);
+          options?.signal?.addEventListener("abort", () => {
+            clearTimeout(timer);
+            reject(options.signal?.reason);
+          });
+        });
+        return { status: "refunded" as const, refundId: "nao" };
+      },
+    };
+    const mailer = async () => {
+      if (locked) mailedWhileLocked = true;
+      ports.emails.push("aviso");
+    };
+    await expect(settleAutomaticLateRefund(ports, hanging, "pay-1", mailer, now)).resolves.toBe("deferred");
+    expect(keys).toEqual(["auto_late:pay-1"]);
+    expect(ports.attempts[0]?.status).toBe("requested");
+    expect((await ports.loadByPaymentId("pay-1"))?.refundStatus).toBeNull();
+    expect(ports.emails).toHaveLength(0);
+    expect(mailedWhileLocked).toBe(false);
+    vi.stubEnv("PAYMENT_PROVIDER_TIMEOUT_MS", "8000");
+    await expect(settleAutomaticLateRefund(ports, {
+      refundCharge: async (_externalId: string, input: { idempotencyKey: string }) => {
+        keys.push(input.idempotencyKey);
+        expect(locked).toBe(false);
+        return { status: "refunded" as const, refundId: "auto-ok" };
+      },
+    }, "pay-1", mailer, now)).resolves.toBe("submitted");
+    expect(keys).toEqual(["auto_late:pay-1", "auto_late:pay-1"]);
+    expect(ports.emails).toHaveLength(1);
+    expect(mailedWhileLocked).toBe(false);
+    expect((await ports.loadByPaymentId("pay-1"))?.refundStatus).toBe("refunded");
+
+    vi.stubEnv("PAYMENT_PROVIDER_TIMEOUT_MS", "100");
+    const owner = memory(view());
+    let ownerLocked = false;
+    const ownerLock = owner.withPaymentLock.bind(owner);
+    owner.withPaymentLock = async (paymentId, run) => {
+      ownerLocked = true;
+      try { return await ownerLock(paymentId, run); }
+      finally { ownerLocked = false; }
+    };
+    const ownerKeys: string[] = [];
+    await expect(executeOwnerRefund(owner, {
+      refundCharge: async (_externalId: string, input: { idempotencyKey: string }, options?: { signal?: AbortSignal }) => {
+        ownerKeys.push(input.idempotencyKey);
+        expect(ownerLocked).toBe(false);
+        await new Promise<void>((_resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error("não deveria concluir")), 1_000);
+          options?.signal?.addEventListener("abort", () => { clearTimeout(timer); reject(options.signal?.reason); });
+        });
+        return { status: "refunded" as const, refundId: "nao" };
+      },
+    }, { businessId: "biz-1", bookingId: "book-1", ownerId: "owner-1", expectedAmountCents: 1500, now, requestedOn: "2030-06-01" }))
+      .rejects.toMatchObject({ status: 503, code: "refund_unavailable" });
+    expect(owner.attempts[0]?.status).toBe("requested");
+    expect(owner.attempts[0]?.idempotencyKey).toBe("pay-1:1");
+    expect((await owner.loadByPaymentId("pay-1"))?.refundStatus).toBeNull();
+    expect((await owner.loadByPaymentId("pay-1"))?.policyRefundRequestedOn).toBe("2030-06-01");
+
+    vi.stubEnv("PAYMENT_PROVIDER_TIMEOUT_MS", "8000");
+    const resumed = { refundCharge: async (_externalId: string, input: { idempotencyKey: string }) => {
+      ownerKeys.push(input.idempotencyKey);
+      return { status: "refunded" as const, refundId: "ok" };
+    } };
+    await expect(executeOwnerRefund(owner, resumed, { businessId: "biz-1", bookingId: "book-1", ownerId: "owner-1", expectedAmountCents: 1500, now }))
+      .resolves.toMatchObject({ status: "refunded", refundId: "ok" });
+    expect(ownerKeys).toEqual(["pay-1:1", "pay-1:1"]);
+    expect(owner.attempts.filter((row) => row.status === "failed")).toHaveLength(0);
+  });
 });
+
+afterEach(() => { vi.unstubAllEnvs(); });
 
 describe("conta desconectada", () => {
   it("charge falha e settlement usa o token retido; sem token não resolve", async () => {
@@ -385,11 +479,29 @@ describe("conta desconectada", () => {
   it("os textos usam o AgendaPix no masculino", () => {
     const sample = [
       disconnectedConfirmedNotice({ customerName: "Ana", serviceName: "Corte", when: "02/06/2030" }).text,
-      lateRefundedNotice({ customerName: "Ana", serviceName: "Corte", when: "02/06/2030" }).text,
-      lateRefundFailedNotice({ customerName: "Ana", serviceName: "Corte", when: "02/06/2030", deadlineLabel: "sáb, 8 jun" }).text,
+      lateRefundedNotice({ customerName: "Ana", serviceName: "Corte", when: "02/06/2030", cause: "window_expired" }).text,
+      lateRefundFailedNotice({ customerName: "Ana", serviceName: "Corte", when: "02/06/2030", deadlineLabel: "sáb, 8 jun", cause: "window_expired" }).text,
       unverifiableSellerNotice({ deadlineLabel: "sáb, 8 jun" }).text,
     ].join("\n");
     expect(sample).not.toMatch(/a AgendaPix/);
     expect(sample).toMatch(/do AgendaPix|O AgendaPix|pelo AgendaPix/);
+  });
+
+  it("o aviso de atraso segue a causa da auditoria e não promete prazo de estorno", () => {
+    const refunded = lateRefundedNotice({ customerName: "Ana", serviceName: "Corte", when: "02/06/2030", cause: "window_expired" });
+    expect(refunded.text).toBe("O cliente Ana pagou o sinal de Corte (02/06/2030) depois que o prazo para reservar o horário acabou. O AgendaPix devolveu o valor automaticamente.");
+    expect(refunded.subject).toBe("Sinal devolvido pelo AgendaPix");
+    expect(refunded.text).not.toMatch(/\b(dias|minutos|horas)\b/);
+    const occupied = lateRefundedNotice({ customerName: "Ana", serviceName: "Corte", when: "02/06/2030", cause: "slot_taken" });
+    expect(occupied.text).toContain("depois do prazo e o horário já estava ocupado");
+    expect(occupied.text).toContain("O AgendaPix devolveu o valor automaticamente.");
+    const failed = lateRefundFailedNotice({ customerName: "Ana", serviceName: "Corte", when: "02/06/2030", deadlineLabel: "sáb, 8 jun", cause: "slot_taken" });
+    expect(failed.subject).toBe("Devolva um sinal no Mercado Pago");
+    expect(failed.text).toContain("o horário já estava ocupado");
+    expect(failed.text).toContain("Você devolve pelo app do Mercado Pago");
+    expect(failed.text).not.toContain("Devolver pelo AgendaPix");
+    const noToken = lateRefundNoTokenNotice({ customerName: "Ana", serviceName: "Corte", when: "02/06/2030", deadlineLabel: "sáb, 8 jun", cause: "window_expired" });
+    expect(noToken.text).toContain("depois que o prazo para reservar o horário acabou");
+    expect(noToken.text).toContain("conta Mercado Pago está desvinculada");
   });
 });

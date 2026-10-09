@@ -1,20 +1,22 @@
 import { BrandMark } from "@/components/ui/brand";
-import { legalPagesPublished, showPendingBlocks } from "@/lib/marketing/flags";
+import { legalPagesPublished } from "@/lib/marketing/flags";
+import { supportEmailAddress, supportMailtoUrl, supportWhatsappUrl } from "@/lib/support-contact";
 import { cn } from "@/lib/utils";
 
 const focusRing = "outline-none [outline:none!important] focus-visible:shadow-[var(--shadow-focus)]";
 
 const product = [
   { href: "#como-funciona", label: "Como funciona" },
-  { href: "#exemplo", label: "Página de exemplo" },
+  { href: "#exemplo", label: "Como o cliente agenda" },
   { href: "#precos", label: "Preço" },
   { href: "#perguntas-frequentes", label: "Dúvidas" },
 ];
 
 export function LandingFooter() {
-  const pending = showPendingBlocks();
   const legal = legalPagesPublished();
   const year = new Date().getFullYear();
+  const email = supportEmailAddress();
+  const whatsapp = supportWhatsappUrl();
 
   return (
     <footer id="rodape" className="border-t border-line bg-surface">
@@ -49,18 +51,19 @@ export function LandingFooter() {
             <a href="/privacidade" className="inline-flex min-h-11 items-center text-sm text-muted hover:text-ink">Política de privacidade</a>
           </nav>
         ) : null}
-        {pending ? (
-          <div>
-            <p className="text-sm font-semibold text-ink">Contato</p>
-            <p className="mt-2 text-sm text-muted">[e-mail de suporte]</p>
-            <p className="mt-1 text-sm text-muted">[WhatsApp]</p>
-          </div>
-        ) : null}
+        <nav aria-label="Contato" className="flex flex-col">
+          <p className="text-sm font-semibold text-ink">Contato</p>
+          <a href={supportMailtoUrl()} className="inline-flex min-h-11 items-center text-sm text-muted hover:text-ink">{email}</a>
+          <a href={whatsapp} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-sm text-muted hover:text-ink">
+            WhatsApp
+            <span className="sr-only"> (abre em nova aba)</span>
+          </a>
+        </nav>
       </div>
       <div className="border-t border-line">
         <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-xs leading-relaxed text-muted">
-            <p>© {year} AgendaPix{pending ? " · [razão social / CNPJ, se houver]" : null}</p>
+            <p>© {year} AgendaPix</p>
             <p className="mt-1">O sinal cai direto na sua conta Mercado Pago.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">

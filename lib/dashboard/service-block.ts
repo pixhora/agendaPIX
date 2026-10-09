@@ -18,6 +18,12 @@ export function serviceBlockCopy(reason: string | null) {
       body: "Reservas novas com sinal ficam pausadas até você aceitar o texto novo em Recebimento. Pix já gerado e sinais já pagos continuam. A conta Mercado Pago segue conectada.",
     };
   }
+  if (reason === "mp_account_test_mode") {
+    return {
+      title: "Conta Mercado Pago em modo de teste",
+      body: "A conta conectada é de teste. O cliente não consegue pagar o sinal enquanto a conta de produção não estiver conectada.",
+    };
+  }
   return {
     title: "Serviço indisponível para reserva",
     body: "Este serviço com sinal ainda não pode ser reservado.",

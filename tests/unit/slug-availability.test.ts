@@ -20,7 +20,7 @@ it("classifica link curto, inválido e reservado sem consultar o banco", () => {
   expect(classifySlug("***")).toMatchObject({ normalized: "", valid: false, reason: "invalid" });
   expect(classifySlug("dashboard")).toMatchObject({ valid: false, available: false, reason: "reserved" });
   expect(classifySlug("precos")).toMatchObject({ valid: false, available: false, reason: "reserved" });
-  expect(classifySlug("studio-bella")).toMatchObject({ valid: true, available: true, reason: null });
+  expect(classifySlug("studio-bella")).toMatchObject({ valid: false, available: false, reason: "reserved" });
 });
 
 it("monta sugestões na ordem da spec, sem sufixo inventado", () => {

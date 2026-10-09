@@ -113,7 +113,7 @@ export default function PreviewConfiguracoesPage() {
             <div>
               <label className="block text-muted-foreground mb-1 font-medium">Chave Cadastrada</label>
               <div className="rounded-lg border border-border bg-subtle p-2.5 font-mono text-foreground">
-                12.345.678/0001-90
+                00.000.000/0000-00 (exemplo)
               </div>
             </div>
           </div>

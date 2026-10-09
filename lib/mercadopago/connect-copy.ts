@@ -1,5 +1,15 @@
 /** Textos da tela de conexão além do aceite. O texto da caixa vem de `MP_CONNECT_CONSENT_TEXT`. */
 
+/** Devolução manual: o dono faz no app do Mercado Pago, não num botão do AgendaPix. */
+export const MP_MANUAL_REFUND_CHANNEL = "Você devolve pelo app do Mercado Pago.";
+
+/**
+ * Frase antiga. Prometia guardar o acesso por mais 24 horas depois do vencimento do Pix.
+ * O código apaga assim que não há Pix em aberto, com teto de 24 horas na tela. Não usar na interface.
+ */
+export const MP_DISCONNECT_RETENTION_COPY =
+  "Até o Pix vencer e por mais 24 horas, guardamos o acesso só para confirmar ou devolver esse sinal. O apagamento roda no processamento diário, então pode levar até cerca de um dia a mais.";
+
 export const MP_AUTO_REFUND_ACK_HINT =
   "Obrigatório para conectar. Essa devolução é regra do AgendaPix para proteger seus clientes e não pode ser desligada.";
 

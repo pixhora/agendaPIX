@@ -10,11 +10,9 @@ import { LandingSteps } from "@/components/landing/LandingSteps";
 import { MoneyFlow } from "@/components/landing/MoneyFlow";
 import { Roadmap } from "@/components/landing/Roadmap";
 import { getPublicBookingFacts } from "@/lib/marketing/facts";
-import { publicSiteHost } from "@/lib/site";
 
 export default async function PreviewLandingPage() {
   const facts = await getPublicBookingFacts();
-  const publicHost = publicSiteHost();
 
   return (
     <div className="flex min-h-dvh w-full max-w-full flex-col overflow-x-clip bg-paper text-ink">
@@ -34,9 +32,9 @@ export default async function PreviewLandingPage() {
         </div>
       </header>
       <main className="flex-1">
-        <LandingHero publicHost={publicHost} />
-        <LandingSteps publicHost={publicHost} />
-        <DemoSection facts={facts} />
+        <LandingHero />
+        <LandingSteps />
+        <DemoSection />
         <MoneyFlow facts={facts} />
         <LandingBenefits />
         <Roadmap />

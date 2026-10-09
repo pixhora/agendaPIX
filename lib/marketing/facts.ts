@@ -9,7 +9,7 @@ export function formatMinutes(minutes: number) {
   return minutes === 1 ? "1 minuto" : `${minutes} minutos`;
 }
 
-/** Padrão false. `true` só se a env pedir CPF. A doc oficial não fecha a questão para Pix. */
+/** Padrão false. A referência do POST /v1/payments não exige o CPF; `true` liga o envio ao Mercado Pago. */
 export function payerCpfRequired(env: Readonly<Record<string, string | undefined>> = process.env) {
   return env.MP_REQUIRES_PAYER_CPF === "true";
 }

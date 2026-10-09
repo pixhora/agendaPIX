@@ -25,7 +25,7 @@ function ConsentLine({ published }: { published: boolean }) {
   return (
     <p className="text-[13px] leading-relaxed text-ink/80">
       Ao continuar, você autoriza o AgendaPix a usar sua conta Mercado Pago só para as ações acima, conforme os{" "}
-      <Link href="/termos" className="font-semibold text-ink underline underline-offset-4">Termos de Uso</Link> (seção 5-A) e a{" "}
+      <Link href="/termos#5-a" className="font-semibold text-ink underline underline-offset-4">Termos de Uso (seção 5-A)</Link> e a{" "}
       <Link href="/privacidade" className="font-semibold text-ink underline underline-offset-4">Política de Privacidade</Link>, e confirma que aceita os termos do Mercado Pago.
     </p>
   );

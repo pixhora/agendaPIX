@@ -43,6 +43,6 @@ describe("normalizeSlug", () => {
   });
 
   it("reserves the extra public paths", () => {
-    expect(RESERVED_BUSINESS_SLUGS).toEqual(expect.arrayContaining(["precos", "ajuda", "suporte", "blog"]));
+    expect(RESERVED_BUSINESS_SLUGS).toEqual(expect.arrayContaining(["precos", "ajuda", "suporte", "blog", "studio-bella"]));
   });
 });

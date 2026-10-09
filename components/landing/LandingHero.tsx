@@ -1,26 +1,15 @@
-import { formatAppointmentMeta } from "@/components/booking/formatters";
 import { CheckIcon } from "./icons";
 import { buttonVariants } from "@/components/ui/button";
-import { ValueSlab } from "@/components/ui/value-slab";
 
 const niches = ["Barbearias", "Salões", "Manicures", "Estética", "Clínicas", "Personal trainers"];
 const reassurances = ["7 dias grátis", "Sem cartão de crédito", "Cliente não baixa app"];
-const days = [
-  { label: "Qua 14", selected: false },
-  { label: "Qui 15", selected: true },
-  { label: "Sex 16", selected: false },
-  { label: "Sáb 17", selected: false },
-];
-const anaReservationAt = "2026-10-15T18:30:00.000Z";
-const anaWhen = formatAppointmentMeta(anaReservationAt, "America/Sao_Paulo");
-const times = ["14:00", "14:45", "15:30", "16:15"];
 
-export function LandingHero({ publicHost }: { publicHost: string }) {
+export function LandingHero() {
   return (
     <section className="relative overflow-hidden">
       <div aria-hidden="true" className="bg-dots pointer-events-none absolute inset-x-0 top-0 h-[420px] opacity-40 [mask-image:linear-gradient(to_bottom,black,transparent)]" />
-      <div className="relative mx-auto grid w-full max-w-[1120px] items-center gap-10 px-5 pt-8 pb-16 lg:grid-cols-2 lg:gap-8 lg:pt-16 lg:pb-28 xl:pb-40">
-        <div>
+      <div className="relative mx-auto w-full max-w-[1120px] px-5 pt-8 pb-16 lg:pt-16 lg:pb-28">
+        <div className="max-w-[40rem]">
           <p className="inline-flex min-h-8 items-center gap-2 rounded-full border border-line bg-surface px-3 text-[13px] font-semibold text-ink">
             <span aria-hidden="true" className="size-1.5 rounded-full bg-pix" />
             Agenda online com sinal no Pix
@@ -31,12 +20,9 @@ export function LandingHero({ publicHost }: { publicHost: string }) {
           <p className="mt-4 max-w-[40rem] text-base leading-[1.55] text-pretty text-muted lg:text-lg">
             Você manda um link no WhatsApp ou no Instagram. O cliente escolhe o horário, paga o sinal por Pix e o valor cai direto na sua conta Mercado Pago. A reserva se confirma sozinha.
           </p>
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+          <div className="mt-6">
             <a id="hero-primary-cta" href="/onboarding" className={buttonVariants({ size: "lg", className: "w-full sm:w-auto" })}>
               Criar minha agenda grátis
-            </a>
-            <a href="/preview/booking" className={buttonVariants({ variant: "outline", size: "lg", className: "w-full sm:w-auto" })}>
-              Ver uma página de exemplo
             </a>
           </div>
           <ul className="mt-4 flex flex-col gap-1.5 text-[13px] text-muted sm:flex-row sm:flex-wrap sm:gap-x-4">
@@ -56,77 +42,7 @@ export function LandingHero({ publicHost }: { publicHost: string }) {
             ))}
           </ul>
         </div>
-
-        <div className="relative mx-auto w-full max-w-[320px] lg:max-w-none">
-          <div className="relative mx-auto h-[440px] w-[270px] overflow-hidden lg:h-auto lg:w-[280px] lg:overflow-visible">
-            <PhoneStage publicHost={publicHost} />
-            <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-paper to-transparent lg:hidden" />
-          </div>
-          <div aria-hidden="true" className="pointer-events-none absolute top-full left-0 z-10 mt-3 hidden w-[210px] max-w-[calc(100%-14.5rem)] rounded-card border border-line bg-surface p-3 shadow-[var(--shadow-raised)] xl:block">
-            <p className="text-[13px] font-semibold text-ink">Nova reserva · Ana</p>
-            <p className="mt-1 text-[13px] text-muted">
-              Design de sobrancelha <span className="whitespace-nowrap">· {anaWhen}</span>
-            </p>
-            <p className="mt-2 inline-flex items-center gap-1 text-[13px] font-semibold text-success">
-              <CheckIcon className="size-3.5" /> Confirmado · sinal pago
-            </p>
-          </div>
-          <ValueSlab
-            aria-hidden="true"
-            size="compact"
-            className="absolute top-[calc(100%-1rem)] right-0 z-10 hidden w-[220px] shadow-[var(--shadow-raised)] xl:block"
-            label="Sinais de hoje"
-            value="R$ 80,00"
-            badge="4 reservas confirmadas"
-          />
-        </div>
       </div>
     </section>
-  );
-}
-
-function PhoneStage({ publicHost }: { publicHost: string }) {
-  return (
-    <div aria-hidden="true" className="rounded-[36px] border-8 border-ink bg-surface shadow-[var(--shadow-raised)]">
-      <div className="px-4 pt-4 pb-5">
-        <div className="mx-auto mb-4 h-1.5 w-16 rounded-full bg-line" />
-        <div className="flex items-center gap-2">
-          <span className="flex size-9 items-center justify-center rounded-full bg-ink text-xs font-bold text-paper">SB</span>
-          <span>
-            <span className="block text-sm font-bold text-ink">Studio Bella</span>
-            <span className="block max-w-[180px] truncate text-[11px] text-muted">{publicHost}/studio-bella</span>
-          </span>
-        </div>
-        <div className="mt-4 rounded-card border border-line p-3">
-          <p className="text-sm font-semibold text-ink">Design de sobrancelha</p>
-          <p className="mt-1 text-[12px] text-muted">45 min · R$ 60,00</p>
-          <p className="mt-1 text-[12px] font-semibold text-pix">Sinal R$ 20,00</p>
-        </div>
-        <div className="mt-3 flex flex-nowrap gap-1">
-          {days.map((day) => (
-            <span key={day.label} className={day.selected ? "whitespace-nowrap rounded-full bg-ink px-2 py-1 text-[10px] font-semibold leading-none text-paper" : "whitespace-nowrap rounded-full bg-subtle px-2 py-1 text-[10px] font-semibold leading-none text-muted"}>
-              {day.label}
-            </span>
-          ))}
-        </div>
-        <div className="mt-3 grid gap-1.5">
-          {times.map((time) =>
-            time === "15:30" ? (
-              <span key={time} className="flex items-center justify-between rounded-full bg-pix-bright px-3 py-1.5 text-[12px] font-semibold text-pix-bright-foreground">
-                <span>{time}</span>
-                <span>Selecionado</span>
-              </span>
-            ) : (
-              <span key={time} className="rounded-full border border-line px-3 py-1.5 text-[12px] font-medium text-ink">
-                {time}
-              </span>
-            ),
-          )}
-        </div>
-        <span className="mt-4 flex min-h-11 items-center justify-center rounded-full bg-ink px-3 text-[13px] font-semibold text-paper">
-          Pagar sinal de R$ 20,00 no Pix
-        </span>
-      </div>
-    </div>
   );
 }

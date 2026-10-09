@@ -7,7 +7,7 @@ import * as schema from "../../db/schema";
 import { bookingAccessSecret } from "../env";
 import { HttpError } from "../http";
 import { paymentsConfig } from "../payments/config";
-import { assertMpConnectedForDeposit, getServiceBlockedReason, readDepositGate } from "../mercadopago-oauth/bookability";
+import { assertMpConnectedForDeposit, getServiceBlockedReason, readMpDepositGate } from "../mercadopago-oauth/bookability";
 import { createDrizzleMpStore } from "../mercadopago-oauth/repository";
 import { getPaymentProvider } from "../payments";
 import { MpAccountNotConnectedError } from "../payments/seller-account";
@@ -23,31 +23,40 @@ import { availabilitySchema, bookingInputSchema, requestKeySchema, slugSchema } 
 import { depositSlotAllowed } from "./hold";
 import { bookingConfig, type BookingConfig } from "./config";
 import { getPublicBookingFacts, payerCpfRequired } from "../marketing/facts";
-import { consumeBookingRateLimit, tenantScopedHash } from "./rate-limit";
+import { withDerivedExpiry } from "./payment-status";
+import { consumeBookingRateLimit, consumePaymentPollRateLimit, tenantScopedHash } from "./rate-limit";
+import { refreshPaidFromGateway, shouldPollGateway } from "../payments/status-poll";
 
 type Database = NodePgDatabase<typeof schema>;
-export function hash(value: string) { return createHash("sha256").update(value).digest("hex"); }
-
-/**
- * Corpo da idempotência sem CPF. O número não entra no hash: um sha256 sem chave do CPF
- * seria recuperável por força bruta. Nome, telefone, serviço, horário e política continuam.
- */
-export function bookingIdempotencyPayload(input: {
+type BookingRequest = {
   serviceId: string;
   startsAt: string;
   customer: { name: string; phone: string; cpfCnpj?: string };
   policyHash?: string;
-}) {
-  return {
-    serviceId: input.serviceId,
-    startsAt: input.startsAt,
-    customer: { name: input.customer.name, phone: input.customer.phone },
-    ...(input.policyHash ? { policyHash: input.policyHash } : {}),
-  };
+};
+
+export function hash(value: string) { return createHash("sha256").update(value).digest("hex"); }
+
+/** Digest novo: o CPF fica de fora para não ser recuperável por força bruta do sha256 sem sal. */
+export function bookingRequestDigest(input: BookingRequest) {
+  const { cpfCnpj: _cpf, ...customer } = input.customer;
+  void _cpf;
+  return hash(JSON.stringify({ ...input, customer }));
 }
 
-export function bookingRequestHash(input: Parameters<typeof bookingIdempotencyPayload>[0]) {
-  return hash(JSON.stringify(bookingIdempotencyPayload(input)));
+/** Digest antigo, com o JSON inteiro. Só serve para reconhecer reserva já gravada. */
+export function legacyBookingRequestDigest(input: BookingRequest) {
+  return hash(JSON.stringify(input));
+}
+
+/**
+ * Replay da mesma requestKey aceita o digest novo ou o antigo.
+ * Reserva antiga foi gravada com o JSON inteiro; o mesmo corpo, inclusive o CPF, continua batendo.
+ * Um retry que tire o CPF de uma reserva antiga não reconstrói aquele digest e responde conflito.
+ */
+export function bookingRequestMatches(stored: string | null, input: BookingRequest) {
+  if (!stored) return false;
+  return stored === bookingRequestDigest(input) || stored === legacyBookingRequestDigest(input);
 }
 export function chargeIdempotencyKey(businessId: string, requestKey: string) {
   const bytes = Buffer.from(hash(`pix-charge:v1:${businessId}:${requestKey}`).slice(0, 32), "hex");
@@ -102,7 +111,7 @@ export async function listPublicServices(slug: string, database: Database = getD
   const business = await businessBySlug(slug, database);
   const access = await loadBookingAccess(business, database);
   const facts = await getPublicBookingFacts(business.id);
-  const deposit = await readDepositGate(business.id, { store: createDrizzleMpStore(database) });
+  const mpGate = await readMpDepositGate(business.id, { store: createDrizzleMpStore(database) });
   const rows = await database.select({
     id: schema.services.id,
     name: schema.services.name,
@@ -123,7 +132,7 @@ export async function listPublicServices(slug: string, database: Database = getD
     pixRecipientDisplayName: facts.pixRecipientDisplayName,
     services: rows.map((service) => {
       const listing = serviceListingBookability(business, service, access);
-      const mpReason = listing.blockedReason === "bookings_paused" ? null : getServiceBlockedReason(service, { mpConnected: deposit.connected, consentCurrent: deposit.consentCurrent });
+      const mpReason = listing.blockedReason === "bookings_paused" ? null : getServiceBlockedReason(service, mpGate);
       const bookability = mpReason ? { bookable: false, blockedReason: mpReason } : listing;
       return {
         id: service.id,
@@ -266,8 +275,7 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
   const config = bookingConfig();
   const input = bookingInputSchema.parse(body);
   const requestKey = requestKeySchema.parse(key);
-  const requestHash = bookingRequestHash(input);
-  const legacyRequestHash = hash(JSON.stringify(input));
+  const requestHash = bookingRequestDigest(input);
   const business = await businessBySlug(slug, database);
   const [prior] = await database.select({ id: schema.bookings.id }).from(schema.bookings).where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.requestKey, requestKey))).limit(1);
   if (!prior) {
@@ -290,10 +298,7 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
     await expirePending(transaction, business.id, now);
     const [existing] = await transaction.select().from(schema.bookings).where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.requestKey, requestKey))).limit(1);
     if (existing) {
-      if (existing.requestHash !== requestHash && existing.requestHash !== legacyRequestHash) throw new HttpError(409, "idempotency_conflict", "Essa chave já foi usada em outro agendamento.");
-      if (existing.requestHash !== requestHash) {
-        await transaction.update(schema.bookings).set({ requestHash }).where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.id, existing.id)));
-      }
+      if (!bookingRequestMatches(existing.requestHash, input)) throw new HttpError(409, "idempotency_conflict", "Essa chave já foi usada em outro agendamento.");
       const [payment] = await transaction.select().from(schema.payments).where(and(eq(schema.payments.businessId, business.id), eq(schema.payments.bookingId, existing.id))).limit(1);
       return { kind: "existing" as const, booking: existing, payment, token: accessToken(business.id, existing.id), now };
     }
@@ -362,20 +367,74 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
   return { replayed: reserved.kind === "existing", data: { ...await bookingView(booking, database, now), accessToken: reserved.token } };
 }
 
-export async function getBookingPayment(slug: string, id: string, authorization: string | null, database: Database = getDb()) {
+const PAYMENT_BEARER = /^Bearer ([A-Za-z0-9_-]{43})$/;
+
+function bearerToken(authorization: string | null) {
+  return PAYMENT_BEARER.exec(authorization ?? "")?.[1] ?? null;
+}
+
+function tokenMatches(token: string, accessTokenHash: string | null) {
+  return Boolean(accessTokenHash && /^[a-f0-9]{64}$/.test(accessTokenHash)
+    && timingSafeEqual(Buffer.from(hash(token), "hex"), Buffer.from(accessTokenHash, "hex")));
+}
+
+export type PaymentGatewayPoll = {
+  provider?: PaymentProvider;
+  timeoutMs?: number;
+};
+
+/**
+ * Consulta pública do Pix. O caminho comum é somente leitura: sem transação, sem lock do negócio
+ * e sem `expirePending`. O vencido da resposta sai de `expiresAt <= now`.
+ * Com cobrança `pending` e hold vigente ou recém-vencido, no máximo uma consulta ao gateway a cada 20 s
+ * (contador no banco). A chamada fica fora de transação. Pago segue `applyPaidEvent`, como o webhook.
+ * Timeout ou erro do gateway devolve o estado local, sem 5xx.
+ */
+export async function getBookingPayment(
+  slug: string,
+  id: string,
+  authorization: string | null,
+  database: Database = getDb(),
+  identity: string | null = null,
+  config: BookingConfig = bookingConfig(),
+  gateway?: PaymentGatewayPoll,
+) {
   const bookingId = z.uuid().parse(id);
-  const token = /^Bearer ([A-Za-z0-9_-]{43})$/.exec(authorization ?? "")?.[1];
+  slugSchema.parse(slug);
+  const token = bearerToken(authorization);
+  if (!token) throw new HttpError(404, "booking_not_found", "Agendamento não encontrado.");
   const business = await businessBySlug(slug, database);
-  return database.transaction(async (transaction) => {
-    await lockBusiness(transaction, business.id);
-    const [booking] = await transaction.select().from(schema.bookings).where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.id, bookingId))).limit(1);
-    if (!booking || !token || !booking.accessTokenHash || !/^[a-f0-9]{64}$/.test(booking.accessTokenHash)
-      || !timingSafeEqual(Buffer.from(hash(token), "hex"), Buffer.from(booking.accessTokenHash, "hex"))) {
-      throw new HttpError(404, "booking_not_found", "Agendamento não encontrado.");
-    }
-    const now = new Date();
-    await expirePending(transaction, business.id, now);
-    const [current] = await transaction.select().from(schema.bookings).where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.id, bookingId))).limit(1);
-    return bookingView(current, transaction, now);
-  });
+  await consumePaymentPollRateLimit(database, business.id, identity, config);
+  const [booking] = await database.select().from(schema.bookings).where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.id, bookingId))).limit(1);
+  if (!booking || !tokenMatches(token, booking.accessTokenHash)) {
+    throw new HttpError(404, "booking_not_found", "Agendamento não encontrado.");
+  }
+  const now = new Date();
+  const view = await bookingView(booking, database, now);
+  if (!shouldPollGateway(view.payment, now)) return withDerivedExpiry(view, now);
+  let provider = gateway?.provider;
+  if (!provider) {
+    try { provider = getPaymentProvider(); }
+    catch { return withDerivedExpiry(view, now); }
+  }
+  const payment = view.payment;
+  if (!payment?.externalId || provider.name !== payment.provider) return withDerivedExpiry(view, now);
+  let timeoutMs = gateway?.timeoutMs;
+  if (timeoutMs == null) {
+    try { timeoutMs = paymentsConfig().PAYMENT_PROVIDER_TIMEOUT_MS; }
+    catch { return withDerivedExpiry(view, now); }
+  }
+  let applied = false;
+  try {
+    applied = await refreshPaidFromGateway({
+      database, businessId: booking.businessId, paymentId: payment.id, externalId: payment.externalId,
+      provider, timeoutMs, now,
+    });
+  } catch {
+    return withDerivedExpiry(view, now);
+  }
+  if (!applied) return withDerivedExpiry(view, now);
+  const [fresh] = await database.select().from(schema.bookings).where(and(eq(schema.bookings.businessId, booking.businessId), eq(schema.bookings.id, booking.id))).limit(1);
+  const readAt = new Date();
+  return withDerivedExpiry(await bookingView(fresh ?? booking, database, readAt), readAt);
 }

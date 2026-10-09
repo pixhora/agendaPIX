@@ -87,7 +87,12 @@ describe("Pix UI status helpers (contrato PixCharge)", () => {
   it("maps booking/payment statuses to pending|paid|expired|cancelled", () => {
     expect(pixUiPhase({ status: "pending_payment", payment: { status: "pending" } as never })).toBe("pending");
     expect(pixUiPhase({ status: "confirmed", payment: { status: "paid" } as never })).toBe("paid");
-    expect(pixUiPhase({ status: "pending_payment", payment: { status: "paid" } as never })).toBe("paid");
+    expect(pixUiPhase({ status: "pending_payment", payment: { status: "paid" } as never })).toBe("confirming");
+    expect(pixUiPhase({ status: "expired", payment: { status: "paid" } as never })).toBe("refund_pending");
+    expect(pixUiPhase({ status: "cancelled", payment: { status: "paid" } as never })).toBe("refund_pending");
+    expect(pixUiPhase({ status: "completed", payment: { status: "paid" } as never })).toBe("paid");
+    expect(pixUiPhase({ status: "expired", payment: { status: "refunded" } as never })).toBe("refunded");
+    expect(pixUiPhase({ status: "expired", payment: { status: "refund_pending" } as never })).toBe("refund_pending");
     expect(pixUiPhase({ status: "expired", payment: { status: "expired" } as never })).toBe("expired");
     expect(pixUiPhase({ status: "pending_payment", payment: { status: "expired" } as never })).toBe("expired");
     expect(pixUiPhase({ status: "cancelled", payment: { status: "cancelled" } as never })).toBe("cancelled");

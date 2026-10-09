@@ -41,12 +41,15 @@ function oauthEnv() {
   vi.stubEnv("MP_OAUTH_PKCE", "off");
 }
 
-async function insertSeller(mpUserId: string, accessToken: string, consentVersion: string | null = MP_CONNECT_CONSENT_VERSION) {
+async function insertSeller(mpUserId: string, accessToken: string, consentOrLive: string | boolean | null = MP_CONNECT_CONSENT_VERSION) {
+  const liveMode = typeof consentOrLive === "boolean" ? consentOrLive : null;
+  const consentVersion = typeof consentOrLive === "string" || consentOrLive === null ? consentOrLive : MP_CONNECT_CONSENT_VERSION;
   await database.insert(schema.mercadopagoConnections).values({
     businessId,
     mpUserId,
     accessTokenEnc: encryptMpToken(accessToken, businessId, "access", key),
     refreshTokenEnc: encryptMpToken(`refresh-${mpUserId}`, businessId, "refresh", key),
+    liveMode,
     expiresAt: new Date("2030-06-01T00:00:00.000Z"),
     connectedAt: new Date("2026-01-01T00:00:00.000Z"),
     status: "connected",
@@ -139,6 +142,28 @@ describe("token do vendedor no banco", () => {
     expect(created.data.payment?.externalId).toBe("9001");
     expect(calls.some((call) => call.includes(platformToken))).toBe(false);
     expect(calls).toContain(`POST /v1/payments Bearer ${sellerToken}`);
+  });
+
+  it("conta de teste não reserva quando o app e o Mercado Pago estão em produção", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("MERCADOPAGO_ENV", "production");
+    await insertSeller("616161", sellerToken, false);
+    const listed = await listPublicServices(slug, database);
+    expect(listed.services[0]).toMatchObject({ bookable: false, blockedReason: "mp_account_test_mode" });
+    await expect(createBooking(slug, {
+      serviceId,
+      startsAt: new Date(Date.UTC(2030, 0, 1, 14, 0)).toISOString(),
+      customer: { name: "Cliente", phone: "+5511999999904" },
+      policyHash: padraoPolicyHash("Negócio"),
+    }, randomUUID(), database)).rejects.toMatchObject({ status: 409, code: "mp_account_test_mode" });
+  });
+
+  it("conta de teste continua na listagem em sandbox", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("MERCADOPAGO_ENV", "sandbox");
+    await insertSeller("616162", sellerToken, false);
+    const listed = await listPublicServices(slug, database);
+    expect(listed.services[0]).toMatchObject({ bookable: true, blockedReason: null });
   });
 
   it("negócio sem conexão recebe 409 e a listagem fica bloqueada", async () => {

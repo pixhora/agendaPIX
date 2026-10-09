@@ -7,3 +7,9 @@ export function showPendingBlocks(): boolean {
 export function legalPagesPublished(): boolean {
   return process.env.LEGAL_PAGES_PUBLISHED === "true";
 }
+
+/** Link de privacidade do passo de dados. Some quando a flag está desligada. */
+export function privacyPolicyLink(published: boolean): { href: "/privacidade"; label: "Política de Privacidade" } | null {
+  if (!published) return null;
+  return { href: "/privacidade", label: "Política de Privacidade" };
+}

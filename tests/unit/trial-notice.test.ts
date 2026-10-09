@@ -123,5 +123,8 @@ describe("motivo de bloqueio na lista de serviços", () => {
     expect(consent?.body).toMatch(/Recebimento/);
     expect(consent?.body).toMatch(/sinais já pagos/);
     expect(consent?.body).not.toMatch(/reconect/i);
+    const testMode = serviceBlockCopy("mp_account_test_mode");
+    expect(testMode?.title).toMatch(/modo de teste/);
+    expect(testMode?.body).toMatch(/conta de produção/);
   });
 });

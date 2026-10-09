@@ -109,7 +109,12 @@ export class FakePaymentProvider implements PaymentProvider {
     this.refunds.set(input.idempotencyKey, result);
     return result;
   }
-  /** Simulação local: marca a cobrança como paga, como faria o banco do pagador. Não existe rota pública para isso. */
+  /**
+   * Simulação local: marca a cobrança como paga, como faria o banco do pagador.
+   * `paidAt` é o instante de aprovação (o `date_approved` do Mercado Pago). O padrão é a hora
+   * desta chamada. Quem simula webhook ou reconciliação atrasados precisa passar a hora real
+   * do pagamento; o processamento posterior não reescreve esse instante. Não há rota pública.
+   */
   markPaid(externalId: string, paidAt = new Date()) {
     const charge = this.store.findByExternalId(externalId);
     if (!charge) throw new Error("Cobrança fake desconhecida.");

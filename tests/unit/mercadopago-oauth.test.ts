@@ -654,6 +654,23 @@ describe("OAuth Mercado Pago por negócio", () => {
     expect((await revoked.findByBusinessId(businessId))?.consentVersion).toBeNull();
   });
 
+  it("recusa conta de teste só com app e Mercado Pago em produção", async () => {
+    const production = { NODE_ENV: "production", MERCADOPAGO_ENV: "production" };
+    expect(getServiceBlockedReason({ depositCents: 1000 }, { mpConnected: true, liveMode: false }, production)).toBe("mp_account_test_mode");
+    expect(getServiceBlockedReason({ depositCents: 0 }, { mpConnected: true, liveMode: false }, production)).toBeNull();
+    expect(getServiceBlockedReason({ depositCents: 1000 }, { mpConnected: false, liveMode: false }, production)).toBe("mp_account_not_connected");
+    expect(getServiceBlockedReason({ depositCents: 1000 }, { mpConnected: true, liveMode: true }, production)).toBeNull();
+    expect(getServiceBlockedReason({ depositCents: 1000 }, { mpConnected: true, liveMode: null }, production)).toBeNull();
+    expect(getServiceBlockedReason({ depositCents: 1000 }, { mpConnected: true, liveMode: false }, { NODE_ENV: "production", MERCADOPAGO_ENV: "sandbox" })).toBeNull();
+    expect(getServiceBlockedReason({ depositCents: 1000 }, { mpConnected: true, liveMode: false }, { NODE_ENV: "development", MERCADOPAGO_ENV: "production" })).toBeNull();
+    const store = createMemoryMpStore([connection({ liveMode: false })]);
+    await expect(assertMpConnectedForDeposit(businessId, { store, now, env: production })).rejects.toMatchObject({
+      status: 409,
+      code: "mp_account_test_mode",
+    });
+    await expect(assertMpConnectedForDeposit(businessId, { store, now, env: { NODE_ENV: "test", MERCADOPAGO_ENV: "sandbox" } })).resolves.toBeUndefined();
+  });
+
   it("mostra o nome da conta e o e-mail mascarado, e esconde os dois quando desconectado", async () => {
     expect(maskEmail("ana.souza@gmail.com")).toBe("an\u2022\u2022@gmail.com");
     expect(maskEmail("ab@x.com")).toBe("a\u2022\u2022@x.com");

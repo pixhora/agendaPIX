@@ -1,3 +1,4 @@
+import { MP_MANUAL_REFUND_CHANNEL } from "../mercadopago/connect-copy";
 import { CREDIT_VALIDITY_DAYS, type DepositPolicy } from "./schema";
 
 /** Trecho de crédito sem o nome do negócio. As frases do cliente reaproveitam isto. */
@@ -267,8 +268,8 @@ function ownerOutcome(policy: DepositPolicy) {
 }
 
 function ownerClosing(policy: DepositPolicy) {
-  if (policy.noShow === "refund") return "Quando houver devolução, você faz pelo app ou site do Mercado Pago, depois de confirmar com o cliente.";
-  if (policy.refundUntilHours !== null) return "Quando o cliente cancelar no prazo, você devolve pelo app ou site do Mercado Pago, depois de confirmar o cancelamento.";
+  if (policy.noShow === "refund") return `Quando houver devolução, você confirma com o cliente. ${MP_MANUAL_REFUND_CHANNEL}`;
+  if (policy.refundUntilHours !== null) return `Quando o cliente cancelar no prazo, você confirma o cancelamento. ${MP_MANUAL_REFUND_CHANNEL}`;
   return "";
 }
 

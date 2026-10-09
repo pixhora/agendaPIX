@@ -36,6 +36,18 @@ export async function isMpConnected(businessId: string, deps?: RefreshDeps): Pro
   return connectionCanCharge(row, deps?.now ?? new Date());
 }
 
+/** Conexão usada na reserva com sinal. `liveMode` null não é modo de teste. `consentCurrent` só entra na cobrança nova. */
+export async function readMpDepositGate(businessId: string, deps?: RefreshDeps): Promise<{ mpConnected: boolean; liveMode: boolean | null; consentCurrent: boolean }> {
+  const row = await storeOf(deps).findByBusinessId(businessId);
+  const now = deps?.now ?? new Date();
+  const gate = depositGate(row, now);
+  return {
+    mpConnected: gate.connected,
+    liveMode: row?.liveMode ?? null,
+    consentCurrent: gate.consentCurrent,
+  };
+}
+
 function connectionCanCharge(row: MpConnection | null, now: Date) {
   return Boolean(row && row.status === "connected" && row.accessTokenEnc && row.refreshTokenEnc && row.expiresAt && row.expiresAt.getTime() > now.getTime());
 }

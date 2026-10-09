@@ -40,6 +40,7 @@ import {
   Sunrise,
   Timer,
   TimerOff,
+  Undo2,
   User,
   Users,
   Wallet,
@@ -112,6 +113,12 @@ export const PIX_STATUS_ICONS: Record<PixUiStatus, LucideIcon> = {
   expired: TimerOff,
   cancelled: CircleX,
 };
+
+/** Devolução: nem o check de sucesso, nem o alerta de erro. */
+export const PIX_REFUND_ICONS = {
+  pending: RotateCcw,
+  done: Undo2,
+} as const;
 
 /** Status de reserva no painel. */
 export type BookingStatusValue = "pending_payment" | "confirmed" | "cancelled" | "expired" | "completed";
