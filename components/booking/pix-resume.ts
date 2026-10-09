@@ -36,6 +36,13 @@ export function pixResumePayload(session: PixResumeSession): string {
   });
 }
 
+/** Sessão antiga: só os 4 campos. Sem eles, devolve null para a página apagar a sessão. */
+export function migratedPixResumePayload(raw: string): string | null {
+  const session = readPixResume(raw);
+  if (!session) return null;
+  return pixResumePayload(session);
+}
+
 /** Retoma só quando o `bookingId` da URL é o mesmo da sessão e o prazo ainda não passou. */
 export function shouldResumePix(session: PixResumeSession | null, bookingIdFromUrl: string | undefined, now = Date.now()): boolean {
   if (!session || !bookingIdFromUrl || session.bookingId !== bookingIdFromUrl) return false;

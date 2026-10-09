@@ -81,7 +81,7 @@ O banco de dados tem um campo para o e-mail do Cliente final, mas o formulário 
 ### 4.5. CPF do Cliente final
 
 - **Quando é pedido:** o campo de CPF só aparece se a exigência de CPF do pagador estiver ligada na configuração do AgendaPix. Hoje ela vem desligada.
-- **Com quem é compartilhado:** quando o Cliente final informa o CPF, ele vai direto ao **Mercado Pago**, como identificação do pagador, para gerar o Pix.
+- **Com quem é compartilhado:** só quando essa exigência está ligada, o CPF vai direto ao **Mercado Pago**, como identificação do pagador, para gerar o Pix.
 - **Como fica guardado:** o AgendaPix **não guarda** o CPF. Ele não é gravado no banco de dados, não entra no resumo técnico do pedido, não aparece no painel e não fica no armazenamento do navegador.
 
 ### 4.6. Dados técnicos e de segurança
@@ -101,7 +101,7 @@ Veja a seção 11.
 | Criar e manter a conta, enviar código de acesso e manter a sessão | E-mail, nome, sessão | Execução de contrato (inciso V) |
 | Publicar a página do negócio e permitir agendamentos | Dados do negócio, serviços, horários | Execução de contrato (V) |
 | Registrar agendamentos e mostrar a agenda e a lista de clientes ao negócio | Dados do Cliente final | Execução de contrato entre o Cliente final e o negócio, em nome do negócio (V) |
-| Gerar o Pix do sinal, confirmar o pagamento, cancelar cobranças vencidas e fazer devoluções | Nome do Cliente final, CPF (quando informado), dados do pagamento, tokens do Mercado Pago | Execução de contrato (V) |
+| Gerar o Pix do sinal, confirmar o pagamento, cancelar cobranças vencidas e fazer devoluções | Nome do Cliente final, CPF (só quando exigido), dados do pagamento, tokens do Mercado Pago | Execução de contrato (V) |
 | Avisar o Assinante por e-mail (sinal devolvido, devolução que precisa ser feita à mão, pagamento a conferir) | E-mail do Assinante; na maioria dos avisos, nome do Cliente final, serviço e horário | Execução de contrato (V) |
 | Controlar o teste grátis, a assinatura e os pedidos de ativação | Dados do negócio e da assinatura | Execução de contrato (V) |
 | Provar o consentimento dado na conexão com o Mercado Pago | Versão do texto, hash, data, IP | Exercício regular de direitos (VI) e legítimo interesse (IX) |
@@ -118,7 +118,7 @@ Compartilhamos dados apenas com quem precisa deles para o serviço funcionar:
 
 | Quem | O quê | Por quê |
 |---|---|---|
-| **Mercado Pago** | Valor do sinal; nome do Cliente final, separado em nome e sobrenome; CPF, quando informado; um e-mail técnico gerado pelo sistema (não é o e-mail real do Cliente final); identificação da cobrança; tokens da conta do Assinante | Gerar o Pix, consultar e cancelar cobranças, fazer devoluções e receber avisos de pagamento. O Mercado Pago também trata esses dados conforme a política dele |
+| **Mercado Pago** | Valor do sinal; nome do Cliente final, separado em nome e sobrenome; CPF, só quando a exigência de CPF estiver ligada; um e-mail técnico gerado pelo sistema (não é o e-mail real do Cliente final); identificação da cobrança; tokens da conta do Assinante | Gerar o Pix, consultar e cancelar cobranças, fazer devoluções e receber avisos de pagamento. O Mercado Pago também trata esses dados conforme a política dele |
 | **Provedor de envio de e-mail (SMTP):** Resend | E-mail do Assinante e o conteúdo das mensagens (código de acesso; avisos que podem conter nome do Cliente final, serviço e horário) | Enviar códigos de acesso e avisos |
 | **Vercel** (hospedagem da aplicação, região São Paulo – `gru1`) | Todos os dados que passam pela aplicação | Executar o serviço |
 | **Banco de dados:** Neon (empresa do grupo Databricks, dos EUA), com os dados na região São Paulo da AWS (aws-sa-east-1) | Todos os dados guardados | Armazenar os dados |
@@ -137,7 +137,7 @@ A aplicação roda na região São Paulo da Vercel. A Vercel é uma empresa estr
 | Rascunho do cadastro (inclui e-mail) | Vence em 7 dias. Depois do vencimento, é apagado por uma rotina que roda uma vez por dia às 03:00 (Brasília), inclusive os rascunhos que já viraram conta |
 | Código e link de acesso | Válidos por 30 minutos |
 | Contadores antiabuso (IP ou e-mail em hash) | Os que têm mais de 24 horas são apagados aos poucos, nas verificações seguintes |
-| Tokens do Mercado Pago depois de desconectar pelo AgendaPix | Sem Pix em aberto, apagados na hora. Com Pix em aberto, ficam guardados (cifrados) só para confirmar ou devolver esses Pix e são apagados em até 24 horas depois que eles forem pagos, vencerem ou forem cancelados |
+| Tokens do Mercado Pago depois de desconectar pelo AgendaPix | Sem Pix em aberto e sem Pix vencido ou cancelado nas últimas 24 horas, apagados na hora. Com Pix ou devolução em aberto, ficam guardados (cifrados) só para resolvê-los e são apagados em até 24 horas depois que se resolverem, ou depois de 7 dias se algum Pix ficar travado |
 | Tokens do Mercado Pago depois de revogar o aplicativo no Mercado Pago | Apagados assim que recebemos o aviso do Mercado Pago |
 | Resumo do código de acesso ao agendamento | Até 90 dias depois do fim da conta do negócio |
 | Resumo técnico do pedido de agendamento (sem CPF) | Até 90 dias depois do fim da conta do negócio |
@@ -214,7 +214,7 @@ Usamos apenas recursos **necessários** ao funcionamento. Não usamos cookies de
 
 | Chave | Conteúdo e finalidade |
 |---|---|
-| `booking_session_<negócio>` | Permitir que o Cliente final retome o pagamento se recarregar a página: só `bookingId`, `accessToken`, `serviceId` e `expiresAt`. Sem nome, WhatsApp ou CPF. Também é apagado quando o Cliente final recomeça o agendamento ou reabre a página depois do prazo |
+| `booking_session_<negócio>` | Permitir que o Cliente final retome o pagamento se recarregar a página: só o identificador do agendamento, o código de acesso, o serviço e o prazo do Pix. Sem nome, WhatsApp ou CPF. Também é apagado quando o Cliente final recomeça o agendamento ou reabre a página depois do prazo |
 | `agendapix.mp.callback` | Resultado da volta do Mercado Pago (conectado ou erro), para mostrar a mensagem certa |
 | `agenda_onboarding_commit` | Resultado da criação do negócio no fim do cadastro |
 | `agendapix-subscription-pending:<negócio>` | Marcar que há um pedido de assinatura em andamento, para avisar quando for ativado |

@@ -295,7 +295,7 @@ export const PERMISSIONS: { strong: string; rest: string }[] = [
   { strong: "conciliar o pagamento", rest: " quando o aviso atrasar: confirma o horário se o Pix foi pago no prazo;" },
   {
     strong: "devolver sozinho o valor inteiro",
-    rest: `. ${latePixRefundCopy()} Você recebe um e-mail a cada devolução;`,
+    rest: `. ${latePixRefundCopy("refund")} Você recebe um e-mail a cada devolução;`,
   },
   { strong: "manter a conexão ativa", rest: " sem pedir sua autorização de novo a cada renovação." },
 ];

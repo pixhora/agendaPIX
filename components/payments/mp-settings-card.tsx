@@ -238,7 +238,7 @@ export function MpConnectionCard({
           <p className="mt-4 flex items-start gap-2 text-sm leading-relaxed text-ink">
             <Undo2 aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted" />
             <span>
-              <strong className="font-semibold">Devoluções:</strong> você devolve pelo app do Mercado Pago. O valor sai do saldo da sua conta Mercado Pago. {latePixRefundCopy()} Você recebe um e-mail.
+              <strong className="font-semibold">Devoluções:</strong> você devolve pelo app do Mercado Pago. O valor sai do saldo da sua conta Mercado Pago. {latePixRefundCopy("refund")} Você recebe um e-mail.
             </span>
           </p>
         ) : null}
