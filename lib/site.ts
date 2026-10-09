@@ -36,3 +36,12 @@ export function siteOrigin(): URL {
     return new URL(DEFAULT_SITE_ORIGIN);
   }
 }
+
+const localHosts = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1"]);
+
+/** Host do mock, sem protocolo. Localhost cai no domínio canônico. */
+export function publicSiteHost(): string {
+  const origin = siteOrigin();
+  if (localHosts.has(origin.hostname)) return new URL(DEFAULT_SITE_ORIGIN).host;
+  return origin.host;
+}

@@ -37,6 +37,8 @@
   --brand-tile-foreground: #f6f5f2;
   --brand-tile-edge: transparent;
 
+  --radius-slab: 22px;
+  --sticky-cta-pad: 0px;
   --success: #156b3a;
   --success-soft: #e6f4ea;
   --warning: #8a5300;

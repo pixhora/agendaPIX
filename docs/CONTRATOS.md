@@ -75,7 +75,7 @@ Um QR estático/copia-e-cola Pix contém a própria chave de recebimento, necess
 | --- | --- | --- |
 | Página pública | `GET /[slug]` | Terminal 4 |
 | Painel | `/dashboard`, `/dashboard/services`, `/dashboard/customers`, `/dashboard/settings`; login único em `/login` (`/dashboard/login` redireciona) | mesmo app Next (antes Terminal 2) |
-| Dados do painel | Server Components + Server Actions (`lib/dashboard/data.ts`, `app/dashboard/(owner)/actions.ts`) no mesmo app; reutiliza schema/migrations do backend | app único |
+| Dados do painel | Server Components + Server Actions (`lib/dashboard/data.ts`, `app/(product)/dashboard/(owner)/actions.ts`) no mesmo app; reutiliza schema/migrations do backend | app único |
 
 ## Painel do dono — app único (veio de `feat/dashboard-v2`, consolidado em `feat/frontend-consolidation`)
 

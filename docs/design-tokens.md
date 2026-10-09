@@ -64,6 +64,7 @@ Aliases shadcn: `background`, `foreground`, `primary`, `primary-foreground`, `mu
 | `--radius-field` | 12px | Campos, itens de menu |
 | `--radius-slab` | 22px | ValueSlab |
 | `--sticky-cta-height` | 0px | Altura do CTA fixo; o JS atualiza no `<html>` |
+| `--sticky-cta-pad` | 0px | Folga inferior do `<main>`: altura da barra + 16 px enquanto ela está visível |
 | `--shadow-card` | sutil | Cartões e botões preenchidos |
 | `--shadow-raised` | elevada | Popover, painel lateral, prints da landing |
 | `--shadow-focus` | `0 0 0 4px` com `--ring` a 18% | Halo de foco no invólucro do campo |

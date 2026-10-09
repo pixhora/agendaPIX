@@ -14,7 +14,7 @@ vi.mock("../../lib/dashboard/data", () => ({
   saveDashboardHours: mocks.saveDashboardHours,
 }));
 
-import { saveHours, saveService } from "../../app/dashboard/(owner)/actions";
+import { saveHours, saveService } from "../../app/(product)/dashboard/(owner)/actions";
 import { HttpError } from "../../lib/http";
 
 describe("actions do painel isoladas por negócio", () => {

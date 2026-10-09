@@ -7,7 +7,7 @@ import { AlertCircle, AlertTriangle, CheckCircle2, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { saveHours, saveService, saveWhatsapp } from "@/app/dashboard/(owner)/actions";
+import { saveHours, saveService, saveWhatsapp } from "@/app/(product)/dashboard/(owner)/actions";
 import { formatMoneyInput, parseMoney, type FormState } from "@/lib/dashboard/validation";
 import { depositPolicySchema, PADRAO_DEPOSIT_POLICY, type DepositPolicy } from "@/lib/policy/schema";
 import { policyPreviewCopy } from "@/lib/dashboard/policy-preview";

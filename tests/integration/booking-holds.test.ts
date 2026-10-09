@@ -4,6 +4,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as schema from "../../db/schema";
+import { bookingConfig } from "../../lib/bookings/config";
 import { createBooking } from "../../lib/bookings/service";
 import { databaseEnvSchema } from "../../lib/env";
 import { FakePaymentProvider } from "../../lib/payments/fake";
@@ -60,7 +61,7 @@ describe("limite de reservas pendentes", () => {
     const error = await book(2, 2, "peer:192.0.2.10").catch((value) => value);
     expect(error).toMatchObject({ status: 429, code: "pending_hold_limit" });
     expect(error.retryAfterSeconds).toBeGreaterThan(0);
-    expect(error.retryAfterSeconds).toBeLessThanOrEqual(30 * 60);
+    expect(error.retryAfterSeconds).toBeLessThanOrEqual(bookingConfig().BOOKING_HOLD_MINUTES * 60);
     expect((await book(2, 2, "peer:192.0.2.11")).data.status).toBe("pending_payment");
     const rows = await database.select().from(schema.bookings).where(eq(schema.bookings.businessId, businessId));
     expect(rows).toHaveLength(3);

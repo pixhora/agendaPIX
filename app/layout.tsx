@@ -15,10 +15,12 @@ const plusJakartaSans = Plus_Jakarta_Sans({
   display: "swap",
 });
 
+// A landing pinta com Plus Jakarta. Inter não entra no preload.
 const inter = Inter({
   subsets: ["latin", "latin-ext"],
   variable: "--font-sans-family",
   display: "swap",
+  preload: false,
 });
 
 export const metadata: Metadata = {
