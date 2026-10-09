@@ -238,6 +238,27 @@ describe("webhook transacional e auditável", () => {
     expect(old.status).toBe("expired"); expect(old.payment?.status).toBe("refunded");
     expect((await getBookingPayment(slugs[0], second.data.bookingId, `Bearer ${second.data.accessToken}`, database)).status).toBe("pending_payment");
   });
+  it("pagamento tardio com rebook_if_free e horário ocupado registra late_no_slot e estorna", async () => {
+    await database.update(schema.businesses).set({ latePaymentPolicy: "rebook_if_free" }).where(eq(schema.businesses.id, businessIds[0]));
+    const first = await createBooking(slugs[0], input(), randomUUID(), database, provider);
+    await database.update(schema.bookings).set({ createdAt: new Date(Date.now() - 60000), expiresAt: new Date(Date.now() - 1000) }).where(eq(schema.bookings.id, first.data.bookingId));
+    await database.update(schema.payments).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(schema.payments.id, first.data.payment!.id));
+    const second = await createBooking(slugs[0], input(), randomUUID(), database, provider);
+    provider.markPaid(first.data.payment!.externalId!);
+    const request = webhook(first.data.payment!.externalId!);
+    const bodyHash = bodyHashes.at(-1)!;
+    await expect(processWebhook(request.clone(), "fake", database, provider)).resolves.toMatchObject({ outcome: "ignored", reason: "late_no_slot" });
+    const old = await getBookingPayment(slugs[0], first.data.bookingId, `Bearer ${first.data.accessToken}`, database);
+    expect(old.status).toBe("expired");
+    expect(old.payment?.status).toBe("refunded");
+    expect((await getBookingPayment(slugs[0], second.data.bookingId, `Bearer ${second.data.accessToken}`, database)).status).toBe("pending_payment");
+    const audits = await database.select().from(schema.paymentAudit).where(eq(schema.paymentAudit.paymentId, first.data.payment!.id));
+    expect(audits.some((row) => row.action === "late_no_slot" && (row.detail as { actor?: string; reason?: string } | null)?.actor === "system")).toBe(true);
+    expect(audits.some((row) => row.action === "automatic_refund")).toBe(true);
+    const [delivery] = await database.select().from(schema.webhookDeliveries).where(eq(schema.webhookDeliveries.bodyHash, bodyHash));
+    expect(delivery).toMatchObject({ outcome: "ignored", reason: "late_no_slot" });
+    await expect(processWebhook(request.clone(), "fake", database, provider)).resolves.toMatchObject({ outcome: "duplicate", reason: "late_no_slot" });
+  });
   it("evento de um negócio não altera a reserva do outro", async () => {
     const first = await createBooking(slugs[0], input(), randomUUID(), database, provider);
     const second = await createBooking(slugs[1], { ...input(), serviceId: serviceIds[1] }, randomUUID(), database, provider);

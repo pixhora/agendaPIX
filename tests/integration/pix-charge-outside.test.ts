@@ -294,6 +294,28 @@ describe("reconciliação", () => {
     expect(payment.status).toBe("paid");
   });
 
+  it("pagamento tardio com rebook_if_free e horário ocupado registra late_no_slot na reconciliação", async () => {
+    vi.stubEnv("MAGIC_LINK_CAPTURE_FILE", "/tmp/agenda-late-rebook-mail.txt");
+    await database.update(schema.businesses).set({ latePaymentPolicy: "rebook_if_free" }).where(eq(schema.businesses.id, businessId));
+    const { data } = await createBooking(slug, input(0), randomUUID(), database, provider);
+    await database.update(schema.bookings).set({ createdAt: new Date(Date.now() - 60_000), expiresAt: new Date(Date.now() - 1000) }).where(eq(schema.bookings.id, data.bookingId));
+    await database.update(schema.payments).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(schema.payments.id, data.payment!.id));
+    const other = await createBooking(slug, input(0, "+5511999999901"), randomUUID(), database, provider);
+    provider.markPaid(data.payment!.externalId!);
+    const report = await reconcileOnce(database, provider, { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50 });
+    expect(report.refundsSettled).toBe(1);
+    const [lateBooking] = await database.select().from(schema.bookings).where(eq(schema.bookings.id, data.bookingId));
+    expect(lateBooking.status).toBe("expired");
+    const [taken] = await database.select().from(schema.bookings).where(eq(schema.bookings.id, other.data.bookingId));
+    expect(taken.status).toBe("pending_payment");
+    const [payment] = await database.select().from(schema.payments).where(eq(schema.payments.id, data.payment!.id));
+    expect(payment.status).toBe("refunded");
+    expect(payment.refundStatus).toBe("refunded");
+    const audits = await database.select().from(schema.paymentAudit).where(eq(schema.paymentAudit.paymentId, data.payment!.id));
+    expect(audits.some((row) => row.action === "late_no_slot" && (row.detail as { actor?: string; reason?: string } | null)?.actor === "system")).toBe(true);
+    expect(audits.some((row) => row.action === "automatic_refund")).toBe(true);
+  });
+
   it("sem provedor disponível (produção sem Mercado Pago) ainda expira holds e creating vencidos", async () => {
     const broken = { name: provider.name, createPixCharge: async () => { throw new Error("fail"); }, getCharge: provider.getCharge.bind(provider), findChargeByReference: provider.findChargeByReference.bind(provider), cancelCharge: provider.cancelCharge.bind(provider), verifyWebhook: provider.verifyWebhook.bind(provider), refundCharge: provider.refundCharge.bind(provider) };
     const { data: pending } = await createBooking(slug, input(0), randomUUID(), database, provider);
