@@ -14,7 +14,7 @@ import { Roadmap } from "@/components/landing/Roadmap";
 import { StickyCta } from "@/components/landing/StickyCta";
 import { landingBootScript } from "@/components/landing/landing-boot-script";
 import { getPublicBookingFacts } from "@/lib/marketing/facts";
-import { publicSiteHost, siteOpenGraph } from "@/lib/site";
+import { siteOpenGraph } from "@/lib/site";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
@@ -23,7 +23,6 @@ export const metadata: Metadata = {
 
 export default async function Home() {
   const facts = await getPublicBookingFacts();
-  const publicHost = publicSiteHost();
   const nonce = (await headers()).get("x-nonce") ?? undefined;
 
   return (
@@ -36,9 +35,9 @@ export default async function Home() {
       </a>
       <LandingHeader />
       <main id="content" tabIndex={-1} className="flex-1 pb-[var(--sticky-cta-pad)] outline-none">
-        <LandingHero publicHost={publicHost} />
-        <LandingSteps publicHost={publicHost} />
-        <DemoSection facts={facts} />
+        <LandingHero />
+        <LandingSteps />
+        <DemoSection />
         <MoneyFlow facts={facts} />
         <LandingBenefits />
         <Roadmap />

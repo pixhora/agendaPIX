@@ -16,6 +16,10 @@ export function holdAnswer(holdMinutes: number): string {
   return `${formatMinutes(holdMinutes)} depois de escolher o horário. Se o Pix não for pago nesse tempo, o código vence e o horário volta a ficar livre para outra pessoa.`;
 }
 
+/** O que o cliente faz no link real. Sem nome, valor ou negócio de exemplo. */
+export const customerAgendaLead =
+  "O cliente abre o seu link, escolhe o horário, paga o sinal no Pix e a reserva confirma quando o pagamento chega na sua conta Mercado Pago.";
+
 /** Três passos que o código faz hoje, na seção de demonstração. */
 export function customerAgendaSteps(): readonly string[] {
   return [

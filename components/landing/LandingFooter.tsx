@@ -7,7 +7,7 @@ const focusRing = "outline-none [outline:none!important] focus-visible:shadow-[v
 
 const product = [
   { href: "#como-funciona", label: "Como funciona" },
-  { href: "#exemplo", label: "Página de exemplo" },
+  { href: "#exemplo", label: "Como o cliente agenda" },
   { href: "#precos", label: "Preço" },
   { href: "#perguntas-frequentes", label: "Dúvidas" },
 ];
