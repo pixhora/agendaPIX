@@ -1,15 +1,12 @@
-> **Rascunho para revisão. Não é parecer jurídico.**
-> Este texto foi montado a partir do código do produto (PR #40, commit `2f1239a`) para ser revisado com um advogado. Trechos entre colchetes `[ ]` dependem de decisão do responsável ou de mudança no código.
-
 # Termos de Uso do AgendaPix
 
-Última atualização: [DATA]
+Última atualização: 9 de outubro de 2026
 
 ---
 
 ## 1. Quem é quem
 
-1.1. **AgendaPix** é um serviço on-line de agenda com cobrança de sinal por Pix, oferecido por **[NOME COMPLETO]**, pessoa física, doravante "nós" ou "AgendaPix".
+1.1. **AgendaPix** é um serviço on-line de agenda com cobrança de sinal por Pix, oferecido por **Matheus de França Torres**, pessoa física, doravante "nós" ou "AgendaPix".
 
 1.2. **Assinante** (ou "dono do negócio") é a pessoa que cria uma conta no AgendaPix para receber agendamentos do seu negócio (por exemplo, salão, barbearia, estúdio ou consultório).
 
@@ -21,11 +18,11 @@
 
 ## 2. Aceite
 
-2.1. Ao criar uma conta ou usar o AgendaPix, você declara que leu e aceita estes Termos e a [Política de Privacidade](/privacidade). [ATUALIZAR SE O CÓDIGO MUDAR: hoje o aviso de aceite no cadastro e os links do rodapé só aparecem quando a configuração `LEGAL_PAGES_PUBLISHED=true` está ligada. Ligar antes de publicar.]
+2.1. Ao criar uma conta ou usar o AgendaPix, você declara que leu e aceita estes Termos e a [Política de Privacidade](/privacidade).
 
 2.2. Se você não concordar, não use o serviço.
 
-2.3. Você declara ter pelo menos 18 anos e capacidade para contratar [CONFIRMAR IDADE MÍNIMA].
+2.3. Você declara ter pelo menos 18 anos e capacidade para contratar.
 
 ## 3. O que o AgendaPix faz e o que não faz
 
@@ -60,17 +57,17 @@
 
 5.2. **Preço.** Depois do teste, o plano custa **R$ 49 por mês, por negócio**.
 
-5.3. **Como assinar.** A assinatura é ativada manualmente. Pelo painel, você abre uma conversa no WhatsApp com o nosso suporte, com o pedido já escrito. Ativamos a assinatura **em até 1 hora após o pedido** [CONFIRMAR VALOR EM PRODUÇÃO]. A forma de pagamento da mensalidade é combinada nessa conversa [FORMA DE PAGAMENTO DA MENSALIDADE A DEFINIR].
+5.3. **Como assinar.** A assinatura é ativada manualmente. Pelo painel, você abre uma conversa no WhatsApp com o nosso suporte, com o pedido já escrito. Ativamos a assinatura **em até 1 hora após o pedido**. O pagamento da mensalidade é feito pelo meio de pagamento informado nessa conversa e na página de assinatura.
 
 5.4. **Sem cobrança automática.** Não cobramos nada de forma automática. Cada ativação vale por um ou mais meses de calendário. A renovação pode ser pedida a partir de 3 dias antes do fim do período e é feita do mesmo jeito, manualmente.
 
 5.5. **Se o acesso vencer.** Se o teste acabar sem assinatura, ou se o período pago terminar sem renovação, a sua página pública continua no ar, mas **novos agendamentos ficam pausados**. O Cliente final vê o aviso de que o negócio não está aceitando novos agendamentos no momento. Agendamentos já feitos não são cancelados por isso.
 
-5.6. **Direito de arrependimento.** Como a contratação é feita fora de estabelecimento comercial, você pode desistir da assinatura em até **7 dias** contados da contratação ou do pagamento, conforme o art. 49 do Código de Defesa do Consumidor. Basta pedir pelos canais da seção 17. Os valores pagos serão devolvidos [FORMA DE DEVOLUÇÃO A DEFINIR].
+5.6. **Direito de arrependimento.** Como a contratação é feita fora de estabelecimento comercial, você pode desistir da assinatura em até **7 dias** contados da contratação ou do pagamento, conforme o art. 49 do Código de Defesa do Consumidor. Basta pedir pelos canais da seção 17. O valor pago é devolvido por inteiro, por Pix.
 
-5.7. **Cancelamento.** Você pode cancelar a qualquer momento pelo e-mail ou WhatsApp da seção 17, ou simplesmente não renovar. Não há multa. Fora do prazo de arrependimento, o período já pago não é devolvido [CONFIRMAR POLÍTICA DE REEMBOLSO PROPORCIONAL]. Depois do fim do período, vale o item 5.5. O que acontece com os seus dados está na seção 12 e na Política de Privacidade.
+5.7. **Cancelamento.** Você pode cancelar a qualquer momento pelo e-mail ou WhatsApp da seção 17, ou simplesmente não renovar. Não há multa. Fora do prazo de arrependimento, o período já pago não é devolvido. Depois do fim do período, vale o item 5.5. O que acontece com os seus dados está na seção 12 e na Política de Privacidade.
 
-5.8. **Mudança de preço.** Se o preço mudar, avisaremos pelo e-mail da conta com antecedência de [PRAZO DE AVISO A DEFINIR]. O novo preço só vale para períodos ativados depois do aviso.
+5.8. **Mudança de preço.** Se o preço mudar, avisaremos pelo e-mail da conta com antecedência mínima de 25 dias. O novo preço só vale para períodos ativados depois do aviso.
 
 ## 5-A. Conexão com a sua conta Mercado Pago
 
@@ -83,30 +80,29 @@
 - **criar cobranças Pix** no valor do sinal dos seus agendamentos;
 - **ver o status** dessas cobranças, para confirmar o agendamento quando o cliente pagar (inclusive pelos avisos automáticos, os "webhooks", enviados pelo Mercado Pago);
 - **cancelar** cobranças que não foram pagas no prazo;
-- **devolver um sinal quando você mandar.** Você devolve pelo app do Mercado Pago. O valor sai do saldo da sua conta Mercado Pago;
 - **pedir sozinho a devolução de um Pix que chegou depois do prazo**, conforme o item 5-A.6 e a seção 6.4. O valor sai do saldo da sua conta Mercado Pago, e você recebe um e-mail a cada devolução;
 - **manter a conexão ativa**, renovando o acesso sem pedir a sua autorização de novo a cada renovação;
 - **mostrar qual conta está ligada**, lendo o nome e o e-mail da conta no Mercado Pago (guardamos só um nome curto e o e-mail mascarado).
 
-5-A.4. **O que o AgendaPix não faz.** O AgendaPix não faz transferências nem saques, não cobra taxa sobre o sinal e só tira dinheiro da sua conta nas devoluções descritas acima.
+5-A.4. **O que o AgendaPix não faz.** O AgendaPix não faz transferências nem saques, não cobra taxa sobre o sinal e só tira dinheiro da sua conta nas devoluções descritas acima. As devoluções que você decidir fazer (por cancelamento, falta ou outro motivo) não passam pelo AgendaPix: você devolve pelo app do Mercado Pago.
 
 5-A.5. **Dados que guardamos da conexão.** Guardamos o identificador da sua conta Mercado Pago, um nome de exibição curto e o e-mail mascarado da conta, as permissões concedidas, a data da conexão, a versão do texto de autorização que você aceitou e o endereço IP do momento do aceite. Os códigos de acesso (tokens) ficam guardados **cifrados**.
 
 5-A.6. **Devolução automática de Pix fora do prazo.** Para conectar, você marca uma autorização obrigatória, que não pode ser desligada. Na prática, o funcionamento é este:
 
-> Quando um Pix chega depois do prazo, o AgendaPix pede a devolução do valor ao Mercado Pago, sem você precisar fazer nada. Na política padrão, todo Pix atrasado é devolvido. Se você escolher remarcar quando o horário estiver livre, a reserva é confirmada se o horário ainda estiver disponível e o valor é devolvido se não estiver.
+> Entendi e autorizo: quando um Pix chegar depois do prazo para reservar o horário, o AgendaPix devolve sozinho o valor inteiro, do saldo da minha conta Mercado Pago, e me avisa por e-mail. Se essa devolução falhar, eu devolvo manualmente em até 7 dias corridos, contados do aviso.
 
-Hoje todos os negócios usam a política padrão. A opção de remarcar ainda não pode ser escolhida no painel. [ATUALIZAR SE O CÓDIGO MUDAR: (1) a caixa de autorização exibida hoje diz: "Entendi e autorizo: quando um Pix chegar depois do prazo e o horário já estiver ocupado, o AgendaPix devolve sozinho o valor inteiro, do saldo da minha conta Mercado Pago, e me avisa por e-mail. Se essa devolução falhar, eu devolvo manualmente em até 7 dias corridos, contados do aviso." A equipe vai trocar esse texto pelo citado acima. Publicar estes Termos só depois que o texto novo estiver no ar e conferir se o compromisso de devolução manual continua na caixa. (2) Se o painel passar a permitir escolher a política, remover a frase sobre a opção ainda não estar disponível.]
+Ou seja: todo Pix pago depois do prazo para reservar o horário é devolvido, por inteiro, e você recebe um e-mail a cada devolução.
 
 A devolução é pedida pelo sistema, mas **não é garantida e não tem prazo fixo**. Ela depende do Mercado Pago, do saldo disponível e de a conexão estar ativa.
 
-5-A.7. **Se a devolução automática falhar ou não puder ser feita.** Você recebe um e-mail e se compromete a devolver o valor manualmente, direto no Mercado Pago, até o fim do **7º dia corrido depois do dia do aviso**, no fuso do seu negócio. O dia do aviso não conta. Exemplo: aviso numa sexta-feira, 16/10, prazo até 23:59:59 da sexta-feira seguinte, 23/10. O sistema prevê também um e-mail de lembrete na véspera do prazo. [ATUALIZAR SE O CÓDIGO MUDAR: o lembrete só é enviado a partir das 9h no fuso do negócio, e na Vercel a rotina roda uma vez por dia às 03:00 (Brasília). Com esse horário, o lembrete pode não sair. Não prometer o lembrete até isso ser ajustado.]
+5-A.7. **Se a devolução automática falhar ou não puder ser feita.** Você recebe um e-mail e se compromete a devolver o valor manualmente, direto no Mercado Pago, até o fim do **7º dia corrido depois do dia do aviso**, no fuso do seu negócio. O dia do aviso não conta. Exemplo: aviso numa sexta-feira, 16/10, prazo até 23:59:59 da sexta-feira seguinte, 23/10.
 
 5-A.8. **Regras do Mercado Pago.** A tarifa do Pix é do Mercado Pago e é descontada da sua conta, conforme o seu contrato com ele. Devoluções, contestações e MED acontecem na sua conta Mercado Pago e dependem de saldo disponível e das regras e prazos do Mercado Pago. O AgendaPix não controla essas regras.
 
 5-A.9. **Como desconectar.** Você pode desconectar quando quiser, no painel do AgendaPix ou direto no Mercado Pago.
 
-- **Pelo AgendaPix:** novos agendamentos com sinal ficam pausados. Agendamentos e sinais já pagos não mudam. Até o Pix vencer e por mais 24 horas, guardamos o acesso só para confirmar ou devolver esse sinal. O apagamento roda no processamento diário, então pode levar até cerca de um dia a mais. A partir da desconexão, as devoluções (inclusive de Pix pago fora do prazo) são feitas por você, direto no Mercado Pago.
+- **Pelo AgendaPix:** novos agendamentos com sinal ficam pausados. Agendamentos e sinais já pagos não mudam. Se não houver Pix em aberto, o acesso à sua conta é apagado na hora. Se houver, o acesso fica guardado (cifrado) só para confirmar o pagamento ou devolver o sinal se ele chegar fora do prazo, e é apagado em até 24 horas depois que esses Pix forem pagos, vencerem ou forem cancelados. A partir da desconexão, as devoluções que você decidir fazer são feitas por você, direto no Mercado Pago.
 - **Direto no Mercado Pago (revogando o aplicativo):** quando recebemos o aviso do Mercado Pago, o acesso é apagado na hora. Sem acesso, podemos não conseguir verificar pagamentos. Nesse caso, mandamos um e-mail para você conferir e resolver na sua conta.
 
 ## 6. Sinal, política e devoluções
@@ -119,9 +115,9 @@ A devolução é pedida pelo sistema, mas **não é garantida e não tem prazo f
 
 6.4. **Pix pago depois do prazo.** Vale a regra do item 5-A.6: na política padrão, usada hoje por todos os negócios, o sistema pede ao Mercado Pago a devolução de todo Pix que chega depois do prazo, mesmo que o horário ainda esteja livre. A devolução sai do saldo da conta Mercado Pago do Assinante, e ele é avisado por e-mail. Ela **não é garantida e não tem prazo fixo**. Se falhar, vale o item 5-A.7.
 
-6.5. **Confirmação pode atrasar.** A confirmação depende do aviso automático do Mercado Pago. Se esse aviso se perder, o pagamento só é conferido na rotina de conciliação, que hoje roda uma vez por dia às 03:00 (Brasília). Por isso a confirmação pode levar até cerca de 24 horas. Nesse caso, mesmo que o Cliente final tenha pago dentro do prazo, o pagamento pode ser tratado como Pix fora do prazo e devolvido (item 6.4). [ATUALIZAR SE O CÓDIGO MUDAR: se a conciliação ficar mais frequente ou passar a considerar a hora do pagamento.]
+6.5. **Confirmação pode atrasar.** A confirmação depende do aviso automático do Mercado Pago. Se esse aviso se perder, o pagamento só é conferido na rotina de conciliação, que hoje roda uma vez por dia às 03:00 (Brasília). Por isso a confirmação pode levar até cerca de 24 horas. Nesse caso, mesmo que o Cliente final tenha pago dentro do prazo, o pagamento pode ser tratado como Pix fora do prazo e devolvido (item 6.4).
 
-6.6. **Outras devoluções.** Cancelamentos, remarcações, faltas e créditos seguem a política definida pelo Assinante. Essas devoluções **não são automáticas**, e a política mostrada ao cliente diz isso. Quem devolve é o Assinante. Você devolve pelo app do Mercado Pago. Perante o Cliente final, o Assinante é o responsável por cumprir a política que publicou e o Código de Defesa do Consumidor.
+6.6. **Outras devoluções.** Cancelamentos, remarcações, faltas e créditos seguem a política definida pelo Assinante. Essas devoluções **não são automáticas**, e a política mostrada ao cliente diz isso. Quem devolve é o Assinante, pelo app do Mercado Pago. Perante o Cliente final, o Assinante é o responsável por cumprir a política que publicou e o Código de Defesa do Consumidor.
 
 6.7. **Papel do AgendaPix.** O AgendaPix é uma ferramenta. Não somos parte do contrato entre o Assinante e o Cliente final, não garantimos a prestação do serviço agendado e não respondemos por reembolsos devidos pelo Assinante.
 
@@ -162,7 +158,7 @@ Podemos suspender ou encerrar contas que violem esta seção, com aviso por e-ma
 
 10.2. A confirmação do sinal depende do Mercado Pago e pode atrasar até cerca de 24 horas se o aviso automático se perder (item 6.5). A tela de acompanhamento do Cliente final mostra a situação registrada no AgendaPix e não consulta o Mercado Pago na hora.
 
-10.3. Nesta versão, não há compromisso de nível de serviço (SLA) [CONFIRMAR].
+10.3. Nesta versão, não há compromisso de nível de serviço (SLA).
 
 ## 11. Limitações de responsabilidade
 
@@ -174,21 +170,21 @@ Podemos suspender ou encerrar contas que violem esta seção, com aviso por e-ma
 - falhas de terceiros fora do nosso controle, incluindo a perda de avisos automáticos do Mercado Pago;
 - prejuízos causados por uso indevido da conta ou por acesso de terceiros ao e-mail do Assinante.
 
-11.2. Nada nestes Termos exclui direitos garantidos ao consumidor pela lei brasileira. [REVISAR COM ADVOGADO: limite de valor da responsabilidade, se houver.]
+11.2. Nada nestes Termos exclui direitos garantidos ao consumidor pela lei brasileira.
 
 ## 12. Encerramento e exclusão da conta
 
-12.1. Você pode pedir a exclusão da sua conta pelo e-mail da seção 17. Hoje não há botão de exclusão no painel. O pedido é atendido manualmente em até [PRAZO A DEFINIR].
+12.1. Você pode pedir a exclusão da sua conta pelo e-mail da seção 17. Hoje não há botão de exclusão no painel. O pedido é atendido manualmente em até 10 dias.
 
 12.2. Antes de pedir a exclusão, recomendamos desconectar o Mercado Pago e resolver os sinais pendentes e as devoluções.
 
-12.3. Ao excluir a conta, apagaremos ou anonimizaremos os dados, exceto os que precisarmos guardar por obrigação legal, para exercício de direitos ou como registro de pagamentos e devoluções [PRAZO DE RETENÇÃO A DEFINIR]. Os detalhes estão na Política de Privacidade.
+12.3. Ao excluir a conta, apagaremos ou anonimizaremos os dados, exceto os que precisarmos guardar por obrigação legal, para exercício de direitos ou como registro de pagamentos e devoluções (por até 5 anos). Os detalhes estão na Política de Privacidade.
 
 12.4. Podemos encerrar a conta em caso de violação destes Termos, com aviso prévio por e-mail sempre que possível.
 
 ## 13. Propriedade intelectual
 
-13.1. A marca, o software e o design do AgendaPix pertencem a [NOME COMPLETO] ou a seus licenciantes. O uso do serviço não transfere nenhum desses direitos.
+13.1. A marca, o software e o design do AgendaPix pertencem a Matheus de França Torres ou a seus licenciantes. O uso do serviço não transfere nenhum desses direitos.
 
 13.2. O conteúdo que você publica (nome do negócio, serviços, textos) continua sendo seu. Você nos autoriza a exibi-lo na sua página pública e a usá-lo para prestar o serviço.
 
@@ -200,9 +196,9 @@ O tratamento de dados pessoais está descrito na [Política de Privacidade](/pri
 
 15.1. Podemos atualizar estes Termos. A data da última atualização fica no topo.
 
-15.2. Mudanças relevantes serão avisadas pelo e-mail da conta com antecedência de [PRAZO DE AVISO A DEFINIR]. Se você continuar usando o serviço depois disso, entenderemos que aceitou. Se não concordar, pode cancelar conforme o item 5.7.
+15.2. Mudanças relevantes serão avisadas pelo e-mail da conta com antecedência mínima de 25 dias. Se você continuar usando o serviço depois disso, entenderemos que aceitou. Se não concordar, pode cancelar conforme o item 5.7.
 
-15.3. Se o texto de autorização do Mercado Pago (item 5-A.6) mudar, um novo aceite só é pedido quando você conectar ou reconectar a conta e a versão aceita antes for diferente da atual. Conexões já ativas continuam funcionando com base no aceite anterior. [CONFIRMAR COM ADVOGADO se isso basta.]
+15.3. Se o texto de autorização do Mercado Pago (item 5-A.6) mudar, um novo aceite só é pedido quando você conectar ou reconectar a conta e a versão aceita antes for diferente da atual. Conexões já ativas continuam funcionando com base no aceite anterior.
 
 ## 16. Lei aplicável e foro
 
@@ -212,6 +208,6 @@ O tratamento de dados pessoais está descrito na [Política de Privacidade](/pri
 
 ## 17. Contato
 
-- **Responsável:** [NOME COMPLETO]
+- **Responsável:** Matheus de França Torres
 - **E-mail:** francatorresmatheus@gmail.com
 - **WhatsApp:** +55 14 99750-4655

@@ -1,10 +1,11 @@
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { businessLoadCopy } from "../../components/booking/booking-error";
 import {
   BUSINESS_LOAD_COPY,
   BUSINESS_NOT_FOUND_COPY,
   BUSINESS_SLOW_COPY,
-  LATE_PIX_AFTER_WATCH_COPY,
   REFUNDED_TITLE,
   REFUND_PENDING_TITLE,
   SLOTS_LOAD_COPY,
@@ -15,11 +16,28 @@ import {
 import { expiredScreenBody } from "../../components/booking/pix-deadline-copy";
 import { pixUiPhase } from "../../components/booking/pix-status";
 
+function bookingSources(dir: string): string[] {
+  return readdirSync(dir).flatMap((name) => {
+    const path = join(dir, name);
+    if (statSync(path).isDirectory()) return bookingSources(path);
+    return path.endsWith(".ts") || path.endsWith(".tsx") ? [path] : [];
+  });
+}
+
 describe("textos da tela de Pix e de erro", () => {
-  it("troca a frase quando a conferência de 3 minutos acaba", () => {
+  it("mantém a frase da política quando o prazo acaba e depois da conferência", () => {
     expect(expiredScreenBody(true, null)).toContain("não puder ser mantido");
-    expect(expiredScreenBody(false, "refund")).toBe(LATE_PIX_AFTER_WATCH_COPY);
-    expect(LATE_PIX_AFTER_WATCH_COPY).toBe("Se você já pagou, a gente confirma aqui ou devolve o valor automaticamente.");
+    expect(expiredScreenBody(false, null)).toContain("não puder ser mantido");
+    expect(expiredScreenBody(false, "refund")).toContain("o valor é devolvido para a conta que fez o Pix");
+    expect(expiredScreenBody(true, "rebook_if_free")).toContain("Se o horário continuar livre");
+  });
+
+  it("não usa a palavra automaticamente na cópia do cliente", () => {
+    const hits = bookingSources("components/booking").flatMap((file) => {
+      const source = readFileSync(file, "utf8");
+      return /automaticamente/i.test(source) ? [file] : [];
+    });
+    expect(hits).toEqual([]);
   });
 
   it("separa devolução pendente e devolvida, sem tom de sucesso", () => {

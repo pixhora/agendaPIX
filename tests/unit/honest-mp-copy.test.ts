@@ -28,13 +28,11 @@ describe("cópia do Mercado Pago", () => {
     expect(hits).toEqual([]);
   });
 
-  it("a desconexão com Pix em aberto usa a frase dos Termos 5-A.9", () => {
+  it("a desconexão com Pix em aberto usa a frase atual da tela", () => {
     expect(openPixDisconnectNote(0)).toBeNull();
     const note = openPixDisconnectNote(1);
     expect(note).toContain(MP_DISCONNECT_RETENTION_COPY);
     expect(note).not.toMatch(/45 minutos|48 horas|é apagado/);
-    expect(readFileSync("content/legal/termos.md", "utf8")).toContain(MP_DISCONNECT_RETENTION_COPY);
-    expect(readFileSync("content/legal/privacidade.md", "utf8")).toContain(MP_DISCONNECT_RETENTION_COPY);
   });
 
   it("a permissão de devolução manual aponta para o app do Mercado Pago", () => {

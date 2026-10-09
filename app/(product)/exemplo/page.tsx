@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
 import { PreviewBookingFlow } from "@/components/preview/PreviewBookingFlow";
-import { isPreviewRouteOpen } from "@/lib/preview/access";
 
 export const metadata: Metadata = {
   title: { absolute: "Demonstração · AgendaPix" },
@@ -9,7 +7,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+/** Demonstração pública. Não usa a trava de `/preview`. */
 export default function ExemploPage() {
-  if (!isPreviewRouteOpen()) notFound();
   return <PreviewBookingFlow mode="demo" />;
 }

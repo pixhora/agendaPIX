@@ -1,12 +1,13 @@
-/**
- * Versão do texto de consentimento. Subiu de `2026-10-08.v3.2` porque o texto mudou.
- * Comparação em memória: sem migration. Quem já aceitou a versão antiga precisa aceitar de novo.
- */
+/** Versão do texto de consentimento da devolução automática. Módulo sem código de servidor, para o front importar. */
 export const MP_CONNECT_CONSENT_VERSION = "2026-10-09.v4";
 
-/** Aceite geral. A tela de conexão não mostra a política escolhida, então o texto traz as duas regras. */
+/**
+ * Texto exato aceito pelo dono. O servidor grava o SHA-256 hex deste valor, sem markdown.
+ * Igual à citação dos Termos, seção 5-A.6. A política efetiva hoje é `refund`: todo Pix pago
+ * depois do prazo da reserva é devolvido, mesmo com o horário livre.
+ */
 export const MP_CONNECT_CONSENT_TEXT =
-  "Entendi e autorizo: quando um Pix chega depois do prazo, o AgendaPix pede a devolução do valor ao Mercado Pago, sem você precisar fazer nada. Na política padrão, todo Pix atrasado é devolvido. Se você escolher remarcar quando o horário estiver livre, a reserva é confirmada se o horário ainda estiver disponível e o valor é devolvido se não estiver. Se essa devolução falhar, eu devolvo manualmente em até 7 dias corridos, contados do aviso.";
+  "Entendi e autorizo: quando um Pix chegar depois do prazo para reservar o horário, o AgendaPix devolve sozinho o valor inteiro, do saldo da minha conta Mercado Pago, e me avisa por e-mail. Se essa devolução falhar, eu devolvo manualmente em até 7 dias corridos, contados do aviso.";
 
 /** Checkbox do formulário (`on`), JSON (`true`) ou valor explícito `1` / `true`. */
 export function isAutoRefundAck(value: unknown) {

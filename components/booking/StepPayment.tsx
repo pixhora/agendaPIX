@@ -524,7 +524,7 @@ export function StepPayment({
           {isManualChecking ? <Icon icon={PIX_ICONS.loading} size="md" className="animate-spin motion-reduce:animate-none" /> : <Icon icon={PIX_ICONS.refresh} size="md" />}
           {isManualChecking ? "Verificando confirmação…" : "Já paguei, verificar agora"}
         </Button>
-        <p className="text-center text-xs text-muted">Verificamos automaticamente a cada poucos segundos. Guarde o comprovante.</p>
+        <p className="text-center text-xs text-muted">A conferência do pagamento se repete a cada poucos segundos. Guarde o comprovante.</p>
       </div>
 
       <p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted">

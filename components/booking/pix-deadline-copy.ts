@@ -1,6 +1,5 @@
 import type { LatePixPolicyChoice } from "@/lib/mercadopago/late-pix-copy";
 import {
-  LATE_PIX_AFTER_WATCH_COPY,
   REFUNDED_TITLE,
   REFUND_PENDING_TITLE,
   refundPendingBody,
@@ -47,9 +46,9 @@ export function expiredPixBody(policy?: LatePixPolicyChoice | null): string {
   return EXPIRED_UNKNOWN;
 }
 
-/** Enquanto confere, mantém a frase da política. Depois dos 3 minutos, a frase final. */
-export function expiredScreenBody(watching: boolean, policy?: LatePixPolicyChoice | null): string {
-  return watching ? expiredPixBody(policy) : LATE_PIX_AFTER_WATCH_COPY;
+/** Corpo da tela de prazo encerrado, na conferência e depois dela. A frase segue a política do sinal. */
+export function expiredScreenBody(_watching: boolean, policy?: LatePixPolicyChoice | null): string {
+  return expiredPixBody(policy);
 }
 
 export function refundPendingCopy(amountLabel: string): { title: string; body: string } {

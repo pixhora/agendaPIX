@@ -1,9 +1,6 @@
-> **Rascunho para revisão. Não é parecer jurídico.**
-> Este texto foi montado a partir do código do produto (PR #40, commit `2f1239a`) para ser revisado com um advogado. Trechos entre colchetes `[ ]` dependem de decisão do responsável ou de mudança no código.
-
 # Política de Privacidade do AgendaPix
 
-Última atualização: [DATA]
+Última atualização: 9 de outubro de 2026
 
 Esta Política explica quais dados pessoais o AgendaPix trata, para quê, com quem compartilha e quais são os seus direitos, conforme a Lei Geral de Proteção de Dados (Lei nº 13.709/2018, "LGPD").
 
@@ -11,14 +8,14 @@ Esta Política explica quais dados pessoais o AgendaPix trata, para quê, com qu
 
 ## 1. Quem é o controlador
 
-O AgendaPix é oferecido por **[NOME COMPLETO]**, pessoa física, que é o controlador dos dados descritos aqui, salvo o que está explicado na seção 3.
+O AgendaPix é oferecido por **Matheus de França Torres**, pessoa física, que é o controlador dos dados descritos aqui, salvo o que está explicado na seção 3.
 
 - **E-mail:** francatorresmatheus@gmail.com
 - **WhatsApp:** +55 14 99750-4655
 
 ## 2. Encarregado (DPO)
 
-Encarregado pelo tratamento de dados pessoais: **[NOME COMPLETO]**.
+Encarregado pelo tratamento de dados pessoais: **Matheus de França Torres**.
 
 - **E-mail:** francatorresmatheus@gmail.com
 - **WhatsApp:** +55 14 99750-4655
@@ -27,7 +24,7 @@ Encarregado pelo tratamento de dados pessoais: **[NOME COMPLETO]**.
 
 3.1. **Assinante** (dono do negócio): quem cria conta no AgendaPix. Para os dados da conta, do negócio e da assinatura, o AgendaPix é o **controlador**.
 
-3.2. **Cliente final**: quem marca horário na página pública de um negócio. Esses dados são coletados para que o negócio atenda o seu cliente. Por isso, em regra, o **negócio (Assinante) é o controlador** dos dados dos seus clientes, e o AgendaPix atua como **operador**: trata esses dados em nome do negócio, conforme as configurações que ele faz no painel. [QUESTÃO PARA O ADVOGADO: confirmar essa divisão e se, em alguns tratamentos (prevenção de abuso, registros de pagamento, devolução automática de Pix fora do prazo), o AgendaPix é controlador.]
+3.2. **Cliente final**: quem marca horário na página pública de um negócio. Esses dados são coletados para que o negócio atenda o seu cliente. Por isso, em regra, o **negócio (Assinante) é o controlador** dos dados dos seus clientes, e o AgendaPix atua como **operador**: trata esses dados em nome do negócio, conforme as configurações que ele faz no painel.
 
 3.3. Se você é Cliente final e quer exercer seus direitos, pode falar com o negócio onde agendou ou com a gente. Quando o pedido couber ao negócio, vamos encaminhá-lo ou orientar você.
 
@@ -75,7 +72,7 @@ Encarregado pelo tratamento de dados pessoais: **[NOME COMPLETO]**.
 | Texto da política do sinal exibido e aceito, com os prazos calculados | Guardado junto com o agendamento |
 | Dados do pagamento do sinal: valor, situação, identificador da cobrança no Mercado Pago, código Pix "copia e cola", QR Code e datas | Gerados pela cobrança |
 | Dados de devoluções: valor, situação e identificador da devolução no Mercado Pago | Quando há devolução |
-| Resumo técnico do pedido de agendamento (hash SHA-256 dos dados enviados: serviço, horário, nome, telefone e CPF, se informado) | Guardado no banco para evitar pedidos duplicados |
+| Resumo técnico do pedido de agendamento (hash SHA-256 dos dados enviados: serviço, horário, nome e telefone; o CPF não entra) | Guardado no banco para evitar pedidos duplicados |
 | Código de acesso ao agendamento | Gerado para o Cliente final acompanhar o pagamento. No servidor fica só um resumo dele |
 | CPF (opcional) | Ver item 4.5 |
 
@@ -83,17 +80,15 @@ O banco de dados tem um campo para o e-mail do Cliente final, mas o formulário 
 
 ### 4.5. CPF do Cliente final
 
-- **Quando é pedido:** o campo de CPF só aparece se essa opção estiver ligada na configuração do AgendaPix. Hoje ela vem desligada.
-- **Com quem é compartilhado:** se o CPF for informado, ele é enviado ao **Mercado Pago**, como identificação do pagador, para gerar o Pix.
-- **Como fica guardado:** o CPF **não** tem um campo próprio no banco de dados e não aparece no painel. Mas ele entra no resumo técnico (hash SHA-256 sem chave secreta) do pedido de agendamento, que fica guardado no banco. Como um CPF tem poucas combinações possíveis, esse resumo **não deve ser considerado anonimização**. O CPF também fica no armazenamento da aba do navegador do Cliente final enquanto o pagamento está pendente (seção 11).
-
-[ATUALIZAR SE O CÓDIGO MUDAR: se a equipe deixar de enviar o CPF ao Mercado Pago quando o campo estiver desligado, ou tirar o CPF do resumo do pedido e do navegador, ajustar este item.]
+- **Quando é pedido:** o campo de CPF só aparece se a exigência de CPF do pagador estiver ligada na configuração do AgendaPix. Hoje ela vem desligada.
+- **Com quem é compartilhado:** quando o Cliente final informa o CPF, ele vai direto ao **Mercado Pago**, como identificação do pagador, para gerar o Pix.
+- **Como fica guardado:** o AgendaPix **não guarda** o CPF. Ele não é gravado no banco de dados, não entra no resumo técnico do pedido, não aparece no painel e não fica no armazenamento do navegador.
 
 ### 4.6. Dados técnicos e de segurança
 
 - **Endereço IP:** usado para limitar tentativas e evitar abuso no agendamento, no envio de códigos e no cadastro. Isso só acontece quando o IP vem de uma fonte confiável, conforme a configuração do servidor; sem ela, o envio de códigos é limitado apenas por e-mail. Nesses controles, o IP e o e-mail são guardados só como **hash** (código irreversível com chave secreta), e não em texto aberto.
 - **Registros de pagamento e de avisos do Mercado Pago:** guardamos identificadores, resumos (hash) e o resultado do processamento, sem o conteúdo bruto, o telefone ou segredos.
-- **Registros da aplicação (logs):** o código evita registrar dados pessoais nas mensagens de erro de autenticação. Os registros gerados pela hospedagem seguem as regras do provedor [CONFIRMAR RETENÇÃO DE LOGS NA VERCEL].
+- **Registros da aplicação (logs):** o código evita registrar dados pessoais nas mensagens de erro de autenticação. Os registros gerados pela hospedagem seguem as regras do provedor.
 
 ### 4.7. Dados guardados no seu navegador
 
@@ -105,11 +100,11 @@ Veja a seção 11.
 |---|---|---|
 | Criar e manter a conta, enviar código de acesso e manter a sessão | E-mail, nome, sessão | Execução de contrato (inciso V) |
 | Publicar a página do negócio e permitir agendamentos | Dados do negócio, serviços, horários | Execução de contrato (V) |
-| Registrar agendamentos e mostrar a agenda e a lista de clientes ao negócio | Dados do Cliente final | Execução de contrato entre o Cliente final e o negócio, em nome do negócio (V) [CONFIRMAR COM ADVOGADO] |
-| Gerar o Pix do sinal, confirmar o pagamento, cancelar cobranças vencidas e fazer devoluções | Nome do Cliente final, CPF se informado, dados do pagamento, tokens do Mercado Pago | Execução de contrato (V) |
+| Registrar agendamentos e mostrar a agenda e a lista de clientes ao negócio | Dados do Cliente final | Execução de contrato entre o Cliente final e o negócio, em nome do negócio (V) |
+| Gerar o Pix do sinal, confirmar o pagamento, cancelar cobranças vencidas e fazer devoluções | Nome do Cliente final, CPF (quando informado), dados do pagamento, tokens do Mercado Pago | Execução de contrato (V) |
 | Avisar o Assinante por e-mail (sinal devolvido, devolução que precisa ser feita à mão, pagamento a conferir) | E-mail do Assinante; na maioria dos avisos, nome do Cliente final, serviço e horário | Execução de contrato (V) |
 | Controlar o teste grátis, a assinatura e os pedidos de ativação | Dados do negócio e da assinatura | Execução de contrato (V) |
-| Provar o consentimento dado na conexão com o Mercado Pago | Versão do texto, hash, data, IP | Exercício regular de direitos (VI) e legítimo interesse (IX) [CONFIRMAR] |
+| Provar o consentimento dado na conexão com o Mercado Pago | Versão do texto, hash, data, IP | Exercício regular de direitos (VI) e legítimo interesse (IX) |
 | Evitar pedidos de agendamento duplicados | Resumo técnico do pedido | Execução de contrato (V) e legítimo interesse (IX) |
 | Prevenir fraude e abuso (limites de tentativas e de reservas sem pagamento) | IP e e-mail em hash, telefone | Legítimo interesse (IX) |
 | Manter registros de auditoria de pagamentos e devoluções | Identificadores e valores, sem dados de contato | Legítimo interesse (IX) e exercício regular de direitos (VI) |
@@ -123,17 +118,17 @@ Compartilhamos dados apenas com quem precisa deles para o serviço funcionar:
 
 | Quem | O quê | Por quê |
 |---|---|---|
-| **Mercado Pago** | Valor do sinal; nome do Cliente final, separado em nome e sobrenome; CPF, se informado; um e-mail técnico gerado pelo sistema (não é o e-mail real do Cliente final); identificação da cobrança; tokens da conta do Assinante | Gerar o Pix, consultar e cancelar cobranças, fazer devoluções e receber avisos de pagamento. O Mercado Pago também trata esses dados conforme a política dele |
-| **Provedor de envio de e-mail (SMTP):** [NOME DO PROVEDOR A DEFINIR] | E-mail do Assinante e o conteúdo das mensagens (código de acesso; avisos que podem conter nome do Cliente final, serviço e horário) | Enviar códigos de acesso e avisos |
+| **Mercado Pago** | Valor do sinal; nome do Cliente final, separado em nome e sobrenome; CPF, quando informado; um e-mail técnico gerado pelo sistema (não é o e-mail real do Cliente final); identificação da cobrança; tokens da conta do Assinante | Gerar o Pix, consultar e cancelar cobranças, fazer devoluções e receber avisos de pagamento. O Mercado Pago também trata esses dados conforme a política dele |
+| **Provedor de envio de e-mail (SMTP):** Resend | E-mail do Assinante e o conteúdo das mensagens (código de acesso; avisos que podem conter nome do Cliente final, serviço e horário) | Enviar códigos de acesso e avisos |
 | **Vercel** (hospedagem da aplicação, região São Paulo – `gru1`) | Todos os dados que passam pela aplicação | Executar o serviço |
-| **Banco de dados:** [PROVEDOR E LOCAL A CONFIRMAR] | Todos os dados guardados | Armazenar os dados |
+| **Banco de dados:** Neon (empresa do grupo Databricks, dos EUA), com os dados na região São Paulo da AWS (aws-sa-east-1) | Todos os dados guardados | Armazenar os dados |
 | **WhatsApp (Meta)** | Só quando você mesmo abre uma conversa pelos botões do site (por exemplo, o pedido de assinatura, que leva o link da sua página, ou o contato entre o negócio e o cliente) | Comunicação iniciada por você |
-| **O negócio (Assinante)** | Dados do Cliente final que agendou com ele (exceto o CPF, que não aparece no painel) | Atender o cliente |
+| **O negócio (Assinante)** | Dados do Cliente final que agendou com ele (o CPF não é guardado nem aparece no painel) | Atender o cliente |
 | **Autoridades** | Os dados exigidos | Quando houver obrigação legal ou ordem judicial |
 
 ## 7. Transferência internacional
 
-A aplicação roda na região São Paulo da Vercel. A Vercel é uma empresa estrangeira, e alguns fornecedores (como o provedor de e-mail e o do banco de dados, ainda a confirmar) podem tratar dados fora do Brasil. [QUESTÃO PARA O ADVOGADO: confirmar os fornecedores, os locais de tratamento e o mecanismo do art. 33 da LGPD aplicável a cada um.]
+A aplicação roda na região São Paulo da Vercel. A Vercel é uma empresa estrangeira, e alguns fornecedores (como a Resend, que envia os e-mails, e o provedor do banco de dados) podem tratar dados fora do Brasil.
 
 ## 8. Por quanto tempo guardamos
 
@@ -142,15 +137,15 @@ A aplicação roda na região São Paulo da Vercel. A Vercel é uma empresa estr
 | Rascunho do cadastro (inclui e-mail) | Vence em 7 dias. Depois do vencimento, é apagado por uma rotina que roda uma vez por dia às 03:00 (Brasília), inclusive os rascunhos que já viraram conta |
 | Código e link de acesso | Válidos por 30 minutos |
 | Contadores antiabuso (IP ou e-mail em hash) | Os que têm mais de 24 horas são apagados aos poucos, nas verificações seguintes |
-| Tokens do Mercado Pago depois de desconectar pelo AgendaPix | Até o Pix vencer e por mais 24 horas, guardamos o acesso só para confirmar ou devolver esse sinal. O apagamento roda no processamento diário, então pode levar até cerca de um dia a mais. |
+| Tokens do Mercado Pago depois de desconectar pelo AgendaPix | Sem Pix em aberto, apagados na hora. Com Pix em aberto, ficam guardados (cifrados) só para confirmar ou devolver esses Pix e são apagados em até 24 horas depois que eles forem pagos, vencerem ou forem cancelados |
 | Tokens do Mercado Pago depois de revogar o aplicativo no Mercado Pago | Apagados assim que recebemos o aviso do Mercado Pago |
-| Resumo do código de acesso ao agendamento | Hoje não expira nem é apagado [PRAZO DE RETENÇÃO A DEFINIR] |
-| Resumo técnico do pedido de agendamento (que pode conter o CPF) | Hoje não é apagado [PRAZO DE RETENÇÃO A DEFINIR] |
-| Dados da conta, do negócio, dos agendamentos, dos Clientes finais e dos pagamentos | [PRAZO DE RETENÇÃO A DEFINIR] |
-| Registros de auditoria de pagamentos e devoluções | [PRAZO DE RETENÇÃO A DEFINIR] |
-| Registro do aceite da conexão com o Mercado Pago (inclui IP) | [PRAZO DE RETENÇÃO A DEFINIR] |
-| Dados de sessão (IP e navegador) | [PRAZO DE RETENÇÃO A DEFINIR] |
-| Registros de acesso à aplicação (Marco Civil da Internet, art. 15) | [PRAZO DE RETENÇÃO A DEFINIR; mínimo legal de 6 meses, se aplicável] |
+| Resumo do código de acesso ao agendamento | Até 90 dias depois do fim da conta do negócio |
+| Resumo técnico do pedido de agendamento (sem CPF) | Até 90 dias depois do fim da conta do negócio |
+| Dados da conta, do negócio, dos agendamentos e dos Clientes finais | Até 90 dias depois do fim da conta. Os dados de pagamentos ficam até 5 anos |
+| Registros de auditoria de pagamentos e devoluções | 5 anos |
+| Registro do aceite da conexão com o Mercado Pago (inclui IP) | 5 anos |
+| Dados de sessão (IP e navegador) | 6 meses |
+| Registros de acesso à aplicação (Marco Civil da Internet, art. 15) | 6 meses |
 
 Hoje não existe exclusão automática de contas. A exclusão é feita manualmente, a pedido (seção 10). Depois dos prazos definidos, os dados serão apagados ou anonimizados, salvo quando a lei permitir ou exigir a guarda.
 
@@ -186,9 +181,9 @@ Pela LGPD (art. 18), você pode pedir:
 - revogação do consentimento;
 - revisão de decisões tomadas apenas com base em tratamento automatizado (art. 20).
 
-**Como pedir:** envie um e-mail para **francatorresmatheus@gmail.com** (ou mensagem no WhatsApp +55 14 99750-4655) com o seu pedido. Podemos pedir dados para confirmar a sua identidade. Responderemos em até [PRAZO DE RESPOSTA A DEFINIR; referência legal: 15 dias para o acesso completo, art. 19, II].
+**Como pedir:** envie um e-mail para **francatorresmatheus@gmail.com** (ou mensagem no WhatsApp +55 14 99750-4655) com o seu pedido. Podemos pedir dados para confirmar a sua identidade. Responderemos em até 10 dias.
 
-**Exclusão de conta:** hoje não há botão de exclusão no painel. A exclusão é feita manualmente, a pedido pelo e-mail acima, em até [PRAZO A DEFINIR]. Alguns dados podem ser mantidos mesmo depois do pedido, quando a lei permitir ou exigir (por exemplo, registros de pagamentos e devoluções).
+**Exclusão de conta:** hoje não há botão de exclusão no painel. A exclusão é feita manualmente, a pedido pelo e-mail acima, em até 10 dias. Alguns dados podem ser mantidos mesmo depois do pedido, quando a lei permitir ou exigir (por exemplo, registros de pagamentos e devoluções).
 
 **Assinante:** pelo painel, você pode alterar os serviços, os horários e o WhatsApp de contato, e desconectar o Mercado Pago quando quiser. Para outras correções (como o nome do negócio ou o e-mail), fale com a gente.
 
@@ -219,7 +214,7 @@ Usamos apenas recursos **necessários** ao funcionamento. Não usamos cookies de
 
 | Chave | Conteúdo e finalidade |
 |---|---|
-| `booking_session_<negócio>` | Permitir que o Cliente final retome o pagamento se recarregar a página: identificador do agendamento, código de acesso, serviço, nome, WhatsApp, **CPF (se informado)** e prazo do Pix. Também é apagado quando o Cliente final recomeça o agendamento ou reabre a página depois do prazo |
+| `booking_session_<negócio>` | Permitir que o Cliente final retome o pagamento se recarregar a página: identificador do agendamento, código de acesso, serviço, nome, WhatsApp e prazo do Pix (sem CPF). Também é apagado quando o Cliente final recomeça o agendamento ou reabre a página depois do prazo |
 | `agendapix.mp.callback` | Resultado da volta do Mercado Pago (conectado ou erro), para mostrar a mensagem certa |
 | `agenda_onboarding_commit` | Resultado da criação do negócio no fim do cadastro |
 | `agendapix-subscription-pending:<negócio>` | Marcar que há um pedido de assinatura em andamento, para avisar quando for ativado |
@@ -228,7 +223,7 @@ Você pode apagar esses dados nas configurações do navegador, mas partes do se
 
 ## 12. Crianças e adolescentes
 
-O AgendaPix é destinado a donos de negócio maiores de 18 anos [CONFIRMAR]. O formulário de agendamento não pergunta a idade do Cliente final. Se um agendamento for feito para ou por menor de idade, o negócio é responsável por observar o art. 14 da LGPD e o melhor interesse da criança ou do adolescente. [QUESTÃO PARA O ADVOGADO.]
+O AgendaPix é destinado a donos de negócio maiores de 18 anos. O formulário de agendamento não pergunta a idade do Cliente final. Se um agendamento for feito para ou por menor de idade, o negócio é responsável por observar o art. 14 da LGPD e o melhor interesse da criança ou do adolescente.
 
 ## 13. Mudanças nesta Política
 
@@ -236,7 +231,7 @@ Podemos atualizar esta Política. A data da última atualização fica no topo. 
 
 ## 14. Onde encontrar esta Política
 
-[ATUALIZAR SE O CÓDIGO MUDAR: hoje os links para esta Política (rodapé do site e aviso no cadastro) só aparecem quando a configuração `LEGAL_PAGES_PUBLISHED=true` está ligada. O fluxo de agendamento do Cliente final ainda não tem link para esta Política; a equipe está incluindo um, controlado pela mesma configuração.]
+
 
 ## 15. Autoridade Nacional de Proteção de Dados (ANPD)
 

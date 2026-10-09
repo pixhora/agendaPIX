@@ -7,6 +7,7 @@ import type { AvailabilitySlot, PublicService } from "../../components/booking/t
 import { LegalArticle } from "../../components/legal/LegalArticle";
 import { legalHeadingId, legalTableOfContents } from "../../lib/legal/headings";
 import { assertLegalPublicationAllowed, legalPublicationProblems } from "../../lib/legal/publish";
+import { MP_CONNECT_CONSENT_TEXT, MP_CONNECT_CONSENT_VERSION } from "../../lib/mercadopago/consent";
 import { privacyPolicyLink } from "../../lib/marketing/flags";
 import sitemap from "../../app/sitemap";
 
@@ -45,20 +46,39 @@ describe("âncoras dos títulos legais", () => {
 
 describe("guarda de publicação", () => {
   it("com a flag desligada, o rascunho não derruba", () => {
-    const draft = readFileSync("content/legal/termos.md", "utf8");
+    const draft = "> **Rascunho para revisão. Não é parecer jurídico.**";
     expect(() => assertLegalPublicationAllowed(draft, false, "termos")).not.toThrow();
   });
 
   it("com a flag ligada, rascunho e placeholder derrubam e o link markdown não entra", () => {
-    const draft = readFileSync("content/legal/termos.md", "utf8");
-    expect(draft).toContain("[Política de Privacidade](/privacidade)");
+    const draft = "> **Rascunho para revisão. Não é parecer jurídico.**\n[NOME COMPLETO DO RESPONSÁVEL]\n";
     expect(() => assertLegalPublicationAllowed(draft, true, "privacidade")).toThrow(/Rascunho para revisão/);
-    expect(() => assertLegalPublicationAllowed(draft, true, "termos")).toThrow(/\[NOME COMPLETO/);
-    expect(legalPublicationProblems(draft).join(" ")).not.toContain("[Política");
+    expect(() => assertLegalPublicationAllowed("[NOME COMPLETO DO RESPONSÁVEL]", true, "termos")).toThrow(/\[NOME COMPLETO/);
     expect(legalPublicationProblems("Leia a [Política de Privacidade](/privacidade).")).toEqual([]);
+    expect(legalPublicationProblems("Rascunho do cadastro (inclui e-mail)")).toEqual([]);
     const fixture = readFileSync("tests/fixtures/legal/termos.md", "utf8");
     expect(legalPublicationProblems(fixture)).toEqual([]);
     expect(() => assertLegalPublicationAllowed(fixture, true, "fixture")).not.toThrow();
+  });
+
+  it("os textos reais passam na guarda de publicação", () => {
+    for (const name of ["termos", "privacidade"] as const) {
+      const markdown = readFileSync(`content/legal/${name}.md`, "utf8");
+      expect(markdown).not.toContain("Rascunho para revisão");
+      expect(legalPublicationProblems(markdown)).toEqual([]);
+      expect(() => assertLegalPublicationAllowed(markdown, true, name)).not.toThrow();
+    }
+    const privacy = readFileSync("content/legal/privacidade.md", "utf8");
+    expect(privacy).toContain("Rascunho do cadastro");
+  });
+
+  it("o aceite do Mercado Pago é a citação da seção 5-A.6", () => {
+    const markdown = readFileSync("content/legal/termos.md", "utf8");
+    const quotes = markdown.split("\n").filter((line) => line.startsWith("> "));
+    expect(quotes).toHaveLength(1);
+    const quote = quotes[0]?.replace(/^>\s*/, "");
+    expect(MP_CONNECT_CONSENT_TEXT).toBe(quote);
+    expect(MP_CONNECT_CONSENT_VERSION).toBe("2026-10-09.v4");
   });
 });
 

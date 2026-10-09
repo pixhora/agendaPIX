@@ -1,3 +1,4 @@
+import { buttonVariants } from "@/components/ui/button";
 import { customerAgendaLead, customerAgendaSteps } from "@/lib/marketing/landing-copy";
 import { Eyebrow, Section, SectionTitle } from "./section";
 
@@ -20,6 +21,9 @@ export function DemoSection() {
           </li>
         ))}
       </ol>
+      <a href="/exemplo" className={buttonVariants({ size: "lg", className: "mt-6 w-full sm:w-auto" })}>
+        Testar a demonstração
+      </a>
     </Section>
   );
 }

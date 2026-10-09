@@ -3,10 +3,6 @@
  * A interface lê daqui. Não mostrar `Error.message` cru no lugar destas frases.
  */
 
-/** Corpo depois dos 3 minutos extras de conferência, quando a consulta para. */
-export const LATE_PIX_AFTER_WATCH_COPY =
-  "Se você já pagou, a gente confirma aqui ou devolve o valor automaticamente.";
-
 export const REFUND_PENDING_TITLE = "Pagamento em devolução";
 
 export const REFUNDED_TITLE = "Pagamento devolvido";
