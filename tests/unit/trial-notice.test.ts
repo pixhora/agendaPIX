@@ -118,5 +118,10 @@ describe("motivo de bloqueio na lista de serviços", () => {
     expect(mp?.body).toMatch(/Mercado Pago/);
     expect(mp?.body).not.toMatch(/conectar agora/i);
     expect(JSON.stringify(mp)).not.toMatch(/chave Pix/i);
+    const consent = serviceBlockCopy("mp_consent_outdated");
+    expect(consent?.title).toMatch(/desatualizado/);
+    expect(consent?.body).toMatch(/Recebimento/);
+    expect(consent?.body).toMatch(/sinais já pagos/);
+    expect(consent?.body).not.toMatch(/reconect/i);
   });
 });

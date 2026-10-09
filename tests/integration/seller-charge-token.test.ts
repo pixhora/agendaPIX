@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
@@ -6,6 +6,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vites
 import * as schema from "../../db/schema";
 import { createBooking, listPublicServices } from "../../lib/bookings/service";
 import { databaseEnvSchema } from "../../lib/env";
+import { MP_CONNECT_CONSENT_TEXT, MP_CONNECT_CONSENT_VERSION } from "../../lib/mercadopago/consent";
 import { encryptMpToken } from "../../lib/mercadopago-oauth/crypto";
 import { buildMercadoPagoManifest, MercadoPagoPaymentProvider, signMercadoPagoWebhook, type MercadoPagoFetch } from "../../lib/payments/mercadopago";
 import { IgnoredWebhookEvent } from "../../lib/payments/provider";
@@ -40,7 +41,7 @@ function oauthEnv() {
   vi.stubEnv("MP_OAUTH_PKCE", "off");
 }
 
-async function insertSeller(mpUserId: string, accessToken: string) {
+async function insertSeller(mpUserId: string, accessToken: string, consentVersion: string | null = MP_CONNECT_CONSENT_VERSION) {
   await database.insert(schema.mercadopagoConnections).values({
     businessId,
     mpUserId,
@@ -49,6 +50,10 @@ async function insertSeller(mpUserId: string, accessToken: string) {
     expiresAt: new Date("2030-06-01T00:00:00.000Z"),
     connectedAt: new Date("2026-01-01T00:00:00.000Z"),
     status: "connected",
+    consentVersion,
+    consentTextSha256: consentVersion ? createHash("sha256").update(MP_CONNECT_CONSENT_TEXT).digest("hex") : null,
+    autoRefundAckAt: consentVersion ? new Date("2026-10-09T12:00:00.000Z") : null,
+    consentUserId: consentVersion ? ownerId : null,
   });
 }
 
@@ -147,8 +152,20 @@ describe("token do vendedor no banco", () => {
     }, randomUUID(), database)).rejects.toMatchObject({ status: 409, code: "mp_account_not_connected" });
   });
 
+  it("consentimento antigo bloqueia reserva nova e a listagem", async () => {
+    await insertSeller("616161", sellerToken, "2026-09-01.v1");
+    const listed = await listPublicServices(slug, database);
+    expect(listed.services[0]).toMatchObject({ bookable: false, blockedReason: "mp_consent_outdated" });
+    await expect(createBooking(slug, {
+      serviceId,
+      startsAt: new Date(Date.UTC(2030, 0, 1, 14, 0)).toISOString(),
+      customer: { name: "Cliente", phone: "+5511999999904" },
+      policyHash: padraoPolicyHash("Negócio"),
+    }, randomUUID(), database)).rejects.toMatchObject({ status: 409, code: "mp_consent_outdated" });
+  });
+
   it("webhook e reconcile usam o token do vendedor daquele pagamento", async () => {
-    await insertSeller("515151", sellerToken);
+    await insertSeller("515151", sellerToken, "2026-09-01.v1");
     const externalId = `pay-${businessId.slice(0, 8)}`;
     const customerId = randomUUID();
     const bookingId = randomUUID();

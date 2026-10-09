@@ -32,6 +32,8 @@ export type MpOwnerStatus = {
 
 export const MP_ACCOUNT_NOT_CONNECTED = "mp_account_not_connected";
 
+export const MP_CONSENT_OUTDATED = "mp_consent_outdated";
+
 export const AUTO_REFUND_ACK_ERROR = MP_AUTO_REFUND_ACK_ERROR;
 
 export const LEGACY_PIX_NOTICE =
@@ -143,6 +145,11 @@ export function mpConnectionUrl(businessId: string): string {
   return `/api/businesses/${encodeURIComponent(businessId)}/mercadopago`;
 }
 
+/** Aceite da versão vigente sem abrir o Mercado Pago de novo. */
+export function mpConsentUrl(businessId: string): string {
+  return `/api/businesses/${encodeURIComponent(businessId)}/mercadopago/consent`;
+}
+
 export function legacyPixDismissUrl(businessId: string): string {
   return `/api/businesses/${encodeURIComponent(businessId)}/notices/pix_key_retired/dismiss`;
 }
@@ -168,7 +175,7 @@ export function statusBadge(status: MpConnectionStatus): { tone: MpStatusBadgeTo
   return { tone: "not_connected", label: "Não conectado" };
 }
 
-export type MpBannerId = "mp-reauth" | "mp-not-connected";
+export type MpBannerId = "mp-reauth" | "mp-not-connected" | "mp-consent";
 
 /**
  * Banners que dependem só do status da conexão ou de `blockedReason`.
@@ -178,9 +185,11 @@ export function selectMpBanners(input: {
   status: MpConnectionStatus;
   hasDepositService: boolean;
   blockedReasons?: readonly string[];
+  /** Conta ainda conectada, mas o texto aceito não é o vigente. */
+  consentOutdated?: boolean;
 }): MpBannerId[] {
   if (input.status === "needs_reconnect") return ["mp-reauth"];
-  if (input.status === "connected") return [];
+  if (input.status === "connected") return input.consentOutdated ? ["mp-consent"] : [];
   const blocked = input.blockedReasons?.includes(MP_ACCOUNT_NOT_CONNECTED) ?? false;
   if (input.hasDepositService || blocked) return ["mp-not-connected"];
   return [];
@@ -239,15 +248,22 @@ export function openPixDisconnectNote(count: number): string | null {
   return `${lead} com Pix em aberto. ${pay} dentro do prazo, o agendamento é confirmado, o dinheiro cai na sua conta Mercado Pago e avisamos você. O acesso à sua conta fica guardado só para conferir ${pix} e é apagado em até ${MP_DISCONNECT_TOKEN_MAX_HOURS} horas depois que ${after}.`;
 }
 
-export function depositUnavailable(service: { bookable?: boolean; reason?: string | null }): boolean {
-  return service.bookable === false && service.reason === MP_ACCOUNT_NOT_CONNECTED;
+type DepositFlag = { bookable?: boolean; reason?: string | null; blockedReason?: string | null };
+
+function depositBlockReason(service: DepositFlag): string | null {
+  return service.reason ?? service.blockedReason ?? null;
 }
 
-export function showDepositUnavailableCard(services: readonly { depositCents: number; bookable?: boolean; reason?: string | null }[]): boolean {
+export function depositUnavailable(service: DepositFlag): boolean {
+  const reason = depositBlockReason(service);
+  return service.bookable === false && (reason === MP_ACCOUNT_NOT_CONNECTED || reason === MP_CONSENT_OUTDATED);
+}
+
+export function showDepositUnavailableCard(services: readonly (DepositFlag & { depositCents: number })[]): boolean {
   return services.length > 0 && services.every((service) => service.depositCents > 0 && depositUnavailable(service));
 }
 
-export function hasBookableService(services: readonly { bookable?: boolean; reason?: string | null }[]): boolean {
+export function hasBookableService(services: readonly DepositFlag[]): boolean {
   return services.some((service) => !depositUnavailable(service));
 }
 

@@ -1,4 +1,6 @@
+import { createHash } from "node:crypto";
 import * as schema from "../../db/schema";
+import { MP_CONNECT_CONSENT_TEXT, MP_CONNECT_CONSENT_VERSION } from "../../lib/mercadopago/consent";
 
 type InsertDb = {
   insert: (table: typeof schema.mercadopagoConnections) => {
@@ -16,6 +18,10 @@ export function connectedMercadoPagoValues(businessId: string): typeof schema.me
     expiresAt: new Date("2099-01-01T00:00:00.000Z"),
     connectedAt: new Date("2026-01-01T00:00:00.000Z"),
     status: "connected",
+    consentVersion: MP_CONNECT_CONSENT_VERSION,
+    consentTextSha256: createHash("sha256").update(MP_CONNECT_CONSENT_TEXT).digest("hex"),
+    autoRefundAckAt: new Date("2026-10-09T12:00:00.000Z"),
+    consentUserId: businessId,
   };
 }
 

@@ -7,7 +7,7 @@ import { disconnectMercadoPago, findBusinessIdByMpUserId, getMercadoPagoOwnerSta
 import { MP_CONNECT_CONSENT_TEXT, MP_CONNECT_CONSENT_VERSION } from "../../lib/mercadopago/consent";
 import { MP_USERS_ME_URL } from "../../lib/mercadopago-oauth/account-profile";
 import { maskEmail } from "../../lib/privacy/mask-email";
-import { assertPlaintextAbsent, beginMercadoPagoConnect, completeMercadoPagoConnect, submitMercadoPagoConnect } from "../../lib/mercadopago-oauth/flow";
+import { acceptMercadoPagoConsent, assertPlaintextAbsent, beginMercadoPagoConnect, completeMercadoPagoConnect, submitMercadoPagoConnect } from "../../lib/mercadopago-oauth/flow";
 import { GET as connectGet } from "../../app/api/businesses/[businessId]/mercadopago/connect/route";
 import { createMemoryMpStore } from "../../lib/mercadopago-oauth/memory-store";
 import { sanitizeMpReturnTo } from "../../lib/mercadopago-oauth/return-to";
@@ -595,6 +595,63 @@ describe("OAuth Mercado Pago por negócio", () => {
     expect(getServiceBlockedReason({ depositCents: 0 }, { mpConnected: false })).toBeNull();
     expect(getServiceBlockedReason({ depositCents: 1000 }, { mpConnected: false })).toBe("mp_account_not_connected");
     expect(getServiceBlockedReason({ depositCents: 1000 }, { mpConnected: true })).toBeNull();
+    expect(getServiceBlockedReason({ depositCents: 1000 }, { mpConnected: true, consentCurrent: false })).toBe("mp_consent_outdated");
+  });
+
+  it("aceite da versão atual libera sinal sem OAuth e versão antiga bloqueia", async () => {
+    const store = createMemoryMpStore([connection()]);
+    await expect(assertMpConnectedForDeposit(businessId, { store, now })).rejects.toMatchObject({ status: 409, code: "mp_consent_outdated" });
+    expect(await getMercadoPagoOwnerStatus(businessId, { store, now })).toMatchObject({ status: "connected", canReceiveDeposits: false, consentVersion: null });
+    expect(await getSellerAccessTokenForSettlement(businessId, { store, env })).toEqual({ accessToken: "seller-access", mpUserId: "4242" });
+    const missing = await acceptMercadoPagoConsent({
+      request: new Request("https://app.example.com/api/businesses/x/mercadopago/consent", {
+        method: "POST",
+        headers: { origin: "https://app.example.com", "content-type": "application/json" },
+        body: JSON.stringify({ autoRefundAck: false, consentVersion: MP_CONNECT_CONSENT_VERSION }),
+      }),
+      businessId,
+      ownerId: "owner",
+      now,
+      env,
+      store,
+    });
+    expect(missing).toMatchObject({ kind: "error", status: 400, body: { error: { code: "auto_refund_ack_required" } } });
+    const accepted = await acceptMercadoPagoConsent({
+      request: new Request("https://app.example.com/api/businesses/x/mercadopago/consent", {
+        method: "POST",
+        headers: { origin: "https://app.example.com", "content-type": "application/json", "x-real-ip": "203.0.113.8" },
+        body: JSON.stringify({ autoRefundAck: true, consentVersion: MP_CONNECT_CONSENT_VERSION }),
+      }),
+      businessId,
+      ownerId: "owner",
+      now,
+      env,
+      store,
+    });
+    expect(accepted.kind).toBe("ok");
+    if (accepted.kind !== "ok") throw new Error("aceite");
+    expect(accepted.status).toMatchObject({ status: "connected", canReceiveDeposits: true, consentVersion: MP_CONNECT_CONSENT_VERSION });
+    const row = await store.findByBusinessId(businessId);
+    expect(row?.autoRefundAckAt).toEqual(now);
+    expect(row?.consentUserId).toBe("owner");
+    expect(row?.consentTextSha256).toBe(createHash("sha256").update(MP_CONNECT_CONSENT_TEXT).digest("hex"));
+    expect(store.consentEvents.at(-1)).toMatchObject({ kind: "consent_recorded", detail: null, ip: "203.0.113.8" });
+    await assertMpConnectedForDeposit(businessId, { store, now });
+    const revoked = createMemoryMpStore([connection({ status: "needs_reconnect", accessTokenEnc: null, refreshTokenEnc: null })]);
+    const reconnect = await acceptMercadoPagoConsent({
+      request: new Request("https://app.example.com/api/businesses/x/mercadopago/consent", {
+        method: "POST",
+        headers: { origin: "https://app.example.com", "content-type": "application/json" },
+        body: JSON.stringify({ autoRefundAck: true, consentVersion: MP_CONNECT_CONSENT_VERSION }),
+      }),
+      businessId,
+      ownerId: "owner",
+      now,
+      env,
+      store: revoked,
+    });
+    expect(reconnect).toMatchObject({ kind: "error", status: 409, body: { error: { code: "mp_reconnect_required" } } });
+    expect((await revoked.findByBusinessId(businessId))?.consentVersion).toBeNull();
   });
 
   it("mostra o nome da conta e o e-mail mascarado, e esconde os dois quando desconectado", async () => {

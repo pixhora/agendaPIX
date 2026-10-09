@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { ExternalLink, Info, Loader2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -14,13 +14,17 @@ import {
   legacyPixDismissUrl,
   mpAccountIdentity,
   mpConnectionUrl,
+  mpConsentUrl,
+  parseMpOwnerStatus,
   reconnectRequiresAck,
   type MpReturnTo,
   showsTestMode,
   statusBadge,
   type MpOwnerStatus,
 } from "@/lib/mercadopago/contract";
-import { MpConnectForm } from "./mp-connect-form";
+import { MP_CONNECT_CONSENT_VERSION } from "@/lib/mercadopago/consent";
+import { buttonVariants } from "@/components/ui/button";
+import { AutoRefundAck, MpConnectForm } from "./mp-connect-form";
 import { MpDisconnectDialog } from "./mp-disconnect-dialog";
 
 function StatusPill({ status }: { status: MpOwnerStatus["status"] }) {
@@ -108,6 +112,8 @@ export function MpConnectionCard({
   const [dialogOpen, setDialogOpen] = useState(initialDisconnectOpen);
   const [disconnecting, setDisconnecting] = useState(false);
   const [dismissedNotice, setDismissedNotice] = useState(false);
+  const [accepting, setAccepting] = useState(false);
+  const [acceptFailed, setAcceptFailed] = useState(false);
   const requireAck = reconnectRequiresAck(status.consentVersion);
   const since = formatConnectedSince(status.connectedAt, timezone);
   const showNotice = legacyNoticeVisible(status.hadLegacyPixKey, dismissedNotice);
@@ -144,8 +150,37 @@ export function MpConnectionCard({
     }
   }
 
+  async function acceptConsent(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!acknowledged) {
+      setAckInvalid(true);
+      return;
+    }
+    setAccepting(true);
+    setAcceptFailed(false);
+    try {
+      const response = await fetch(mpConsentUrl(businessId), {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({ autoRefundAck: true, consentVersion: MP_CONNECT_CONSENT_VERSION }),
+      });
+      const parsed = parseMpOwnerStatus(await response.json().catch(() => null));
+      if (!response.ok || !parsed || reconnectRequiresAck(parsed.consentVersion)) {
+        setAcceptFailed(true);
+        return;
+      }
+      setAcknowledged(false);
+      onStatus(parsed);
+    } catch {
+      setAcceptFailed(true);
+    } finally {
+      setAccepting(false);
+    }
+  }
+
   const showAccount = Boolean(account || since);
   const showActions = connected || reconnect;
+  const acceptInPlace = connected && requireAck;
 
   return (
     <>
@@ -188,7 +223,10 @@ export function MpConnectionCard({
         ) : null}
 
         {reconnect ? (
-          <p className="mt-4 text-sm leading-relaxed text-ink">O Mercado Pago encerrou a conexão. Reservas com sinal estão pausadas.</p>
+          <p className="mt-4 text-sm leading-relaxed text-ink">
+            O Mercado Pago encerrou a conexão. Reservas com sinal estão pausadas.
+            {requireAck ? " Para aceitar o texto novo, entre de novo no Mercado Pago. Sem reconectar, o aceite não vale." : ""}
+          </p>
         ) : null}
 
         {status.status === "not_connected" ? (
@@ -205,21 +243,53 @@ export function MpConnectionCard({
         ) : null}
 
         <div className="mt-4">
-          <MpConnectForm
-            businessId={businessId}
-            returnTo={returnTo}
-            requireAck={requireAck}
-            acknowledged={acknowledged}
-            onAcknowledgedChange={(value) => {
-              setAcknowledged(value);
-              if (value) setAckInvalid(false);
-            }}
-            ackInvalid={ackInvalid}
-            submitLabel={status.status === "not_connected" ? "Conectar Mercado Pago" : "Reconectar"}
-            buttonVariant={reconnect ? "pix" : connected ? "outline" : "pix"}
-            onBlocked={() => setAckInvalid(true)}
-            beside={showActions ? <DisconnectLink onClick={() => setDialogOpen(true)} /> : null}
-          />
+          {acceptInPlace ? (
+            <form onSubmit={(event) => void acceptConsent(event)}>
+              <p className="font-semibold">Aceite o texto novo para voltar a receber sinal</p>
+              <p className="mt-1 text-sm leading-relaxed text-ink">
+                A conta continua conectada. Reservas novas com sinal ficam pausadas até você aceitar este texto. Pix já gerado e sinais já pagos seguem normalmente. Não precisa entrar de novo no Mercado Pago.
+              </p>
+              <div className="mt-3">
+                <AutoRefundAck
+                  checked={acknowledged}
+                  onChange={(value) => {
+                    setAcknowledged(value);
+                    if (value) setAckInvalid(false);
+                  }}
+                  invalid={ackInvalid}
+                  onInvalid={() => setAckInvalid(true)}
+                />
+              </div>
+              <div className="mt-3 flex flex-col items-stretch gap-2">
+                <button
+                  type="submit"
+                  aria-busy={accepting || undefined}
+                  className={cn(buttonVariants({ variant: "pix", size: "lg" }), "w-full")}
+                >
+                  {accepting ? <Loader2 aria-hidden="true" className="animate-spin motion-reduce:animate-none" /> : null}
+                  {accepting ? "Registrando o aceite…" : "Aceitar e voltar a receber sinal"}
+                </button>
+                {showActions ? <DisconnectLink onClick={() => setDialogOpen(true)} /> : null}
+              </div>
+              {acceptFailed ? <p role="alert" className="mt-2 text-[13px] font-medium text-danger">Não conseguimos registrar o aceite agora. Tente de novo.</p> : null}
+            </form>
+          ) : (
+            <MpConnectForm
+              businessId={businessId}
+              returnTo={returnTo}
+              requireAck={requireAck}
+              acknowledged={acknowledged}
+              onAcknowledgedChange={(value) => {
+                setAcknowledged(value);
+                if (value) setAckInvalid(false);
+              }}
+              ackInvalid={ackInvalid}
+              submitLabel={status.status === "not_connected" ? "Conectar Mercado Pago" : "Reconectar"}
+              buttonVariant={reconnect ? "pix" : connected ? "outline" : "pix"}
+              onBlocked={() => setAckInvalid(true)}
+              beside={showActions ? <DisconnectLink onClick={() => setDialogOpen(true)} /> : null}
+            />
+          )}
         </div>
       </div>
       <MpDisconnectDialog

@@ -63,8 +63,8 @@ export const MP_STATUS_FIXTURES = {
   /** Mesma versão aceita: reconectar sem a caixa. */
   needs_reconnect: { ...base, status: "needs_reconnect", canReceiveDeposits: false },
   test_mode: { ...base, status: "connected", liveMode: false },
-  /** Versão diferente: a caixa volta no reconectar. */
-  stale_consent: { ...base, status: "connected", consentVersion: "2026-09-01.v1" },
+  /** Versão diferente: o dono aceita o texto novo sem reconectar. */
+  stale_consent: { ...base, status: "connected", canReceiveDeposits: false, consentVersion: "2026-09-01.v1" },
   /** Desconectado e sem aceite desta versão: a caixa volta. */
   needs_reconnect_stale: {
     ...base,

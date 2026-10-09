@@ -8,6 +8,11 @@ export const MP_CONNECT_CONSENT_VERSION = "2026-10-09.v4";
  */
 export const MP_CONNECT_CONSENT_TEXT = "Entendi e autorizo: quando um Pix chegar depois do prazo para reservar o horário, o AgendaPix devolve sozinho o valor inteiro, do saldo da minha conta Mercado Pago, e me avisa por e-mail. Se essa devolução falhar, eu devolvo manualmente em até 7 dias corridos, contados do aviso.";
 
+/** A versão gravada na conexão é a atual e houve um aceite com data. */
+export function storedConsentIsCurrent(version: string | null | undefined, acknowledgedAt: Date | string | null | undefined) {
+  return version === MP_CONNECT_CONSENT_VERSION && acknowledgedAt != null;
+}
+
 /** Checkbox do formulário (`on`), JSON (`true`) ou valor explícito `1` / `true`. */
 export function isAutoRefundAck(value: unknown) {
   return value === true || value === "true" || value === "on" || value === "1";

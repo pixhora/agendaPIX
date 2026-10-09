@@ -82,15 +82,20 @@ function magicLinkVerifyRequest(link: string, baseURL: string) {
 
 async function ensureSellerConnection(businessId: string) {
   const database = getDb();
-  await database.insert(mercadopagoConnections).values(connectedMercadoPagoValues(businessId)).onConflictDoUpdate({
+  const values = connectedMercadoPagoValues(businessId);
+  await database.insert(mercadopagoConnections).values(values).onConflictDoUpdate({
     target: mercadopagoConnections.businessId,
     set: {
-      mpUserId: businessId,
-      accessTokenEnc: "v1.fixture.access",
-      refreshTokenEnc: "v1.fixture.refresh",
-      expiresAt: new Date("2099-01-01T00:00:00.000Z"),
+      mpUserId: values.mpUserId,
+      accessTokenEnc: values.accessTokenEnc,
+      refreshTokenEnc: values.refreshTokenEnc,
+      expiresAt: values.expiresAt,
       status: "connected",
       disconnectedAt: null,
+      consentVersion: values.consentVersion,
+      consentTextSha256: values.consentTextSha256,
+      autoRefundAckAt: values.autoRefundAckAt,
+      consentUserId: values.consentUserId,
     },
   });
 }

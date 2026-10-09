@@ -5,7 +5,7 @@ import { businesses, bookings, businessHours, customers, services } from "../../
 import { loadBookingAccess } from "../billing/load";
 import { serviceListingBookability } from "../bookings/deposit-bookability";
 import { HttpError } from "../http";
-import { assertMpConnectedForDeposit, getServiceBlockedReason, isMpConnected } from "../mercadopago-oauth/bookability";
+import { assertMpConnectedForDeposit, getServiceBlockedReason, readDepositGate } from "../mercadopago-oauth/bookability";
 import { createDrizzleMpStore } from "../mercadopago-oauth/repository";
 import { findOwnedBusiness } from "../tenancy";
 import { contactWhatsappSchema } from "../validation/whatsapp";
@@ -26,11 +26,11 @@ export async function dashboardServices(ownerId: string, businessId: string, dat
   const business = await authorize(ownerId, businessId, database);
   const rows = await database.select().from(services).where(eq(services.businessId, businessId)).orderBy(asc(services.name), asc(services.id));
   const access = await loadBookingAccess(business, database);
-  const mpConnected = await isMpConnected(businessId, { store: createDrizzleMpStore(database) });
+  const deposit = await readDepositGate(businessId, { store: createDrizzleMpStore(database) });
   return rows.map((service) => {
     const listing = serviceListingBookability(business, service, access);
     if (listing.blockedReason === "bookings_paused") return { ...service, ...listing };
-    const mpReason = getServiceBlockedReason(service, { mpConnected });
+    const mpReason = getServiceBlockedReason(service, { mpConnected: deposit.connected, consentCurrent: deposit.consentCurrent });
     if (mpReason) return { ...service, bookable: false, blockedReason: mpReason };
     return { ...service, ...listing };
   });

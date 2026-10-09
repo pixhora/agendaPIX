@@ -38,6 +38,11 @@ const COPY: Record<MpBannerId, { title: string; body: string; action: string }> 
     body: "Serviços com sinal estão indisponíveis na sua página.",
     action: "Conectar",
   },
+  "mp-consent": {
+    title: "Aceite o texto novo da devolução automática",
+    body: "Reservas novas com sinal estão pausadas. Pix já gerado e sinais já pagos continuam. A conta Mercado Pago segue conectada.",
+    action: "Aceitar o texto",
+  },
 };
 
 export function MpBannerList({
@@ -51,7 +56,12 @@ export function MpBannerList({
   hasDepositService: boolean;
   blockedReasons?: readonly string[];
 }) {
-  const banners = selectMpBanners({ status: status.status, hasDepositService, blockedReasons });
+  const banners = selectMpBanners({
+    status: status.status,
+    hasDepositService,
+    blockedReasons,
+    consentOutdated: status.status === "connected" && reconnectRequiresAck(status.consentVersion),
+  });
   const bannerKey = banners.join("|");
   const [hidden, setHidden] = useState<Partial<Record<MpBannerId, boolean>>>({});
   const [ready, setReady] = useState(false);
@@ -70,7 +80,7 @@ export function MpBannerList({
   }, [bannerKey, businessId]);
 
   if (!ready) return null;
-  const visible = banners.filter((banner) => banner === "mp-reauth" || !hidden[banner]).slice(0, 2);
+  const visible = banners.filter((banner) => banner === "mp-reauth" || banner === "mp-consent" || !hidden[banner]).slice(0, 2);
   if (!visible.length) return null;
 
   return (

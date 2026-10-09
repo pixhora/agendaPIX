@@ -1,3 +1,4 @@
+import { storedConsentIsCurrent } from "../mercadopago/consent";
 import { accountIdLast4 } from "./account-profile";
 import { mpOAuthConfig } from "./config";
 import { decryptMpToken } from "./crypto";
@@ -37,6 +38,12 @@ export async function isMpConnected(businessId: string, deps?: RefreshDeps): Pro
 
 function connectionCanCharge(row: MpConnection | null, now: Date) {
   return Boolean(row && row.status === "connected" && row.accessTokenEnc && row.refreshTokenEnc && row.expiresAt && row.expiresAt.getTime() > now.getTime());
+}
+
+/** Conta ligada para liquidar Pix. `consentCurrent` só entra na cobrança nova. */
+export function depositGate(row: MpConnection | null, now: Date) {
+  const connected = connectionCanCharge(row, now);
+  return { connected, consentCurrent: connected && storedConsentIsCurrent(row?.consentVersion, row?.autoRefundAckAt) };
 }
 
 export type MpOwnerStatus = {
@@ -81,7 +88,7 @@ export async function getMercadoPagoOwnerStatus(businessId: string, deps?: Refre
     connectedAt: row.connectedAt.toISOString(),
     expiresAt: row.expiresAt?.toISOString() ?? null,
     liveMode: row.liveMode,
-    canReceiveDeposits: connectionCanCharge(row, now),
+    canReceiveDeposits: depositGate(row, now).consentCurrent,
     consentVersion,
     ...account,
   };

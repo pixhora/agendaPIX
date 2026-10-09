@@ -30,6 +30,7 @@ import {
   legacyNoticeVisible,
   legacyPixDismissUrl,
   mpAccountIdentity,
+  depositUnavailable,
   parseMpOwnerStatus,
   presentMpCallback,
   reconnectRequiresAck,
@@ -246,6 +247,27 @@ describe("Mercado Pago connect consent", () => {
     const settingsButton = settings.slice(settings.lastIndexOf("<button", settingsReconnect), settingsReconnect);
     expect(settingsButton).toContain("border");
     expect(settingsButton).not.toContain("bg-pix ");
+
+    const stale = renderToStaticMarkup(createElement(MpSettingsCard, {
+      businessId: "biz",
+      status: MP_STATUS_FIXTURES.stale_consent,
+      timezone: "America/Sao_Paulo",
+      onStatus: () => undefined,
+    }));
+    expect(stale).toContain("Aceite o texto novo para voltar a receber sinal");
+    expect(stale).toContain("Não precisa entrar de novo no Mercado Pago.");
+    expect(stale).toContain("Aceitar e voltar a receber sinal");
+    expect(stale).toContain("Entendi e autorizo:");
+    expect(stale).not.toContain(">Reconectar<");
+
+    const staleReconnect = renderToStaticMarkup(createElement(MpSettingsCard, {
+      businessId: "biz",
+      status: MP_STATUS_FIXTURES.needs_reconnect_stale,
+      timezone: "America/Sao_Paulo",
+      onStatus: () => undefined,
+    }));
+    expect(staleReconnect).toContain("Para aceitar o texto novo, entre de novo no Mercado Pago.");
+    expect(staleReconnect).toContain("Sem reconectar, o aceite não vale.");
 
     const paused = renderToStaticMarkup(createElement(MpSettingsCard, {
       businessId: "biz",
@@ -471,6 +493,10 @@ describe("Mercado Pago status mapping", () => {
   it("picks banners from connection status only", () => {
     expect(selectMpBanners({ status: "needs_reconnect", hasDepositService: false })).toEqual(["mp-reauth"]);
     expect(selectMpBanners({ status: "connected", hasDepositService: true })).toEqual([]);
+    expect(selectMpBanners({ status: "connected", hasDepositService: true, consentOutdated: true })).toEqual(["mp-consent"]);
+    expect(depositUnavailable({ bookable: false, blockedReason: "mp_consent_outdated" })).toBe(true);
+    expect(depositUnavailable({ bookable: false, blockedReason: "mp_account_not_connected" })).toBe(true);
+    expect(depositUnavailable({ bookable: false, reason: "bookings_paused" })).toBe(false);
     expect(selectMpBanners({ status: "not_connected", hasDepositService: true })).toEqual(["mp-not-connected"]);
     expect(selectMpBanners({ status: "not_connected", hasDepositService: false, blockedReasons: ["mp_account_not_connected"] })).toEqual(["mp-not-connected"]);
     expect(selectMpBanners({ status: "not_connected", hasDepositService: false })).toEqual([]);

@@ -4,7 +4,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as schema from "../../db/schema";
-import { bookingRequestHash, createBooking, getAvailability, getBookingPayment, hash } from "../../lib/bookings/service";
+import { bookingRequestHash, createBooking, getAvailability, getBookingPayment, hash, listPublicServices } from "../../lib/bookings/service";
 import { bookingInputSchema } from "../../lib/bookings/validation";
 import { databaseEnvSchema } from "../../lib/env";
 import { FakePaymentProvider, signFakeWebhook } from "../../lib/payments/fake";
@@ -88,6 +88,21 @@ describe("reserva e cobrança do sinal", () => {
     await expect(getBookingPayment(slugs[0], first.data.bookingId, null, database)).rejects.toMatchObject({ status: 404 });
     await expect(getBookingPayment(slugs[1], first.data.bookingId, `Bearer ${first.data.accessToken}`, database)).rejects.toMatchObject({ status: 404 });
     await expect(createBooking(slugs[0], { ...input(), customer: { ...input().customer, name: "Outro nome" } }, key, database, provider)).rejects.toMatchObject({ status: 409 });
+  });
+  it("consentimento antigo bloqueia reserva nova e ainda confirma o Pix já gerado", async () => {
+    const key = randomUUID();
+    const first = await createBooking(slugs[0], input(), key, database, provider);
+    await database.update(schema.mercadopagoConnections).set({ consentVersion: "2026-09-01.v1" }).where(eq(schema.mercadopagoConnections.businessId, businessIds[0]));
+    const listed = await listPublicServices(slugs[0], database);
+    expect(listed.services[0]).toMatchObject({ bookable: false, blockedReason: "mp_consent_outdated" });
+    const replay = await createBooking(slugs[0], input(), key, database, provider);
+    expect(replay.replayed).toBe(true);
+    expect(replay.data.bookingId).toBe(first.data.bookingId);
+    await expect(createBooking(slugs[0], { ...input(), startsAt: "2030-01-01T13:00:00Z" }, randomUUID(), database, provider)).rejects.toMatchObject({ status: 409, code: "mp_consent_outdated" });
+    expect(await processWebhook(webhook(first.data.payment!.externalId!), "fake", database, provider)).toMatchObject({ outcome: "processed" });
+    const status = await getBookingPayment(slugs[0], first.data.bookingId, `Bearer ${first.data.accessToken}`, database);
+    expect(status.status).toBe("confirmed");
+    expect(status.payment?.status).toBe("paid");
   });
   it("não grava CPF e trata outro CPF na mesma chave como repetição", async () => {
     const key = randomUUID();

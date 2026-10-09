@@ -2,10 +2,12 @@ import { createHash } from "node:crypto";
 import { isAutoRefundAck, MP_CONNECT_CONSENT_TEXT, MP_CONNECT_CONSENT_VERSION } from "../mercadopago/consent";
 import { normalizeClientAddress } from "../bookings/rate-limit";
 import { findOwnedBusiness } from "../tenancy";
-import { readBody } from "../http";
+import { authEnvSchema } from "../env";
+import { HttpError, readBody } from "../http";
 import { syncAccountProfile } from "./account-profile";
 import { mpOAuthConfig, type MpOAuthConfig } from "./config";
 import { encryptMpToken } from "./crypto";
+import { getMercadoPagoOwnerStatus, type MpOwnerStatus } from "./credentials";
 import { createDrizzleMpStore } from "./repository";
 import { codeChallengeS256, createCodeVerifier, createOAuthState } from "./pkce";
 import { MP_OAUTH_COOKIE_MAX_AGE_SECONDS, openMpOAuthState, sealMpOAuthState } from "./state";
@@ -197,7 +199,7 @@ export async function submitMercadoPagoConnect(input: {
   const store = input.store ?? createDrizzleMpStore();
   const existing = await store.findByBusinessId(input.businessId);
   const textSha256 = createHash("sha256").update(MP_CONNECT_CONSENT_TEXT).digest("hex");
-  // Versão antiga continua recebendo sinal. O texto novo só é exigido na próxima tentativa de conectar.
+  // Reconexão reaproveita só o aceite vigente. Versão diferente não autoriza cobrança nova.
   const reused = existing?.consentVersion === MP_CONNECT_CONSENT_VERSION && existing.autoRefundAckAt && existing.consentUserId
     ? { version: existing.consentVersion, ackAt: existing.autoRefundAckAt, userId: existing.consentUserId, textSha256: existing.consentTextSha256 ?? textSha256 }
     : null;
@@ -221,6 +223,65 @@ export async function submitMercadoPagoConnect(input: {
     expiresAt: new Date(now.getTime() + MP_OAUTH_COOKIE_MAX_AGE_SECONDS * 1000),
   });
   return { kind: "redirect", location: started.authorizationUrl, cookie: started.cookie };
+}
+
+export type MpConsentAccept =
+  | { kind: "ok"; status: MpOwnerStatus }
+  | { kind: "error"; status: 400 | 403 | 409; body: { error: { code: string; message: string } } };
+
+/**
+ * Grava o aceite da versão vigente sem abrir o Mercado Pago de novo.
+ * Conta `needs_reconnect` ou sem token exige reconectar.
+ */
+export async function acceptMercadoPagoConsent(input: {
+  request: Request;
+  businessId: string;
+  ownerId: string;
+  now?: Date;
+  env?: Readonly<Record<string, string | undefined>>;
+  store?: MpConnectionStore;
+}): Promise<MpConsentAccept> {
+  const auth = authEnvSchema.safeParse(input.env ?? process.env);
+  if (!auth.success) throw new HttpError(503, "mp_oauth_unconfigured", "A conexão com o Mercado Pago ainda não está configurada.");
+  const now = input.now ?? new Date();
+  if (!sameOrigin(input.request, new URL(auth.data.BETTER_AUTH_URL).origin)) {
+    return { kind: "error", status: 403, body: { error: { code: "forbidden_origin", message: "Essa origem não pode registrar o aceite." } } };
+  }
+  const fields = await readConnectFields(input.request);
+  if (!(isAutoRefundAck(fields.autoRefundAck) && fields.consentVersion === MP_CONNECT_CONSENT_VERSION)) {
+    return { kind: "error", status: 400, body: { error: { code: "auto_refund_ack_required", message: "Marque que você entendeu a devolução automática." } } };
+  }
+  const store = input.store ?? createDrizzleMpStore();
+  const textSha256 = createHash("sha256").update(MP_CONNECT_CONSENT_TEXT).digest("hex");
+  const outcome = await store.withBusinessLock(input.businessId, async (lock) => {
+    const row = await lock.read();
+    if (!row || row.status === "disconnected") {
+      return { ok: false as const, status: 409 as const, code: "mp_account_not_connected", message: "Conecte a conta Mercado Pago deste negócio no AgendaPix para cobrar sinal." };
+    }
+    if (row.status !== "connected" || !row.accessTokenEnc) {
+      return { ok: false as const, status: 409 as const, code: "mp_reconnect_required", message: "O Mercado Pago encerrou a conexão. Reconecte a conta para aceitar o texto novo." };
+    }
+    await lock.write({
+      ...row,
+      consentVersion: MP_CONNECT_CONSENT_VERSION,
+      consentTextSha256: textSha256,
+      autoRefundAckAt: now,
+      consentUserId: input.ownerId,
+    });
+    return { ok: true as const };
+  });
+  if (!outcome.ok) {
+    return { kind: "error", status: outcome.status, body: { error: { code: outcome.code, message: outcome.message } } };
+  }
+  await store.recordConnectionEvent({
+    businessId: input.businessId,
+    kind: "consent_recorded",
+    ip: requestClientIp(input.request),
+    detail: null,
+    createdAt: now,
+  });
+  const status = await getMercadoPagoOwnerStatus(input.businessId, { store, now, env: input.env });
+  return { kind: "ok", status };
 }
 
 export function assertPlaintextAbsent(serialized: string, secrets: string[]) {

@@ -7,7 +7,7 @@ import * as schema from "../../db/schema";
 import { bookingAccessSecret } from "../env";
 import { HttpError } from "../http";
 import { paymentsConfig } from "../payments/config";
-import { assertMpConnectedForDeposit, getServiceBlockedReason, isMpConnected } from "../mercadopago-oauth/bookability";
+import { assertMpConnectedForDeposit, getServiceBlockedReason, readDepositGate } from "../mercadopago-oauth/bookability";
 import { createDrizzleMpStore } from "../mercadopago-oauth/repository";
 import { getPaymentProvider } from "../payments";
 import { MpAccountNotConnectedError } from "../payments/seller-account";
@@ -102,7 +102,7 @@ export async function listPublicServices(slug: string, database: Database = getD
   const business = await businessBySlug(slug, database);
   const access = await loadBookingAccess(business, database);
   const facts = await getPublicBookingFacts(business.id);
-  const mpConnected = await isMpConnected(business.id, { store: createDrizzleMpStore(database) });
+  const deposit = await readDepositGate(business.id, { store: createDrizzleMpStore(database) });
   const rows = await database.select({
     id: schema.services.id,
     name: schema.services.name,
@@ -123,7 +123,7 @@ export async function listPublicServices(slug: string, database: Database = getD
     pixRecipientDisplayName: facts.pixRecipientDisplayName,
     services: rows.map((service) => {
       const listing = serviceListingBookability(business, service, access);
-      const mpReason = listing.blockedReason === "bookings_paused" ? null : getServiceBlockedReason(service, { mpConnected });
+      const mpReason = listing.blockedReason === "bookings_paused" ? null : getServiceBlockedReason(service, { mpConnected: deposit.connected, consentCurrent: deposit.consentCurrent });
       const bookability = mpReason ? { bookable: false, blockedReason: mpReason } : listing;
       return {
         id: service.id,
