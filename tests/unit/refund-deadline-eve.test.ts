@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { refundDeadlineEveNotice, type EveItem } from "../../lib/email/templates/refund-deadline-eve";
+import { MP_MANUAL_REFUND_CHANNEL } from "../../lib/mercadopago/connect-copy";
 import { formatBusinessDate, formatBusinessDateTime, formatBusinessDay, manualRefundDueAt } from "../../lib/payments/manual-refund-calendar";
 
 const tz = "America/Sao_Paulo";
@@ -34,10 +35,12 @@ describe("E5 devolução pela política", () => {
     expect(notice.text).toContain("Pedido de cancelamento: sex, 16 out");
     expect(notice.text).toContain("Valor a devolver: R$ 20,00");
     expect(notice.text).toContain("Prazo: até sex, 23 out");
-    expect(notice.text).toContain("Coloque saldo e toque em \"Devolver agora\"");
-    expect(notice.text).toContain("na venda de R$ 20,00 de qui, 8 out, 14:02, e toque em \"Devolvi pelo Mercado Pago\"");
+    expect(notice.text).toContain(`Devolva até sex, 23 out. ${MP_MANUAL_REFUND_CHANNEL}`);
     expect(notice.text).toContain("Este é o último lembrete sobre esta devolução.");
-    expect(notice.text).toContain("Devolver agora: /dashboard/agenda/book-1?devolver=1");
+    expect(notice.text).toContain("Abrir agendamento: /dashboard/agenda/book-1");
+    expect(notice.text).not.toContain("Devolver agora");
+    expect(notice.text).not.toContain("Devolver pelo AgendaPix");
+    expect(notice.text).not.toContain("?devolver=1");
     expect(notice.text).not.toContain("Marcar como devolvido");
     expect(notice.text).not.toContain("ou devolva por outro meio");
     expect(notice.html).toContain("<strong>sex, 16 out</strong>");
@@ -45,11 +48,12 @@ describe("E5 devolução pela política", () => {
     expect(notice.html).toContain("<strong>amanhã, sex, 23 out</strong>");
   });
 
-  it("sem conexão some a opção de saldo e o botão abre o agendamento", () => {
+  it("sem conexão mantém a devolução no app do Mercado Pago e abre o agendamento", () => {
     const notice = refundDeadlineEveNotice({ ownerName: "Marina", items: [policyItem({ disconnected: true })] });
+    expect(notice.text).toContain(`Devolva até sex, 23 out. ${MP_MANUAL_REFUND_CHANNEL}`);
     expect(notice.text).not.toContain("Coloque saldo");
     expect(notice.text).not.toContain("Devolver agora");
-    expect(notice.text).toContain("Devolvi pelo Mercado Pago");
+    expect(notice.text).not.toContain("Devolver pelo AgendaPix");
     expect(notice.text).toContain("Abrir agendamento: /dashboard/agenda/book-1");
     expect(notice.text).not.toContain("?devolver=1");
   });

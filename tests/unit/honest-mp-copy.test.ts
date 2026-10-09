@@ -4,21 +4,21 @@ import { describe, expect, it } from "vitest";
 import { MP_DISCONNECT_RETENTION_COPY, MP_MANUAL_REFUND_CHANNEL } from "../../lib/mercadopago/connect-copy";
 import { openPixDisconnectNote, PERMISSIONS } from "../../lib/mercadopago/contract";
 
-const COPY_ROOTS = ["app", "components", "lib"];
-const FORBIDDEN = ["45 minutos", "Devolver pelo AgendaPix"] as const;
+const COPY_ROOTS = ["app", "components", "lib", "content", "docs"];
+const FORBIDDEN = ["45 minutos", "Devolver agora", "Devolver pelo AgendaPix"] as const;
 
 function copyFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
     const path = join(dir, name);
     const parts = path.split("/");
-    if (parts.includes("node_modules") || parts.includes("content")) return [];
+    if (parts.includes("node_modules") || parts.includes(".git")) return [];
     if (statSync(path).isDirectory()) return copyFiles(path);
-    return path.endsWith(".ts") || path.endsWith(".tsx") ? [path] : [];
+    return path.endsWith(".ts") || path.endsWith(".tsx") || path.endsWith(".md") ? [path] : [];
   });
 }
 
 describe("cópia do Mercado Pago", () => {
-  it("não promete apagar em 45 minutos nem o botão Devolver pelo AgendaPix", () => {
+  it("não promete apagar em 45 minutos nem Devolver agora ou Devolver pelo AgendaPix", () => {
     const hits = COPY_ROOTS.flatMap((root) =>
       copyFiles(root).flatMap((file) => {
         const source = readFileSync(file, "utf8");

@@ -1,3 +1,4 @@
+import { MP_MANUAL_REFUND_CHANNEL } from "../../mercadopago/connect-copy";
 import { formatBusinessDay } from "../../payments/manual-refund-calendar";
 import { OWNER_MANUAL_MARK_LABEL } from "../../payments/refund-copy";
 
@@ -19,14 +20,11 @@ export type EveItem = {
 };
 
 function bookingHref(item: EveItem) {
-  const path = item.bookingPath.split("?")[0] ?? item.bookingPath;
-  if (item.disconnected || item.kind !== "policy") return path;
-  return `${path}?devolver=1`;
+  return item.bookingPath.split("?")[0] ?? item.bookingPath;
 }
 
 function actionLabel(item: EveItem) {
-  if (item.disconnected) return "Abrir agendamento";
-  if (item.kind === "policy") return "Devolver agora";
+  if (item.disconnected || item.kind === "policy") return "Abrir agendamento";
   return item.kind === "review" ? "Conferir agendamento" : "Resolver agora";
 }
 
@@ -42,13 +40,7 @@ function steps(item: EveItem) {
     ].join("\n");
   }
   if (item.kind === "policy") {
-    const manual = `Devolva pelo app do Mercado Pago, na venda de ${item.amountLabel} de ${item.paidAtLabel}, e toque em "${OWNER_MANUAL_MARK_LABEL}".`;
-    if (item.disconnected) return `Para resolver:\n1. ${manual}`;
-    return [
-      `Para resolver:`,
-      `1. Coloque saldo e toque em "Devolver agora"; ou`,
-      `2. ${manual}`,
-    ].join("\n");
+    return `Devolva até ${item.dueLabel}. ${MP_MANUAL_REFUND_CHANNEL}`;
   }
   const option = item.disconnected
     ? `1. Devolva pelo app do Mercado Pago e toque em "${OWNER_MANUAL_MARK_LABEL}".`
