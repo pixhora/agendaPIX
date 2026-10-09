@@ -197,9 +197,23 @@ h1, h2, h3, h4, h5, h6, .font-display {
   color: var(--ink);
 }
 
-:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  /* O anel dos campos fica no invólucro. Título com foco de programa não desenha caixa. */
+  input:focus,
+  input:focus-visible,
+  textarea:focus,
+  textarea:focus-visible,
+  select:focus,
+  select:focus-visible,
+  [tabindex="-1"]:focus,
+  [tabindex="-1"]:focus-visible {
+    outline: none;
+  }
 }
 
 /* Formulários do painel: o anel fica no invólucro, nunca no input interno. */
@@ -311,4 +325,17 @@ h1, h2, h3, h4, h5, h6, .font-display {
 /* Painel no celular: foco e âncoras nunca ficam atrás das barras fixas (WCAG 2.4.11). */
 @media (max-width: 1023.98px) {
   html:has([data-app-frame]) { scroll-padding-block: 5rem; }
+}
+
+/* O Sonner anima a opacidade do toast (entrada) e do texto de trás (400ms).
+   No meio do fade o axe lê um cinza abaixo de 4,5:1. A opacidade troca na hora. */
+[data-sonner-toast] {
+  transition: transform 400ms, height 400ms, box-shadow 200ms !important;
+}
+[data-sonner-toast][data-mounted="true"] {
+  opacity: 1 !important;
+}
+[data-sonner-toast][data-expanded="false"][data-front="false"] > * {
+  opacity: 0 !important;
+  transition: none !important;
 }

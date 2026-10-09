@@ -2,6 +2,7 @@ import { Icon } from "@/components/ui/icon";
 import { SUMMARY_ICONS } from "@/lib/icons/registry";
 import type { AvailabilitySlot, PublicService } from "./types";
 import { formatCurrency, formatDateFull, formatDuration, formatTimeSlot } from "./formatters";
+import { DEPOSIT_NOW_LABEL, REMAINDER_LABEL } from "@/lib/copy/booking-summary";
 import { cn } from "@/lib/utils";
 
 interface BookingSummaryProps {
@@ -57,11 +58,11 @@ export function BookingSummary({ service, slot, timezone, variant = "hero", clas
             <dd className="tabular-nums text-ink">{formatCurrency(service.priceCents)}</dd>
           </div>
           <div className="flex justify-between gap-3">
-            <dt className="text-muted">Restante no local</dt>
+            <dt className="text-muted">{REMAINDER_LABEL}</dt>
             <dd className="tabular-nums text-ink">{formatCurrency(remainingCents)}</dd>
           </div>
           <div className="flex justify-between gap-3 border-t border-line pt-2 font-semibold">
-            <dt className="text-ink">Sinal agora (Pix)</dt>
+            <dt className="text-ink">{DEPOSIT_NOW_LABEL}</dt>
             <dd className="tabular-nums text-pix">{formatCurrency(service.depositCents)}</dd>
           </div>
         </dl>

@@ -8,15 +8,19 @@ import type { PublicService } from "./types";
 import { formatCurrency, formatDuration } from "./formatters";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { SOME_SERVICES_UNAVAILABLE_MESSAGE, depositServiceUnbookable } from "./booking-error";
+import { serviceCardAside, serviceCardMeta } from "./service-card";
+import { UnbookableNotice } from "./UnbookableNotice";
 
 interface StepServiceProps {
   services: PublicService[];
   selectedServiceId: string | null;
   onSelectService: (service: PublicService) => void;
   onNext: () => void;
+  contactWhatsapp?: string | null;
 }
 
-export function StepService({ services, selectedServiceId, onSelectService, onNext }: StepServiceProps) {
+export function StepService({ services, selectedServiceId, onSelectService, onNext, contactWhatsapp }: StepServiceProps) {
   const groupRef = React.useRef<HTMLDivElement>(null);
 
   if (services.length === 0) {
@@ -28,17 +32,21 @@ export function StepService({ services, selectedServiceId, onSelectService, onNe
     );
   }
 
-  const selectedService = services.find((s) => s.id === selectedServiceId);
-  const focusIndex = selectedService ? services.indexOf(selectedService) : 0;
+  const selectableIndexes = services.flatMap((service, index) => (depositServiceUnbookable(service.depositCents, service.bookable) ? [] : [index]));
+  const selectedService = services.find((service) => service.id === selectedServiceId && !depositServiceUnbookable(service.depositCents, service.bookable));
+  const focusIndex = selectedService ? services.indexOf(selectedService) : (selectableIndexes[0] ?? 0);
+  const hasUnbookableDeposit = services.some((service) => depositServiceUnbookable(service.depositCents, service.bookable));
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
     const forward = e.key === "ArrowDown" || e.key === "ArrowRight";
     const backward = e.key === "ArrowUp" || e.key === "ArrowLeft";
-    if (!forward && !backward) return;
+    if ((!forward && !backward) || selectableIndexes.length === 0) return;
     e.preventDefault();
-    const nextIndex = (index + (forward ? 1 : -1) + services.length) % services.length;
+    const position = selectableIndexes.indexOf(index);
+    const nextPosition = (position + (forward ? 1 : -1) + selectableIndexes.length) % selectableIndexes.length;
+    const nextIndex = selectableIndexes[nextPosition] ?? index;
     onSelectService(services[nextIndex]);
-    groupRef.current?.querySelectorAll<HTMLButtonElement>('[role="radio"]')[nextIndex]?.focus();
+    groupRef.current?.querySelector<HTMLButtonElement>(`[data-service-id="${services[nextIndex]?.id}"]`)?.focus();
   };
 
   return (
@@ -48,14 +56,28 @@ export function StepService({ services, selectedServiceId, onSelectService, onNe
         <p className="mt-1 text-sm text-muted">O sinal é pago por Pix e garante o seu horário. O restante você paga no local.</p>
       </div>
 
+      {hasUnbookableDeposit ? (
+        <UnbookableNotice contactWhatsapp={contactWhatsapp} message={SOME_SERVICES_UNAVAILABLE_MESSAGE} />
+      ) : null}
+
       <div ref={groupRef} className="grid gap-3" role="radiogroup" aria-label="Serviços disponíveis">
         {services.map((service, index) => {
+          if (depositServiceUnbookable(service.depositCents, service.bookable)) {
+            return (
+              <div key={service.id} aria-disabled="true" className="cursor-default rounded-card border border-line bg-surface p-4">
+                <span className="block font-semibold text-ink">{service.name}</span>
+                <span className="mt-1 block text-sm text-muted">{service.priceCents > 0 ? `${formatDuration(service.durationMinutes)} · ${formatCurrency(service.priceCents)}` : formatDuration(service.durationMinutes)}</span>
+                <p className="mt-2 text-sm text-muted">Indisponível no momento</p>
+              </div>
+            );
+          }
           const isSelected = service.id === selectedServiceId;
           return (
             <button
               key={service.id}
               type="button"
               role="radio"
+              data-service-id={service.id}
               aria-checked={isSelected}
               tabIndex={index === focusIndex ? 0 : -1}
               onClick={() => onSelectService(service)}
@@ -77,20 +99,22 @@ export function StepService({ services, selectedServiceId, onSelectService, onNe
               <span className="min-w-0 flex-1">
                 <span className="block font-semibold text-ink">{service.name}</span>
                 <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
-                  <span className="inline-flex items-center gap-1"><Icon icon={SUMMARY_ICONS.duration} className="size-3.5" />{formatDuration(service.durationMinutes)}</span>
+                  <span className="inline-flex items-center gap-1"><Icon icon={SUMMARY_ICONS.duration} className="size-3.5" />{serviceCardMeta(service)}</span>
                   {service.depositCents > 0 ? (
                     <span className="inline-flex items-center rounded-full bg-pix-soft px-2 py-0.5 text-xs font-semibold text-pix">Sinal {formatCurrency(service.depositCents)} no Pix</span>
-                  ) : (
-                    <span className="text-xs font-semibold">Sem sinal</span>
-                  )}
-                  {service.policySummary && <span className="basis-full text-sm text-muted">{service.policySummary}</span>}
+                  ) : null}
+                  {service.policySummary ? <span className="basis-full text-sm text-muted">{service.policySummary}</span> : null}
                 </span>
               </span>
               <span className="shrink-0 text-right">
-                <span className="inline-flex items-center justify-end gap-1 font-display text-lg font-bold tabular-nums text-ink">
-                  <Icon icon={SUMMARY_ICONS.price} className="size-3.5 text-muted" />
-                  {formatCurrency(service.priceCents)}
-                </span>
+                {service.depositCents > 0 && serviceCardAside(service) ? (
+                  <span className="inline-flex items-center justify-end gap-1 font-display text-lg font-bold tabular-nums text-ink">
+                    <Icon icon={SUMMARY_ICONS.price} className="size-3.5 text-muted" />
+                    {serviceCardAside(service)}
+                  </span>
+                ) : (
+                  <span className="text-sm font-semibold text-ink">Sem sinal</span>
+                )}
               </span>
             </button>
           );

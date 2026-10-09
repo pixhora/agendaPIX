@@ -68,7 +68,7 @@ test("captura booking público (serviço → confirmado)", async ({ page, reques
   await shot(page, "03-slug-dados-resumo");
 
   await page.getByRole("button", { name: /Gerar Pix/ }).filter({ visible: true }).first().click();
-  await expect(page.getByRole("button", { name: /Copiar código Pix/ })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("button", { name: /Copiar código/ })).toBeVisible({ timeout: 20_000 });
   await shot(page, "04-slug-pix");
 
   const payment = await latestPayment(slug);

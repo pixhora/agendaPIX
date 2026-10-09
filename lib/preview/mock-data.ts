@@ -35,6 +35,15 @@ export const MOCK_SERVICES: PublicService[] = [
     durationMinutes: 60,
     priceCents: 8000,   // R$ 80,00
     depositCents: 2500, // R$ 25,00
+    policySummary: "Com 24 h de antecedência, Studio Bella pode devolver o sinal. Mais perto da hora, o sinal fica com Studio Bella.",
+    policyHash: "preview-policy-corte",
+    depositPolicy: { refundUntilHours: 24, rescheduleUntilHours: 24 },
+    policyDetails: [
+      { title: "Até qua, 07 out, 11:30", body: "Cancele e Studio Bella pode devolver o sinal, ou remarque usando o sinal (1 vez).", tone: "ok" },
+      { title: "Depois disso", body: "Se cancelar, o sinal fica com Studio Bella.", tone: "warn" },
+      { title: "Se faltar", body: "Studio Bella pode devolver o sinal.", tone: "ok" },
+      { title: "Como cancelar ou remarcar", body: "Fale com Studio Bella pelo WhatsApp. A devolução não é automática: quem devolve é Studio Bella, da conta Mercado Pago do negócio, depois de confirmar o cancelamento.", tone: "ok" },
+    ],
   },
   {
     id: "srv-corte-escova",
