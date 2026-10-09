@@ -109,11 +109,11 @@ export function MpConnectionCard({
   const [disconnecting, setDisconnecting] = useState(false);
   const [dismissedNotice, setDismissedNotice] = useState(false);
   const requireAck = reconnectRequiresAck(status.consentVersion);
-  const since = formatConnectedSince(status.connectedAt, timezone);
   const showNotice = legacyNoticeVisible(status.hadLegacyPixKey, dismissedNotice);
   const account = mpAccountIdentity(status);
   const connected = status.status === "connected";
   const reconnect = status.status === "needs_reconnect";
+  const since = connected ? formatConnectedSince(status.connectedAt, timezone) : null;
 
   async function disconnect() {
     setDisconnecting(true);

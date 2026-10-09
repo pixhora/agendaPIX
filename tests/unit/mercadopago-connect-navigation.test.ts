@@ -1,9 +1,12 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { NextResponse } from "next/server";
 import { describe, expect, it } from "vitest";
+import { MpConnectUnavailable } from "../../components/payments/mp-connect-unavailable";
 import { HttpError } from "../../lib/http";
-import { MP_CONNECT_CONFIG_COPY, ownerConnectConfigCopy, respondMercadoPagoConnect } from "../../lib/mercadopago/connect-navigation";
+import { MP_CONNECT_UNAVAILABLE_COPY, ownerConnectConfigCopy, respondMercadoPagoConnect } from "../../lib/mercadopago/connect-navigation";
 
 const connectRoute = resolve(process.cwd(), "app/api/businesses/[businessId]/mercadopago/connect/route.ts");
 const callbackRoute = resolve(process.cwd(), "app/api/integrations/mercadopago/callback/route.ts");
@@ -22,33 +25,41 @@ function formRequest(returnTo: string, accept = "text/html,application/xhtml+xml
 }
 
 describe("navegação do connect com mp_oauth_pkce_invalid", () => {
-  it("mostra a frase genérica de configuração e esconde o código", async () => {
+  it("manda o dono para a página do app, sem o código", async () => {
     const response = await respondMercadoPagoConnect(formRequest("/onboarding"), async () => {
       throw new HttpError(503, "mp_oauth_pkce_invalid", "MP_OAUTH_PKCE deve ser on ou off.");
     });
-    expect(response.status).toBe(503);
-    expect(response.headers.get("content-type")).toContain("text/html");
+    expect(response.status).toBe(303);
     expect(response.headers.get("cache-control")).toBe("no-store");
-    const html = await response.text();
-    expect(html).toContain(MP_CONNECT_CONFIG_COPY);
+    const location = response.headers.get("location") ?? "";
+    expect(location).toBe("https://app.example.com/mercadopago/indisponivel?returnTo=%2Fonboarding");
+    expect(location).not.toContain("mp_oauth_pkce_invalid");
+    expect(location).not.toContain("MP_OAUTH_PKCE");
+    expect(ownerConnectConfigCopy("mp_oauth_pkce_invalid")).toBe(MP_CONNECT_UNAVAILABLE_COPY);
+    expect(ownerConnectConfigCopy("mp_oauth_unconfigured")).toBe(MP_CONNECT_UNAVAILABLE_COPY);
+  });
+
+  it("usa a marca, a pílula e a frase nova", () => {
+    const html = renderToStaticMarkup(createElement(MpConnectUnavailable, { backHref: "/onboarding" }));
     expect(html).toContain("Conexão indisponível");
+    expect(html).toContain(MP_CONNECT_UNAVAILABLE_COPY);
+    expect(html).toContain(">Voltar<");
     expect(html).toContain('href="/onboarding"');
-    expect(html).toContain("min-height: 44px");
+    expect(html).toContain("rounded-full");
+    expect(html).toContain("Agenda");
+    expect(html).toContain("Pix");
+    expect(html).toContain("font-display");
     expect(html).not.toContain("mp_oauth_pkce_invalid");
     expect(html).not.toContain("MP_OAUTH_PKCE");
-    expect(html).not.toContain("deve ser on ou off");
-    expect(ownerConnectConfigCopy("mp_oauth_pkce_invalid")).toBe(MP_CONNECT_CONFIG_COPY);
-    expect(ownerConnectConfigCopy("mp_oauth_unconfigured")).toBe(MP_CONNECT_CONFIG_COPY);
+    expect(html).not.toContain("A conexão com o Mercado Pago ainda não está configurada.");
   });
 
   it("trata o modo inválido como a configuração ausente", async () => {
     const response = await respondMercadoPagoConnect(formRequest("/dashboard"), async () => {
-      throw new HttpError(503, "mp_oauth_unconfigured", MP_CONNECT_CONFIG_COPY);
+      throw new HttpError(503, "mp_oauth_unconfigured", "A conexão com o Mercado Pago ainda não está configurada.");
     });
-    const html = await response.text();
-    expect(html).toContain(MP_CONNECT_CONFIG_COPY);
-    expect(html).toContain('href="/dashboard"');
-    expect(html).not.toContain("mp_oauth_unconfigured");
+    expect(response.headers.get("location")).toBe("https://app.example.com/mercadopago/indisponivel?returnTo=%2Fdashboard");
+    expect(response.headers.get("location")).not.toContain("mp_oauth_unconfigured");
   });
 
   it("mantém o JSON do contrato quando o cliente pede application/json", async () => {
@@ -88,17 +99,16 @@ describe("navegação do connect com mp_oauth_pkce_invalid", () => {
       formRequest("https://evil.test/phish"),
       async () => { throw new HttpError(503, "mp_oauth_pkce_invalid", "MP_OAUTH_PKCE deve ser on ou off."); },
     );
-    const externalHtml = await external.text();
-    expect(externalHtml).toContain('href="/dashboard"');
-    expect(externalHtml).not.toContain("evil.test");
+    expect(external.headers.get("location")).toBe("https://app.example.com/mercadopago/indisponivel?returnTo=%2Fdashboard");
+    expect(external.headers.get("location")).not.toContain("evil.test");
 
     const echoed = await respondMercadoPagoConnect(
       formRequest("/onboarding?reason=mp_oauth_pkce_invalid"),
       async () => { throw new HttpError(503, "mp_oauth_pkce_invalid", "MP_OAUTH_PKCE deve ser on ou off."); },
     );
-    const echoedHtml = await echoed.text();
-    expect(echoedHtml).toContain('href="/onboarding"');
-    expect(echoedHtml).not.toContain("mp_oauth_pkce_invalid");
+    const echoedLocation = echoed.headers.get("location") ?? "";
+    expect(echoedLocation).toBe("https://app.example.com/mercadopago/indisponivel?returnTo=%2Fonboarding");
+    expect(echoedLocation).not.toContain("mp_oauth_pkce_invalid");
   });
 
   it("liga o formulário e o callback na mesma resposta de navegação", () => {

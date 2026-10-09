@@ -251,6 +251,8 @@ describe("Mercado Pago connect consent", () => {
     const pausedReconnect = paused.indexOf("Reconectar");
     expect(paused.slice(paused.lastIndexOf("<button", pausedReconnect), pausedReconnect)).toContain("bg-pix ");
     expect(paused).toContain("O Mercado Pago encerrou a conexão.");
+    expect(paused).not.toContain("Conectado desde");
+    expect(paused).not.toContain("2 de outubro de 2026");
   });
 
   it("centers the disconnect dialog and links the Mercado Pago apps help", () => {
