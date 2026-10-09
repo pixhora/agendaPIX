@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pixResumePayload } from "../../components/booking/pix-resume";
+import { migratedPixResumePayload, pixResumePayload } from "../../components/booking/pix-resume";
 import { buildPublicBookingBody, stripStoredBookingCpf } from "../../components/booking/booking-payload";
 
 const service = {
@@ -65,5 +65,31 @@ describe("corpo do agendamento público", () => {
     expect(stripped.hadCpf).toBe(true);
     expect(stripped.record).not.toHaveProperty("customerCpf");
     expect(stripStoredBookingCpf(session).hadCpf).toBe(false);
+  });
+
+  it("migra uma sessão antiga com nome, WhatsApp e CPF para só os 4 campos", () => {
+    const raw = JSON.stringify({
+      bookingId: "b1",
+      accessToken: "tok",
+      serviceId: service.id,
+      expiresAt: "2030-01-01T15:30:00.000Z",
+      customerName: "Ana",
+      customerPhone: "+5511987654321",
+      customerCpf: "52998224725",
+      name: "Ana",
+      phone: "+5511987654321",
+    });
+    const migrated = migratedPixResumePayload(raw);
+    expect(migrated).not.toBeNull();
+    const session = JSON.parse(migrated ?? "{}") as Record<string, unknown>;
+    expect(Object.keys(session).sort()).toEqual(["accessToken", "bookingId", "expiresAt", "serviceId"]);
+    expect(session).toEqual({
+      bookingId: "b1",
+      accessToken: "tok",
+      expiresAt: "2030-01-01T15:30:00.000Z",
+      serviceId: service.id,
+    });
+    expect(JSON.stringify(session)).not.toMatch(/Ana|5511987654321|52998224725/);
+    expect(migratedPixResumePayload(JSON.stringify({ customerName: "Ana", customerPhone: "+5511987654321" }))).toBeNull();
   });
 });

@@ -29,8 +29,8 @@ import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { BrandMark } from "@/components/ui/brand";
 import { BookingSummary } from "./BookingSummary";
 import { GENERIC_SUBMIT_MESSAGE, OFFLINE_MESSAGE, POLICY_CHANGED_MESSAGE, businessLoadCopy, isOfflineError, publicBookingErrorView, whatsappHref } from "./booking-error";
-import { pixResumePayload, pixResumeStorageKey, readPixResume, shouldClearExpiredResume, shouldResumePix, type PixResumeSession } from "./pix-resume";
-import { buildPublicBookingBody, stripStoredBookingCpf } from "./booking-payload";
+import { migratedPixResumePayload, pixResumePayload, pixResumeStorageKey, readPixResume, shouldClearExpiredResume, shouldResumePix, type PixResumeSession } from "./pix-resume";
+import { buildPublicBookingBody } from "./booking-payload";
 import { PausedState } from "./PausedState";
 import { PolicySheet } from "@/components/policy/PolicySheet";
 
@@ -142,10 +142,12 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
     try {
       const raw = sessionStorage.getItem(storageKey);
       if (raw) {
-        const stripped = stripStoredBookingCpf(JSON.parse(raw));
-        stored = readPixResume(JSON.stringify(stripped.record ?? null));
-        if (stripped.hadCpf && stripped.record) {
-          sessionStorage.setItem(storageKey, stored ? pixResumePayload(stored) : JSON.stringify(stripped.record));
+        const migrated = migratedPixResumePayload(raw);
+        if (!migrated) {
+          sessionStorage.removeItem(storageKey);
+        } else {
+          if (migrated !== raw) sessionStorage.setItem(storageKey, migrated);
+          stored = readPixResume(migrated);
         }
       }
     } catch {
