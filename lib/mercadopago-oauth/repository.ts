@@ -168,7 +168,7 @@ export function createDrizzleMpStore(database: Database = getDb()): MpConnection
             select 1 from payment_refunds
             where payment_refunds.business_id = ${payments.businessId}
               and payment_refunds.payment_id = ${payments.id}
-              and payment_refunds.status = 'processing'
+              and payment_refunds.status in ('requested', 'processing')
           )
         )`,
         lastExpiresAt: sql<Date | string | null>`max(${payments.expiresAt})`,

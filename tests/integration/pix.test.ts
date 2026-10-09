@@ -15,7 +15,7 @@ import { simulateDevFakePayment } from "../../lib/payments/simulate-dev";
 import { padraoPolicyHash } from "../helpers/deposit-policy";
 import { disconnectMercadoPago } from "../../lib/mercadopago-oauth/credentials";
 import { createDrizzleMpStore } from "../../lib/mercadopago-oauth/repository";
-import { purgeDisconnectedMercadoPagoTokens } from "../../lib/mercadopago-oauth/refresh";
+import { MP_DISCONNECT_SETTLEMENT_GRACE_MS, purgeDisconnectedMercadoPagoTokens } from "../../lib/mercadopago-oauth/refresh";
 import { insertConnectedMercadoPago } from "../helpers/connected-mp";
 
 const pool = new Pool({ connectionString: databaseEnvSchema.parse(process.env).DATABASE_URL, max: 10, connectionTimeoutMillis: 5000 });
@@ -475,6 +475,49 @@ describe("webhook transacional e auditável", () => {
     expect(await purgeDisconnectedMercadoPagoTokens({ store, businessId: businessIds[0], now: new Date() })).toEqual({ purged: 1 });
     const [gone] = await database.select().from(schema.mercadopagoConnections).where(eq(schema.mercadopagoConnections.businessId, businessIds[0]));
     expect(gone.accessTokenEnc).toBeNull();
+  });
+  it("devolução pedida segura o token e só apaga depois de liquidar e da folga de 24 h", async () => {
+    const first = await createBooking(slugs[0], input(), randomUUID(), database, provider);
+    const withinGrace = new Date(Date.now() - 60 * 60 * 1000);
+    const pastGrace = new Date(withinGrace.getTime() - MP_DISCONNECT_SETTLEMENT_GRACE_MS - 60_000);
+    await database.update(schema.bookings).set({ status: "expired", expiresAt: pastGrace }).where(eq(schema.bookings.id, first.data.bookingId));
+    await database.update(schema.payments).set({
+      status: "paid",
+      paidAt: new Date(pastGrace.getTime() - 60_000),
+      expiresAt: pastGrace,
+      refundStatus: null,
+    }).where(eq(schema.payments.id, first.data.payment!.id));
+    await database.insert(schema.paymentRefunds).values({
+      businessId: businessIds[0],
+      paymentId: first.data.payment!.id,
+      bookingId: first.data.bookingId,
+      amountCents: 1000,
+      kind: "auto_late",
+      status: "requested",
+      idempotencyKey: `requested:${first.data.payment!.id}`,
+    });
+    const store = createDrizzleMpStore(database);
+    await disconnectMercadoPago(businessIds[0], { store });
+    expect(await purgeDisconnectedMercadoPagoTokens({ store, businessId: businessIds[0], now: new Date() })).toEqual({ purged: 0 });
+    const [kept] = await database.select().from(schema.mercadopagoConnections).where(eq(schema.mercadopagoConnections.businessId, businessIds[0]));
+    expect(kept.accessTokenEnc).toBeTruthy();
+
+    const settledAt = new Date();
+    await database.update(schema.paymentRefunds).set({ status: "refunded", finishedAt: settledAt }).where(eq(schema.paymentRefunds.paymentId, first.data.payment!.id));
+    await database.update(schema.payments).set({
+      refundStatus: "refunded",
+      refundedAt: settledAt,
+      expiresAt: withinGrace,
+    }).where(eq(schema.payments.id, first.data.payment!.id));
+    expect(await purgeDisconnectedMercadoPagoTokens({ store, businessId: businessIds[0], now: new Date() })).toEqual({ purged: 0 });
+    const [waiting] = await database.select().from(schema.mercadopagoConnections).where(eq(schema.mercadopagoConnections.businessId, businessIds[0]));
+    expect(waiting.accessTokenEnc).toBeTruthy();
+
+    const afterGrace = new Date(withinGrace.getTime() + MP_DISCONNECT_SETTLEMENT_GRACE_MS + 1_000);
+    expect(await purgeDisconnectedMercadoPagoTokens({ store, businessId: businessIds[0], now: afterGrace })).toEqual({ purged: 1 });
+    const [gone] = await database.select().from(schema.mercadopagoConnections).where(eq(schema.mercadopagoConnections.businessId, businessIds[0]));
+    expect(gone.accessTokenEnc).toBeNull();
+    expect(gone.refreshTokenEnc).toBeNull();
   });
   it("creating preso há mais de 7 dias não segura o token e não muda o status", async () => {
     const first = await createBooking(slugs[0], input(), randomUUID(), database, provider);

@@ -108,7 +108,7 @@ export async function getMercadoPagoOwnerStatus(businessId: string, deps?: Refre
 
 /**
  * Desconecta do nosso lado. Sem Pix em aberto e sem vencimento recente, apaga os tokens na hora.
- * `creating`/`pending` recente, devolução `processing`, ou o último `expires_at`/`remote_cancelled_at`
+ * `creating`/`pending` recente, devolução `requested` ou `processing`, ou o último `expires_at`/`remote_cancelled_at`
  * há menos de 24 h, guarda o par para confirmar ou devolver. O reconciliador apaga depois; o webhook só o negócio do evento.
  */
 export async function disconnectMercadoPago(businessId: string, deps?: RefreshDeps) {
