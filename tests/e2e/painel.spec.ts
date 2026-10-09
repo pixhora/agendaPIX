@@ -76,18 +76,19 @@ test.describe("painel do dono — jornadas", () => {
     await expect(page.getByRole("link", { name: /Ligar para Cliente E2E/ })).toHaveAttribute("href", "tel:+5511987654321");
   });
 
-  test("configurações: salva horários; link público visível", async ({ page }) => {
+  test("configurações: salva horários e mostra o link público", async ({ page }) => {
     await page.goto(withBusiness("/dashboard/settings"));
     await expect(page.getByRole("heading", { name: "Configurações", level: 1 })).toBeVisible();
     await expect(page.getByText(meta.businessASlug).first()).toBeVisible();
     await expect(page.getByText("Fuso horário: Horário de Brasília.")).toBeVisible();
     await expect(page.getByText("America/Sao_Paulo")).toHaveCount(0);
+    await expect(page.getByRole("region", { name: "Chave Pix do negócio" })).toHaveCount(0);
+    await expect(page.getByLabel(/Chave Pix|Nova chave Pix/)).toHaveCount(0);
 
     const hours = page.getByRole("form", { name: "Horários de funcionamento" });
     await hours.getByLabel("Domingo: aberto").uncheck();
     await hours.getByRole("button", { name: "Salvar horários de funcionamento" }).click();
     await expect(page.getByText("Horários de funcionamento salvos.").first()).toBeVisible();
-
     await expectNoAxeViolations(page, "painel: configurações");
   });
 });

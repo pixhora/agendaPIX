@@ -49,6 +49,7 @@ test.describe("painel do dono — autenticado", () => {
     await expect(page.getByRole("heading", { name: "Sua página pública", exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Aparência", exact: true })).toBeVisible();
     await expect(page.getByText("Compartilhe este link para receber reservas com sinal via Pix.")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "WhatsApp do negócio", exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Chave Pix do negócio" })).toHaveCount(0);
   });
 

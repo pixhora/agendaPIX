@@ -11,7 +11,7 @@ import { StatusChip, ValueSlab } from "@/components/ui/value-slab";
 import { buttonVariants } from "@/components/ui/button";
 import { dashboardBookings } from "@/lib/dashboard/data";
 import { dashboardAgendaKpis, dashboardAgendaSummary, formatBrlCents } from "@/lib/dashboard/summary";
-import { getBusinessBilling } from "@/lib/billing/status";
+import { OwnerBillingNotice } from "@/components/dashboard/owner-billing-notice";
 import { ownerContext } from "@/lib/dashboard/session";
 import { dateSchema, shiftDate, weekDates } from "@/lib/dashboard/validation";
 import { localDate } from "@/lib/bookings/availability";
@@ -34,7 +34,6 @@ function KpiCard({ label, value, hint, icon, tone = "default" }: { label: string
 export default async function AgendaPage({ searchParams }: { searchParams: Promise<{ businessId?: string; date?: string; view?: string }> }) {
   const query = await searchParams;
   const { businesses, business, owner } = await ownerContext(query.businessId);
-  const billing = business ? await getBusinessBilling(business.id, owner.id) : null;
   const now = new Date();
   const timezone = business?.timezone ?? "America/Sao_Paulo";
   const parsedDate = dateSchema.safeParse(query.date);
@@ -84,11 +83,8 @@ export default async function AgendaPage({ searchParams }: { searchParams: Promi
     : `${longLabel(date).replace(/^./, (letter) => letter.toUpperCase())}${date === today ? " · hoje" : ""}`;
   const nextBooking = summary?.nextReservation;
 
-  return <DashboardShell title={business ? `Agenda de ${business.name}` : "Sua agenda"} description={description} path="/dashboard" businesses={businesses} businessId={business?.id}>
+  return <DashboardShell title={business ? `Agenda de ${business.name}` : "Sua agenda"} description={description} path="/dashboard" businesses={businesses} businessId={business?.id} notice={business ? <OwnerBillingNotice ownerId={owner.id} businessId={business.id} timeZone={business.timezone} publicSlug={business.slug} /> : undefined}>
     {business && summary && <>
-      {billing?.bookingsPaused && <p role="status" className="rounded-card border border-warning/30 bg-warning-soft px-4 py-3 text-sm font-medium text-warning">Novos agendamentos estão pausados. O teste grátis terminou.</p>}
-      {billing && !billing.bookingsPaused && billing.state === "trial_last_day" && <p role="status" className="rounded-card border border-line bg-surface px-4 py-3 text-sm font-medium">Seu teste grátis termina hoje, às 23:59.</p>}
-      {billing && !billing.bookingsPaused && billing.state === "trial_ending" && <p role="status" className="rounded-card border border-line bg-surface px-4 py-3 text-sm font-medium">{billing.daysLeft === 1 ? "Seu teste grátis termina amanhã." : `Seu teste grátis termina em ${billing.daysLeft} dias.`}</p>}
       <div className="flex flex-wrap items-center gap-2">
         <nav aria-label="Navegar por datas" className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
           <Link className={buttonVariants({ variant: "outline", size: "icon" })} href={href(shiftDate(date, weekly ? -7 : -1))} aria-label={weekly ? "Semana anterior" : "Dia anterior"}><ChevronLeft aria-hidden="true" /></Link>
