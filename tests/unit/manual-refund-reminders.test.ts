@@ -36,12 +36,22 @@ function item(overrides: Partial<ReminderCase> = {}): ReminderCase {
 }
 
 describe("lembretes da devolução manual", () => {
-  it("E5 sai na véspera a partir das 09:00 e não no dia do prazo", () => {
+  it("E5 sai na primeira passagem da véspera, inclusive no cron das 03:00 BRT, e não no dia do prazo", () => {
     const row = item();
-    expect(selectEve([row], new Date("2026-10-22T11:59:00.000Z"))).toHaveLength(0);
+    // 21:00 BRT do dia anterior: ainda não é a véspera.
+    expect(selectEve([row], new Date("2026-10-22T00:00:00.000Z"))).toHaveLength(0);
+    // 00:00 BRT da véspera: primeira passagem de um cron a cada poucos minutos.
+    expect(selectEve([row], new Date("2026-10-22T03:00:00.000Z"))).toHaveLength(1);
+    // 03:00 BRT: `0 6 * * *` UTC. O Hobby pode disparar até 06:59 UTC (03:59 BRT).
+    expect(selectEve([row], new Date("2026-10-22T06:00:00.000Z"))).toHaveLength(1);
+    expect(selectEve([row], new Date("2026-10-22T06:59:00.000Z"))).toHaveLength(1);
+    // 08:59 BRT ficava de fora quando a janela começava às 09:00.
+    expect(selectEve([row], new Date("2026-10-22T11:59:00.000Z"))).toHaveLength(1);
     expect(selectEve([row], new Date("2026-10-22T12:00:00.000Z"))).toHaveLength(1);
+    expect(selectEve([row], new Date("2026-10-23T06:00:00.000Z"))).toHaveLength(0);
     expect(selectEve([row], new Date("2026-10-23T12:00:00.000Z"))).toHaveLength(0);
-    expect(selectEve([item({ open: false })], new Date("2026-10-22T12:00:00.000Z"))).toHaveLength(0);
+    expect(selectEve([item({ reminderSentAt: new Date("2026-10-22T06:00:00.000Z") })], new Date("2026-10-22T12:00:00.000Z"))).toHaveLength(0);
+    expect(selectEve([item({ open: false })], new Date("2026-10-22T06:00:00.000Z"))).toHaveLength(0);
   });
 
   it("não manda E5 da política se a primeira tentativa foi no D+6 ou depois", () => {
@@ -65,6 +75,7 @@ describe("lembretes da devolução manual", () => {
     const day2 = new Date("2026-10-18T12:00:00.000Z");
     const day3 = new Date("2026-10-19T12:00:00.000Z");
     expect(selectDaily([failed], day1, new Set())).toHaveLength(1);
+    expect(selectDaily([failed], new Date("2026-10-17T06:00:00.000Z"), new Set())).toHaveLength(1);
     expect(selectDaily([item({ reminderCount: 1, lastRemindedOn: "2026-10-17" })], day1, new Set())).toHaveLength(0);
     expect(selectDaily([item({ reminderCount: 1, lastRemindedOn: "2026-10-17" })], day2, new Set())).toHaveLength(1);
     expect(selectDaily([item({ reminderCount: 2 })], day2, new Set())).toHaveLength(0);
@@ -80,6 +91,26 @@ describe("lembretes da devolução manual", () => {
     expect(selectDaily([review], new Date("2026-10-17T14:00:00.000Z"), new Set())).toHaveLength(0);
     expect(selectDaily([review], new Date("2026-10-17T15:00:00.000Z"), new Set())).toHaveLength(1);
     expect(selectDaily([item({ ...review, reminderCount: 1 })], new Date("2026-10-18T15:00:00.000Z"), new Set())).toHaveLength(0);
+  });
+
+  it("o cron das 03:00 BRT envia uma vez; outra passagem no mesmo dia não repete", async () => {
+    let sentAt: Date | null = null;
+    const sent: string[] = [];
+    const ports: ReminderPorts = {
+      async load() { return [item({ reminderSentAt: sentAt })]; },
+      async claimEve() {
+        if (sentAt) return false;
+        sentAt = new Date();
+        return true;
+      },
+      async releaseEve() { sentAt = null; },
+      async send(mail) { sent.push(mail.to); },
+      async recordEve(_item, at) { sentAt = at; },
+      async recordDaily() {},
+    };
+    expect(await runManualRefundReminders(ports, new Date("2026-10-22T06:00:00.000Z"))).toEqual({ emails: 1 });
+    expect(await runManualRefundReminders(ports, new Date("2026-10-22T12:05:00.000Z"))).toEqual({ emails: 0 });
+    expect(sent).toEqual(["dono@example.com"]);
   });
 
   it("dois jobs ao mesmo tempo enviam um e-mail, só para o dono", async () => {

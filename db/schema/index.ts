@@ -169,12 +169,17 @@ export const payments = pgTable("payments", {
   manualRefundReminderSentAt: timestamp("manual_refund_reminder_sent_at", { withTimezone: true }),
   /** Dia local em que o cliente pediu o cancelamento, informado pelo dono. */
   policyRefundRequestedOn: date("policy_refund_requested_on"),
+  /** Cancelamento remoto já concluído. A reconciliação não tenta de novo. */
+  remoteCancelledAt: timestamp("remote_cancelled_at", { withTimezone: true }),
+  /** Última tentativa de cancelamento que não concluiu. Null cede a vez a quem ainda não foi tentado. */
+  remoteCancelAttemptedAt: timestamp("remote_cancel_attempted_at", { withTimezone: true }),
   ...timestamps(),
 }, (table) => [
   unique("payments_business_id_unique").on(table.businessId, table.id),
   foreignKey({ name: "payments_booking_tenant_fk", columns: [table.businessId, table.bookingId], foreignColumns: [bookings.businessId, bookings.id] }),
   index("payments_business_booking_idx").on(table.businessId, table.bookingId),
   index("payments_reconcile_status_idx").on(table.status, table.updatedAt),
+  index("payments_remote_cancel_due_idx").on(table.remoteCancelAttemptedAt, table.expiresAt, table.id).where(sql`${table.remoteCancelledAt} IS NULL AND ${table.externalId} IS NOT NULL AND ${table.status} IN ('pending', 'expired')`),
   unique("payments_provider_external_unique").on(table.provider, table.externalId),
   check("payments_amount_positive", sql`${table.amountCents} > 0`),
   check("payments_provider_not_empty", sql`length(trim(${table.provider})) > 0`),

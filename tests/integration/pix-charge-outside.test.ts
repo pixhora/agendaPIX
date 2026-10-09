@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -11,6 +11,7 @@ import { reconcileOnce } from "../../lib/payments/reconcile";
 import { applyPaidEvent } from "../../lib/payments/apply-paid";
 import { drizzleRefundPorts, settleAutomaticLateRefund } from "../../lib/payments/refund-flow";
 import { polledPaidEvent, type ChargeInput, type PaymentProvider } from "../../lib/payments/provider";
+import { PIX_APPROVAL_TOLERANCE_MS } from "../../lib/payments/rules";
 import { hash } from "../../lib/bookings/service";
 import { padraoPolicyHash } from "../helpers/deposit-policy";
 import { insertConnectedMercadoPago } from "../helpers/connected-mp";
@@ -150,7 +151,7 @@ describe("reconciliação", () => {
     const broken = { name: provider.name, createPixCharge: async () => { throw new Error("fail"); }, getCharge: provider.getCharge.bind(provider), findChargeByReference: provider.findChargeByReference.bind(provider), cancelCharge: provider.cancelCharge.bind(provider), verifyWebhook: provider.verifyWebhook.bind(provider), refundCharge: provider.refundCharge.bind(provider) };
     await expect(createBooking(slug, input(0), randomUUID(), database, broken)).rejects.toMatchObject({ status: 503 });
     await database.update(schema.payments).set({ updatedAt: new Date(Date.now() - 120_000) }).where(eq(schema.payments.businessId, businessId));
-    const report = await reconcileOnce(database, provider, { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50 });
+    const report = await reconcileOnce(database, provider, { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50, RECONCILE_BUDGET_MS: 50_000 });
     expect(report.stuckRetried).toBe(1);
     const [payment] = await database.select().from(schema.payments).where(eq(schema.payments.businessId, businessId));
     expect(payment.status).toBe("pending");
@@ -161,17 +162,33 @@ describe("reconciliação", () => {
     const { data } = await createBooking(slug, input(0), randomUUID(), database, provider);
     await database.update(schema.bookings).set({ createdAt: new Date(Date.now() - 60_000), expiresAt: new Date(Date.now() - 1000) }).where(eq(schema.bookings.id, data.bookingId));
     await database.update(schema.payments).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(schema.payments.id, data.payment!.id));
-    const report = await reconcileOnce(database, provider, { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50 });
+    const report = await reconcileOnce(database, provider, { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50, RECONCILE_BUDGET_MS: 50_000 });
     expect(report.expiredCancelled).toBe(1);
     expect(await provider.getCharge(data.payment!.externalId!)).toMatchObject({ status: "cancelled" });
     const [payment] = await database.select().from(schema.payments).where(eq(schema.payments.id, data.payment!.id));
     expect(payment.status).toBe("expired");
   });
 
+  it("reconciliação confirma Pix aprovado no prazo mesmo depois do hold", async () => {
+    const { data } = await createBooking(slug, input(0), randomUUID(), database, provider);
+    const holdEnds = new Date(Date.now() - 30_000);
+    const paidAt = new Date(holdEnds.getTime() - 60_000);
+    await database.update(schema.bookings).set({ createdAt: new Date(Date.now() - 60_000), expiresAt: holdEnds }).where(eq(schema.bookings.id, data.bookingId));
+    await database.update(schema.payments).set({ expiresAt: holdEnds }).where(eq(schema.payments.id, data.payment!.id));
+    provider.markPaid(data.payment!.externalId!, paidAt);
+    const report = await reconcileOnce(database, provider, { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50, RECONCILE_BUDGET_MS: 50_000 });
+    expect(report.refundsSettled).toBe(0);
+    const [booking] = await database.select().from(schema.bookings).where(eq(schema.bookings.id, data.bookingId));
+    expect(booking.status).toBe("confirmed");
+    const [payment] = await database.select().from(schema.payments).where(eq(schema.payments.id, data.payment!.id));
+    expect(payment.status).toBe("paid");
+    expect(payment.refundStatus).toBeNull();
+  });
+
   it("descobre pagamento perdido pelo webhook via poll", async () => {
     const { data } = await createBooking(slug, input(0), randomUUID(), database, provider);
     provider.markPaid(data.payment!.externalId!);
-    const report = await reconcileOnce(database, provider, { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50 });
+    const report = await reconcileOnce(database, provider, { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50, RECONCILE_BUDGET_MS: 50_000 });
     expect(report.polledPaid).toBe(1);
     const [booking] = await database.select().from(schema.bookings).where(eq(schema.bookings.id, data.bookingId));
     expect(booking.status).toBe("confirmed");
@@ -183,7 +200,7 @@ describe("reconciliação", () => {
     await database.update(schema.payments).set({ expiresAt: new Date(Date.now() - 1000), status: "expired" }).where(eq(schema.payments.id, data.payment!.id));
     // Outro cliente pega o horário
     await createBooking(slug, input(0, "+5511999999901"), randomUUID(), database, provider);
-    const charge = provider.markPaid(data.payment!.externalId!);
+    const charge = provider.markPaid(data.payment!.externalId!, new Date(Date.now() + PIX_APPROVAL_TOLERANCE_MS));
     await database.transaction(async (tx) => {
       const result = await applyPaidEvent(tx, "fake", polledPaidEvent(charge, hash), new Date());
       expect(result).toMatchObject({ outcome: "ignored", reason: "late_no_slot" });
@@ -203,12 +220,62 @@ describe("reconciliação", () => {
     expect(store.calls.refund).toBe(callsBefore + 1);
   });
 
+  it("timeout do estorno tardio solta o pagamento e a próxima passagem reusa a chave", async () => {
+    vi.stubEnv("PAYMENT_PROVIDER_TIMEOUT_MS", "400");
+    const { data } = await createBooking(slug, input(0), randomUUID(), database, provider);
+    await database.update(schema.bookings).set({ createdAt: new Date(Date.now() - 60_000), expiresAt: new Date(Date.now() - 1000), status: "expired" }).where(eq(schema.bookings.id, data.bookingId));
+    await database.update(schema.payments).set({ expiresAt: new Date(Date.now() - 1000), status: "expired" }).where(eq(schema.payments.id, data.payment!.id));
+    await createBooking(slug, input(0, "+5511999999901"), randomUUID(), database, provider);
+    const charge = provider.markPaid(data.payment!.externalId!, new Date(Date.now() + PIX_APPROVAL_TOLERANCE_MS));
+    await database.transaction(async (tx) => {
+      expect(await applyPaidEvent(tx, "fake", polledPaidEvent(charge, hash), new Date())).toMatchObject({ outcome: "ignored", reason: "late_no_slot" });
+    });
+    const keys: string[] = [];
+    provider.latencyMs = 3_000;
+    const ports = drizzleRefundPorts(database);
+    const pending = settleAutomaticLateRefund(ports, {
+      refundCharge: async (externalId, input, options) => {
+        keys.push(input.idempotencyKey);
+        return provider.refundCharge(externalId, input, options);
+      },
+    }, data.payment!.id, async () => {});
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    const started = Date.now();
+    await database.transaction(async (tx) => {
+      await tx.execute(sql`select id from payments where id = ${data.payment!.id} for update`);
+    });
+    expect(Date.now() - started).toBeLessThan(200);
+    await expect(pending).resolves.toBe("deferred");
+    const [attempt] = await database.select().from(schema.paymentRefunds).where(eq(schema.paymentRefunds.paymentId, data.payment!.id));
+    expect(attempt?.status).toBe("requested");
+    expect(attempt?.idempotencyKey).toBe(`auto_late:${data.payment!.id}`);
+    const [open] = await database.select().from(schema.payments).where(eq(schema.payments.id, data.payment!.id));
+    expect(open.status).toBe("paid");
+    expect(open.refundStatus).toBeNull();
+
+    provider.latencyMs = 0;
+    vi.stubEnv("PAYMENT_PROVIDER_TIMEOUT_MS", "8000");
+    await expect(settleAutomaticLateRefund(ports, {
+      refundCharge: async (externalId, input, options) => {
+        keys.push(input.idempotencyKey);
+        return provider.refundCharge(externalId, input, options);
+      },
+    }, data.payment!.id, async () => {})).resolves.toBe("submitted");
+    expect(keys).toEqual([`auto_late:${data.payment!.id}`, `auto_late:${data.payment!.id}`]);
+    const [closed] = await database.select().from(schema.payments).where(eq(schema.payments.id, data.payment!.id));
+    expect(closed.status).toBe("refunded");
+    expect(closed.refundStatus).toBe("refunded");
+    const attempts = await database.select().from(schema.paymentRefunds).where(eq(schema.paymentRefunds.paymentId, data.payment!.id));
+    expect(attempts).toHaveLength(1);
+    expect(attempts[0]?.status).toBe("refunded");
+  });
+
   it("pagamento tardio com rebook_if_free confirma se o horário estiver livre", async () => {
     await database.update(schema.businesses).set({ latePaymentPolicy: "rebook_if_free" }).where(eq(schema.businesses.id, businessId));
     const { data } = await createBooking(slug, input(0), randomUUID(), database, provider);
     await database.update(schema.bookings).set({ createdAt: new Date(Date.now() - 60_000), expiresAt: new Date(Date.now() - 1000), status: "expired" }).where(eq(schema.bookings.id, data.bookingId));
     await database.update(schema.payments).set({ expiresAt: new Date(Date.now() - 1000), status: "expired" }).where(eq(schema.payments.id, data.payment!.id));
-    const charge = provider.markPaid(data.payment!.externalId!);
+    const charge = provider.markPaid(data.payment!.externalId!, new Date(Date.now() + PIX_APPROVAL_TOLERANCE_MS));
     await database.transaction(async (tx) => {
       expect(await applyPaidEvent(tx, "fake", polledPaidEvent(charge, hash), new Date())).toMatchObject({ outcome: "processed", reason: "late_rebooked" });
     });
@@ -218,6 +285,28 @@ describe("reconciliação", () => {
     expect(payment.status).toBe("paid");
   });
 
+  it("pagamento tardio com rebook_if_free e horário ocupado registra late_no_slot na reconciliação", async () => {
+    vi.stubEnv("MAGIC_LINK_CAPTURE_FILE", "/tmp/agenda-late-rebook-mail.txt");
+    await database.update(schema.businesses).set({ latePaymentPolicy: "rebook_if_free" }).where(eq(schema.businesses.id, businessId));
+    const { data } = await createBooking(slug, input(0), randomUUID(), database, provider);
+    await database.update(schema.bookings).set({ createdAt: new Date(Date.now() - 60_000), expiresAt: new Date(Date.now() - 1000) }).where(eq(schema.bookings.id, data.bookingId));
+    await database.update(schema.payments).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(schema.payments.id, data.payment!.id));
+    const other = await createBooking(slug, input(0, "+5511999999901"), randomUUID(), database, provider);
+    provider.markPaid(data.payment!.externalId!, new Date(Date.now() + PIX_APPROVAL_TOLERANCE_MS));
+    const report = await reconcileOnce(database, provider, { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50, RECONCILE_BUDGET_MS: 50_000 });
+    expect(report.refundsSettled).toBe(1);
+    const [lateBooking] = await database.select().from(schema.bookings).where(eq(schema.bookings.id, data.bookingId));
+    expect(lateBooking.status).toBe("expired");
+    const [taken] = await database.select().from(schema.bookings).where(eq(schema.bookings.id, other.data.bookingId));
+    expect(taken.status).toBe("pending_payment");
+    const [payment] = await database.select().from(schema.payments).where(eq(schema.payments.id, data.payment!.id));
+    expect(payment.status).toBe("refunded");
+    expect(payment.refundStatus).toBe("refunded");
+    const audits = await database.select().from(schema.paymentAudit).where(eq(schema.paymentAudit.paymentId, data.payment!.id));
+    expect(audits.some((row) => row.action === "late_no_slot" && (row.detail as { actor?: string; reason?: string } | null)?.actor === "system")).toBe(true);
+    expect(audits.some((row) => row.action === "automatic_refund")).toBe(true);
+  });
+
   it("sem provedor disponível (produção sem Mercado Pago) ainda expira holds e creating vencidos", async () => {
     const broken = { name: provider.name, createPixCharge: async () => { throw new Error("fail"); }, getCharge: provider.getCharge.bind(provider), findChargeByReference: provider.findChargeByReference.bind(provider), cancelCharge: provider.cancelCharge.bind(provider), verifyWebhook: provider.verifyWebhook.bind(provider), refundCharge: provider.refundCharge.bind(provider) };
     const { data: pending } = await createBooking(slug, input(0), randomUUID(), database, provider);
@@ -225,7 +314,7 @@ describe("reconciliação", () => {
     const past = new Date(Date.now() - 1000);
     await database.update(schema.bookings).set({ createdAt: new Date(Date.now() - 60_000), expiresAt: past }).where(eq(schema.bookings.businessId, businessId));
     await database.update(schema.payments).set({ expiresAt: past }).where(eq(schema.payments.businessId, businessId));
-    const report = await reconcileOnce(database, null, { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50 });
+    const report = await reconcileOnce(database, null, { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50, RECONCILE_BUDGET_MS: 50_000 });
     expect(report).toMatchObject({ skippedLock: false, stuckCancelled: 1, expiredCancelled: 1, polledPaid: 0 });
     const payments = await database.select().from(schema.payments).where(eq(schema.payments.businessId, businessId));
     expect(payments.map((p) => p.status).sort()).toEqual(["expired", "expired"]);
@@ -239,7 +328,9 @@ describe("reconciliação", () => {
   it("reconcilers concorrentes: só um executa o trabalho", async () => {
     const { data } = await createBooking(slug, input(0), randomUUID(), database, provider);
     provider.markPaid(data.payment!.externalId!);
-    const config = { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50 };
+    // Segura o advisory lock durante a consulta para o outro processo observar o conflito.
+    provider.latencyMs = 250;
+    const config = { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50, RECONCILE_BUDGET_MS: 50_000 };
     // Duas conexões distintas para advisory locks de sessão.
     const pool2 = new Pool({ connectionString: databaseEnvSchema.parse(process.env).DATABASE_URL, max: 2 });
     const db2 = drizzle(pool2, { schema });

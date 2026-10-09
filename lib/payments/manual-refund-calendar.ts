@@ -3,7 +3,6 @@
  * vence no fim do 7º dia, no fuso do negócio. Aviso em sex, 16 out → fim de sex, 23 out.
  */
 export const MANUAL_REFUND_DEADLINE_DAYS = 7;
-export const MANUAL_REFUND_REMINDER_HOUR = 9;
 
 const DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
@@ -11,11 +10,6 @@ export function localDate(instant: Date, timeZone: string) {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(instant);
   const value = Object.fromEntries(parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
   return `${value.year}-${value.month}-${value.day}`;
-}
-
-export function localHour(instant: Date, timeZone: string) {
-  const hour = new Intl.DateTimeFormat("en-GB", { timeZone, hour: "2-digit", hourCycle: "h23" }).format(instant);
-  return Number(hour);
 }
 
 export function addCalendarDays(isoDate: string, days: number) {

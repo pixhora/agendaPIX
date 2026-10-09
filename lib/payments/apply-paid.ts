@@ -15,10 +15,12 @@ async function audit(database: Database, input: { businessId: string; paymentId:
 
 /**
  * Efeito de um pagamento confirmado, compartilhado pelo webhook e pela reconciliação.
- * Deduplica por (provider, eventId) e aplica decidePaidEvent. Pagamento dentro do hold
- * confirma a reserva. Pagamento depois do hold não é tratado como confirmado até a
- * reserva gravar `confirmed` (`late_rebooked`, horário ainda livre). Sem horário, devolve
- * `late_no_slot` e o estorno roda depois do commit. Não há repasse: o Pix cai na conta do dono.
+ * Deduplica por (provider, eventId) e aplica decidePaidEvent. "No prazo" é a hora de
+ * aprovação (`date_approved`), não o relógio deste processamento. Se o hold já liberou a
+ * reserva e o horário segue livre, retoma (`on_time_reclaimed`). Sem horário, grava
+ * `late_no_slot`; o estorno sai depois do commit, fora desta transação. Pagamento
+ * de fato depois do prazo segue a política do negócio (`late_rebooked` ou `late_no_slot`).
+ * Não há repasse: o Pix cai na conta do dono.
  */
 export async function applyPaidEvent(database: Database, providerName: string, event: PaidEvent, now = new Date()): Promise<PaidOutcome> {
   const payloadHash = hash(JSON.stringify(event));
@@ -61,6 +63,8 @@ export async function applyPaidEvent(database: Database, providerName: string, e
         detail: { eventId: event.eventId, statusDetail: event.statusDetail ?? null },
       });
       result = { outcome: decision.outcome, reason: decision.reason, ...ids };
+    } else if (decision.reason === "on_time_hold_released") {
+      result = await reclaimOnTimeBooking(database, { business, payment, booking, event, now: processingNow });
     } else if (decision.outcome === "ignored" && decision.reason === "late_payment") {
       result = await resolveLatePayment(database, { business, payment, booking, event, now: processingNow });
     } else {
@@ -69,6 +73,58 @@ export async function applyPaidEvent(database: Database, providerName: string, e
   }
   await database.update(schema.paymentEvents).set({ outcome: result.outcome, reason: result.reason }).where(eq(schema.paymentEvents.id, inserted.id));
   return result;
+}
+
+/**
+ * Aprovação no prazo, mas o hold já expirou a reserva. Retoma se o horário estiver livre.
+ * O UPDATE para `confirmed` pode esbarrar na exclusão `bookings_no_overlap` (23P01) quando
+ * outra reserva ocupou o intervalo. O savepoint (transação aninhada do Drizzle) desfaz só
+ * essa tentativa; a transação de fora grava `late_no_slot` e o estorno segue o fluxo atual.
+ * O atraso com `rebook_if_free` usa o savepoint de `resolveLatePayment`.
+ */
+async function reclaimOnTimeBooking(database: Database, input: {
+  business: typeof schema.businesses.$inferSelect;
+  payment: typeof schema.payments.$inferSelect;
+  booking: typeof schema.bookings.$inferSelect;
+  event: PaidEvent;
+  now: Date;
+}): Promise<PaidOutcome> {
+  const { business, payment, booking, event, now } = input;
+  const ids = { paymentId: payment.id, businessId: business.id, bookingId: booking.id };
+  if (booking.startsAt > now) {
+    let reclaimed = false;
+    try {
+      reclaimed = await database.transaction(async (tx) => {
+        await tx.update(schema.bookings).set({ status: "confirmed", expiresAt: null })
+          .where(and(
+            eq(schema.bookings.businessId, business.id),
+            eq(schema.bookings.id, booking.id),
+            or(eq(schema.bookings.status, "expired"), eq(schema.bookings.status, "pending_payment")),
+          ));
+        const [current] = await tx.select().from(schema.bookings)
+          .where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.id, booking.id))).limit(1);
+        return current.status === "confirmed";
+      });
+    } catch (error) {
+      const cause = error instanceof Error && error.cause ? error.cause : error;
+      if (!(typeof cause === "object" && cause !== null && "code" in cause && cause.code === "23P01")) throw error;
+    }
+    if (reclaimed) {
+      await audit(database, {
+        businessId: business.id, paymentId: payment.id, bookingId: booking.id, action: "payment_confirmed",
+        detail: { eventId: event.eventId, statusDetail: event.statusDetail ?? null, reclaimed: true },
+      });
+      return { outcome: "processed", reason: "on_time_reclaimed", ...ids };
+    }
+  }
+  await audit(database, {
+    businessId: business.id, paymentId: payment.id, bookingId: booking.id, action: "late_no_slot",
+    detail: {
+      actor: "system", actorUserId: null, amountCents: payment.amountCents, status: null, mpRefundId: null,
+      failureCause: null, policyHash: null, reason: "late_no_slot", eventId: event.eventId, statusDetail: event.statusDetail ?? null,
+    },
+  });
+  return { outcome: "ignored", reason: "late_no_slot", ...ids };
 }
 
 async function resolveLatePayment(database: Database, input: {
@@ -82,18 +138,25 @@ async function resolveLatePayment(database: Database, input: {
   // Só vira confirmed se o horário ainda estiver livre. Antes dessa gravação o atraso
   // não é tratado como confirmado. Não cria repasse.
   if (business.latePaymentPolicy === "rebook_if_free" && booking.startsAt > now) {
+    // Savepoint (transação aninhada do Drizzle). O 23P01 da exclusão gist aborta a transação
+    // do Postgres se o UPDATE correr no mesmo bloco: late_no_slot não grava, o webhook
+    // responde 503 em loop e o estorno não dispara. O rollback do savepoint deixa o bloco válido.
+    let rebooked = false;
     try {
-      await database.update(schema.bookings).set({ status: "confirmed", expiresAt: null })
-        .where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.id, booking.id), or(eq(schema.bookings.status, "expired"), eq(schema.bookings.status, "pending_payment"))));
-      const [current] = await database.select().from(schema.bookings)
-        .where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.id, booking.id))).limit(1);
-      if (current.status === "confirmed") {
-        await audit(database, { businessId: business.id, paymentId: payment.id, bookingId: booking.id, action: "late_payment_rebooked", detail: { eventId: event.eventId, statusDetail: event.statusDetail ?? null } });
-        return { outcome: "processed", reason: "late_rebooked", paymentId: payment.id, businessId: business.id, bookingId: booking.id };
-      }
+      rebooked = await database.transaction(async (tx) => {
+        await tx.update(schema.bookings).set({ status: "confirmed", expiresAt: null })
+          .where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.id, booking.id), or(eq(schema.bookings.status, "expired"), eq(schema.bookings.status, "pending_payment"))));
+        const [current] = await tx.select().from(schema.bookings)
+          .where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.id, booking.id))).limit(1);
+        return current.status === "confirmed";
+      });
     } catch (error) {
       const cause = error instanceof Error && error.cause ? error.cause : error;
       if (!(typeof cause === "object" && cause !== null && "code" in cause && cause.code === "23P01")) throw error;
+    }
+    if (rebooked) {
+      await audit(database, { businessId: business.id, paymentId: payment.id, bookingId: booking.id, action: "late_payment_rebooked", detail: { eventId: event.eventId, statusDetail: event.statusDetail ?? null } });
+      return { outcome: "processed", reason: "late_rebooked", paymentId: payment.id, businessId: business.id, bookingId: booking.id };
     }
   }
   await audit(database, {

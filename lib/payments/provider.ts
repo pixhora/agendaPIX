@@ -41,6 +41,13 @@ export const paidEventSchema = z.object({
   externalId: z.string().min(1).max(200),
   amountCents: centsSchema.refine((value) => value > 0),
   paidAt: z.iso.datetime({ offset: true }),
+  /**
+   * `date_approved`: instante de aprovação informado pelo gateway.
+   * `fallback`: `date_approved` ausente ou inválido; `paidAt` é só o instante do processamento
+   * e não prova que o Pix foi pago no prazo.
+   * Ausente (fake e eventos antigos): `paidAt` é a aprovação declarada por quem montou o evento.
+   */
+  paidAtSource: z.enum(["date_approved", "fallback"]).optional(),
   /** `status_detail` do Mercado Pago, gravado em `payment_audit`. */
   statusDetail: z.string().min(1).max(80).optional(),
 }).strict();
@@ -99,12 +106,19 @@ export interface PaymentProvider {
   verifyWebhook(body: string, headers: Headers, now: Date, requestUrl?: string): PaidEvent | Promise<PaidEvent>;
 }
 
-/** Evento sintético e determinístico para pagamentos descobertos por consulta (reconciliação). */
-export function polledPaidEvent(charge: ProviderCharge, digest: (value: string) => string): PaidEvent {
-  if (charge.status !== "paid" || !charge.paidAt) throw new Error("Cobrança não paga.");
+/**
+ * Evento sintético e determinístico para pagamentos descobertos por consulta (reconciliação).
+ * `paidAt` preenchido é a aprovação (`date_approved` no Mercado Pago; o instante passado a
+ * `markPaid` no fake). Sem instante válido, o evento usa `now` com `paidAtSource: "fallback"`.
+ */
+export function polledPaidEvent(charge: ProviderCharge, digest: (value: string) => string, now = new Date()): PaidEvent {
+  if (charge.status !== "paid") throw new Error("Cobrança não paga.");
+  const known = charge.paidAt instanceof Date && !Number.isNaN(charge.paidAt.getTime());
   const id = charge.externalId.length <= 190 ? charge.externalId : digest(charge.externalId);
   return paidEventSchema.parse({
-    eventId: `poll:${id}`, type: "payment.paid", externalId: charge.externalId, amountCents: charge.amountCents, paidAt: charge.paidAt.toISOString(),
+    eventId: `poll:${id}`, type: "payment.paid", externalId: charge.externalId, amountCents: charge.amountCents,
+    paidAt: (known ? charge.paidAt! : now).toISOString(),
+    paidAtSource: known ? "date_approved" : "fallback",
     ...(charge.statusDetail ? { statusDetail: charge.statusDetail } : {}),
   });
 }

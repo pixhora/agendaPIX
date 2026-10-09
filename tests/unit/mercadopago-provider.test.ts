@@ -5,6 +5,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { getPaymentProvider } from "../../lib/payments";
 import { processWebhook } from "../../lib/payments/webhook";
 import { ObservedRefundEvent, UnverifiableSellerPayment } from "../../lib/payments/provider";
+import { ProviderTimeoutError } from "../../lib/payments/timeout";
 import { MpAccountNotConnectedError, resetSellerAccountHooks } from "../../lib/payments/seller-account";
 import {
   buildMercadoPagoManifest,
@@ -23,6 +24,7 @@ const customer = { name: "Cliente Teste Silva", phone: "+5511999999999" };
 
 afterEach(() => {
   resetSellerAccountHooks();
+  vi.unstubAllEnvs();
 });
 
 type Call = { method: string; url: string; body?: Record<string, unknown>; headers?: Record<string, string> };
@@ -266,6 +268,23 @@ describe("MercadoPagoPaymentProvider: cobrança", () => {
     expect(cancelAttempts).toHaveLength(0);
   });
 
+  it("estorno sem signal do chamador aborta no prazo configurado", async () => {
+    vi.stubEnv("PAYMENT_PROVIDER_TIMEOUT_MS", "100");
+    const slow = new MercadoPagoPaymentProvider({
+      accessToken, webhookSecret, baseUrl,
+      fetchImpl: (_input, init) => new Promise((_resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error("lento")), 5_000);
+        init?.signal?.addEventListener("abort", () => {
+          clearTimeout(timer);
+          reject(init.signal?.reason ?? new Error("abort"));
+        });
+      }),
+    });
+    const started = Date.now();
+    await expect(slow.refundCharge("1001", { idempotencyKey: "pay-0001:1" })).rejects.toBeInstanceOf(ProviderTimeoutError);
+    expect(Date.now() - started).toBeLessThan(1_000);
+  });
+
   it("propaga AbortSignal e erros 5xx", async () => {
     const { mp } = provider();
     const controller = new AbortController();
@@ -376,6 +395,7 @@ describe("MercadoPagoPaymentProvider: webhook", () => {
       externalId: created.externalId,
       amountCents: 1500,
       paidAt: "2030-01-01T12:05:00.000Z",
+      paidAtSource: "date_approved",
       statusDetail: "accredited",
     });
   });
@@ -416,6 +436,29 @@ describe("MercadoPagoPaymentProvider: webhook", () => {
     await expect(processWebhook(request, "mercadopago", untouchable, mp, now)).resolves.toEqual({
       outcome: "ignored", reason: "unsupported_event",
     });
+  });
+
+  it("timeout ao consultar o pagamento responde 503 sem tocar no banco", async () => {
+    vi.stubEnv("PAYMENT_PROVIDER_TIMEOUT_MS", "100");
+    const slow = new MercadoPagoPaymentProvider({
+      accessToken, webhookSecret, baseUrl,
+      fetchImpl: (_input, init) => new Promise((_resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error("lento")), 5_000);
+        init?.signal?.addEventListener("abort", () => {
+          clearTimeout(timer);
+          reject(init.signal?.reason ?? new Error("abort"));
+        });
+      }),
+    });
+    const body = JSON.stringify({ id: 1, type: "payment", action: "payment.updated", user_id: 4444, data: { id: "1001" } });
+    const request = new Request("http://localhost/api/webhooks/payments/mercadopago?data.id=1001&type=payment", {
+      method: "POST", body, headers: signedHeaders("1001"),
+    });
+    const started = Date.now();
+    await expect(processWebhook(request, "mercadopago", untouchable, slow, now)).rejects.toMatchObject({
+      status: 503, code: "webhook_unavailable",
+    });
+    expect(Date.now() - started).toBeLessThan(1_000);
   });
 
   it("tipo merchant_order autenticado → ignored", async () => {
@@ -459,6 +502,7 @@ describe("MercadoPagoPaymentProvider: webhook", () => {
       externalId: created.externalId,
       amountCents: 2000,
       paidAt: "2030-01-01T12:07:00.000Z",
+      paidAtSource: "date_approved",
       statusDetail: "accredited",
     });
   });
@@ -492,6 +536,34 @@ describe("MercadoPagoPaymentProvider: webhook", () => {
       type: "payment.paid",
       externalId: created.externalId,
       amountCents: 1200,
+      paidAtSource: "date_approved",
+    });
+  });
+
+  it("sem date_approved válido não usa date_created nem o relógio como aprovação", async () => {
+    const { mock, mp } = provider();
+    const reference = randomUUID();
+    const created = await mp.createPixCharge({
+      idempotencyKey: randomUUID(), reference, amountCents: 1500,
+      expiresAt: new Date(now.getTime() + 40 * 60_000), customer,
+    });
+    const payment = mock.byId.get(created.externalId)!;
+    payment.status = "approved";
+    payment.status_detail = "accredited";
+    payment.date_created = "2030-01-01T11:00:00.000Z";
+    payment.date_approved = "nao-e-data";
+    expect(await mp.getCharge(created.externalId)).toMatchObject({ status: "paid", paidAt: null });
+
+    payment.date_approved = null;
+    const body = JSON.stringify({
+      id: 777, type: "payment", action: "payment.updated", user_id: 4444, data: { id: created.externalId },
+    });
+    const url = `http://localhost/api/webhooks/payments/mercadopago?data.id=${created.externalId}&type=payment`;
+    const event = await mp.verifyWebhook(body, signedHeaders(created.externalId), now, url);
+    expect(event).toMatchObject({
+      paidAt: now.toISOString(),
+      paidAtSource: "fallback",
+      statusDetail: "accredited",
     });
   });
 });
