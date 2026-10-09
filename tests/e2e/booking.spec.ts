@@ -48,6 +48,13 @@ async function expireLatestHold(slug: string) {
   });
 }
 
+async function fillCustomer(page: import("@playwright/test").Page, name: string) {
+  await page.locator("#customer-name").fill(name);
+  await page.locator("#customer-phone").fill("11987654321");
+  const cpf = page.locator("#customer-cpf");
+  if (await cpf.isVisible()) await cpf.fill("52998224725");
+}
+
 async function fillBookingUntilPix(page: import("@playwright/test").Page, testInfo: import("@playwright/test").TestInfo) {
   await page.goto(`/${meta.businessASlug}`);
   await expect(page.getByRole("heading", { level: 1, name: "Negócio E2E A" })).toBeVisible();
@@ -66,9 +73,7 @@ async function fillBookingUntilPix(page: import("@playwright/test").Page, testIn
   await slots.first().click();
   await page.getByRole("button", { name: /Continuar com \d{2}:\d{2}/ }).filter({ visible: true }).first().click();
 
-  await page.locator("#customer-name").fill(`Cliente Pix ${testInfo.project.name}`);
-  await page.locator("#customer-phone").fill("11987654321");
-  await page.locator("#customer-cpf").fill("52998224725");
+  await fillCustomer(page, `Cliente Pix ${testInfo.project.name}`);
   await page.getByRole("button", { name: /Gerar Pix de R\$\s?10,00/ }).filter({ visible: true }).first().click();
 
   await expect(page.getByRole("button", { name: /Copiar código/ })).toBeVisible({ timeout: 20_000 });
@@ -101,10 +106,8 @@ test("cliente agenda pela página pública, paga o sinal Pix (fake) e vê a rese
   await expectNoAxeViolations(page, "página pública: horários");
   await page.getByRole("button", { name: /Continuar com \d{2}:\d{2}/ }).filter({ visible: true }).first().click();
 
-  // 3. Nome, WhatsApp e CPF antes do Pix
-  await page.locator("#customer-name").fill(`Cliente Pix ${testInfo.project.name}`);
-  await page.locator("#customer-phone").fill("11987654321");
-  await page.locator("#customer-cpf").fill("52998224725");
+  // 3. Nome e WhatsApp. O CPF só aparece quando o servidor exige o documento.
+  await fillCustomer(page, `Cliente Pix ${testInfo.project.name}`);
   await expectNoAxeViolations(page, "página pública: dados");
   await page.getByRole("button", { name: /Gerar Pix de R\$\s?10,00/ }).filter({ visible: true }).first().click();
 
