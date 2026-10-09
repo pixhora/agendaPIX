@@ -1,0 +1,31 @@
+import { z } from "zod";
+
+/**
+ * Códigos das rotas de perfil, logo e disponibilidade.
+ * O corpo de erro é `{ error: { code, message, details? } }`.
+ */
+export const apiErrorCodeSchema = z.enum([
+  "invalid_input",
+  "unauthorized",
+  "business_unavailable",
+  "slug_taken",
+  "rate_limited",
+  "logo_invalid",
+  "logo_too_large",
+  "blob_unavailable",
+  "internal_error",
+]);
+
+export type ApiErrorCode = z.infer<typeof apiErrorCodeSchema>;
+
+export const apiErrorDetailsSchema = z.record(z.string(), z.unknown());
+
+export const apiErrorBodySchema = z.object({
+  error: z.object({
+    code: apiErrorCodeSchema,
+    message: z.string().min(1),
+    details: apiErrorDetailsSchema.optional(),
+  }).strict(),
+}).strict();
+
+export type ApiErrorBody = z.infer<typeof apiErrorBodySchema>;
