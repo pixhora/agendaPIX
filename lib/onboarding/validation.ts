@@ -3,7 +3,8 @@ import { slugSchema } from "../bookings/validation";
 import { serviceInputSchema } from "../validation/service";
 import { contactWhatsappSchema } from "../validation/whatsapp";
 
-const clock = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
+/** `HH:mm` ou `HH:mm:ss` (campo `type=time`). O valor guardado fica `HH:mm`. */
+const clock = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/).transform((value) => value.slice(0, 5));
 export const onboardingInputSchema = z.object({
   business: z.object({
     name: z.string().trim().min(1).max(120),

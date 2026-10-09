@@ -49,6 +49,29 @@ describe("draft and commit follow-up", () => {
     expect(sendOtp).not.toHaveBeenCalled();
   });
 
+  it("mostra a mensagem do 400 e não manda o código", async () => {
+    const sendOtp = vi.fn();
+    const deps = {
+      patch: async () => ({ ok: true as const, draftId: "x" }),
+      sendOtp,
+    };
+    const plan = await saveDraftThenSendOtp(
+      { draftId: null, body, online: true },
+      { ...deps, create: async () => ({ ok: false, status: 400, error: { code: "plan_unavailable" } }) },
+    );
+    expect(plan).toEqual({
+      type: "validation",
+      message: "O plano completo ainda não está à venda. Comece pelo plano AgendaPix.",
+      draftId: null,
+    });
+    const invalid = await saveDraftThenSendOtp(
+      { draftId: null, body, online: true },
+      { ...deps, create: async () => ({ ok: false, status: 400, error: { code: "invalid_input", fields: { "data.hours.0.opensAt": "Invalid string" } } }) },
+    );
+    expect(invalid).toEqual({ type: "validation", message: "Confira os dados enviados.", draftId: null });
+    expect(sendOtp).not.toHaveBeenCalled();
+  });
+
   it("maps consumed, expired and a different e-mail", () => {
     expect(followUpFromFailure(409, { code: "draft_consumed" }).type).toBe("consumed");
     expect(followUpFromFailure(409, { code: "already_has_business", publicPath: "/studio" })).toEqual({

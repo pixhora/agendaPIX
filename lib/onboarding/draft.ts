@@ -12,6 +12,12 @@ export const SEGMENT_UNTIL_STEP: OnboardingSegment = "outro";
 
 const SEGMENT_SET = new Set<string>(ONBOARDING_SEGMENTS);
 
+/** O campo de hora do celular manda `HH:mm:ss`. O contrato guarda `HH:mm`. */
+function draftClock(value: string): string {
+  const trimmed = value.trim();
+  return /^([01]\d|2[0-3]):[0-5]\d:[0-5]\d$/.test(trimmed) ? trimmed.slice(0, 5) : trimmed;
+}
+
 export function asOnboardingSegment(value: string | undefined): OnboardingSegment {
   return value && SEGMENT_SET.has(value) ? value as OnboardingSegment : SEGMENT_UNTIL_STEP;
 }
@@ -62,7 +68,7 @@ export function buildOnboardingDraftBody(input: OnboardingDraftInput): Onboardin
       },
       hours: [...input.openDays]
         .sort((a, b) => a - b)
-        .map((weekday) => ({ weekday, opensAt: input.opensAt, closesAt: input.closesAt })),
+        .map((weekday) => ({ weekday, opensAt: draftClock(input.opensAt), closesAt: draftClock(input.closesAt) })),
     },
   };
   return body;

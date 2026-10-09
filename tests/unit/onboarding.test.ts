@@ -32,6 +32,14 @@ it.each(["login", "onboarding", "preview", "dashboard", "api", "admin", "auth", 
   },
 );
 
+it("aceita o horário com segundos do campo de hora e grava HH:mm", () => {
+  const parsed = onboardingInputSchema.parse({
+    ...input,
+    hours: [{ weekday: 1, opensAt: "09:00:00", closesAt: "19:00:00" }],
+  });
+  expect(parsed.hours).toEqual([{ weekday: 1, opensAt: "09:00", closesAt: "19:00" }]);
+});
+
 it("accepts ordinary business slugs", () => {
   expect(slugSchema.parse("barbearia-demo")).toBe("barbearia-demo");
   expect(onboardingInputSchema.safeParse(input).success).toBe(true);

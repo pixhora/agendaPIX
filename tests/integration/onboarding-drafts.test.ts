@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { eq, inArray, sql } from "drizzle-orm";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import { POST as createDraft } from "../../app/api/onboarding/drafts/route";
 import { GET as readDraft, PATCH as patchDraft } from "../../app/api/onboarding/drafts/[id]/route";
 import { POST as commitDraft } from "../../app/api/onboarding/drafts/[id]/commit/route";
@@ -8,6 +8,7 @@ import { GET as slugAvailabilityRoute } from "../../app/api/public/slugs/availab
 import { getDb } from "../../db";
 import { businesses, businessHours, onboardingDrafts, onboardingRequests, services, user, verification } from "../../db/schema";
 import { commitOnboardingDraft, createOnboardingDraft, deleteExpiredOnboardingDrafts, signInOtpIdentifier } from "../../lib/onboarding/drafts";
+import { draftBodyFromOnboarding, onboardingPlanForEnv, restoreOnboardingDraft } from "../../lib/onboarding/flow";
 
 const db = getDb();
 const owners: string[] = [];
@@ -201,5 +202,43 @@ describe.sequential("rascunho de cadastro", () => {
     }
     expect(lastStatus).toBe(429);
     await db.execute(sql`DELETE FROM abuse_rate_limits WHERE scope = 'onboarding-draft'`);
+  });
+
+  it("aceita em produção o passo 4 de ?plano=base mesmo com completo guardado e hora com segundos", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("BETTER_AUTH_URL", "http://localhost:3000");
+    const id = randomUUID();
+    const email = `base-${id}@example.com`;
+    try {
+      const stored = {
+        plan: "completo" as const,
+        businessName: "Studio Repro",
+        slug: `repro-${id.slice(0, 8)}`,
+        serviceName: "Corte",
+        durationMinutes: 45,
+        priceCents: 5000,
+        depositCents: 0,
+        depositMode: "30" as const,
+        openDays: [1, 2, 3, 4, 5, 6],
+        opensAt: "09:00:00",
+        closesAt: "19:00:00",
+        email,
+      };
+      const body = draftBodyFromOnboarding(restoreOnboardingDraft(stored, onboardingPlanForEnv("base", "production")));
+      const response = await createDraft(originRequest("http://localhost:3000/api/onboarding/drafts", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      }));
+      const payload = await response.json() as { draftId?: string; error?: { code?: string } };
+      expect(response.status).toBe(201);
+      const draftId = payload.draftId ?? "";
+      const [row] = await db.select().from(onboardingDrafts).where(eq(onboardingDrafts.id, draftId));
+      expect(row?.plan).toBe("base");
+      expect(row?.data.hours[0]).toEqual({ weekday: 1, opensAt: "09:00", closesAt: "19:00" });
+      await db.delete(onboardingDrafts).where(eq(onboardingDrafts.id, draftId));
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });
