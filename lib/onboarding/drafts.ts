@@ -105,9 +105,16 @@ async function readableDraft(id: string, reader: DraftReader, database: Database
   return draft;
 }
 
-export async function createOnboardingDraft(body: unknown, database: Database = getDb()) {
+export function assertOnboardingPlanForSale(plan: "base" | "completo", nodeEnv: string | undefined = process.env.NODE_ENV) {
+  if (plan === "completo" && nodeEnv === "production") {
+    throw new HttpError(400, "plan_unavailable", "O plano completo ainda não está à venda. Comece pelo plano AgendaPix.");
+  }
+}
+
+export async function createOnboardingDraft(body: unknown, database: Database = getDb(), env: Readonly<Record<string, string | undefined>> = process.env) {
   const envelope = draftEnvelopeSchema.safeParse(body);
   if (!envelope.success) invalidInput(envelope.error);
+  assertOnboardingPlanForSale(envelope.data.plan, env.NODE_ENV);
   const data = parseDraftData(envelope.data.data);
   await assertSlugFree(data.business.slug, envelope.data.segment, database);
   const now = new Date();
@@ -173,6 +180,7 @@ export async function commitOnboardingDraft(id: string, owner: DraftOwner, datab
     return { result: previous.result, replay: true as const };
   }
   if (draft.expiresAt.getTime() <= Date.now()) throw new HttpError(410, "draft_expired", "Seu cadastro guardado venceu.");
+  if (draft.plan === "completo") assertOnboardingPlanForSale("completo");
 
   if (oneBusinessPerOwner()) {
     const [owned] = await database.select({ slug: businesses.slug }).from(businesses).where(eq(businesses.ownerId, owner.userId)).orderBy(asc(businesses.createdAt), asc(businesses.id)).limit(1);

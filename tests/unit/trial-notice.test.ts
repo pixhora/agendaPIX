@@ -118,5 +118,8 @@ describe("motivo de bloqueio na lista de serviços", () => {
     expect(mp?.body).toMatch(/Mercado Pago/);
     expect(mp?.body).not.toMatch(/conectar agora/i);
     expect(JSON.stringify(mp)).not.toMatch(/chave Pix/i);
+    const testMode = serviceBlockCopy("mp_account_test_mode");
+    expect(testMode?.title).toMatch(/modo de teste/);
+    expect(testMode?.body).toMatch(/conta de produção/);
   });
 });

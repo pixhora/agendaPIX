@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPublicBookingBody } from "../../components/booking/booking-payload";
+import { buildPublicBookingBody, publicBookingSession, stripStoredBookingCpf } from "../../components/booking/booking-payload";
 
 const service = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -25,17 +25,44 @@ describe("corpo do agendamento público", () => {
     });
   });
 
-  it("mantém o CPF e não manda policyHash enquanto a API atual não publica a política", () => {
+  it("envia o CPF só quando o servidor exige e não manda policyHash sem política", () => {
     expect(buildPublicBookingBody({
       service: { id: service.id, depositCents: 2500 },
       startsAt: "2030-01-01T15:00:00.000Z",
       name: "Ana",
       phone: "+5511987654321",
       cpfDigits: "52998224725",
+      requiresPayerCpf: true,
     })).toEqual({
       serviceId: service.id,
       startsAt: "2030-01-01T15:00:00.000Z",
       customer: { name: "Ana", phone: "+5511987654321", cpfCnpj: "52998224725" },
     });
+  });
+
+  it("não manda CPF quando a flag vem ausente", () => {
+    expect(buildPublicBookingBody({
+      service: { id: service.id, depositCents: 0 },
+      startsAt: "2030-01-01T15:00:00.000Z",
+      name: "Ana",
+      phone: "+5511987654321",
+      cpfDigits: "52998224725",
+    }).customer).toEqual({ name: "Ana", phone: "+5511987654321" });
+  });
+
+  it("a sessão do navegador não guarda CPF e apaga um valor antigo", () => {
+    const session = publicBookingSession({
+      bookingId: "b1",
+      accessToken: "tok",
+      serviceId: service.id,
+      customerName: "Ana",
+      customerPhone: "11987654321",
+      expiresAt: "2030-01-01T15:30:00.000Z",
+    });
+    expect(JSON.stringify(session)).not.toContain("cpf");
+    const stripped = stripStoredBookingCpf({ ...session, customerCpf: "529.982.247-25" });
+    expect(stripped.hadCpf).toBe(true);
+    expect(stripped.record).not.toHaveProperty("customerCpf");
+    expect(stripStoredBookingCpf(session).hadCpf).toBe(false);
   });
 });

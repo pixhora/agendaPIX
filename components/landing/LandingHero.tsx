@@ -1,4 +1,5 @@
 import { formatAppointmentMeta } from "@/components/booking/formatters";
+import { isDevExampleOpen } from "@/components/preview/preview-badge-gate";
 import { CheckIcon } from "./icons";
 import { buttonVariants } from "@/components/ui/button";
 import { ValueSlab } from "@/components/ui/value-slab";
@@ -35,9 +36,11 @@ export function LandingHero({ publicHost }: { publicHost: string }) {
             <a id="hero-primary-cta" href="/onboarding" className={buttonVariants({ size: "lg", className: "w-full sm:w-auto" })}>
               Criar minha agenda grátis
             </a>
-            <a href="/preview/booking" className={buttonVariants({ variant: "outline", size: "lg", className: "w-full sm:w-auto" })}>
-              Ver uma página de exemplo
-            </a>
+            {isDevExampleOpen() ? (
+              <a href="/preview/booking" className={buttonVariants({ variant: "outline", size: "lg", className: "w-full sm:w-auto" })}>
+                Ver uma página de exemplo
+              </a>
+            ) : null}
           </div>
           <ul className="mt-4 flex flex-col gap-1.5 text-[13px] text-muted sm:flex-row sm:flex-wrap sm:gap-x-4">
             {reassurances.map((item) => (

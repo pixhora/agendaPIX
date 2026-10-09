@@ -608,7 +608,7 @@ describe("seleção do provedor", () => {
     }, { businessId: "biz-1" });
     const post = mock.calls.find((call) => call.method === "POST" && call.url.endsWith("/v1/payments"))!;
     expect(post.headers?.authorization).toBe(`Bearer ${ownerToken}`);
-    expect(post.body).toMatchObject({ payer: { identification: { type: "CPF", number: "52998224725" } } });
+    expect(JSON.stringify(post.body)).not.toContain("identification");
     expect(seen.some((query) => query.businessId === "biz-1" && query.purpose === "charge")).toBe(true);
     expect(seen.some((query) => query.purpose === "settlement")).toBe(true);
     expect(await resolveMpAccessToken({}, { MERCADOPAGO_ACCESS_TOKEN: accessToken })).toBe(accessToken);
@@ -620,6 +620,27 @@ describe("seleção do provedor", () => {
     await expect(custom.verifyWebhook(body, signedHeaders(created.externalId), now, url)).rejects.toBeInstanceOf(ObservedRefundEvent);
     expect(seen.some((query) => query.mpUserId === "seller-9" && query.purpose === "settlement")).toBe(true);
     expect(mock.calls.filter((call) => call.url.includes("/refunds"))).toHaveLength(0);
+  });
+
+  it("só envia identification quando MP_REQUIRES_PAYER_CPF=true", async () => {
+    const previous = process.env.MP_REQUIRES_PAYER_CPF;
+    process.env.MP_REQUIRES_PAYER_CPF = "true";
+    try {
+      const { mock, mp } = provider();
+      const reference = randomUUID();
+      await mp.createPixCharge({
+        idempotencyKey: randomUUID(),
+        reference,
+        amountCents: 800,
+        expiresAt: new Date(now.getTime() + 40 * 60_000),
+        customer: { ...customer, cpfCnpj: "52998224725" },
+      });
+      const post = mock.calls.find((call) => call.method === "POST" && call.url.endsWith("/v1/payments"))!;
+      expect(post.body).toMatchObject({ payer: { identification: { type: "CPF", number: "52998224725" } } });
+    } finally {
+      if (previous === undefined) delete process.env.MP_REQUIRES_PAYER_CPF;
+      else process.env.MP_REQUIRES_PAYER_CPF = previous;
+    }
   });
 
   it("webhook sem token de liquidação não confirma o pagamento", async () => {

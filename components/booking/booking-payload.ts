@@ -6,12 +6,9 @@ export interface PublicBookingBodyInput {
   startsAt: string;
   name: string;
   phone: string;
-  /** Dígitos do CPF. Ignorado quando o servidor manda `requiresPayerCpf: false`. */
+  /** Dígitos do CPF. Só entram no corpo quando `requiresPayerCpf` é `true`. */
   cpfDigits: string;
-  /**
-   * Ausente: o pedido ainda leva CPF, porque a API no master exige o documento.
-   * `false`: o campo sai do corpo.
-   */
+  /** `true`: envia o CPF. Qualquer outro valor tira o campo do corpo. */
   requiresPayerCpf?: boolean;
 }
 
@@ -21,7 +18,7 @@ export function buildPublicBookingBody(input: PublicBookingBodyInput) {
     name: input.name,
     phone: input.phone,
   };
-  if (input.requiresPayerCpf !== false && input.cpfDigits) {
+  if (input.requiresPayerCpf === true && input.cpfDigits) {
     customer.cpfCnpj = input.cpfDigits;
   }
   const policy = servicePolicyState(input.service);
@@ -31,4 +28,32 @@ export function buildPublicBookingBody(input: PublicBookingBodyInput) {
     customer,
     ...(policy === "ready" && input.service.policyHash ? { policyHash: input.service.policyHash } : {}),
   };
+}
+
+/** Sessão do Pix em andamento. Não leva CPF: o documento fica só na memória da tela. */
+export function publicBookingSession(input: {
+  bookingId: string;
+  accessToken: string;
+  serviceId: string;
+  customerName: string;
+  customerPhone: string;
+  expiresAt?: string | null;
+}) {
+  return {
+    bookingId: input.bookingId,
+    accessToken: input.accessToken,
+    serviceId: input.serviceId,
+    customerName: input.customerName,
+    customerPhone: input.customerPhone,
+    expiresAt: input.expiresAt ?? null,
+  };
+}
+
+/** Tira CPF gravado por uma versão antiga da sessão. */
+export function stripStoredBookingCpf(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return { record: null, hadCpf: false };
+  const record = { ...(value as Record<string, unknown>) };
+  const hadCpf = "customerCpf" in record;
+  delete record.customerCpf;
+  return { record, hadCpf };
 }

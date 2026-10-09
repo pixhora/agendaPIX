@@ -76,7 +76,7 @@ export function faqItems(facts: PublicBookingFacts): FaqItem[] {
     items.push({
       id: "cpf",
       question: "Por que o cliente informa o CPF?",
-      answer: "O Mercado Pago pede o CPF de quem paga para gerar o Pix. O AgendaPix envia o CPF direto para o Mercado Pago e não guarda esse dado.",
+      answer: "O AgendaPix envia o CPF ao Mercado Pago na cobrança do Pix e não guarda esse dado no cadastro nem no navegador.",
     });
   }
 

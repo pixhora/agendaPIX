@@ -7,7 +7,7 @@ import * as schema from "../../db/schema";
 import { bookingAccessSecret } from "../env";
 import { HttpError } from "../http";
 import { paymentsConfig } from "../payments/config";
-import { assertMpConnectedForDeposit, getServiceBlockedReason, isMpConnected } from "../mercadopago-oauth/bookability";
+import { assertMpConnectedForDeposit, getServiceBlockedReason, readMpDepositGate } from "../mercadopago-oauth/bookability";
 import { createDrizzleMpStore } from "../mercadopago-oauth/repository";
 import { getPaymentProvider } from "../payments";
 import { MpAccountNotConnectedError } from "../payments/seller-account";
@@ -22,11 +22,40 @@ import { assertDepositBookable, serviceListingBookability } from "./deposit-book
 import { availabilitySchema, bookingInputSchema, requestKeySchema, slugSchema } from "./validation";
 import { depositSlotAllowed } from "./hold";
 import { bookingConfig, type BookingConfig } from "./config";
-import { getPublicBookingFacts } from "../marketing/facts";
+import { getPublicBookingFacts, payerCpfRequired } from "../marketing/facts";
 import { consumeBookingRateLimit, tenantScopedHash } from "./rate-limit";
 
 type Database = NodePgDatabase<typeof schema>;
+type BookingRequest = {
+  serviceId: string;
+  startsAt: string;
+  customer: { name: string; phone: string; cpfCnpj?: string };
+  policyHash?: string;
+};
+
 export function hash(value: string) { return createHash("sha256").update(value).digest("hex"); }
+
+/** Digest novo: o CPF fica de fora para não ser recuperável por força bruta do sha256 sem sal. */
+export function bookingRequestDigest(input: BookingRequest) {
+  const { cpfCnpj: _cpf, ...customer } = input.customer;
+  void _cpf;
+  return hash(JSON.stringify({ ...input, customer }));
+}
+
+/** Digest antigo, com o JSON inteiro. Só serve para reconhecer reserva já gravada. */
+export function legacyBookingRequestDigest(input: BookingRequest) {
+  return hash(JSON.stringify(input));
+}
+
+/**
+ * Replay da mesma requestKey aceita o digest novo ou o antigo.
+ * Reserva antiga foi gravada com o JSON inteiro; o mesmo corpo, inclusive o CPF, continua batendo.
+ * Um retry que tire o CPF de uma reserva antiga não reconstrói aquele digest e responde conflito.
+ */
+export function bookingRequestMatches(stored: string | null, input: BookingRequest) {
+  if (!stored) return false;
+  return stored === bookingRequestDigest(input) || stored === legacyBookingRequestDigest(input);
+}
 export function chargeIdempotencyKey(businessId: string, requestKey: string) {
   const bytes = Buffer.from(hash(`pix-charge:v1:${businessId}:${requestKey}`).slice(0, 32), "hex");
   bytes[6] = (bytes[6] & 0x0f) | 0x40;
@@ -80,7 +109,7 @@ export async function listPublicServices(slug: string, database: Database = getD
   const business = await businessBySlug(slug, database);
   const access = await loadBookingAccess(business, database);
   const facts = await getPublicBookingFacts(business.id);
-  const mpConnected = await isMpConnected(business.id, { store: createDrizzleMpStore(database) });
+  const mpGate = await readMpDepositGate(business.id, { store: createDrizzleMpStore(database) });
   const rows = await database.select({
     id: schema.services.id,
     name: schema.services.name,
@@ -101,7 +130,7 @@ export async function listPublicServices(slug: string, database: Database = getD
     pixRecipientDisplayName: facts.pixRecipientDisplayName,
     services: rows.map((service) => {
       const listing = serviceListingBookability(business, service, access);
-      const mpReason = listing.blockedReason === "bookings_paused" ? null : getServiceBlockedReason(service, { mpConnected });
+      const mpReason = listing.blockedReason === "bookings_paused" ? null : getServiceBlockedReason(service, mpGate);
       const bookability = mpReason ? { bookable: false, blockedReason: mpReason } : listing;
       return {
         id: service.id,
@@ -244,7 +273,7 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
   const config = bookingConfig();
   const input = bookingInputSchema.parse(body);
   const requestKey = requestKeySchema.parse(key);
-  const requestHash = hash(JSON.stringify(input));
+  const requestHash = bookingRequestDigest(input);
   const business = await businessBySlug(slug, database);
   const [prior] = await database.select({ id: schema.bookings.id }).from(schema.bookings).where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.requestKey, requestKey))).limit(1);
   if (!prior) {
@@ -257,7 +286,7 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
   const chargeCustomer = {
     name: input.customer.name,
     phone: input.customer.phone,
-    ...(input.customer.cpfCnpj ? { cpfCnpj: input.customer.cpfCnpj } : {}),
+    ...(payerCpfRequired() && input.customer.cpfCnpj ? { cpfCnpj: input.customer.cpfCnpj } : {}),
   };
 
   // Transação curta com lock: reserva o horário e, se houver sinal, cria pagamento em "creating" sem chamar o gateway.
@@ -267,7 +296,7 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
     await expirePending(transaction, business.id, now);
     const [existing] = await transaction.select().from(schema.bookings).where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.requestKey, requestKey))).limit(1);
     if (existing) {
-      if (existing.requestHash !== requestHash) throw new HttpError(409, "idempotency_conflict", "Essa chave já foi usada em outro agendamento.");
+      if (!bookingRequestMatches(existing.requestHash, input)) throw new HttpError(409, "idempotency_conflict", "Essa chave já foi usada em outro agendamento.");
       const [payment] = await transaction.select().from(schema.payments).where(and(eq(schema.payments.businessId, business.id), eq(schema.payments.bookingId, existing.id))).limit(1);
       return { kind: "existing" as const, booking: existing, payment, token: accessToken(business.id, existing.id), now };
     }
@@ -297,7 +326,7 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
     if (!slot) throw new HttpError(409, "slot_unavailable", "Esse horário não está disponível. Escolha outro.");
     if (service.depositCents > 0) await enforcePendingHoldLimits(transaction, business.id, { clientHash, phone: input.customer.phone }, now, config);
     const { cpfCnpj: _cpf, ...customerRow } = input.customer;
-    void _cpf; // CPF antigo não entra no cadastro nem no pedido do Mercado Pago.
+    void _cpf; // CPF não entra no cadastro nem no request_hash. O Mercado Pago só recebe o documento com MP_REQUIRES_PAYER_CPF=true.
     const [insertedCustomer] = await transaction.insert(schema.customers).values({ businessId: business.id, ...customerRow }).onConflictDoNothing({ target: [schema.customers.businessId, schema.customers.phone] }).returning({ id: schema.customers.id });
     const [existingCustomer] = insertedCustomer ? [] : await transaction.select({ id: schema.customers.id }).from(schema.customers).where(and(eq(schema.customers.businessId, business.id), eq(schema.customers.phone, input.customer.phone))).limit(1);
     const customerId = (insertedCustomer ?? existingCustomer).id;

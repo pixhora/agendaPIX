@@ -81,7 +81,7 @@ export function publicBookingErrorView(status: number, body: unknown): BookingFa
     };
     return { kind: "policy_changed", update };
   }
-  if (code === "mp_account_not_connected" || readBookableFalse(body)) {
+  if (code === "mp_account_not_connected" || code === "mp_account_test_mode" || readBookableFalse(body)) {
     return { kind: "unavailable", message: SERVICE_UNAVAILABLE_MESSAGE, contactWhatsapp: readContactWhatsapp(body) };
   }
   const serverMessage = readApiErrorMessage(body);

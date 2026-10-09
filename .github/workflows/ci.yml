@@ -145,13 +145,15 @@ jobs:
           done
       - name: Start app container
         run: |
+          # A imagem sobe com NODE_ENV=production. O boot recusa SMTP_FROM em example.com.
+          # O Mailpit não entrega de verdade; o remetente só precisa passar na validação.
           docker run -d --name agendapix --network host \
             -e PORT=3000 \
             -e DATABASE_URL=postgresql://agenda@localhost:5432/agenda \
             -e BETTER_AUTH_URL=http://localhost:3000 \
             -e BETTER_AUTH_SECRET="$(openssl rand -base64 32)" \
             -e SMTP_HOST=localhost -e SMTP_PORT=1025 -e SMTP_SECURE=false \
-            -e "SMTP_FROM=Agenda <ci@example.com>" \
+            -e "SMTP_FROM=AgendaPix <ci@agendapix.dev.br>" \
             agendapix:ci
       - name: Smoke test HTTP
         run: |

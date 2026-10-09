@@ -10,6 +10,12 @@ export const TAKEN_LATER = "Alguém acabou de pegar esse link. Escolha outro, o 
 const DEPOSIT_MODES = new Set<DepositMode>(["20", "30", "50", "custom", "none"]);
 const STORED_STEPS = new Set<OnboardingStep>(["business", "service", "hours", "email", "code"]);
 
+/** Em produção o cadastro começa no plano à venda. Fora dela, `completo` continua o padrão de desenvolvimento. */
+export function onboardingPlanForEnv(plano: string | null | undefined, nodeEnv: string | undefined = process.env.NODE_ENV): "base" | "completo" {
+  if (nodeEnv === "production") return "base";
+  return plano === "base" ? "base" : "completo";
+}
+
 export function createOnboardingData(plan: "base" | "completo"): OnboardingData {
   return {
     plan,

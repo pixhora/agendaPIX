@@ -19,7 +19,9 @@ import { OWNER_MANUAL_MARK_LABEL } from "../../lib/payments/refund-copy";
 import { assessRefund } from "../../lib/payments/refund-eligibility";
 import {
   disconnectedConfirmedNotice,
+  lateRefundCause,
   lateRefundFailedNotice,
+  lateRefundNoTokenNotice,
   lateRefundedNotice,
   unverifiableSellerNotice,
 } from "../../lib/payments/notices";
@@ -57,6 +59,7 @@ function view(overrides: Partial<RefundView> = {}): RefundView {
     policyText: null,
     policyHash: null,
     policyRefundDeadlineAt: null,
+    latePaymentPolicy: "refund",
     ...overrides,
   };
 }
@@ -250,7 +253,10 @@ describe("devolução automática só no atraso sem horário", () => {
     expect(await settleAutomaticLateRefund(ports, provider, "pay-1", mailer, now)).toBe("done");
     expect(calls).toBe(1);
     expect(ports.emails).toHaveLength(1);
-    expect(ports.emails[0]).toContain("O AgendaPix devolveu o valor automaticamente");
+    expect(ports.emails[0]).toContain("pagou o sinal de Corte");
+    expect(ports.emails[0]).toContain("depois do prazo");
+    expect(ports.emails[0]).toContain("O AgendaPix devolveu o valor do sinal");
+    expect(ports.emails[0]).not.toContain("horário");
     expect(ports.audits.some((row) => row.detail.actor === "system" && row.detail.reason === "late_no_slot")).toBe(true);
   });
 
@@ -363,11 +369,26 @@ describe("conta desconectada", () => {
   it("os textos usam o AgendaPix no masculino", () => {
     const sample = [
       disconnectedConfirmedNotice({ customerName: "Ana", serviceName: "Corte", when: "02/06/2030" }).text,
-      lateRefundedNotice({ customerName: "Ana", serviceName: "Corte", when: "02/06/2030" }).text,
-      lateRefundFailedNotice({ customerName: "Ana", serviceName: "Corte", when: "02/06/2030", deadlineLabel: "sáb, 8 jun" }).text,
+      lateRefundedNotice({ customerName: "Ana", serviceName: "Corte", when: "02/06/2030", cause: "after_deadline" }).text,
+      lateRefundFailedNotice({ customerName: "Ana", serviceName: "Corte", when: "02/06/2030", deadlineLabel: "sáb, 8 jun", cause: "after_deadline" }).text,
       unverifiableSellerNotice({ deadlineLabel: "sáb, 8 jun" }).text,
     ].join("\n");
     expect(sample).not.toMatch(/a AgendaPix/);
     expect(sample).toMatch(/do AgendaPix|O AgendaPix|pelo AgendaPix/);
+  });
+
+  it("o aviso de atraso segue a política e não promete prazo de estorno", () => {
+    const refunded = lateRefundedNotice({ customerName: "Ana", serviceName: "Corte", when: "02/06/2030", cause: lateRefundCause("refund") });
+    expect(refunded.text).toBe("O cliente Ana pagou o sinal de Corte (02/06/2030) depois do prazo. O AgendaPix devolveu o valor do sinal.");
+    expect(refunded.text).not.toMatch(/dias|minutos|horas/);
+    const occupied = lateRefundedNotice({ customerName: "Ana", serviceName: "Corte", when: "02/06/2030", cause: lateRefundCause("rebook_if_free") });
+    expect(occupied.text).toContain("depois do prazo e o horário não estava mais disponível");
+    expect(occupied.text).toContain("O AgendaPix devolveu o valor do sinal");
+    const failed = lateRefundFailedNotice({ customerName: "Ana", serviceName: "Corte", when: "02/06/2030", deadlineLabel: "sáb, 8 jun", cause: "slot_unavailable" });
+    expect(failed.text).toContain("o horário não estava mais disponível");
+    expect(failed.text).not.toContain("não havia horário livre");
+    const noToken = lateRefundNoTokenNotice({ customerName: "Ana", serviceName: "Corte", when: "02/06/2030", deadlineLabel: "sáb, 8 jun", cause: "after_deadline" });
+    expect(noToken.text).not.toContain("horário");
+    expect(noToken.text).toContain("conta Mercado Pago está desvinculada");
   });
 });

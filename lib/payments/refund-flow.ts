@@ -11,6 +11,7 @@ import { assessRefund, refundBlockMessage, type RefundBlockReason, type RefundSt
 import {
   disconnectedConfirmedNotice,
   formatAppointment,
+  lateRefundCause,
   lateRefundFailedNotice,
   lateRefundNoTokenNotice,
   lateRefundedNotice,
@@ -40,6 +41,7 @@ export type RefundView = {
   serviceName: string;
   startsAt: Date;
   timezone: string;
+  latePaymentPolicy: "refund" | "rebook_if_free";
   policyText: string | null;
   policyHash: string | null;
   policyRefundDeadlineAt: string | null;
@@ -390,7 +392,12 @@ export async function settleAutomaticLateRefund(
   });
 
   const when = formatAppointment(outcome.view.startsAt, outcome.view.timezone);
-  const names = { customerName: outcome.view.customerName, serviceName: outcome.view.serviceName, when };
+  const names = {
+    customerName: outcome.view.customerName,
+    serviceName: outcome.view.serviceName,
+    when,
+    cause: lateRefundCause(outcome.view.latePaymentPolicy),
+  };
   if (outcome.type === "submitted" || outcome.type === "done") {
     await notifyOnce(ports, outcome.view, "notice_late_refunded", mailer, lateRefundedNotice(names));
   } else if (outcome.type === "failed_now" || outcome.type === "failed_already") {
@@ -494,6 +501,7 @@ function toView(row: {
   refundStatus: RefundStatus | null; refundedAt: Date | null; manualRefundDueAt: Date | null;
   policyRefundRequestedOn: string | null; paidAt: Date | null;
   customerName: string; customerEmail: string | null; serviceName: string; startsAt: Date; timezone: string;
+  latePaymentPolicy: "refund" | "rebook_if_free";
 }, policy: PolicySnapshot): RefundView {
   return { ...row, policyText: policy.text, policyHash: policy.hash, policyRefundDeadlineAt: policy.refundDeadlineAt };
 }
@@ -517,6 +525,7 @@ const refundColumns = {
   serviceName: schema.services.name,
   startsAt: schema.bookings.startsAt,
   timezone: schema.businesses.timezone,
+  latePaymentPolicy: schema.businesses.latePaymentPolicy,
 };
 
 function refundQuery(database: Database) {
