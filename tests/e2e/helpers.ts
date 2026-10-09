@@ -50,6 +50,8 @@ function summarize(violations: Awaited<ReturnType<AxeBuilder["analyze"]>>["viola
  * e o aviso que permanece na tela é o status inline.
  */
 export async function expectNoAxeViolations(page: Page, context: string) {
+  // O refresh do painel pode esvaziar o <title> por um instante. Axe não espera.
+  await expect(page).toHaveTitle(/.+/);
   const main = await new AxeBuilder({ page }).withTags(WCAG_TAGS).disableRules(["target-size"]).exclude("nextjs-portal").exclude("[data-sonner-toaster]").analyze();
   const style = await page.addStyleTag({ content: "[data-sticky-chrome]{position:static!important}[data-sonner-toaster]{display:none!important}" });
   const targets = await new AxeBuilder({ page }).withRules(["target-size"]).exclude("nextjs-portal").exclude("[data-sonner-toaster]").analyze();

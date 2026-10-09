@@ -16,7 +16,7 @@ test("a demonstração pública simula o pagamento sem Pix real", async ({ page 
   await expect(page.getByRole("link", { name: /preview/i })).toHaveCount(0);
 
   await page.getByRole("button", { name: "Escolher horário" }).click();
-  await page.getByRole("button", { name: /^\d{2}:\d{2}$/ }).first().click();
+  await page.getByRole("radio", { name: /^\d{2}:\d{2}$/ }).first().click();
   await page.getByRole("button", { name: /Continuar com/ }).click();
   await page.getByRole("button", { name: /Gerar Pix de/ }).click();
   await page.getByRole("button", { name: "Simular pagamento (demonstração)" }).click();
