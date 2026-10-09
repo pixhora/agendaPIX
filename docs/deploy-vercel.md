@@ -27,6 +27,8 @@ Holds vencidos já expiram sozinhos em cada leitura/criação de reserva.
   precisa ser mais frequente que o hold.
 - **Pro:** pode trocar para `*/2 * * * *` ou `*/5 * * * *` no `vercel.json` (o mínimo do plano é 1 minuto).
 
+O lembrete da véspera da devolução manual não espera 09:00. Sai na primeira passagem do dia local anterior ao prazo: com `0 6 * * *` UTC, por volta das 03:00 em Brasília. A coluna `manual_refund_reminder_sent_at` impede um segundo envio se o cron passar a rodar a cada poucos minutos.
+
 ## Variáveis (Production)
 
 | Variável | Valor |
