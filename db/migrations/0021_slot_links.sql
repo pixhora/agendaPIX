@@ -36,3 +36,16 @@ ALTER TABLE "slot_links" ADD CONSTRAINT "slot_links_booking_tenant_fk" FOREIGN K
 CREATE UNIQUE INDEX "slot_links_booking_id_unique" ON "slot_links" USING btree ("booking_id") WHERE "slot_links"."booking_id" IS NOT NULL;--> statement-breakpoint
 CREATE INDEX "slot_links_business_start_idx" ON "slot_links" USING btree ("business_id","starts_at");--> statement-breakpoint
 CREATE INDEX "slot_links_business_created_idx" ON "slot_links" USING btree ("business_id","created_at");
+--> statement-breakpoint
+CREATE TABLE "slot_link_bookings" (
+	"business_id" uuid NOT NULL,
+	"slot_link_id" uuid NOT NULL,
+	"booking_id" uuid NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "slot_link_bookings_booking_id_pk" PRIMARY KEY("booking_id")
+);
+--> statement-breakpoint
+ALTER TABLE "slot_link_bookings" ADD CONSTRAINT "slot_link_bookings_business_id_businesses_id_fk" FOREIGN KEY ("business_id") REFERENCES "public"."businesses"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "slot_link_bookings" ADD CONSTRAINT "slot_link_bookings_link_fk" FOREIGN KEY ("business_id","slot_link_id") REFERENCES "public"."slot_links"("business_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "slot_link_bookings" ADD CONSTRAINT "slot_link_bookings_booking_fk" FOREIGN KEY ("business_id","booking_id") REFERENCES "public"."bookings"("business_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "slot_link_bookings_link_idx" ON "slot_link_bookings" USING btree ("business_id","slot_link_id");

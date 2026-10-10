@@ -176,6 +176,18 @@ async function resolveLatePayment(database: Database, input: {
 }
 
 async function markSlotLinkPaid(database: Database, businessId: string, bookingId: string, now: Date) {
+  const [origin] = await database.select({ slotLinkId: schema.slotLinkBookings.slotLinkId }).from(schema.slotLinkBookings).where(and(
+    eq(schema.slotLinkBookings.businessId, businessId),
+    eq(schema.slotLinkBookings.bookingId, bookingId),
+  )).limit(1);
+  if (origin) {
+    await database.update(schema.slotLinks).set({ status: "paid", bookingId, updatedAt: now }).where(and(
+      eq(schema.slotLinks.businessId, businessId),
+      eq(schema.slotLinks.id, origin.slotLinkId),
+      sql`${schema.slotLinks.status} <> 'cancelled'`,
+    ));
+    return;
+  }
   await database.update(schema.slotLinks).set({ status: "paid", updatedAt: now }).where(and(
     eq(schema.slotLinks.businessId, businessId),
     eq(schema.slotLinks.bookingId, bookingId),

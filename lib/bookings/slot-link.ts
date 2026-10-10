@@ -52,6 +52,12 @@ const MP_OWNER_MESSAGE = "Conecte o Mercado Pago para cobrar sinal.";
 const MP_PUBLIC_MESSAGE = "Esta loja não está recebendo sinal agora.";
 const BOOKINGS_PAUSED_MESSAGE = "Este estabelecimento não está aceitando novos agendamentos no momento.";
 const GLOBAL_PROBE_BUCKET = "*global*";
+/**
+ * Sem IP o probe cai num balde só. O teto por cliente (10–60/min) nesse balde
+ * deixaria um visitante travar todo mundo. O teto alto só corta flood.
+ * Na Vercel o IP existe (`BOOKING_TRUST_PROXY`); este balde só vale fora dela.
+ */
+const ANONYMOUS_PROBE_LIMIT = 10_000;
 
 export function slotLinkExpiresAt(now: Date, startsAt: Date, ttlMinutes: number) {
   return new Date(Math.min(now.getTime() + ttlMinutes * 60_000, startsAt.getTime()));
@@ -216,13 +222,26 @@ async function linkedBooking(database: Database, link: LinkRow) {
   return booking ?? null;
 }
 
-async function linkedPayment(database: Database, link: LinkRow) {
-  if (!link.bookingId) return null;
-  const [payment] = await database.select().from(schema.payments).where(and(
-    eq(schema.payments.businessId, link.businessId),
-    eq(schema.payments.bookingId, link.bookingId),
+async function confirmedSlotLinkBooking(database: Database, link: LinkRow) {
+  const [row] = await database.select({ id: schema.bookings.id }).from(schema.slotLinkBookings).innerJoin(schema.bookings, and(
+    eq(schema.bookings.businessId, schema.slotLinkBookings.businessId),
+    eq(schema.bookings.id, schema.slotLinkBookings.bookingId),
+  )).where(and(
+    eq(schema.slotLinkBookings.businessId, link.businessId),
+    eq(schema.slotLinkBookings.slotLinkId, link.id),
+    inArray(schema.bookings.status, ["confirmed", "completed"]),
   )).limit(1);
-  return payment ?? null;
+  return row ?? null;
+}
+
+async function pointLinkAtPaidBooking(database: Database, link: LinkRow, bookingId: string, now: Date): Promise<SlotLinkStatus> {
+  if (link.status === "cancelled") return "cancelled";
+  await database.update(schema.slotLinks).set({ status: "paid", bookingId, updatedAt: now }).where(and(
+    eq(schema.slotLinks.businessId, link.businessId),
+    eq(schema.slotLinks.id, link.id),
+    sql`${schema.slotLinks.status} <> 'cancelled'`,
+  ));
+  return "paid";
 }
 
 async function writeStatus(database: Database, link: LinkRow, status: SlotLinkStatus, now: Date) {
@@ -235,19 +254,29 @@ async function writeStatus(database: Database, link: LinkRow, status: SlotLinkSt
   return updated?.status ?? status;
 }
 
+function holdStillActive(booking: typeof schema.bookings.$inferSelect, now: Date) {
+  return booking.status === "pending_payment" && Boolean(booking.expiresAt && booking.expiresAt > now);
+}
+
 /** Recalcula o status no banco. Pago e cancelado não voltam atrás. */
 export async function refreshSlotLinkStatus(database: Database, link: LinkRow, now: Date): Promise<SlotLinkStatus> {
   if (link.status === "cancelled") return "cancelled";
-  const [booking, payment, overlap] = await Promise.all([
-    linkedBooking(database, link),
-    linkedPayment(database, link),
-    overlappingBooking(database, link, now),
-  ]);
   if (link.status === "paid") return "paid";
-  const paid = booking?.status === "confirmed" || booking?.status === "completed" || payment?.status === "paid";
-  if (paid) return writeStatus(database, link, "paid", now);
+  const [booking, overlap, origin] = await Promise.all([
+    linkedBooking(database, link),
+    overlappingBooking(database, link, now),
+    confirmedSlotLinkBooking(database, link),
+  ]);
+  // Reserva antiga reconfirmada (`late_rebooked`) marca o link, mesmo que `booking_id` já aponte para outra.
+  if (origin) return pointLinkAtPaidBooking(database, link, origin.id, now);
+  if (booking && (booking.status === "confirmed" || booking.status === "completed")) {
+    return pointLinkAtPaidBooking(database, link, booking.id, now);
+  }
   if (link.startsAt <= now) return writeStatus(database, link, "expired", now);
   if (overlap) return writeStatus(database, link, "taken", now);
+  // Hold da reserva atual venceu e nenhuma reserva deste link confirmou: o link expira.
+  // `late_no_slot` não marca pago. Claim novo ainda passa enquanto o prazo do link existir.
+  if (booking && !holdStillActive(booking, now)) return writeStatus(database, link, "expired", now);
   if (link.expiresAt <= now) return writeStatus(database, link, "expired", now);
   return writeStatus(database, link, "pending", now);
 }
@@ -331,7 +360,8 @@ export async function cancelSlotLink(businessId: string, ownerId: string, linkId
     eq(schema.slotLinks.id, linkId),
   )).limit(1);
   if (!link) throw invalidLink();
-  const now = new Date();
+  const [clock] = (await database.execute(sql`SELECT now() AS now`)).rows as { now: Date | string }[];
+  const now = new Date(clock?.now ?? Date.now());
   const holdMinutes = bookingConfig().BOOKING_HOLD_MINUTES;
   const status = await refreshSlotLinkStatus(database, link, now);
   const current = { ...link, status };
@@ -341,12 +371,14 @@ export async function cancelSlotLink(businessId: string, ownerId: string, linkId
   }
   if (!isCancellable(current, now, holdMinutes)) throw new HttpError(409, "link_used", LINK_USED_MESSAGE);
   const service = await serviceForBusiness(database, business.id, link.serviceId, false);
-  const cutoff = new Date(now.getTime() - holdMinutes * 60_000);
   const [updated] = await database.update(schema.slotLinks).set({ status: "cancelled", updatedAt: now }).where(and(
     eq(schema.slotLinks.businessId, business.id),
     eq(schema.slotLinks.id, link.id),
     isNull(schema.slotLinks.bookingId),
-    or(isNull(schema.slotLinks.payStartedAt), lt(schema.slotLinks.payStartedAt, cutoff)),
+    or(
+      isNull(schema.slotLinks.payStartedAt),
+      sql`${schema.slotLinks.payStartedAt} < now() - (${holdMinutes} * interval '1 minute')`,
+    ),
     sql`${schema.slotLinks.status} <> 'paid'`,
   )).returning();
   if (!updated) throw new HttpError(409, "link_used", LINK_USED_MESSAGE);
@@ -366,7 +398,11 @@ async function linkByToken(database: Database, token: string) {
 }
 
 async function probeLimit(database: Database, scope: string, identity: string | null, limit: number) {
-  await consumeAbuseBucket(scope, identity ?? GLOBAL_PROBE_BUCKET, limit, "minute", database);
+  if (!identity) {
+    await consumeAbuseBucket(scope, GLOBAL_PROBE_BUCKET, ANONYMOUS_PROBE_LIMIT, "minute", database);
+    return;
+  }
+  await consumeAbuseBucket(scope, identity, limit, "minute", database);
 }
 
 function policyView(service: ServiceRow, business: BusinessRow, startsAt: Date) {
@@ -415,9 +451,23 @@ export async function openSlotLink(slug: string, token: string, identity: string
 function payRefusal(link: LinkRow, status: SlotLinkStatus, now: Date) {
   if (status === "cancelled" || link.status === "cancelled") return new HttpError(409, "link_cancelled", LINK_CANCELLED_MESSAGE);
   if (status === "paid" || link.status === "paid") return new HttpError(409, "link_used", LINK_USED_MESSAGE);
-  if (status === "expired" || link.expiresAt <= now || link.startsAt <= now) return new HttpError(410, "link_expired", LINK_EXPIRED_MESSAGE);
+  // `expiresAt` do link não bloqueia aqui: a mesma chave ainda retoma o Pix se o hold da reserva vale.
+  if (link.startsAt <= now) return new HttpError(410, "link_expired", LINK_EXPIRED_MESSAGE);
   if (status === "taken") return new HttpError(409, "slot_unavailable", SLOT_TAKEN_MESSAGE);
   return null;
+}
+
+async function attachSlotLinkBooking(database: Database, link: LinkRow, hash: string, bookingId: string) {
+  await database.insert(schema.slotLinkBookings).values({
+    businessId: link.businessId,
+    slotLinkId: link.id,
+    bookingId,
+  }).onConflictDoNothing();
+  await database.update(schema.slotLinks).set({ bookingId, updatedAt: new Date() }).where(and(
+    eq(schema.slotLinks.businessId, link.businessId),
+    eq(schema.slotLinks.id, link.id),
+    eq(schema.slotLinks.payIdempotencyHash, hash),
+  ));
 }
 
 async function releaseClaim(database: Database, link: LinkRow, hash: string) {
@@ -466,7 +516,7 @@ async function claimForPay(database: Database, link: LinkRow, hash: string, hold
     if (locked.status === "cancelled") throw new HttpError(409, "link_cancelled", LINK_CANCELLED_MESSAGE);
     if (locked.status === "paid") throw new HttpError(409, "link_used", LINK_USED_MESSAGE);
     if (locked.status === "taken") throw new HttpError(409, "slot_unavailable", SLOT_TAKEN_MESSAGE);
-    if (locked.startsAt <= now || locked.expiresAt <= now) {
+    if (locked.startsAt <= now) {
       await tx.update(schema.slotLinks).set({ status: "expired", updatedAt: now }).where(and(
         eq(schema.slotLinks.id, locked.id),
         sql`${schema.slotLinks.status} NOT IN ('cancelled', 'paid')`,
@@ -489,10 +539,17 @@ async function claimForPay(database: Database, link: LinkRow, hash: string, hold
       throw new HttpError(409, "link_used", LINK_USED_MESSAGE);
     }
     const holdActive = Boolean(booking && booking.status === "pending_payment" && booking.expiresAt && booking.expiresAt > now);
-    if (holdActive || claimIsFresh(locked.payStartedAt, now, holdMinutes)) {
-      if (sameSecretHash(locked.payIdempotencyHash, hash)) return { mode: "resume" as const, now };
-      throw new HttpError(409, "link_in_progress", LINK_IN_PROGRESS_MESSAGE);
+    const claimActive = holdActive || claimIsFresh(locked.payStartedAt, now, holdMinutes);
+    // A mesma chave retoma o Pix mesmo com o prazo do link vencido, se o hold da reserva ainda vale.
+    if (claimActive && sameSecretHash(locked.payIdempotencyHash, hash)) return { mode: "resume" as const, now };
+    if (locked.expiresAt <= now) {
+      await tx.update(schema.slotLinks).set({ status: "expired", updatedAt: now }).where(and(
+        eq(schema.slotLinks.id, locked.id),
+        sql`${schema.slotLinks.status} NOT IN ('cancelled', 'paid')`,
+      ));
+      throw new HttpError(410, "link_expired", LINK_EXPIRED_MESSAGE);
     }
+    if (claimActive) throw new HttpError(409, "link_in_progress", LINK_IN_PROGRESS_MESSAGE);
     if (booking && booking.status === "pending_payment") {
       await expirePending(tx, locked.businessId, now);
     }
@@ -504,13 +561,14 @@ async function claimForPay(database: Database, link: LinkRow, hash: string, hold
       ));
     }
     const [claimed] = await tx.update(schema.slotLinks).set({
+      status: "pending",
       payStartedAt: now,
       payIdempotencyHash: hash,
       updatedAt: now,
     }).where(and(
       eq(schema.slotLinks.businessId, locked.businessId),
       eq(schema.slotLinks.id, locked.id),
-      eq(schema.slotLinks.status, "pending"),
+      sql`${schema.slotLinks.status} IN ('pending', 'expired')`,
       isNull(schema.slotLinks.bookingId),
       or(
         isNull(schema.slotLinks.payStartedAt),
@@ -597,11 +655,7 @@ export async function paySlotLink(
       customer: input.customer,
       policyHash: input.policyHash,
     }, requestKey, database, provider, identity);
-    await database.update(schema.slotLinks).set({ bookingId: result.data.bookingId, updatedAt: new Date() }).where(and(
-      eq(schema.slotLinks.businessId, link.businessId),
-      eq(schema.slotLinks.id, link.id),
-      eq(schema.slotLinks.payIdempotencyHash, hash),
-    ));
+    await attachSlotLinkBooking(database, link, hash, result.data.bookingId);
     return payJson(result.data);
   } catch (error) {
     if (postgresCode(error) === "23P01" || (error instanceof HttpError && error.code === "slot_unavailable")) {
@@ -617,11 +671,7 @@ export async function paySlotLink(
       eq(schema.bookings.requestKey, requestKey),
     )).limit(1);
     if (existing) {
-      await database.update(schema.slotLinks).set({ bookingId: existing.id, updatedAt: new Date() }).where(and(
-        eq(schema.slotLinks.businessId, link.businessId),
-        eq(schema.slotLinks.id, link.id),
-        eq(schema.slotLinks.payIdempotencyHash, hash),
-      ));
+      await attachSlotLinkBooking(database, link, hash, existing.id);
     } else if (claimed.mode === "create") {
       await releaseClaim(database, link, hash);
     }

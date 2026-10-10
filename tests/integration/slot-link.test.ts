@@ -43,6 +43,7 @@ async function seedShop(label: string): Promise<Shop> {
 }
 
 async function destroyShop(shop: Shop) {
+  await database.delete(schema.slotLinkBookings).where(eq(schema.slotLinkBookings.businessId, shop.businessId));
   await database.delete(schema.slotLinks).where(eq(schema.slotLinks.businessId, shop.businessId));
   await database.delete(schema.paymentRefunds).where(eq(schema.paymentRefunds.businessId, shop.businessId));
   await database.delete(schema.ownerNotices).where(eq(schema.ownerNotices.businessId, shop.businessId));
@@ -284,7 +285,10 @@ describe("link de um horário", () => {
     const again = await pay(created.token, 11, "peer:192.0.2.111", payKey(11));
     expect(again.bookingId).toBe(first.bookingId);
     expect(again.accessToken).toBe(first.accessToken);
+    expect(again.payment?.id).toBe(first.payment?.id);
+    expect(again.payment?.externalId).toBe(first.payment?.externalId);
     expect(again.payment?.copyPaste).toBe(first.payment?.copyPaste);
+    expect(again.payment?.qrCodeDataUrl).toBe(first.payment?.qrCodeDataUrl);
     expect(again.payment?.expiresAt).toBe(first.payment?.expiresAt);
     expect(await database.select().from(schema.payments).where(eq(schema.payments.businessId, shop.businessId))).toHaveLength(1);
     const listed = await listSlotLinks(shop.businessId, shop.ownerId, { date: DATE }, database);
@@ -351,6 +355,70 @@ describe("link de um horário", () => {
     expect(newAfter.status).toBe("pending_payment");
     expect(oldPayment.refundStatus).toBe("refunded");
     expect(oldPayment.status).toBe("refunded");
+    const [link] = await database.select().from(schema.slotLinks).where(eq(schema.slotLinks.id, created.id));
+    expect(link.status).not.toBe("paid");
+    expect(link.bookingId).toBe(second.bookingId);
+    const listed = await listSlotLinks(shop.businessId, shop.ownerId, { date: DATE }, database);
+    expect(listed.links.find((item) => item.id === created.id)?.status).toBe("pending");
+  });
+
+  it("late_rebooked da reserva antiga marca o link como pago", async () => {
+    await database.update(schema.businesses).set({ latePaymentPolicy: "rebook_if_free" }).where(eq(schema.businesses.id, shop.businessId));
+    const created = await makeLink(0);
+    const first = await pay(created.token, 15, "peer:192.0.2.152", payKey(25));
+    await ageHold(created.id, first.bookingId);
+    const second = await pay(created.token, 16, "peer:192.0.2.153", payKey(26));
+    await ageHold(created.id, second.bookingId);
+    await database.transaction(async (tx) => {
+      await bookingService.expirePending(tx, shop.businessId, new Date());
+    });
+    const charge = provider.markPaid(first.payment!.externalId!, new Date(Date.now() + PIX_APPROVAL_TOLERANCE_MS));
+    await database.transaction(async (tx) => {
+      const result = await applyPaidEvent(tx, "fake", polledPaidEvent(charge, hash), new Date());
+      expect(result).toMatchObject({ outcome: "processed", reason: "late_rebooked", bookingId: first.bookingId });
+    });
+    const [link] = await database.select().from(schema.slotLinks).where(eq(schema.slotLinks.id, created.id));
+    expect(link.status).toBe("paid");
+    expect(link.bookingId).toBe(first.bookingId);
+    const listed = await listSlotLinks(shop.businessId, shop.ownerId, { date: DATE }, database);
+    expect(listed.links.find((item) => item.id === created.id)?.status).toBe("paid");
+  });
+
+  it("late_no_slot com a reserva nova também vencida deixa o link expirado", async () => {
+    const created = await makeLink(0);
+    const first = await pay(created.token, 15, "peer:192.0.2.154", payKey(27));
+    await ageHold(created.id, first.bookingId);
+    const second = await pay(created.token, 16, "peer:192.0.2.155", payKey(28));
+    await ageHold(created.id, second.bookingId);
+    await database.transaction(async (tx) => {
+      await bookingService.expirePending(tx, shop.businessId, new Date());
+    });
+    const charge = provider.markPaid(first.payment!.externalId!, new Date(Date.now() + PIX_APPROVAL_TOLERANCE_MS));
+    await database.transaction(async (tx) => {
+      const result = await applyPaidEvent(tx, "fake", polledPaidEvent(charge, hash), new Date());
+      expect(result).toMatchObject({ outcome: "ignored", reason: "late_no_slot", bookingId: first.bookingId });
+    });
+    const [link] = await database.select().from(schema.slotLinks).where(eq(schema.slotLinks.id, created.id));
+    expect(link.status).not.toBe("paid");
+    const listed = await listSlotLinks(shop.businessId, shop.ownerId, { date: DATE }, database);
+    expect(listed.links.find((item) => item.id === created.id)?.status).toBe("expired");
+  });
+
+  it("a mesma chave retoma o mesmo Pix depois que o prazo do link passou", async () => {
+    const created = await makeLink(0);
+    const first = await pay(created.token, 11, "peer:192.0.2.156", payKey(29));
+    const past = new Date(Date.now() - 60_000);
+    await database.update(schema.slotLinks).set({
+      createdAt: new Date(past.getTime() - 60_000),
+      expiresAt: past,
+    }).where(eq(schema.slotLinks.id, created.id));
+    const again = await pay(created.token, 11, "peer:192.0.2.157", payKey(29));
+    expect(again.bookingId).toBe(first.bookingId);
+    expect(again.payment?.id).toBe(first.payment?.id);
+    expect(again.payment?.copyPaste).toBe(first.payment?.copyPaste);
+    expect(again.accessToken).toBe(first.accessToken);
+    expect(await database.select().from(schema.payments).where(eq(schema.payments.businessId, shop.businessId))).toHaveLength(1);
+    await expect(pay(created.token, 12, "peer:192.0.2.158", payKey(30))).rejects.toMatchObject({ status: 410, code: "link_expired" });
   });
 
   it("duas chaves disputam a retomada de um hold vencido e só uma vence", async () => {
@@ -439,7 +507,9 @@ describe("link de um horário", () => {
 
     vi.stubEnv("SLOT_LINK_OPEN_PER_CLIENT", "1");
     await readSlotLinkPreview(created.previewId, null, database);
-    await expect(readSlotLinkPreview(created.previewId, null, database)).rejects.toMatchObject({ status: 429, code: "rate_limited" });
+    await readSlotLinkPreview(created.previewId, null, database);
+    await readSlotLinkPreview(created.previewId, "peer:192.0.2.253", database);
+    await expect(readSlotLinkPreview(created.previewId, "peer:192.0.2.253", database)).rejects.toMatchObject({ status: 429, code: "rate_limited" });
   });
 
   it("apaga o lembrete depois do início e os links saem com o negócio", async () => {
