@@ -3,11 +3,12 @@ import { clearAliasCache } from "../../lib/business-profile/alias-cache";
 import { SlugMoved } from "../../lib/business-profile/public-slug";
 import { withPublicSlug } from "../../lib/business-profile/public-route";
 
-const state = vi.hoisted(() => ({ mode: "down" as "down" | "alias" | "none" | "boom" }));
+const state = vi.hoisted(() => ({ mode: "down" as "down" | "alias" | "none" | "boom" | "plain" }));
 
 vi.mock("../../db", () => ({
   getDb: () => ({
     select() {
+      if (state.mode === "plain") throw new Error("lookup exploded");
       if (state.mode === "down" || state.mode === "boom") {
         const error = new Error(state.mode === "down" ? 'relation "business_slug_history" does not exist' : "connection refused");
         (error as Error & { cause?: unknown }).cause = state.mode === "down"
@@ -55,7 +56,7 @@ describe("withPublicSlug", () => {
     logged.mockRestore();
   });
 
-  it("rethrows alias lookup errors that are not a missing table", async () => {
+  it("keeps the public route for any alias lookup failure and logs only the SQLSTATE", async () => {
     state.mode = "boom";
     const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const run = vi.fn(async () => Response.json({ ok: true }));
@@ -64,13 +65,25 @@ describe("withPublicSlug", () => {
       "salao",
       run,
     );
-    expect(run).not.toHaveBeenCalled();
-    expect(response.status).toBe(500);
+    expect(logged).toHaveBeenCalledWith("[alias] code=08006");
+    expect(run).toHaveBeenCalledOnce();
+    expect(response.status).toBe(200);
+    expect(response.headers.get("location")).toBeNull();
     const body = await response.text();
-    expect(body).toContain("internal_error");
-    expect(body).not.toContain("super-secret");
-    expect(body).not.toContain("08006");
-    expect(logged.mock.calls.flat().join(" ")).not.toContain("[alias] code=42P01");
+    expect(body).toBe('{"ok":true}');
+    expect(logged.mock.calls.flat().join(" ")).not.toContain("super-secret");
+    expect(logged.mock.calls.flat().join(" ")).not.toContain("connection refused");
+    logged.mockRestore();
+  });
+
+  it("keeps the public route when the alias lookup throws an error without a SQLSTATE", async () => {
+    state.mode = "plain";
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const run = vi.fn(async () => Response.json({ ok: true }));
+    const response = await withPublicSlug(new Request("https://agenda.example/api/public/salao/services"), "salao", run);
+    expect(response.status).toBe(200);
+    expect(run).toHaveBeenCalledOnce();
+    expect(logged).toHaveBeenCalledWith("[alias] code=unknown");
     logged.mockRestore();
   });
 

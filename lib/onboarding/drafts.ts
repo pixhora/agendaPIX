@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { and, asc, eq, isNull, lt, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "../../db";
-import { businesses, onboardingDrafts, onboardingRequests, verification, type OnboardingDraftData } from "../../db/schema";
+import { businesses, onboardingDrafts, onboardingRequests, type OnboardingDraftData } from "../../db/schema";
 import { requestKeySchema } from "../bookings/validation";
 import { HttpError } from "../http";
 import { ONBOARDING_SEGMENTS, suggestFreeSlugs, takenSlugs } from "../slug-availability";
@@ -145,8 +145,9 @@ export async function updateOnboardingDraft(id: string, body: unknown, reader: D
   if (!patch.success) invalidInput(patch.error);
   let email = draft.email;
   let data = draft.data;
+  // O OTP do e-mail antigo não é apagado: a tabela `verification` não guarda o rascunho,
+  // então não dá para apagar só os seus. O código expira sozinho.
   if (patch.data.email && patch.data.email !== draft.email) {
-    await database.delete(verification).where(eq(verification.identifier, signInOtpIdentifier(draft.email)));
     email = patch.data.email;
   }
   if (patch.data.data !== undefined) {
