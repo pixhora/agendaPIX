@@ -2,10 +2,26 @@ import { expect, it } from "vitest";
 import { isReservedBusinessSlug, RESERVED_BUSINESS_SLUGS, slugSchema } from "../../lib/bookings/validation";
 import { onboardingInputSchema } from "../../lib/onboarding/validation";
 
-const input = { business: { name: " Salão ", slug: "salao" }, service: { name: "Corte", durationMinutes: 30, priceCents: 5000, depositCents: 1000 }, hours: [{ weekday: 1, opensAt: "09:00", closesAt: "18:00" }] };
+const logoUrl = "https://ce0rcu23vrrdzqap.public.blob.vercel-storage.com/logos/test.webp";
+const input = { business: { name: " Salão ", slug: "salao", logoUrl, timezone: "America/Sao_Paulo" }, service: { name: "Corte", durationMinutes: 30, priceCents: 5000, depositCents: 1000 }, hours: [{ weekday: 1, opensAt: "09:00", closesAt: "18:00" }] };
 
-it("normalizes names and supplies the existing timezone", () => {
-  expect(onboardingInputSchema.parse(input).business).toEqual({ name: "Salão", slug: "salao", timezone: "America/Sao_Paulo" });
+it("keeps the name, slug, logo and timezone the client sent", () => {
+  expect(onboardingInputSchema.parse(input).business).toEqual({ name: "Salão", slug: "salao", logoUrl, timezone: "America/Sao_Paulo" });
+});
+
+it("does not fill an empty profile, service or hours with an example", () => {
+  expect(onboardingInputSchema.safeParse({}).success).toBe(false);
+  expect(onboardingInputSchema.safeParse({ ...input, business: { slug: "salao", logoUrl, timezone: "America/Sao_Paulo" } }).success).toBe(false);
+  expect(onboardingInputSchema.safeParse({ ...input, business: { ...input.business, logoUrl: undefined } }).success).toBe(false);
+  expect(onboardingInputSchema.safeParse({ ...input, business: { ...input.business, timezone: undefined } }).success).toBe(false);
+  expect(onboardingInputSchema.safeParse({ ...input, service: { ...input.service, name: "" } }).success).toBe(false);
+  expect(onboardingInputSchema.safeParse({ ...input, hours: [] }).success).toBe(false);
+  const parsed = onboardingInputSchema.parse(input);
+  expect(parsed.business.name).toBe("Salão");
+  expect(parsed.business.slug).toBe("salao");
+  expect(parsed.service.name).toBe("Corte");
+  expect(parsed.service).not.toHaveProperty("depositPolicy");
+  expect(JSON.stringify(parsed)).not.toContain("Studio Bella");
 });
 
 it("rejects tenant injection, invalid timezone, money, duplicate days and intervals", () => {

@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { contactWhatsappSchema, normalizeContactWhatsapp } from "../../lib/validation/whatsapp";
 import { onboardingInputSchema } from "../../lib/onboarding/validation";
-import { PADRAO_DEPOSIT_POLICY } from "../../lib/policy/schema";
-
-const input = { business: { name: "Salão", slug: "salao" }, service: { name: "Corte", durationMinutes: 30, priceCents: 5000, depositCents: 1000 }, hours: [{ weekday: 1, opensAt: "09:00", closesAt: "18:00" }] };
+const logoUrl = "https://ce0rcu23vrrdzqap.public.blob.vercel-storage.com/logos/test.webp";
+const input = { business: { name: "Salão", slug: "salao", logoUrl, timezone: "America/Sao_Paulo" }, service: { name: "Corte", durationMinutes: 30, priceCents: 5000, depositCents: 1000 }, hours: [{ weekday: 1, opensAt: "09:00", closesAt: "18:00" }] };
 
 describe("WhatsApp do negócio", () => {
   it("normaliza telefone brasileiro e rejeita lixo", () => {
@@ -13,10 +12,10 @@ describe("WhatsApp do negócio", () => {
     expect(contactWhatsappSchema.safeParse("123").success).toBe(false);
   });
 
-  it("aceita o campo no onboarding e aplica a política padrão", () => {
+  it("aceita o campo no onboarding sem inventar política", () => {
     const parsed = onboardingInputSchema.parse({ ...input, business: { ...input.business, contactWhatsapp: "11999999999" } });
     expect(parsed.business.contactWhatsapp).toBe("+5511999999999");
-    expect(parsed.service.depositPolicy).toEqual(PADRAO_DEPOSIT_POLICY);
+    expect(parsed.service).not.toHaveProperty("depositPolicy");
     expect(onboardingInputSchema.parse(input).business.contactWhatsapp).toBeUndefined();
   });
 });

@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "../../db";
-import { businesses, businessHours, onboardingRequests, services } from "../../db/schema";
+import { businessHours, businessSlugHistory, businesses, onboardingRequests, services } from "../../db/schema";
 import { trialEndsAtFromCreation } from "../billing/access";
 import { requestKeySchema } from "../bookings/validation";
 import { HttpError } from "../http";
+import { isUniqueViolation } from "../business-profile/slug-conflict";
 import { onboardingInputSchema } from "./validation";
 
 export async function provisionBusiness(ownerId: string, key: unknown, body: unknown, database?: ReturnType<typeof getDb>) {
@@ -21,9 +22,12 @@ export async function provisionBusiness(ownerId: string, key: unknown, body: unk
         if (!previous.result) throw new HttpError(503, "onboarding_unavailable", "Não foi possível concluir o cadastro. Tente novamente.");
         return { result: previous.result, replay: true };
       }
+      const [alias] = await tx.select({ oldSlug: businessSlugHistory.oldSlug }).from(businessSlugHistory).where(eq(businessSlugHistory.oldSlug, input.business.slug)).limit(1);
+      if (alias) throw new HttpError(409, "slug_unavailable", "Esse endereço já está em uso. Escolha outro.");
       const [business] = await tx.insert(businesses).values({
         name: input.business.name,
         slug: input.business.slug,
+        logoUrl: input.business.logoUrl,
         timezone: input.business.timezone,
         contactWhatsapp: input.business.contactWhatsapp ?? null,
         trialEndsAt: trialEndsAtFromCreation(new Date(), input.business.timezone),
@@ -38,6 +42,7 @@ export async function provisionBusiness(ownerId: string, key: unknown, body: unk
     });
   } catch (error) {
     if (error instanceof HttpError) throw error;
+    if (isUniqueViolation(error)) throw new HttpError(409, "slug_unavailable", "Esse endereço já está em uso. Escolha outro.");
     throw new HttpError(503, "onboarding_unavailable", "Não foi possível concluir o cadastro. Tente novamente.");
   }
 }

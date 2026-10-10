@@ -64,7 +64,8 @@ describe("document security headers", () => {
     const csp = buildContentSecurityPolicy({ nonce: NONCE, isDev: false, upgradeInsecureRequests: false });
     expect(csp).toContain("font-src 'self'");
     expect(csp).toContain("connect-src 'self'");
-    expect(csp).toContain("img-src 'self' blob: data:");
+    expect(csp).toContain("img-src 'self' blob: data: https://*.public.blob.vercel-storage.com");
+    expect(csp).not.toContain("blob.fake.local");
     expect(csp).toContain("style-src 'self' 'unsafe-inline'");
     expect(csp).toContain("style-src-attr 'unsafe-inline'");
     expect(csp).not.toContain("upgrade-insecure-requests");
@@ -73,6 +74,7 @@ describe("document security headers", () => {
   it("allows eval only in development", () => {
     const csp = buildContentSecurityPolicy({ nonce: NONCE, isDev: true, upgradeInsecureRequests: false });
     expect(csp).toContain("'unsafe-eval'");
+    expect(csp).toContain("https://blob.fake.local");
     expect(csp).toContain("style-src 'self' 'unsafe-inline'");
     expect(csp).not.toContain("upgrade-insecure-requests");
   });
@@ -143,8 +145,8 @@ describe("security proxy", () => {
     vi.unstubAllEnvs();
   });
 
-  it("sets the headers on the response and does not leak the nonce header", () => {
-    const response = proxy(new NextRequest("https://agenda.example/dashboard"));
+  it("sets the headers on the response and does not leak the nonce header", async () => {
+    const response = await proxy(new NextRequest("https://agenda.example/dashboard"));
     const csp = response.headers.get("content-security-policy") ?? "";
     expect(csp).toContain("frame-ancestors 'none'");
     expect(csp).toContain("'strict-dynamic'");
@@ -161,27 +163,27 @@ describe("security proxy", () => {
     expect(response.headers.get("x-middleware-request-content-security-policy")).toContain(`'nonce-${nonce}'`);
   });
 
-  it("uses a fresh nonce per request and skips upgrade on localhost", () => {
-    const first = proxy(new NextRequest("http://127.0.0.1:3000/"));
-    const second = proxy(new NextRequest("http://127.0.0.1:3000/api/health"));
+  it("uses a fresh nonce per request and skips upgrade on localhost", async () => {
+    const first = await proxy(new NextRequest("http://127.0.0.1:3000/"));
+    const second = await proxy(new NextRequest("http://127.0.0.1:3000/api/health"));
     expect(first.headers.get("content-security-policy")).not.toBe(second.headers.get("content-security-policy"));
     expect(first.headers.get("content-security-policy")).not.toContain("upgrade-insecure-requests");
     expect(first.headers.get("strict-transport-security")).toBeNull();
     expect(second.headers.get("strict-transport-security")).toBeNull();
-    expect(proxy(new NextRequest("http://[::1]:3000/api/health")).headers.get("strict-transport-security")).toBeNull();
-    expect(proxy(new NextRequest("http://agenda.example/api/health")).headers.get("strict-transport-security")).toBe(HSTS_VALUE);
+    expect((await proxy(new NextRequest("http://[::1]:3000/api/health"))).headers.get("strict-transport-security")).toBeNull();
+    expect((await proxy(new NextRequest("http://agenda.example/api/health"))).headers.get("strict-transport-security")).toBe(HSTS_VALUE);
     expect(second.headers.get("x-content-type-options")).toBe("nosniff");
   });
 
-  it("allows eval only while developing", () => {
+  it("allows eval only while developing", async () => {
     vi.stubEnv("NODE_ENV", "development");
-    const response = proxy(new NextRequest("http://localhost:3000/preview/booking"));
+    const response = await proxy(new NextRequest("http://localhost:3000/preview/booking"));
     const csp = response.headers.get("content-security-policy") ?? "";
     expect(csp).toContain("'unsafe-eval'");
     expect(csp).toContain("style-src 'self' 'unsafe-inline'");
     expect(csp).not.toContain("upgrade-insecure-requests");
     expect(response.headers.get("strict-transport-security")).toBeNull();
     vi.stubEnv("NODE_ENV", "production");
-    expect(proxy(new NextRequest("https://agenda.example/")).headers.get("strict-transport-security")).toBe(HSTS_VALUE);
+    expect((await proxy(new NextRequest("https://agenda.example/"))).headers.get("strict-transport-security")).toBe(HSTS_VALUE);
   });
 });

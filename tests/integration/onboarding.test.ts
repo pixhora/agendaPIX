@@ -9,7 +9,8 @@ afterAll(() => db.$client.end());
 it("provisions atomically, replays concurrent requests and isolates owners and slug conflicts", async () => {
   const owners = [randomUUID(), randomUUID()];
   const key = randomUUID();
-  const input = { business: { name: "Fixture", slug: `onboarding-${key}` }, service: { name: "Corte", durationMinutes: 30, priceCents: 5000, depositCents: 1000 }, hours: [{ weekday: 1, opensAt: "09:00", closesAt: "18:00" }] };
+  const slug = `onb-${key.replaceAll("-", "").slice(0, 16)}`;
+  const input = { business: { name: "Fixture", slug, logoUrl: "https://ce0rcu23vrrdzqap.public.blob.vercel-storage.com/logos/test.webp", timezone: "America/Sao_Paulo" }, service: { name: "Corte", durationMinutes: 30, priceCents: 5000, depositCents: 1000 }, hours: [{ weekday: 1, opensAt: "09:00", closesAt: "18:00" }] };
   await db.insert(user).values(owners.map(id => ({ id, name: "Fixture", email: `${id}@example.com` })));
   try {
     const results = await Promise.all(Array.from({ length: 5 }, () => provisionBusiness(owners[0], key, input, db)));
@@ -18,7 +19,7 @@ it("provisions atomically, replays concurrent requests and isolates owners and s
     await expect(provisionBusiness(owners[0], key, { ...input, business: { ...input.business, name: "Changed" } }, db)).rejects.toMatchObject({ status: 409, code: "idempotency_conflict" });
     await expect(provisionBusiness(owners[1], key, input, db)).rejects.toMatchObject({ status: 409, code: "slug_unavailable" });
     expect(await db.select().from(onboardingRequests).where(eq(onboardingRequests.ownerId, owners[1]))).toHaveLength(0);
-    const second = await provisionBusiness(owners[1], key, { ...input, business: { ...input.business, slug: `other-${key}` } }, db);
+    const second = await provisionBusiness(owners[1], key, { ...input, business: { ...input.business, slug: `oth-${key.replaceAll("-", "").slice(0, 16)}` } }, db);
     expect(second.result.businessId).not.toBe(results[0].result.businessId);
     expect(await db.select().from(businessHours).where(eq(businessHours.businessId, results[0].result.businessId))).toHaveLength(1);
   } finally {

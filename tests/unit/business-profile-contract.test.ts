@@ -1,6 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
-
-const originalNodeEnv = process.env.NODE_ENV;
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   FAKE_BLOB_HOST,
   businessProfilePatchRequestSchema,
@@ -17,8 +15,7 @@ const vercelLogo = "https://ce0rcu23vrrdzqap.public.blob.vercel-storage.com/logo
 const fakeLogo = `https://${FAKE_BLOB_HOST}/logos/loja.webp`;
 
 afterEach(() => {
-  if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
-  else process.env.NODE_ENV = originalNodeEnv;
+  vi.unstubAllEnvs();
 });
 
 describe("businessProfile", () => {
@@ -43,14 +40,14 @@ describe("businessProfile", () => {
   });
 
   it("aceita o host público do Blob e o host falso só fora de produção", () => {
-    process.env.NODE_ENV = "test";
+    vi.stubEnv("NODE_ENV", "test");
     expect(logoUrlRejection(vercelLogo, "production")).toBeNull();
     expect(logoUrlRejection(fakeLogo, "test")).toBeNull();
     expect(logoUrlRejection(fakeLogo, "production")).toBe("logo_invalid");
     expect(logoUrlRejection("http://ce0rcu23vrrdzqap.public.blob.vercel-storage.com/logos/a.webp", "test")).toBe("logo_invalid");
     expect(logoUrlRejection("https://ce0rcu23vrrdzqap.private.blob.vercel-storage.com/logos/a.webp", "test")).toBe("logo_invalid");
     expect(businessProfileSchema.safeParse({ name: "Ana", slug: "ana-lash", logoUrl: fakeLogo }).success).toBe(true);
-    process.env.NODE_ENV = "production";
+    vi.stubEnv("NODE_ENV", "production");
     expect(businessProfileSchema.safeParse({ name: "Ana", slug: "ana-lash", logoUrl: fakeLogo }).success).toBe(false);
   });
 });
@@ -71,7 +68,7 @@ describe("profile routes", () => {
       publicPath: "/ana-luz",
       publicUrl: null,
     }).publicPath).toBe("/ana-luz");
-    process.env.NODE_ENV = "test";
+    vi.stubEnv("NODE_ENV", "test");
     expect(logoUploadResponseSchema.parse({ logoUrl: fakeLogo }).logoUrl).toBe(fakeLogo);
     expect(apiErrorBodySchema.parse({
       error: { code: "slug_taken", message: "Esse endereço já está em uso.", details: { constraint: "businesses_slug_unique" } },

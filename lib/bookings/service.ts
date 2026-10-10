@@ -19,6 +19,7 @@ import { policyHashFor } from "../policy/hash";
 import { clientPolicyText, policySummary, refundWindowClosedAtBooking } from "../policy/text";
 import { availableSlots, localDate } from "./availability";
 import { assertDepositBookable, serviceListingBookability } from "./deposit-bookability";
+import { SlugMoved, aliasTarget } from "../business-profile/public-slug";
 import { availabilitySchema, bookingInputSchema, requestKeySchema, slugSchema } from "./validation";
 import { depositSlotAllowed } from "./hold";
 import { bookingConfig, type BookingConfig } from "./config";
@@ -82,9 +83,12 @@ export async function expirePending(database: Database, businessId: string, now:
   ));
 }
 async function businessBySlug(slug: string, database: Database) {
-  const [business] = await database.select().from(schema.businesses).where(eq(schema.businesses.slug, slugSchema.parse(slug))).limit(1);
-  if (!business) throw new HttpError(404, "business_not_found", "Negócio não encontrado.");
-  return business;
+  const parsed = slugSchema.parse(slug);
+  const [business] = await database.select().from(schema.businesses).where(eq(schema.businesses.slug, parsed)).limit(1);
+  if (business) return business;
+  const moved = await aliasTarget(parsed, database);
+  if (moved) throw new SlugMoved(moved);
+  throw new HttpError(404, "business_not_found", "Negócio não encontrado.");
 }
 async function serviceById(businessId: string, serviceId: string, database: Database) {
   const [service] = await database.select().from(schema.services).where(and(eq(schema.services.businessId, businessId), eq(schema.services.id, serviceId), eq(schema.services.active, true))).limit(1);
@@ -125,7 +129,7 @@ export async function listPublicServices(slug: string, database: Database = getD
     timezone: business.timezone,
     address: null,
     phone: null,
-    logoUrl: null,
+    logoUrl: business.logoUrl,
     contactWhatsapp: business.contactWhatsapp,
     bookingsPaused: access.bookingsPaused,
     requiresPayerCpf: facts.requiresPayerCpf,

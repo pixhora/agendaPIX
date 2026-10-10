@@ -24,6 +24,7 @@ export function buildProvisioningPayload(data: OnboardingData): ProvisioningPayl
     business: {
       name: data.businessName,
       slug: data.slug,
+      logoUrl: data.logoUrl,
       timezone: "America/Sao_Paulo",
       ...(data.contactWhatsapp ? { contactWhatsapp: data.contactWhatsapp } : {}),
     },

@@ -19,7 +19,7 @@ function draftBody(email: string, slug: string, segment = "barbearia") {
     segment,
     plan: "base",
     data: {
-      business: { name: "Studio Bella", slug },
+      business: { name: "Studio Bella", slug, logoUrl: "https://ce0rcu23vrrdzqap.public.blob.vercel-storage.com/logos/test.webp", timezone: "America/Sao_Paulo" },
       service: { name: "Corte", durationMinutes: 30, priceCents: 5000, depositCents: 1000 },
       hours: [{ weekday: 1, opensAt: "09:00", closesAt: "18:00" }],
     },
@@ -214,6 +214,7 @@ describe.sequential("rascunho de cadastro", () => {
         plan: "completo" as const,
         businessName: "Studio Repro",
         slug: `repro-${id.slice(0, 8)}`,
+        logoUrl: "https://ce0rcu23vrrdzqap.public.blob.vercel-storage.com/logos/test.webp",
         serviceName: "Corte",
         durationMinutes: 45,
         priceCents: 5000,
