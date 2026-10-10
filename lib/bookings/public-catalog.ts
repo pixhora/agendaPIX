@@ -366,15 +366,28 @@ async function overlayLiveSubscription(catalog: PublicCatalog): Promise<PublicCa
  * Catálogo público (serviços, horários, perfil). A ocupação dos horários não entra aqui.
  * Fora do Next (testes) lê direto do banco. No servidor, revalida na hora em que o dono muda o cadastro.
  */
+async function loadCatalogJson(slug: string) {
+  try {
+    return serializeCatalog(await loadPublicCatalog(slug, getDb()));
+  } catch (error) {
+    // `unstable_cache` devolve o valor antigo se a função lançar. Null força a página a procurar o alias.
+    if (error instanceof HttpError && error.code === "business_not_found") return null;
+    throw error;
+  }
+}
+
 export async function readCachedCatalog(slug: string): Promise<PublicCatalog> {
-  const load = async () => serializeCatalog(await loadPublicCatalog(slug, getDb()));
-  if (!process.env.NEXT_RUNTIME) return hydrateCatalog(await load());
-  const { unstable_cache } = await import("next/cache");
-  const cached = unstable_cache(load, ["public-catalog-v1", slug], {
-    tags: [publicCatalogTag(slug)],
-    revalidate: PUBLIC_CATALOG_REVALIDATE_SECONDS,
-  });
-  return overlayLiveSubscription(hydrateCatalog(await cached()));
+  const load = () => loadCatalogJson(slug);
+  const json = process.env.NEXT_RUNTIME
+    ? await (await import("next/cache")).unstable_cache(load, ["public-catalog-v1", slug], {
+      tags: [publicCatalogTag(slug)],
+      revalidate: PUBLIC_CATALOG_REVALIDATE_SECONDS,
+    })()
+    : await load();
+  if (!json) throw new HttpError(404, "business_not_found", "Negócio não encontrado.");
+  const catalog = hydrateCatalog(json);
+  if (!process.env.NEXT_RUNTIME) return catalog;
+  return overlayLiveSubscription(catalog);
 }
 
 /** Horários ocupados de um intervalo. A disponibilidade continua lendo isto ao vivo. */

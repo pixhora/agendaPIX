@@ -25,11 +25,13 @@ function documentHeaders(request: NextRequest) {
  * Skips Next prefetch so a nonce is not frozen into a cached payload, and
  * skips files covered by `headers()` in next.config.ts.
  */
-export async function proxy(request: NextRequest, lookup: AliasLookup = aliasTarget) {
+export async function proxy(request: NextRequest, lookup?: AliasLookup) {
+  // O Next chama `proxy(request, event)`. O segundo argumento só é a busca nos testes.
+  const resolve = typeof lookup === "function" ? lookup : aliasTarget;
   const slug = publicSlugFromPath(request.nextUrl.pathname);
   if (slug) {
     try {
-      const target = await cachedAliasTarget(slug, lookup);
+      const target = await cachedAliasTarget(slug, resolve);
       if (target && target !== slug) {
         const location = new URL(locationForMovedSlug(request.url, slug, target), request.url);
         const response = NextResponse.redirect(location, 308);
