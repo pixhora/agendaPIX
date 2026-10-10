@@ -93,6 +93,24 @@ export async function expectThemeScriptNonce(response: Awaited<ReturnType<Page["
   expect(theme![1], "script do tema sem o nonce da CSP").toContain(`nonce="${nonce}"`);
 }
 
+/** Razão de contraste WCAG entre duas cores rgb()/rgba() do computed style. */
+export function contrastRatio(a: string, b: string): number {
+  const parse = (value: string) => {
+    const match = value.match(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/);
+    if (!match) throw new Error(`cor não reconhecida: ${value}`);
+    return [Number(match[1]), Number(match[2]), Number(match[3])];
+  };
+  const lum = (rgb: number[]) => {
+    const [red, green, blue] = rgb.map((channel) => {
+      const c = channel / 255;
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+  };
+  const [light, dark] = [lum(parse(a)), lum(parse(b))].sort((x, y) => y - x);
+  return (light + 0.05) / (dark + 0.05);
+}
+
 /** Reflow (WCAG 1.4.10): nada de rolagem horizontal na largura do projeto. */
 export async function expectNoHorizontalOverflow(page: Page) {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);

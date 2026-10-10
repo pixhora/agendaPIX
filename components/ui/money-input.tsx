@@ -2,8 +2,17 @@
 
 import { useLayoutEffect, useRef, useState } from "react";
 import { FieldError } from "@/components/ui/field";
+import { fieldShell } from "@/components/ui/input";
 import { centsFromTypedField, formatCents, parsePastedMoney, MAX_MONEY_CENTS } from "@/lib/money";
 import { cn } from "@/lib/utils";
+
+/**
+ * Mesma caixa de texto para o prefixo "R$" e para o valor.
+ * 16px, Inter, peso normal: igual aos outros campos e ao placeholder "0,00".
+ */
+export const moneyFigureClass = "font-sans text-base font-normal leading-6 tabular-nums";
+
+const moneyPlaceholderClass = "placeholder:font-sans placeholder:text-base placeholder:font-normal placeholder:leading-6 placeholder:text-muted";
 
 const PASTE_ERROR = "Não entendemos esse valor. Digite só os números.";
 
@@ -22,13 +31,13 @@ function shake(element: HTMLElement | null) {
 
 export function MoneyReadout({ cents, label }: { cents: number | null; label: string }) {
   return (
-    <div className="flex min-h-[52px] items-center rounded-field border border-line-strong/60 bg-surface px-3.5" aria-label={label}>
+    <div className="flex min-h-12 items-center gap-1 rounded-field border border-line-strong/60 bg-surface px-3.5" aria-label={label}>
       {cents == null ? (
-        <span className="font-display text-[22px] font-bold text-muted">—</span>
+        <span className={cn(moneyFigureClass, "text-muted")}>—</span>
       ) : (
         <>
-          <span aria-hidden="true" className="mr-1.5 text-lg font-semibold text-muted">R$</span>
-          <span className="font-display text-[22px] font-bold tabular-nums text-ink">{formatCents(cents)}</span>
+          <span aria-hidden="true" className={cn(moneyFigureClass, "text-ink")}>R$</span>
+          <span className={cn(moneyFigureClass, "text-ink")}>{formatCents(cents)}</span>
         </>
       )}
     </div>
@@ -45,6 +54,7 @@ export function MoneyInput({
   error,
   hint,
   readOnly = false,
+  disabled = false,
 }: {
   id: string;
   label: string;
@@ -56,6 +66,7 @@ export function MoneyInput({
   error?: string | null;
   hint?: string;
   readOnly?: boolean;
+  disabled?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
@@ -66,6 +77,8 @@ export function MoneyInput({
   const errorId = shownError ? `${id}-error` : undefined;
   const describedBy = [hintId, errorId].filter(Boolean).join(" ") || undefined;
   const text = valueCents == null ? "" : formatCents(valueCents);
+  const quiet = readOnly || disabled;
+  const empty = valueCents == null;
 
   useLayoutEffect(() => {
     const element = inputRef.current;
@@ -87,13 +100,15 @@ export function MoneyInput({
       </label>
       <div
         ref={boxRef}
-        className={cn(
-          "onb-control-wrap flex min-h-[52px] items-center rounded-field border bg-surface px-3.5 focus-within:shadow-focus",
-          shownError ? "border-danger" : "border-line-strong/60 focus-within:border-ring",
-          readOnly && "bg-subtle",
-        )}
+        className={cn(fieldShell, "gap-1 px-3.5", readOnly && "border-line bg-subtle shadow-none")}
       >
-        <span aria-hidden="true" className="mr-1.5 text-lg font-semibold text-muted">R$</span>
+        <span
+          aria-hidden="true"
+          data-money-prefix=""
+          className={cn(moneyFigureClass, "shrink-0", quiet || empty ? "text-muted" : "text-ink")}
+        >
+          R$
+        </span>
         <input
           ref={inputRef}
           id={id}
@@ -102,6 +117,7 @@ export function MoneyInput({
           pattern="[0-9]*"
           autoComplete="off"
           readOnly={readOnly}
+          disabled={disabled}
           aria-invalid={shownError ? true : undefined}
           aria-describedby={describedBy}
           placeholder="0,00"
@@ -127,7 +143,7 @@ export function MoneyInput({
             emit(parsed === 0 ? null : parsed);
           }}
           onChange={(event) => {
-            if (readOnly) return;
+            if (readOnly || disabled) return;
             if (skipChange.current) {
               skipChange.current = false;
               return;
@@ -139,7 +155,12 @@ export function MoneyInput({
             }
             emit(interpreted.cents);
           }}
-          className="min-w-0 flex-1 bg-transparent font-display text-[22px] font-bold tabular-nums text-ink outline-none placeholder:font-sans placeholder:text-base placeholder:font-normal placeholder:text-muted"
+          className={cn(
+            moneyFigureClass,
+            moneyPlaceholderClass,
+            "min-w-0 flex-1 bg-transparent text-ink outline-none disabled:cursor-not-allowed disabled:text-muted",
+            quiet && "text-muted",
+          )}
         />
       </div>
       {hint ? <p id={hintId} className="text-sm text-muted">{hint}</p> : null}
