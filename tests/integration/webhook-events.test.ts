@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, createHmac, randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
@@ -6,6 +6,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as schema from "../../db/schema";
 import { databaseEnvSchema } from "../../lib/env";
 import { MP_CONNECT_CONSENT_TEXT, MP_CONNECT_CONSENT_VERSION } from "../../lib/mercadopago/consent";
+import { handleMpConnectWebhook, mercadoPagoManifest } from "../../lib/mercadopago-oauth/connect-webhook";
 import { encryptMpToken } from "../../lib/mercadopago-oauth/crypto";
 import { createDrizzleWebhookEvents, MP_CONNECT_EVENT_PROVIDER } from "../../lib/mercadopago-oauth/webhook-events";
 
@@ -13,6 +14,7 @@ const pool = new Pool({ connectionString: databaseEnvSchema.parse(process.env).D
 const database = drizzle(pool, { schema });
 const events = createDrizzleWebhookEvents(database);
 const key = "ab".repeat(32);
+const webhookSecret = "d".repeat(40);
 
 let ownerId: string;
 let businessId: string;
@@ -100,6 +102,43 @@ describe("webhook_events no Postgres", () => {
     `);
 
     await expect(events.deauthorize(requestId, mpUserId)).rejects.toSatisfy((error: unknown) => pgError(error).message?.includes("forced_update_failure") === true);
+
+    const rows = await database.select().from(schema.webhookEvents).where(eq(schema.webhookEvents.requestId, requestId));
+    const [connection] = await database.select().from(schema.mercadopagoConnections).where(eq(schema.mercadopagoConnections.businessId, businessId));
+    expect(rows).toHaveLength(0);
+    expect(connection?.status).toBe("connected");
+    expect(connection?.accessTokenEnc).not.toBeNull();
+  });
+
+  it("200 em GET /users/me não grava a entrega e responde 503", async () => {
+    const requestId = `req-${randomUUID()}`;
+    const body = JSON.stringify({ action: "application.deauthorized", type: "mp-connect", user_id: mpUserId });
+    const ts = "1700000000";
+    const manifest = mercadoPagoManifest({ dataId: "abc123", requestId, ts });
+    const signature = createHmac("sha256", webhookSecret).update(manifest).digest("hex");
+    const headers = new Headers({
+      "x-signature": `ts=${ts},v1=${signature}`,
+      "x-request-id": requestId,
+    });
+    const env = {
+      MP_CLIENT_ID: "mp-client",
+      MP_CLIENT_SECRET: "mp-client-secret",
+      MP_OAUTH_REDIRECT_URI: "https://app.example.com/api/integrations/mercadopago/callback",
+      MP_TOKEN_ENCRYPTION_KEY: key,
+      BETTER_AUTH_URL: "https://app.example.com",
+      BETTER_AUTH_SECRET: "c".repeat(40),
+      MERCADOPAGO_WEBHOOK_SECRET: webhookSecret,
+      MP_OAUTH_PKCE: "off",
+    };
+    await expect(handleMpConnectWebhook({
+      body,
+      headers,
+      url: "https://app.example.com/api/webhooks/payments/mercadopago?data.id=abc123&type=mp-connect",
+      now: new Date(Number(ts) * 1000),
+      env,
+      events,
+      fetchImpl: async () => Response.json({ id: 1 }),
+    })).rejects.toMatchObject({ status: 503, code: "mp_revocation_unconfirmed" });
 
     const rows = await database.select().from(schema.webhookEvents).where(eq(schema.webhookEvents.requestId, requestId));
     const [connection] = await database.select().from(schema.mercadopagoConnections).where(eq(schema.mercadopagoConnections.businessId, businessId));

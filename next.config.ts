@@ -1,5 +1,8 @@
 import type { NextConfig } from "next";
+import { assertVercelProductionBuild } from "./lib/env";
 import { staticAssetHeaderRules } from "./lib/security/headers";
+
+assertVercelProductionBuild();
 
 const nextConfig: NextConfig = {
   // O e2e da publicação legal não pode reusar o .next do suite principal: lá a flag está desligada.

@@ -123,9 +123,8 @@ export async function handleMpConnectWebhook(input: {
     throw revocationUnconfirmed();
   }
   if (verdict.result === "active") {
-    const recorded = await events.record(requestId);
-    if (recorded === "duplicate") return { outcome: "duplicate" as const };
-    return { outcome: "ignored" as const, reason: "authorization_still_active" };
+    // Token ainda válido. Não grava webhook_events: o replay viraria duplicate e o Mercado Pago não reenviaria.
+    throw revocationUnconfirmed();
   }
 
   const claimed = await events.deauthorize(requestId, mpUserId);

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { isDevExampleOpen } from "../../components/preview/preview-badge-gate";
-import { assertProductionSafeEnv, smtpFromUsesExampleDomain } from "../../lib/env";
+import { assertProductionSafeEnv, assertVercelProductionBuild, smtpFromUsesExampleDomain } from "../../lib/env";
 import { assertMpOAuthPkce } from "../../lib/mercadopago-oauth/config";
 import { magicLinkCapturePath } from "../../lib/email";
 import { mpFixturesAllowed, readMpFixture } from "../../lib/mercadopago/dev-fixtures";
@@ -96,7 +96,13 @@ describe("boot de produção", () => {
     expect(() => assertProductionSafeEnv({ BOOKING_TRUST_PROXY: "yes" })).not.toThrow();
     const production = { NODE_ENV: "production", SMTP_FROM: "AgendaPix <ci@agendapix.dev.br>" };
     expect(() => assertProductionSafeEnv({ ...production, BOOKING_HOLD_MINUTES: "27" })).toThrow(/BOOKING_HOLD_MINUTES inválido/);
-    expect(() => assertProductionSafeEnv({ ...production, BOOKING_TRUST_PROXY: "yes" })).toThrow("Agendamento indisponível. Tente novamente mais tarde.");
+    expect(() => assertProductionSafeEnv({ ...production, BOOKING_TRUST_PROXY: "yes" })).toThrow(/BOOKING_TRUST_PROXY inválido/);
+    try {
+      assertProductionSafeEnv({ ...production, BOOKING_TRUST_PROXY: "yes" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      expect(message).not.toContain("yes");
+    }
     expect(() => assertProductionSafeEnv({
       NODE_ENV: "production",
       NEXT_PHASE: "phase-production-build",
@@ -109,6 +115,61 @@ describe("boot de produção", () => {
       expect(message).not.toContain("27");
       expect(message).not.toContain("ci@agendapix");
     }
+  });
+});
+
+describe("build de produção na Vercel", () => {
+  it("recusa PKCE ausente ou bookingConfig inválido e deixa preview e dev passarem", () => {
+    expect(() => assertVercelProductionBuild({ VERCEL_ENV: "production" })).toThrow("MP_OAUTH_PKCE deve ser on quando VERCEL_ENV=production.");
+    expect(() => assertVercelProductionBuild({ VERCEL_ENV: "production", MP_OAUTH_PKCE: "off" })).toThrow(/MP_OAUTH_PKCE deve ser on/);
+    expect(() => assertVercelProductionBuild({ VERCEL_ENV: "production", MP_OAUTH_PKCE: "talvez" })).toThrow(/MP_OAUTH_PKCE deve ser on/);
+    const secretValue = "segredo-nao-pode-vazar";
+    try {
+      assertVercelProductionBuild({ VERCEL_ENV: "production", MP_OAUTH_PKCE: secretValue });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      expect(message).not.toContain(secretValue);
+    }
+    expect(() => assertVercelProductionBuild({ VERCEL_ENV: "production", MP_OAUTH_PKCE: " on " })).not.toThrow();
+
+    const hold = "27";
+    expect(() => assertVercelProductionBuild({
+      VERCEL_ENV: "production",
+      MP_OAUTH_PKCE: "on",
+      BOOKING_HOLD_MINUTES: hold,
+    })).toThrow(/BOOKING_HOLD_MINUTES/);
+    try {
+      assertVercelProductionBuild({ VERCEL_ENV: "production", MP_OAUTH_PKCE: "on", BOOKING_HOLD_MINUTES: hold });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      expect(message).toContain("BOOKING_HOLD_MINUTES");
+      expect(message).not.toContain(hold);
+    }
+    expect(() => assertVercelProductionBuild({
+      VERCEL_ENV: "production",
+      MP_OAUTH_PKCE: "on",
+      BOOKING_TRUST_PROXY: "yes",
+    })).toThrow(/BOOKING_TRUST_PROXY/);
+
+    expect(() => assertVercelProductionBuild({
+      VERCEL_ENV: "preview",
+      MP_OAUTH_PKCE: "off",
+      BOOKING_HOLD_MINUTES: hold,
+    })).not.toThrow();
+    expect(() => assertVercelProductionBuild({
+      NODE_ENV: "development",
+      BOOKING_HOLD_MINUTES: hold,
+    })).not.toThrow();
+    expect(() => assertVercelProductionBuild({
+      VERCEL_ENV: "development",
+      MP_OAUTH_PKCE: "off",
+      BOOKING_TRUST_PROXY: "yes",
+    })).not.toThrow();
+  });
+
+  it("o next.config chama a checagem que derruba o build", () => {
+    const source = readFileSync("next.config.ts", "utf8");
+    expect(source).toContain("assertVercelProductionBuild()");
   });
 });
 

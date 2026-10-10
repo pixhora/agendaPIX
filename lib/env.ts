@@ -92,10 +92,26 @@ function productionBoot(env: Readonly<Record<string, string | undefined>>) {
   return env.NODE_ENV === "production" && env.NEXT_PHASE !== "phase-production-build";
 }
 
+const vercelProductionPkceMessage = "MP_OAUTH_PKCE deve ser on quando VERCEL_ENV=production.";
+
+/**
+ * O `register()` do instrumentation só roda quando a instância sobe. Na Vercel isso é
+ * depois do deploy, e um throw vira 500 em toda rota, inclusive `/api/health`.
+ * `next.config.ts` chama isto ao carregar: o `next build` de produção falha e a Vercel
+ * recusa o deploy. Preview (`VERCEL_ENV=preview`) e dev não entram.
+ * ` on ` vale `on`. A mensagem não repete o valor.
+ */
+export function assertVercelProductionBuild(env: Readonly<Record<string, string | undefined>> = process.env) {
+  if (env.VERCEL_ENV !== "production") return;
+  if (readMpOAuthPkce(env.MP_OAUTH_PKCE) !== "on") throw new Error(vercelProductionPkceMessage);
+  bookingConfig(env);
+}
+
 /**
  * Boot de produção. Chamado por `instrumentation.ts` e pelo worker de reconciliação.
  * Não cria um segundo caminho: PKCE em produção e `bookingConfig` passam por aqui.
- * `bookingConfig` só roda com `NODE_ENV=production`. O `next build` não é boot.
+ * `bookingConfig` só roda com `NODE_ENV=production`. O `next build` não é boot:
+ * a recusa do deploy de produção fica em `assertVercelProductionBuild`.
  * A mensagem de PKCE não repete o valor configurado.
  */
 export function assertProductionSafeEnv(env: Readonly<Record<string, string | undefined>> = process.env) {

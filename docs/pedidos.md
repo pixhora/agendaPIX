@@ -2,7 +2,7 @@
 
 ## P10 — Contrato: boot PKCE, cache de alias e dedupe do mp-connect
 
-Estado: implementado neste branch, sem merge e sem deploy. `assertProductionSafeEnv` passa a exigir `MP_OAUTH_PKCE=on` quando `MERCADOPAGO_ENV=production`. `bookingConfig` no boot só roda com `NODE_ENV=production`. Antes do merge, confirmar que `MP_OAUTH_PKCE=on` já está em Production na Vercel. Migration `0020_webhook_events` precisa rodar antes do deploy e não foi aplicada em produção. Limpeza de `webhook_events` com 30 dias está só documentada em `docs/CONTRATOS.md`.
+Estado: implementado neste branch, sem merge e sem deploy. `assertProductionSafeEnv` passa a exigir `MP_OAUTH_PKCE=on` quando `MERCADOPAGO_ENV=production`. `bookingConfig` no boot só roda com `NODE_ENV=production`. O `next build` com `VERCEL_ENV=production` falha se o PKCE não for `on` ou se `bookingConfig` for inválido. Antes do merge, confirmar que `MP_OAUTH_PKCE=on` já está em Production na Vercel. Migration `0020_webhook_events` precisa rodar antes do deploy e não foi aplicada em produção. Limpeza de `webhook_events` com 30 dias está só documentada em `docs/CONTRATOS.md`.
 
 ## P09 — T1 → Humano/T2/T4: chave do Pix e confirmação
 

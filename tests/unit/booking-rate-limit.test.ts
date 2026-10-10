@@ -41,6 +41,15 @@ describe("configuração antiabuso", () => {
     { PAYMENT_POLL_RATE_LIMIT_PER_CLIENT: "50", PAYMENT_POLL_RATE_LIMIT_PER_BUSINESS: "10" },
   ])("recusa configuração inválida %o com 503 em vez de cair em padrão silencioso", (env) => {
     expect(() => bookingConfig(env)).toThrow(expect.objectContaining({ status: 503, code: "booking_unavailable" }));
+    try {
+      bookingConfig(env);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      for (const [name, value] of Object.entries(env)) {
+        expect(message).toContain(name);
+        expect(message).not.toContain(value);
+      }
+    }
   });
 });
 

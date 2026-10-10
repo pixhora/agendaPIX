@@ -114,10 +114,13 @@ describe("mp-connect não desconecta sem confirmação nem dedupe", () => {
     expect((await granted.store.findByBusinessId(businessId))?.status).toBe("needs_reconnect");
 
     const active = harness(async () => Response.json({ id: 4242 }));
-    expect(await active.run("req-active")).toEqual({ outcome: "ignored", reason: "authorization_still_active" });
+    await expect(active.run("req-active")).rejects.toMatchObject({ status: 503, code: "mp_revocation_unconfirmed" });
     expect((await active.store.findByBusinessId(businessId))?.status).toBe("connected");
-    expect(await active.run("req-active")).toEqual({ outcome: "duplicate" });
-    expect(active.calls).toEqual([MP_USERS_ME_URL]);
+    expect((await active.store.findByBusinessId(businessId))?.accessTokenEnc).not.toBeNull();
+    expect(await active.events.seen("req-active")).toBe(false);
+    await expect(active.run("req-active")).rejects.toMatchObject({ status: 503, code: "mp_revocation_unconfirmed" });
+    expect(active.calls).toEqual([MP_USERS_ME_URL, MP_USERS_ME_URL]);
+    expect(active.marks()).toBe(0);
 
     const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
     for (const [requestId, fetchImpl] of [
