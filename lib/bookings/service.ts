@@ -21,7 +21,7 @@ import { clientPolicyText, policySummary, refundWindowClosedAtBooking } from "..
 import { availableSlots, localDate } from "./availability";
 import { availabilityDates, busyIntervals, loadPublicCatalog, presentPublicServices, readCachedCatalog, slotsForCatalog } from "./public-catalog";
 import { assertDepositBookable } from "./deposit-bookability";
-import { SlugMoved, readAliasTarget } from "../business-profile/public-slug";
+import { SlugMoved, readAliasTarget, sqlStateOf } from "../business-profile/public-slug";
 import { availabilitySchema, bookingInputSchema, requestKeySchema, slugSchema } from "./validation";
 import { depositSlotAllowed } from "./hold";
 import { bookingConfig, type BookingConfig } from "./config";
@@ -115,7 +115,13 @@ async function loadCatalogOrMoved(slug: string, database?: Database) {
     return database ? await loadPublicCatalog(slug, database) : await readCachedCatalog(slug);
   } catch (error) {
     if (error instanceof HttpError && error.code === "business_not_found") {
-      const moved = await readAliasTarget(slug, database ?? getDb());
+      // Falha na consulta de alias não troca o 404 por 500: loga o SQLSTATE e segue.
+      let moved: string | null = null;
+      try {
+        moved = await readAliasTarget(slug, database ?? getDb());
+      } catch (aliasError) {
+        console.error(`[alias] code=${sqlStateOf(aliasError)}`);
+      }
       if (moved) throw new SlugMoved(moved);
     }
     throw error;

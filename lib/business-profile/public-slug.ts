@@ -13,6 +13,20 @@ export class SlugMoved extends Error {
 
 type Database = Pick<ReturnType<typeof getDb>, "select">;
 
+/**
+ * SQLSTATE de um erro de banco, para log. Só o código: a mensagem pode trazer
+ * a string de conexão. Sem código devolve `unknown`.
+ */
+export function sqlStateOf(error: unknown): string {
+  let current: unknown = error;
+  for (let depth = 0; depth < 5; depth += 1) {
+    if (!current || typeof current !== "object") return "unknown";
+    if ("code" in current && typeof current.code === "string" && /^[0-9A-Z]{5}$/.test(current.code)) return current.code;
+    current = "cause" in current ? current.cause : undefined;
+  }
+  return "unknown";
+}
+
 /** Leitura direta. Não passa pelo cache de 60s. */
 export async function readAliasTarget(slug: string, database: Database): Promise<string | null> {
   if (!isPublicSlug(slug) || isReservedBusinessSlug(slug)) return null;
