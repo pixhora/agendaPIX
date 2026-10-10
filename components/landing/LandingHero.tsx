@@ -7,7 +7,7 @@ const reassurances = ["7 dias grátis", "Sem cartão de crédito", "Cliente não
 
 export function LandingHero() {
   return (
-    <section className="relative overflow-hidden">
+    <section id="hero" className="relative overflow-hidden">
       <div aria-hidden="true" className="bg-dots pointer-events-none absolute inset-x-0 top-0 h-[420px] opacity-40 [mask-image:linear-gradient(to_bottom,black,transparent)]" />
       <div className="relative mx-auto grid w-full max-w-[1120px] items-center gap-12 px-5 pt-8 pb-16 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,27.5rem)] lg:gap-10 lg:pt-16 lg:pb-28">
         <div className="min-w-0 max-w-[40rem]">
