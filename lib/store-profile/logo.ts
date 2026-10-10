@@ -33,13 +33,16 @@ export function logoShrinkSize(width: number, height: number, maxEdge = LOGO_SHR
   return { width: Math.round(width * scale), height: Math.round(height * scale) };
 }
 
+const SERVER_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+
 /**
- * Foto de celular passa de 2 MB com facilidade e era recusada antes de chegar ao servidor.
- * Reduz no navegador (WebP) quando precisa; se não conseguir ler a imagem, devolve o arquivo original
- * para a validação normal mostrar a mensagem.
+ * Qualquer imagem que o navegador consiga decodificar (HEIC no Safari, GIF, BMP…) vira WebP de até 1024 px aqui,
+ * porque o servidor só aceita PNG, JPEG e WebP. Formato que o navegador não lê volta igual e cai na validação.
+ * Quando a imagem já é aceita e cabe no limite, nada muda.
  */
-export async function shrinkLogoIfNeeded(file: File): Promise<File> {
-  if (file.size <= LOGO_MAX_BYTES) return file;
+export async function prepareLogoFile(file: File): Promise<File> {
+  const accepted = SERVER_TYPES.has(file.type.toLowerCase());
+  if (accepted && file.size <= LOGO_MAX_BYTES) return file;
   try {
     const bitmap = await createImageBitmap(file);
     const size = logoShrinkSize(bitmap.width, bitmap.height);
@@ -51,8 +54,7 @@ export async function shrinkLogoIfNeeded(file: File): Promise<File> {
     context.drawImage(bitmap, 0, 0, size.width, size.height);
     bitmap.close();
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", 0.85));
-    // Safari nem sempre codifica WebP: o navegador devolve PNG. Nesse caso o arquivo rotulado como WebP
-    // quebra na prévia, então só usamos o resultado quando o formato veio mesmo como WebP.
+    // Safari nem sempre codifica WebP: o navegador devolve PNG. Só usamos o resultado quando veio mesmo como WebP.
     if (!blob || blob.type !== "image/webp" || blob.size === 0) return file;
     return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".webp", { type: "image/webp" });
   } catch {

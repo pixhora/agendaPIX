@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { ImageIcon } from "lucide-react";
-import { logoRejection, shrinkLogoIfNeeded, uploadLogoFile } from "@/lib/store-profile/logo";
+import { logoRejection, prepareLogoFile, uploadLogoFile } from "@/lib/store-profile/logo";
 import { rememberPendingLogo } from "@/lib/store-profile/pending-logo";
 import { cn } from "@/lib/utils";
 
@@ -37,7 +37,7 @@ export function LogoUpload({
   }
 
   async function send(original: File) {
-    const file = await shrinkLogoIfNeeded(original);
+    const file = await prepareLogoFile(original);
     const rejection = logoRejection(file);
     if (rejection) {
       setCanRetry(false);
@@ -111,7 +111,7 @@ export function LogoUpload({
             ref={inputRef}
             id="store-logo-button"
             type="file"
-            accept="image/png,image/jpeg,image/webp"
+            accept="image/*"
             aria-busy={busy || undefined}
             aria-describedby={error ? errorId : !shown && !busy ? "store-logo-help" : undefined}
             disabled={disabled || busy}
@@ -124,7 +124,7 @@ export function LogoUpload({
           />
         </div>
         <div className="grid min-w-0 gap-1">
-          {!shown && !busy ? <p id="store-logo-help" className="text-sm text-muted-foreground">PNG, JPEG ou WebP, até 2 MB.</p> : null}
+          {!shown && !busy ? <p id="store-logo-help" className="text-sm text-muted-foreground">Foto do celular ou imagem comum. Se for grande, reduzimos sozinhos.</p> : null}
           {busy ? (
             <div className="grid gap-1" aria-live="polite">
               <p className="text-sm font-medium">Enviando… {progress}%</p>
