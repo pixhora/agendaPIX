@@ -39,13 +39,14 @@ export function StoreSettingsForm({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [forcedTaken, setForcedTaken] = useState(false);
+  const [forcedCopy, setForcedCopy] = useState<string | null>(null);
   const [takenSuggestions, setTakenSuggestions] = useState<string[]>([]);
   const [leaveHref, setLeaveHref] = useState<string | null>(null);
   const finalSlug = normalizeSlug(slug, { final: true });
   const dirty = name !== baseline.name || finalSlug !== baseline.slug || logoUrl !== baseline.logoUrl;
   const slugState = useStoreSlug(slug, { ownedSlug: baseline.slug, paused: pending });
   const status = forcedTaken ? "taken" as const : slugState.status;
-  const message = status === "taken" && forcedTaken ? SLUG_COPY.taken : slugState.message;
+  const message = status === "taken" && forcedTaken ? (forcedCopy ?? SLUG_COPY.taken) : slugState.message;
   const suggestions = status === "taken" && forcedTaken ? takenSuggestions.slice(0, 2) : slugState.suggestions;
   const nameOk = businessNameSchema.safeParse(name).success;
   const slugOk = businessSlugSchema.safeParse(finalSlug).success;
@@ -85,8 +86,9 @@ export function StoreSettingsForm({
     const result = await patchBusinessProfile(businessId, patch);
     setPending(false);
     if (!result.ok) {
-      if (result.code === "slug_taken" || result.status === 409) {
+      if (result.code === "slug_conflict_retry" || result.code === "slug_taken" || result.status === 409) {
         setForcedTaken(true);
+        setForcedCopy(result.code === "slug_conflict_retry" ? result.message : null);
         const checked = await fetchSlugAvailability(finalSlug, new AbortController().signal);
         setTakenSuggestions(result.suggestions.length ? result.suggestions : checked.ok ? checked.availability.suggestions : []);
         document.getElementById("settings-slug")?.focus();
@@ -99,6 +101,7 @@ export function StoreSettingsForm({
     setBaseline({ name: patch.name ?? baseline.name, slug: patch.slug ?? baseline.slug, logoUrl });
     if (patch.slug) setSlug(patch.slug);
     setForcedTaken(false);
+    setForcedCopy(null);
     toast("Alterações salvas.");
     router.refresh();
   }
@@ -122,10 +125,12 @@ export function StoreSettingsForm({
         onRetry={slugState.retry}
         onValueChange={(next) => {
           setForcedTaken(false);
+          setForcedCopy(null);
           setSlug(next);
         }}
         onPickSuggestion={(suggestion) => {
           setForcedTaken(false);
+          setForcedCopy(null);
           setSlug(suggestion);
         }}
       />

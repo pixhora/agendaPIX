@@ -80,7 +80,7 @@ export async function updateBusinessProfile(businessId: string, ownerId: string,
       if (alias) await tx.delete(businessSlugHistory).where(eq(businessSlugHistory.oldSlug, nextSlug));
       const [taken] = await tx.select({ id: businesses.id }).from(businesses).where(eq(businesses.slug, nextSlug)).limit(1);
       if (taken && taken.id !== business.id) {
-        await rejectTakenSlug(database, nextSlug, "businesses_slug_unique");
+        await rejectTakenSlug(database, nextSlug, "businesses_slug_unique", "slug_conflict_retry");
       }
 
       const active = await tx.select({ oldSlug: businessSlugHistory.oldSlug }).from(businessSlugHistory).where(and(
@@ -104,7 +104,7 @@ export async function updateBusinessProfile(businessId: string, ownerId: string,
         name: nextName,
         slug: nextSlug,
       }).where(and(eq(businesses.id, business.id), eq(businesses.ownerId, ownerId), eq(businesses.slug, business.slug))).returning();
-      if (!updated) await rejectTakenSlug(database, nextSlug, "businesses_slug_unique");
+      if (!updated) await rejectTakenSlug(database, nextSlug, "businesses_slug_unique", "slug_conflict_retry");
       await tx.insert(businessSlugHistory).values({ oldSlug: business.slug, businessId: business.id });
       dropped.push(business.slug, nextSlug);
       if (releasedSlug) dropped.push(releasedSlug);
@@ -114,7 +114,7 @@ export async function updateBusinessProfile(businessId: string, ownerId: string,
     return result;
   } catch (error) {
     if (error instanceof HttpError) throw error;
-    if (isUniqueViolation(error) && parsed.data.slug) await rejectTakenSlug(database, parsed.data.slug, "slug");
+    if (isUniqueViolation(error) && parsed.data.slug) await rejectTakenSlug(database, parsed.data.slug, "slug", "slug_conflict_retry");
     throw error;
   }
 }

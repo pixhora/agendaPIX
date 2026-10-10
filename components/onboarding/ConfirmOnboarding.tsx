@@ -19,7 +19,8 @@ import { signInWithEmailOtp } from "@/lib/onboarding/auth-otp";
 import { OTP_LENGTH, mapOtpError, otpDigits, wrongCodeMessage } from "@/lib/onboarding/otp";
 import { clearOnboardingProgress, readOnboardingDraftRaw, writeCommitResult } from "./storage";
 import { uploadLogoFile } from "@/lib/store-profile/logo";
-import { clearPendingLogo, peekPendingLogo } from "@/lib/store-profile/pending-logo";
+import { logoRejection } from "@/lib/store-profile/logo";
+import { LOGO_RELOAD_MESSAGE, clearPendingLogo, peekPendingLogo, rememberPendingLogo } from "@/lib/store-profile/pending-logo";
 import { onboardingPlanForEnv, restoreOnboardingDraft } from "@/lib/onboarding/flow";
 import { storedDraftPayload } from "@/lib/onboarding/local-draft";
 
@@ -49,6 +50,8 @@ export function ConfirmOnboarding({ draftId }: { draftId: string }) {
   const [status, setStatus] = useState<OtpVisualStatus>("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [attemptsUsed, setAttemptsUsed] = useState(0);
+  const [needsLogo, setNeedsLogo] = useState(false);
+  const [logoNote, setLogoNote] = useState<string | null>(null);
   const local = restoreOnboardingDraft(storedDraftPayload(readOnboardingDraftRaw()), onboardingPlanForEnv(null));
 
   useEffect(() => {
@@ -63,6 +66,10 @@ export function ConfirmOnboarding({ draftId }: { draftId: string }) {
       }
       setEmail(storedEmail);
       setNeedEmail(!storedEmail);
+      if (!peekPendingLogo()) {
+        setNeedsLogo(true);
+        setLogoNote(LOGO_RELOAD_MESSAGE);
+      }
       setReady(true);
     });
     if (!draftId) return;
@@ -96,8 +103,25 @@ export function ConfirmOnboarding({ draftId }: { draftId: string }) {
     window.setTimeout(() => document.getElementById(problem.id)?.focus(), 0);
   }
 
+  function keepLogo(file: File) {
+    const rejection = logoRejection(file);
+    if (rejection) {
+      setLogoNote(rejection);
+      return;
+    }
+    rememberPendingLogo(file);
+    setNeedsLogo(false);
+    setLogoNote(null);
+  }
+
   async function enter(value = code) {
     if (pending) return;
+    if (!peekPendingLogo()) {
+      setNeedsLogo(true);
+      setLogoNote(LOGO_RELOAD_MESSAGE);
+      window.setTimeout(() => document.getElementById("confirm-logo")?.focus(), 0);
+      return;
+    }
     if (!confirmSubmitReady({ code: value, email, emailRequired: needEmail })) {
       revealIdle(value);
       return;
@@ -243,6 +267,24 @@ export function ConfirmOnboarding({ draftId }: { draftId: string }) {
               }}
             >
               <h1 className="font-display text-[28px] font-bold leading-tight tracking-tight">Continuar seu cadastro</h1>
+              {needsLogo ? (
+                <div className="grid gap-1.5">
+                  {logoNote ? <p id="confirm-logo-note" role="alert" className="text-sm font-medium text-danger">{logoNote}</p> : null}
+                  <label htmlFor="confirm-logo" className="text-sm font-semibold">Logo da loja</label>
+                  <input
+                    id="confirm-logo"
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    aria-describedby={logoNote ? "confirm-logo-note" : undefined}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      event.target.value = "";
+                      if (file) keepLogo(file);
+                    }}
+                    className="min-h-11 w-full text-sm file:mr-3 file:min-h-11 file:rounded-full file:border-0 file:bg-subtle file:px-4 file:text-sm file:font-semibold"
+                  />
+                </div>
+              ) : null}
               {businessName ? <p className="font-display text-xl font-bold leading-tight tracking-tight">{businessName}</p> : null}
               <p className="text-[15px] text-muted">{confirmSupportCopy(fromFragment)}</p>
               {needEmail ? (

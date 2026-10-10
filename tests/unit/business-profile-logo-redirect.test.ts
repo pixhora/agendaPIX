@@ -1,7 +1,7 @@
-import { NextRequest } from "next/server";
+import { NextRequest, type NextFetchEvent } from "next/server";
 import sharp from "sharp";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { clearAliasCache, invalidateAliasCache } from "../../lib/business-profile/alias-cache";
+import { cachedAliasTarget, clearAliasCache, invalidateAliasCache } from "../../lib/business-profile/alias-cache";
 import { LOGO_UPLOAD_MAX_BYTES } from "../../lib/contracts";
 import { HttpError } from "../../lib/http";
 import { assertLogoBytes, reencodeLogo } from "../../lib/business-profile/logo-image";
@@ -10,6 +10,11 @@ import { aliasTarget, locationForMovedSlug, publicSlugFromPath, slugMovedRespons
 import { rejectTakenSlug, slugTakenError } from "../../lib/business-profile/slug-conflict";
 import { slugAvailability, takenSlugs } from "../../lib/slug-availability";
 import { proxy } from "../../proxy";
+
+/** O segundo argumento do proxy é o evento do Next. Função nesse lugar é a busca do teste. */
+function asProxyEvent(lookup: (slug: string) => Promise<string | null>): NextFetchEvent {
+  return lookup as unknown as NextFetchEvent;
+}
 
 const { putMock, delMock } = vi.hoisted(() => ({ putMock: vi.fn(), delMock: vi.fn() }));
 
@@ -189,7 +194,7 @@ describe("slug redirect", () => {
   });
 
   it("answers 308 from the proxy for the page and the public API", async () => {
-    const page = await proxy(new NextRequest("https://agenda.example/antiga/opengraph-image?ref=wa"), async () => "nova");
+    const page = await proxy(new NextRequest("https://agenda.example/antiga/opengraph-image?ref=wa"), asProxyEvent(async () => "nova"));
     expect(page.status).toBe(308);
     expect(page.headers.get("location")).toBe("https://agenda.example/nova/opengraph-image?ref=wa");
     expect(page.headers.get("cache-control")).toBe("no-store");
@@ -197,7 +202,7 @@ describe("slug redirect", () => {
 
     const payment = await proxy(
       new NextRequest("https://agenda.example/api/public/antiga/bookings/11111111-1111-4111-8111-111111111111/payment?x=1"),
-      async () => "nova",
+      asProxyEvent(async () => "nova"),
     );
     expect(payment.status).toBe(308);
     expect(payment.headers.get("location")).toBe(
@@ -206,26 +211,26 @@ describe("slug redirect", () => {
     expect(payment.headers.get("cache-control")).toBe("no-store");
 
     let lookedUp = false;
-    const checker = await proxy(new NextRequest("https://agenda.example/api/public/slugs/availability?slug=loja"), async () => {
+    const checker = await proxy(new NextRequest("https://agenda.example/api/public/slugs/availability?slug=loja"), asProxyEvent(async () => {
       lookedUp = true;
       return "nova";
-    });
+    }));
     expect(lookedUp).toBe(false);
     expect(checker.status).not.toBe(308);
 
     let skipped = 0;
-    await proxy(new NextRequest("https://agenda.example/dashboard"), async () => {
+    await proxy(new NextRequest("https://agenda.example/dashboard"), asProxyEvent(async () => {
       skipped += 1;
       return "nova";
-    });
-    await proxy(new NextRequest("https://agenda.example/onboarding"), async () => {
+    }));
+    await proxy(new NextRequest("https://agenda.example/onboarding"), asProxyEvent(async () => {
       skipped += 1;
       return "nova";
-    });
-    await proxy(new NextRequest("https://agenda.example/login"), async () => {
+    }));
+    await proxy(new NextRequest("https://agenda.example/login"), asProxyEvent(async () => {
       skipped += 1;
       return "nova";
-    });
+    }));
     expect(skipped).toBe(0);
   });
 
@@ -249,6 +254,17 @@ describe("slug redirect", () => {
       code: "slug_taken",
       details: { details: { constraint: "businesses_slug_unique", suggestions: [] } },
     });
+
+    await expect(rejectTakenSlug({
+      async execute() {
+        return { rows: [] };
+      },
+    } as never, "loja", "slug", "slug_conflict_retry")).rejects.toMatchObject({
+      status: 409,
+      code: "slug_conflict_retry",
+      message: "Esse link acabou de ser escolhido por outra pessoa. Escolha uma das sugestões.",
+      details: { details: { constraint: "slug", suggestions: ["loja-2", "loja-3", "loja-4"] } },
+    });
   });
 
   it("remembers a released alias as a miss and looks again after the slug changes", async () => {
@@ -257,14 +273,14 @@ describe("slug redirect", () => {
       hits += 1;
       return null;
     };
-    const first = await proxy(new NextRequest("https://agenda.example/antiga"), lookup);
-    const second = await proxy(new NextRequest("https://agenda.example/antiga/opengraph-image"), lookup);
+    const first = await proxy(new NextRequest("https://agenda.example/antiga"), asProxyEvent(lookup));
+    const second = await proxy(new NextRequest("https://agenda.example/antiga/opengraph-image"), asProxyEvent(lookup));
     expect(first.status).not.toBe(308);
     expect(second.status).not.toBe(308);
     expect(hits).toBe(1);
 
     invalidateAliasCache("antiga");
-    await proxy(new NextRequest("https://agenda.example/antiga"), lookup);
+    await proxy(new NextRequest("https://agenda.example/antiga"), asProxyEvent(lookup));
     expect(hits).toBe(2);
 
     clearAliasCache();
@@ -295,8 +311,8 @@ describe("slug redirect", () => {
       hits += 1;
       return "nova";
     };
-    await proxy(new NextRequest("https://agenda.example/antiga?ref=wa"), lookup);
-    await proxy(new NextRequest("https://agenda.example/antiga/opengraph-image?ref=wa"), lookup);
+    await proxy(new NextRequest("https://agenda.example/antiga?ref=wa"), asProxyEvent(lookup));
+    await proxy(new NextRequest("https://agenda.example/antiga/opengraph-image?ref=wa"), asProxyEvent(lookup));
     expect(hits).toBe(1);
 
     clearAliasCache();
@@ -305,9 +321,20 @@ describe("slug redirect", () => {
       failures += 1;
       throw new Error("db down");
     };
-    await proxy(new NextRequest("https://agenda.example/antiga"), failing);
-    await proxy(new NextRequest("https://agenda.example/antiga"), failing);
+    await proxy(new NextRequest("https://agenda.example/antiga"), asProxyEvent(failing));
+    await proxy(new NextRequest("https://agenda.example/antiga"), asProxyEvent(failing));
     expect(failures).toBe(2);
+  });
+
+  it("keeps the alias cache on globalThis so a slug change in this process drops the miss", async () => {
+    clearAliasCache();
+    await cachedAliasTarget("antiga", async () => null);
+    const map = (globalThis as { __agendapixAliasCache?: Map<string, unknown> }).__agendapixAliasCache;
+    expect(map?.has("antiga")).toBe(true);
+    invalidateAliasCache("antiga");
+    expect(map?.has("antiga")).toBe(false);
+    expect(await cachedAliasTarget("antiga", async () => "nova")).toBe("nova");
+    expect(map?.get("antiga")).toMatchObject({ target: "nova" });
   });
 
   it("checks current slugs and aliases in one query and drops an alias from the suggestions", async () => {

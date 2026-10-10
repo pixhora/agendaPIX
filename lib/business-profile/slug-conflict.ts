@@ -20,15 +20,24 @@ export function slugTakenError(error: unknown): HttpError | null {
   });
 }
 
+const SLUG_TAKEN_MESSAGE = "Esse endereço já está em uso. Escolha outro.";
+const SLUG_CONFLICT_RETRY_MESSAGE = "Esse link acabou de ser escolhido por outra pessoa. Escolha uma das sugestões.";
+
 /** 409 com até 3 links livres para a tela oferecer na hora. */
-export async function rejectTakenSlug(database: Pick<ReturnType<typeof getDb>, "execute">, slug: string, constraint: string): Promise<never> {
+export async function rejectTakenSlug(
+  database: Pick<ReturnType<typeof getDb>, "execute">,
+  slug: string,
+  constraint: string,
+  code: "slug_taken" | "slug_conflict_retry" = "slug_taken",
+): Promise<never> {
   let suggestions: string[] = [];
   try {
     suggestions = await suggestFreeSlugs(slug, null, database);
   } catch {
     suggestions = [];
   }
-  throw new HttpError(409, "slug_taken", "Esse endereço já está em uso. Escolha outro.", undefined, {
+  const message = code === "slug_conflict_retry" ? SLUG_CONFLICT_RETRY_MESSAGE : SLUG_TAKEN_MESSAGE;
+  throw new HttpError(409, code, message, undefined, {
     details: { constraint, suggestions },
   });
 }

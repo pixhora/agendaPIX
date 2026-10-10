@@ -9,6 +9,7 @@ export const apiErrorCodeSchema = z.enum([
   "unauthorized",
   "business_unavailable",
   "slug_taken",
+  "slug_conflict_retry",
   "rate_limited",
   "logo_invalid",
   "logo_too_large",

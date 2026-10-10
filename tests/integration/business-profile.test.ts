@@ -56,7 +56,11 @@ it("returns 409 when two owners take the same slug, and 308 from the old public 
     expect(won).toHaveLength(1);
     expect(lost).toHaveLength(1);
     if (!won[0].ok || lost[0].ok) throw new Error("race result");
-    expect(lost[0].error).toMatchObject({ status: 409, code: "slug_taken" });
+    expect(lost[0].error).toMatchObject({
+      status: 409,
+      code: "slug_conflict_retry",
+      message: "Esse link acabou de ser escolhido por outra pessoa. Escolha uma das sugestões.",
+    });
     const raceSuggestions = (lost[0].error.details?.details as { suggestions?: string[] } | undefined)?.suggestions ?? [];
     expect(raceSuggestions.length).toBeGreaterThan(0);
     expect(raceSuggestions.length).toBeLessThanOrEqual(3);

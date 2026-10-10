@@ -20,7 +20,13 @@ async function capturedLink(email: string) {
 }
 
 /** O e-mail abre a página de confirmação. O botão é que cria a sessão. */
-async function openAccessLink(page: Page, link: string, email?: string) {
+const logoFile = {
+  name: "logo.png",
+  mimeType: "image/png",
+  buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64"),
+};
+
+async function openAccessLink(page: Page, link: string, email?: string, beforeConfirm?: () => Promise<void>) {
   await page.goto(link);
   const path = new URL(page.url()).pathname;
   if (path === "/entrar/confirmar") {
@@ -35,6 +41,7 @@ async function openAccessLink(page: Page, link: string, email?: string) {
     if (!email) throw new Error("A confirmação pediu o e-mail e o teste não passou um.");
     await emailField.fill(email);
   }
+  if (beforeConfirm) await beforeConfirm();
   const button = page.getByRole("button", { name: "Confirmar código" });
   await expect(button).not.toHaveAttribute("aria-disabled", "true");
   await button.click();
@@ -88,11 +95,7 @@ test("cadastro concluído → \"Ir para o painel\" abre /dashboard com o negóci
   await price.click();
   await price.pressSequentially("5000");
   await expect(price).toHaveValue(/50,00/);
-  await page.locator("input[type=file]").setInputFiles({
-    name: "logo.png",
-    mimeType: "image/png",
-    buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64"),
-  });
+  await page.locator("input[type=file]").setInputFiles(logoFile);
   await page.locator("#store-day-1").check();
   await page.locator("#store-open-1").fill("09:00");
   await page.locator("#store-close-1").fill("18:00");
@@ -121,7 +124,10 @@ test("cadastro concluído → \"Ir para o painel\" abre /dashboard com o negóci
   expect(draftBody.data?.business).not.toHaveProperty("logoUrl");
   await expect(page.getByRole("heading", { name: "Digite o código que mandamos" })).toBeVisible();
 
-  await openAccessLink(page, await capturedLink(email), email);
+  await openAccessLink(page, await capturedLink(email), email, async () => {
+    await expect(page.getByText("A página recarregou e a logo não veio junto. Escolha o arquivo de novo.")).toBeVisible();
+    await page.locator("#confirm-logo").setInputFiles(logoFile);
+  });
   await expect(page).toHaveURL(/\/onboarding\/recebimento$/, { timeout: 20_000 });
   await page.getByRole("link", { name: "Agora não" }).click();
   await expect(page).toHaveURL(/\/onboarding\/concluir$/, { timeout: 20_000 });

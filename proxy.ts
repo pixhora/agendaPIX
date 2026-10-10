@@ -1,9 +1,14 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server";
 import { cachedAliasTarget } from "@/lib/business-profile/alias-cache";
 import { aliasTarget, locationForMovedSlug, publicSlugFromPath } from "@/lib/business-profile/public-slug";
 import { documentSecurityHeaders, shouldSendStrictTransportSecurity, shouldUpgradeInsecureRequests } from "@/lib/security/headers";
 
 type AliasLookup = (slug: string) => Promise<string | null>;
+
+/** Next passa `event`. Teste pode passar a função de busca nesse lugar. */
+function resolveAliasLookup(event: unknown): AliasLookup {
+  return typeof event === "function" ? (event as AliasLookup) : aliasTarget;
+}
 
 function documentHeaders(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
@@ -25,7 +30,8 @@ function documentHeaders(request: NextRequest) {
  * Skips Next prefetch so a nonce is not frozen into a cached payload, and
  * skips files covered by `headers()` in next.config.ts.
  */
-export async function proxy(request: NextRequest, lookup: AliasLookup = aliasTarget) {
+export async function proxy(request: NextRequest, event: NextFetchEvent) {
+  const lookup = resolveAliasLookup(event);
   const slug = publicSlugFromPath(request.nextUrl.pathname);
   if (slug) {
     try {

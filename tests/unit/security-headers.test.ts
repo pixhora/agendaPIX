@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, type NextFetchEvent } from "next/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   FORM_ACTION_SOURCES,
@@ -13,6 +13,8 @@ import {
   staticAssetSecurityHeaders,
 } from "../../lib/security/headers";
 import { proxy } from "../../proxy";
+
+const fetchEvent = { waitUntil() {} } as unknown as NextFetchEvent;
 
 const NONCE = Buffer.from("11111111-1111-4111-8111-111111111111").toString("base64");
 
@@ -146,7 +148,7 @@ describe("security proxy", () => {
   });
 
   it("sets the headers on the response and does not leak the nonce header", async () => {
-    const response = await proxy(new NextRequest("https://agenda.example/dashboard"));
+    const response = await proxy(new NextRequest("https://agenda.example/dashboard"), fetchEvent);
     const csp = response.headers.get("content-security-policy") ?? "";
     expect(csp).toContain("frame-ancestors 'none'");
     expect(csp).toContain("'strict-dynamic'");
@@ -164,26 +166,26 @@ describe("security proxy", () => {
   });
 
   it("uses a fresh nonce per request and skips upgrade on localhost", async () => {
-    const first = await proxy(new NextRequest("http://127.0.0.1:3000/"));
-    const second = await proxy(new NextRequest("http://127.0.0.1:3000/api/health"));
+    const first = await proxy(new NextRequest("http://127.0.0.1:3000/"), fetchEvent);
+    const second = await proxy(new NextRequest("http://127.0.0.1:3000/api/health"), fetchEvent);
     expect(first.headers.get("content-security-policy")).not.toBe(second.headers.get("content-security-policy"));
     expect(first.headers.get("content-security-policy")).not.toContain("upgrade-insecure-requests");
     expect(first.headers.get("strict-transport-security")).toBeNull();
     expect(second.headers.get("strict-transport-security")).toBeNull();
-    expect((await proxy(new NextRequest("http://[::1]:3000/api/health"))).headers.get("strict-transport-security")).toBeNull();
-    expect((await proxy(new NextRequest("http://agenda.example/api/health"))).headers.get("strict-transport-security")).toBe(HSTS_VALUE);
+    expect((await proxy(new NextRequest("http://[::1]:3000/api/health"), fetchEvent)).headers.get("strict-transport-security")).toBeNull();
+    expect((await proxy(new NextRequest("http://agenda.example/api/health"), fetchEvent)).headers.get("strict-transport-security")).toBe(HSTS_VALUE);
     expect(second.headers.get("x-content-type-options")).toBe("nosniff");
   });
 
   it("allows eval only while developing", async () => {
     vi.stubEnv("NODE_ENV", "development");
-    const response = await proxy(new NextRequest("http://localhost:3000/preview/booking"));
+    const response = await proxy(new NextRequest("http://localhost:3000/preview/booking"), fetchEvent);
     const csp = response.headers.get("content-security-policy") ?? "";
     expect(csp).toContain("'unsafe-eval'");
     expect(csp).toContain("style-src 'self' 'unsafe-inline'");
     expect(csp).not.toContain("upgrade-insecure-requests");
     expect(response.headers.get("strict-transport-security")).toBeNull();
     vi.stubEnv("NODE_ENV", "production");
-    expect((await proxy(new NextRequest("https://agenda.example/"))).headers.get("strict-transport-security")).toBe(HSTS_VALUE);
+    expect((await proxy(new NextRequest("https://agenda.example/"), fetchEvent)).headers.get("strict-transport-security")).toBe(HSTS_VALUE);
   });
 });

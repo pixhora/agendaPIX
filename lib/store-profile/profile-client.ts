@@ -32,7 +32,11 @@ export async function patchBusinessProfile(
     });
     if (response.ok) return { ok: true };
     const error = await readApiError(response);
-    const code = response.status === 409 ? "slug_taken" : error.code;
+    const code = error.code === "slug_conflict_retry"
+      ? error.code
+      : response.status === 409
+        ? "slug_taken"
+        : error.code;
     return {
       ok: false,
       status: response.status,

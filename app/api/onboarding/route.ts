@@ -1,5 +1,5 @@
 import { getAuth } from "@/lib/auth";
-import { HttpError, json, readBody } from "@/lib/http";
+import { HttpError, json, parseJsonBody, readBody } from "@/lib/http";
 import { provisionBusiness } from "@/lib/onboarding/service";
 import { appPreflight, requireAppOrigin, withAppCors } from "@/lib/origins";
 
@@ -11,7 +11,7 @@ export function POST(request: Request) {
       throw new HttpError(503, "auth_unavailable", "O acesso está indisponível. Tente novamente mais tarde.");
     });
     if (!session) throw new HttpError(401, "unauthorized", "Entre na sua conta para continuar.");
-    const { result, replay } = await provisionBusiness(session.user.id, request.headers.get("idempotency-key"), JSON.parse(await readBody(request)));
+    const { result, replay } = await provisionBusiness(session.user.id, request.headers.get("idempotency-key"), parseJsonBody(await readBody(request)));
     return json(result, replay ? 200 : 201);
   });
 }
