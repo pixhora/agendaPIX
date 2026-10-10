@@ -380,10 +380,16 @@ h1, h2, h3, h4, h5, h6, .font-display {
   opacity: 1;
 }
 
-/* Opções nativas do <select>: no modo escuro o popup herda o texto claro e o navegador pinta o fundo de branco. */
+/*
+ * Menu nativo do <select>. No Linux o popup fica branco e ignora background-color,
+ * mas usa `color`. No escuro --ink é claro e o texto some.
+ * As opções ficam no esquema claro (texto escuro sobre branco), nos dois temas.
+ * O controle fechado continua com a cor do próprio select (text-ink sobre --surface).
+ */
 :where(select option, select optgroup) {
-  background-color: var(--surface);
-  color: var(--ink);
+  color-scheme: light;
+  background-color: #ffffff;
+  color: #0b0b0c;
 }
 
 /* Hero: composição em camadas (components/landing/HeroMotion.tsx).

@@ -1,23 +1,5 @@
 import { expect } from "@playwright/test";
-import { test } from "./helpers";
-
-/** Razão de contraste WCAG entre duas cores rgb()/rgba() do computed style. */
-function contrast(a: string, b: string): number {
-  const parse = (value: string) => {
-    const m = value.match(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/);
-    if (!m) throw new Error(`cor não reconhecida: ${value}`);
-    return [Number(m[1]), Number(m[2]), Number(m[3])];
-  };
-  const lum = (rgb: number[]) => {
-    const [r, g, b2] = rgb.map((channel) => {
-      const c = channel / 255;
-      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-    });
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b2;
-  };
-  const [light, dark] = [lum(parse(a)), lum(parse(b))].sort((x, y) => y - x);
-  return (light + 0.05) / (dark + 0.05);
-}
+import { contrastRatio, test } from "./helpers";
 
 test.describe("select nativo: opções legíveis nos dois temas", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
@@ -33,7 +15,17 @@ test.describe("select nativo: opções legíveis nos dois temas", () => {
         return { color: computed.color, background: computed.backgroundColor };
       });
       expect(style.background).not.toBe("rgba(0, 0, 0, 0)");
-      expect(contrast(style.color, style.background)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(style.color, style.background)).toBeGreaterThanOrEqual(4.5);
+      // O menu nativo no Linux fica branco e ignora background-color. Texto claro some.
+      expect(contrastRatio(style.color, "rgb(255, 255, 255)")).toBeGreaterThanOrEqual(4.5);
+      const closed = await select.evaluate((element) => {
+        const shell = element.parentElement;
+        return {
+          color: getComputedStyle(element).color,
+          surface: shell ? getComputedStyle(shell).backgroundColor : getComputedStyle(element).backgroundColor,
+        };
+      });
+      expect(contrastRatio(closed.color, closed.surface)).toBeGreaterThanOrEqual(4.5);
     });
   }
 });

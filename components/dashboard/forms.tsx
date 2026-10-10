@@ -5,7 +5,8 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { AlertCircle, AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { fieldShell, Input } from "@/components/ui/input";
+import { moneyFigureClass } from "@/components/ui/money-input";
 import { Switch } from "@/components/ui/switch";
 import { saveHours, saveService, saveWhatsapp } from "@/app/(product)/dashboard/(owner)/actions";
 import { formatMoneyInput, parseMoney, type FormState } from "@/lib/dashboard/validation";
@@ -59,13 +60,25 @@ function FieldShell({ invalid, children }: { invalid?: boolean; children: React.
   return <span className="control-shell block rounded-field border border-line-strong/60 bg-surface" data-invalid={invalid ? "true" : undefined}>{children}</span>;
 }
 
-function MoneyInput({ id, invalid, ...props }: React.ComponentProps<"input"> & { id: string; invalid?: boolean }) {
-  return <FieldShell invalid={invalid}>
-    <span className="relative flex items-center">
-      <span aria-hidden="true" className="pointer-events-none pl-3.5 text-sm font-semibold text-muted">R$</span>
-      <Input id={id} inputMode="decimal" aria-invalid={invalid || undefined} pattern="(?:\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:[.,]\d{1,2})?)" className={cn(bareInput, "dash-disabled pl-2 tabular-nums")} {...props} />
-    </span>
-  </FieldShell>;
+function MoneyInput({ id, invalid, className, value, disabled, readOnly, ...props }: React.ComponentProps<"input"> & { id: string; invalid?: boolean }) {
+  const empty = value == null || value === "";
+  const quiet = Boolean(disabled || readOnly);
+  return (
+    <div className={cn(fieldShell, "gap-1 px-3.5", quiet && "border-line bg-subtle shadow-none")}>
+      <span aria-hidden="true" data-money-prefix="" className={cn(moneyFigureClass, "pointer-events-none shrink-0", quiet || empty ? "text-muted" : "text-ink")}>R$</span>
+      <input
+        id={id}
+        value={value}
+        disabled={disabled}
+        readOnly={readOnly}
+        inputMode="decimal"
+        aria-invalid={invalid || undefined}
+        pattern="(?:\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:[.,]\d{1,2})?)"
+        className={cn(moneyFigureClass, "dash-disabled min-w-0 flex-1 bg-transparent text-ink outline-none placeholder:text-muted disabled:cursor-not-allowed disabled:text-muted", quiet && "text-muted", className)}
+        {...props}
+      />
+    </div>
+  );
 }
 
 function TextInput({ invalid, className, ...props }: React.ComponentProps<"input"> & { invalid?: boolean }) {
