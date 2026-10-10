@@ -17,8 +17,8 @@ import { StepProgress } from "./StepProgress";
 import { StepService } from "./StepService";
 import { StepSlot } from "./StepSlot";
 import { StepCustomer } from "./StepCustomer";
-import { StepPayment } from "./StepPayment";
-import { BookingConfirmation } from "./BookingConfirmation";
+const StepPayment = React.lazy(() => import("./StepPayment").then((mod) => ({ default: mod.StepPayment })));
+const BookingConfirmation = React.lazy(() => import("./BookingConfirmation").then((mod) => ({ default: mod.BookingConfirmation })));
 import { AlertTriangle } from "lucide-react";
 import { Icon } from "@/components/ui/icon";
 import { BusinessAvatar } from "@/components/ui/business-avatar";
@@ -32,7 +32,7 @@ import { GENERIC_SUBMIT_MESSAGE, OFFLINE_MESSAGE, POLICY_CHANGED_MESSAGE, busine
 import { migratedPixResumePayload, pixResumePayload, pixResumeStorageKey, readPixResume, shouldClearExpiredResume, shouldResumePix, type PixResumeSession } from "./pix-resume";
 import { buildPublicBookingBody } from "./booking-payload";
 import { PausedState } from "./PausedState";
-import { PolicySheet } from "@/components/policy/PolicySheet";
+const PolicySheet = React.lazy(() => import("@/components/policy/PolicySheet").then((mod) => ({ default: mod.PolicySheet })));
 
 interface BookingFlowProps {
   slug: string;
@@ -72,6 +72,13 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
     trigger: null,
   });
   const [bookingResponse, setBookingResponse] = useState<BookingResponse | null>(null);
+
+  useEffect(() => {
+    if (step < 2 && !selectedService) return;
+    void import("./StepPayment");
+    void import("./BookingConfirmation");
+    void import("@/components/policy/PolicySheet");
+  }, [step, selectedService]);
 
   // Chave de Idempotência fixa por tentativa de reserva
   const [idempotencyKey, setIdempotencyKey] = useState<string>(() => {
@@ -511,6 +518,7 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
       <div className="min-h-dvh bg-paper">
         {pageHeader}
         <main id="content" className="mx-auto w-full max-w-xl px-4 py-8 sm:py-12">
+          <React.Suspense fallback={null}>
           <BookingConfirmation
             businessName={business.name}
             service={selectedService}
@@ -524,6 +532,7 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
             contactWhatsapp={business.contactWhatsapp}
             onNewBooking={handleRestart}
           />
+          </React.Suspense>
         </main>
         {pageFooter}
       </div>
@@ -625,6 +634,7 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
             )}
 
             {step === 4 && bookingResponse && (
+              <React.Suspense fallback={<Skeleton className="h-64 w-full rounded-card" />}>
               <StepPayment
                 slug={slug}
                 booking={bookingResponse}
@@ -646,6 +656,7 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
                 }}
                 onRestart={handleRestart}
               />
+              </React.Suspense>
             )}
           </section>
           </>
@@ -662,6 +673,7 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
       </main>
       {pageFooter}
       {selectedService ? (
+        <React.Suspense fallback={null}>
         <PolicySheet
           open={policySheet.open}
           businessName={business.name}
@@ -673,6 +685,7 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
           returnFocus={policySheet.trigger}
           onClose={() => setPolicySheet((current) => ({ ...current, open: false, trigger: null }))}
         />
+        </React.Suspense>
       ) : null}
     </div>
   );

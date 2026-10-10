@@ -1,3 +1,4 @@
+import { invalidatePublicCatalogForBusiness } from "../bookings/public-cache";
 import { HttpError } from "../http";
 import { syncAccountProfile } from "./account-profile";
 import { mpOAuthConfig } from "./config";
@@ -57,6 +58,7 @@ export async function refreshMercadoPagoConnection(businessId: string, deps: Ref
   const now = deps.now ?? new Date();
   const windowMs = deps.windowMs ?? MP_REFRESH_ON_DEMAND_WINDOW_MS;
   const store = deps.store ?? createDrizzleMpStore();
+  let wrote = false;
   const result = await store.withBusinessLock(businessId, async (lock): Promise<RefreshResult> => {
     const current = await lock.read();
     if (!current || current.status !== "connected" || !current.accessTokenEnc || !current.refreshTokenEnc || !current.expiresAt) {
@@ -68,6 +70,7 @@ export async function refreshMercadoPagoConnection(businessId: string, deps: Ref
     catch {
       const connection = needsReconnect(current, "token_unreadable");
       await lock.write(connection);
+      wrote = true;
       return { outcome: "needs_reconnect" as const, connection };
     }
     const exchanged = await requestMpToken({
@@ -80,6 +83,7 @@ export async function refreshMercadoPagoConnection(businessId: string, deps: Ref
       if (exchanged.reason === "invalid_grant") {
         const connection = needsReconnect(current, "invalid_grant");
         await lock.write(connection);
+        wrote = true;
         return { outcome: "needs_reconnect", connection };
       }
       throw new HttpError(503, "mp_oauth_refresh_failed", "Não foi possível renovar a conexão com o Mercado Pago. Tente de novo mais tarde.");
@@ -99,8 +103,10 @@ export async function refreshMercadoPagoConnection(businessId: string, deps: Ref
       disconnectedAt: null,
     };
     await lock.write(connection);
+    wrote = true;
     return { outcome: "refreshed" as const, connection };
   });
+  if (wrote) await invalidatePublicCatalogForBusiness(businessId);
   if (result.outcome !== "refreshed" || result.connection.accountDisplayName || result.connection.accountEmailMasked || !result.connection.accessTokenEnc) {
     return result;
   }

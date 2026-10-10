@@ -14,6 +14,12 @@ export function json(value: unknown, status = 200) {
   return Response.json(value, { status, headers: { "Cache-Control": "no-store" } });
 }
 
+export function withTiming(response: Response, startedAt: number) {
+  const duration = Math.max(0, performance.now() - startedAt);
+  response.headers.append("Server-Timing", `app;dur=${duration.toFixed(1)}`);
+  return response;
+}
+
 export async function handleHttp(run: () => Promise<Response>) {
   try { return await run(); }
   catch (error) {

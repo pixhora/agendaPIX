@@ -11,6 +11,8 @@ export type E2EMeta = {
   businessASlug: string;
   businessBSlug: string;
   ownerName: string;
+  agendaDate: string;
+  confirmedStart: string;
 };
 
 export function readMeta(): E2EMeta {

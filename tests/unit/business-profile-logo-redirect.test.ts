@@ -1,12 +1,13 @@
 import { NextRequest } from "next/server";
 import sharp from "sharp";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { clearAliasCache, invalidateAliasCache } from "../../lib/business-profile/alias-cache";
+import { ABSENT_ALIAS_TTL_MS, ALIAS_LOOKUP_LIMIT, boundedAliasTarget, clearAliasCache } from "../../lib/business-profile/alias-cache";
 import { LOGO_UPLOAD_MAX_BYTES } from "../../lib/contracts";
 import { HttpError } from "../../lib/http";
 import { assertLogoBytes, reencodeLogo } from "../../lib/business-profile/logo-image";
 import { createFakeBlobStore, createVercelBlobStore, resolveBlobStore } from "../../lib/business-profile/logo-store";
 import { aliasTarget, locationForMovedSlug, publicSlugFromPath, slugMovedResponse } from "../../lib/business-profile/public-slug";
+import { listPublicServices } from "../../lib/bookings/service";
 import { rejectTakenSlug, slugTakenError } from "../../lib/business-profile/slug-conflict";
 import { slugAvailability, takenSlugs } from "../../lib/slug-availability";
 import { proxy } from "../../proxy";
@@ -251,42 +252,134 @@ describe("slug redirect", () => {
     });
   });
 
-  it("remembers a released alias as a miss and looks again after the slug changes", async () => {
+  it("does not remember a miss, so another instance redirects after the slug changes", async () => {
+    let target: string | null = null;
     let hits = 0;
     const lookup = async () => {
       hits += 1;
-      return null;
+      return target;
     };
-    const first = await proxy(new NextRequest("https://agenda.example/antiga"), lookup);
-    const second = await proxy(new NextRequest("https://agenda.example/antiga/opengraph-image"), lookup);
-    expect(first.status).not.toBe(308);
-    expect(second.status).not.toBe(308);
-    expect(hits).toBe(1);
-
-    invalidateAliasCache("antiga");
-    await proxy(new NextRequest("https://agenda.example/antiga"), lookup);
+    const live = await proxy(new NextRequest("https://agenda.example/antiga"), lookup);
+    const again = await proxy(new NextRequest("https://agenda.example/antiga/opengraph-image"), lookup);
+    expect(live.status).not.toBe(308);
+    expect(again.status).not.toBe(308);
     expect(hits).toBe(2);
 
+    target = "nova";
+    const moved = await proxy(new NextRequest("https://agenda.example/antiga"), lookup);
+    expect(hits).toBe(3);
+    expect(moved.status).toBe(308);
+    expect(moved.headers.get("location")).toBe("https://agenda.example/nova");
+
     clearAliasCache();
+    let history: { slug: string }[] = [];
     let selects = 0;
     const database = {
+      async execute() {
+        return { rows: [] };
+      },
       select() {
         selects += 1;
+        let joined = false;
         const chain = {
           from: () => chain,
-          innerJoin: () => chain,
+          innerJoin: () => {
+            joined = true;
+            return chain;
+          },
           where: () => chain,
-          limit: async () => [],
+          limit: async () => (joined ? history : []),
         };
         return chain;
       },
     };
     expect(await aliasTarget("antiga", database as never)).toBeNull();
     expect(await aliasTarget("antiga", database as never)).toBeNull();
-    expect(selects).toBe(1);
-    invalidateAliasCache("antiga");
-    expect(await aliasTarget("antiga", database as never)).toBeNull();
     expect(selects).toBe(2);
+
+    history = [{ slug: "nova" }];
+    await expect(listPublicServices("antiga", database as never)).rejects.toMatchObject({ slug: "nova" });
+    expect(selects).toBe(3);
+    expect(await aliasTarget("antiga", database as never)).toBe("nova");
+    expect(await aliasTarget("antiga", database as never)).toBe("nova");
+    expect(selects).toBe(4);
+  });
+
+  it("reads a moved slug from the database when the cache still has the previous alias", async () => {
+    let history: { slug: string }[] = [{ slug: "velha" }];
+    const database = {
+      async execute() {
+        return { rows: [] };
+      },
+      select() {
+        let joined = false;
+        const chain = {
+          from: () => chain,
+          innerJoin: () => {
+            joined = true;
+            return chain;
+          },
+          where: () => chain,
+          limit: async () => (joined ? history : []),
+        };
+        return chain;
+      },
+    };
+    expect(await aliasTarget("antiga", database as never)).toBe("velha");
+    history = [{ slug: "nova" }];
+    expect(await aliasTarget("antiga", database as never)).toBe("velha");
+    await expect(listPublicServices("antiga", database as never)).rejects.toMatchObject({ slug: "nova" });
+    expect(await aliasTarget("antiga", database as never)).toBe("velha");
+  });
+
+  it("does not cache a live slug, so another instance still redirects at once", async () => {
+    clearAliasCache();
+    let result: "live" | "absent" | { alias: string } = "live";
+    let calls = 0;
+    const classify = async () => {
+      calls += 1;
+      return result;
+    };
+    expect(await boundedAliasTarget("loja", classify)).toBeNull();
+    expect(await boundedAliasTarget("loja", classify)).toBeNull();
+    expect(calls).toBe(2);
+    result = { alias: "loja-nova" };
+    expect(await boundedAliasTarget("loja", classify)).toBe("loja-nova");
+    expect(calls).toBe(3);
+  });
+
+  it("remembers an unknown slug for a few seconds and caps lookups without storing a live slug", async () => {
+    clearAliasCache();
+    let absentCalls = 0;
+    expect(await boundedAliasTarget("sumiu", async () => {
+      absentCalls += 1;
+      return "absent";
+    }, 1_000)).toBeNull();
+    expect(await boundedAliasTarget("sumiu", async () => {
+      absentCalls += 1;
+      return "absent";
+    }, 1_000 + ABSENT_ALIAS_TTL_MS - 1)).toBeNull();
+    expect(absentCalls).toBe(1);
+    expect(await boundedAliasTarget("sumiu", async () => {
+      absentCalls += 1;
+      return "absent";
+    }, 1_000 + ABSENT_ALIAS_TTL_MS)).toBeNull();
+    expect(absentCalls).toBe(2);
+
+    clearAliasCache();
+    let liveCalls = 0;
+    const live = async () => {
+      liveCalls += 1;
+      return "live" as const;
+    };
+    for (let index = 0; index < ALIAS_LOOKUP_LIMIT; index += 1) {
+      expect(await boundedAliasTarget(`loja-${index}`, live, 50_000)).toBeNull();
+    }
+    expect(liveCalls).toBe(ALIAS_LOOKUP_LIMIT);
+    expect(await boundedAliasTarget("loja-extra", live, 50_000)).toBeNull();
+    expect(liveCalls).toBe(ALIAS_LOOKUP_LIMIT);
+    expect(await boundedAliasTarget("loja-extra", live, 51_000)).toBeNull();
+    expect(liveCalls).toBe(ALIAS_LOOKUP_LIMIT + 1);
   });
 
   it("remembers an alias lookup for a minute and does not remember a database error", async () => {

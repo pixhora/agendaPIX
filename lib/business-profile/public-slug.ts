@@ -3,7 +3,7 @@ import { getDb } from "../../db";
 import { businessSlugHistory, businesses } from "../../db/schema";
 import { isReservedBusinessSlug } from "../bookings/validation";
 import { isPublicSlug } from "../slug";
-import { cachedAliasTarget } from "./alias-cache";
+import { cachedAliasTarget, type PublicAliasClass } from "./alias-cache";
 
 export class SlugMoved extends Error {
   constructor(public slug: string) {
@@ -13,7 +13,8 @@ export class SlugMoved extends Error {
 
 type Database = Pick<ReturnType<typeof getDb>, "select">;
 
-async function readAliasTarget(slug: string, database: Database): Promise<string | null> {
+/** Leitura direta. Não passa pelo cache de 60s. */
+export async function readAliasTarget(slug: string, database: Database): Promise<string | null> {
   if (!isPublicSlug(slug) || isReservedBusinessSlug(slug)) return null;
   const [row] = await database
     .select({ slug: businesses.slug })
@@ -26,11 +27,24 @@ async function readAliasTarget(slug: string, database: Database): Promise<string
 }
 
 /**
- * Slug atual quando `slug` é um alias ativo. Alias solto e slug desconhecido
- * devolvem null e ficam no cache por 60s, junto com o proxy.
+ * Slug atual quando `slug` é um alias ativo. Sem alias devolve null e não
+ * entra no cache: um slug vivo pode mudar de nome em outra instância.
  */
 export async function aliasTarget(slug: string, database: Database = getDb()): Promise<string | null> {
   return cachedAliasTarget(slug, (value) => readAliasTarget(value, database));
+}
+
+/** Alias, slug vivo ou inexistente. O vivo não pode ser cacheado. `getDb` só roda no miss. */
+export async function classifyPublicAlias(
+  slug: string,
+  lookup: (slug: string) => Promise<string | null>,
+  database?: Database,
+): Promise<PublicAliasClass> {
+  const target = await lookup(slug);
+  if (target) return { alias: target };
+  const db = database ?? getDb();
+  const [row] = await db.select({ slug: businesses.slug }).from(businesses).where(eq(businesses.slug, slug)).limit(1);
+  return row ? "live" : "absent";
 }
 
 function decodeSegment(value: string) {

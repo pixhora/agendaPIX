@@ -17,7 +17,12 @@ export const slugSchema = z
   .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/)
   .refine((value) => !isReservedBusinessSlug(value), { message: "slug_reserved" });
 
-export const availabilitySchema = z.object({ serviceId: z.uuid(), date: z.iso.date() }).strict();
+export const availabilitySchema = z.object({
+  serviceId: z.uuid(),
+  date: z.iso.date(),
+  /** Lista opcional de dias (até 7) para a régua da página pública. Sem ela, a resposta continua só com `slots` do `date`. */
+  dates: z.string().max(80).optional(),
+}).strict();
 export const bookingInputSchema = z.object({
   serviceId: z.uuid(),
   startsAt: z.iso.datetime({ offset: true }).transform((value) => new Date(value).toISOString()),

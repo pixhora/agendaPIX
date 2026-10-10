@@ -9,6 +9,8 @@ import { PublicLink } from "@/components/dashboard/public-link";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { StatusChip, ValueSlab } from "@/components/ui/value-slab";
 import { buttonVariants } from "@/components/ui/button";
+import { getBusinessBilling } from "@/lib/billing/status";
+import { getDb } from "@/db";
 import { dashboardBookings } from "@/lib/dashboard/data";
 import { dashboardAgendaKpis, dashboardAgendaSummary, formatBrlCents } from "@/lib/dashboard/summary";
 import { OwnerBillingNotice } from "@/components/dashboard/owner-billing-notice";
@@ -41,7 +43,12 @@ export default async function AgendaPage({ searchParams }: { searchParams: Promi
   const date = parsedDate.success ? parsedDate.data : today;
   const weekly = query.view === "week";
   const dates = weekly ? weekDates(date) : [date];
-  const bookings = business ? await dashboardBookings(owner.id, business.id, dates) : [];
+  const [bookings, billing] = business
+    ? await Promise.all([
+      dashboardBookings(owner.id, business.id, dates, getDb(), business),
+      getBusinessBilling(business.id, owner.id),
+    ])
+    : [[] as Awaited<ReturnType<typeof dashboardBookings>>, null];
   const summary = business ? dashboardAgendaSummary(bookings, date, timezone, now) : null;
   const kpis = dashboardAgendaKpis(bookings, now);
 
@@ -83,17 +90,17 @@ export default async function AgendaPage({ searchParams }: { searchParams: Promi
     : `${longLabel(date).replace(/^./, (letter) => letter.toUpperCase())}${date === today ? " · hoje" : ""}`;
   const nextBooking = summary?.nextReservation;
 
-  return <DashboardShell title={business ? `Agenda de ${business.name}` : "Sua agenda"} description={description} path="/dashboard" businesses={businesses} businessId={business?.id} notice={business ? <OwnerBillingNotice ownerId={owner.id} businessId={business.id} timeZone={business.timezone} publicSlug={business.slug} /> : undefined}>
+  return <DashboardShell title={business ? `Agenda de ${business.name}` : "Sua agenda"} description={description} path="/dashboard" businesses={businesses} businessId={business?.id} notice={business && billing ? <OwnerBillingNotice ownerId={owner.id} businessId={business.id} timeZone={business.timezone} publicSlug={business.slug} billing={billing} /> : undefined}>
     {business && summary && <>
       <div className="flex flex-wrap items-center gap-2">
         <nav aria-label="Navegar por datas" className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
-          <Link className={buttonVariants({ variant: "outline", size: "icon" })} href={href(shiftDate(date, weekly ? -7 : -1))} aria-label={weekly ? "Semana anterior" : "Dia anterior"}><ChevronLeft aria-hidden="true" /></Link>
-          <Link className={buttonVariants({ variant: date === today ? "default" : "outline", className: "px-4" })} href={href(today)} aria-current={date === today ? "date" : undefined}>Hoje</Link>
-          <Link className={buttonVariants({ variant: "outline", size: "icon" })} href={href(shiftDate(date, weekly ? 7 : 1))} aria-label={weekly ? "Próxima semana" : "Próximo dia"}><ChevronRight aria-hidden="true" /></Link>
+          <Link prefetch className={buttonVariants({ variant: "outline", size: "icon" })} href={href(shiftDate(date, weekly ? -7 : -1))} aria-label={weekly ? "Semana anterior" : "Dia anterior"}><ChevronLeft aria-hidden="true" /></Link>
+          <Link prefetch className={buttonVariants({ variant: date === today ? "default" : "outline", className: "px-4" })} href={href(today)} aria-current={date === today ? "date" : undefined}>Hoje</Link>
+          <Link prefetch className={buttonVariants({ variant: "outline", size: "icon" })} href={href(shiftDate(date, weekly ? 7 : 1))} aria-label={weekly ? "Próxima semana" : "Próximo dia"}><ChevronRight aria-hidden="true" /></Link>
           <AgendaDatePicker key={date} date={date} label={pickerLabel(date)} hrefBase={hrefBase} />
         </nav>
         <nav aria-label="Visualização da agenda" className="grid w-full grid-cols-2 rounded-full border border-line bg-surface p-1 sm:ml-auto sm:inline-flex sm:w-auto">
-          {(["day", "week"] as const).map((option) => <Link key={option} href={href(date, option)} aria-current={view === option ? "page" : undefined} className={cn("inline-flex min-h-9 items-center justify-center rounded-full px-4 text-sm font-semibold transition-feedback focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring", view === option ? "bg-ink text-paper" : "text-muted hover:text-ink")}>{option === "day" ? "Dia" : "Semana"}</Link>)}
+          {(["day", "week"] as const).map((option) => <Link prefetch key={option} href={href(date, option)} aria-current={view === option ? "page" : undefined} className={cn("inline-flex min-h-9 items-center justify-center rounded-full px-4 text-sm font-semibold transition-feedback focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring", view === option ? "bg-ink text-paper" : "text-muted hover:text-ink")}>{option === "day" ? "Dia" : "Semana"}</Link>)}
         </nav>
       </div>
       {query.date && !parsedDate.success && <p role="alert" className="rounded-card border border-warning/30 bg-warning-soft p-4 text-sm text-warning">Data inválida. Mostrando a agenda de hoje; escolha uma data válida.</p>}

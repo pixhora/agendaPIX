@@ -1,17 +1,26 @@
 import { randomUUID } from "node:crypto";
 import sharp from "sharp";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
-import { afterAll, expect, it } from "vitest";
+import { afterAll, expect, it, vi } from "vitest";
 import { getDb } from "../../db";
-import { businesses, businessSlugHistory, user } from "../../db/schema";
+import { businesses, businessHours, businessSlugHistory, services, user } from "../../db/schema";
 import { GET as paymentGet } from "../../app/api/public/[slug]/bookings/[id]/payment/route";
 import { GET as servicesGet } from "../../app/api/public/[slug]/services/route";
 import { consumeAbuseBucket } from "../../lib/abuse-rate-limit";
+import { SlugMoved } from "../../lib/business-profile/public-slug";
 import { createFakeBlobStore, LOGO_REQUEST_MAX_BYTES, saveBusinessLogo, uploadBusinessLogo } from "../../lib/business-profile/logo-store";
 import { PROFILE_PATCH_LIMIT } from "../../lib/business-profile/slug-policy";
 import { updateBusinessProfile } from "../../lib/business-profile/update";
+import { getAvailability, listPublicServices } from "../../lib/bookings/service";
+import { loadPublicCatalog } from "../../lib/bookings/public-catalog";
 import { HttpError } from "../../lib/http";
 import { slugAvailability } from "../../lib/slug-availability";
+
+const revalidateTag = vi.fn();
+vi.mock("next/cache", () => ({
+  revalidateTag: (...args: unknown[]) => revalidateTag(...args),
+  unstable_cache: (load: () => Promise<unknown>) => load,
+}));
 
 const db = getDb();
 afterAll(() => db.$client.end());
@@ -340,6 +349,54 @@ it("releases the oldest alias, stops its redirect, and blocks other businesses f
     expect(activeLeft).toHaveLength(3);
   } finally {
     await cleanup(owners);
+  }
+});
+
+it("keeps the old slug as a 308 from the catalog, returns the stored logo, and drops both catalog tags", async () => {
+  const token = randomUUID().replaceAll("-", "").slice(0, 12);
+  const ownerId = await createOwner("Catálogo");
+  const oldSlug = `velho-${token}`;
+  const nextSlug = `novo-${token}`;
+  const business = await createBusiness(ownerId, oldSlug, "Estúdio");
+  try {
+    await db.insert(services).values([
+      { businessId: business.id, name: "Zeta", durationMinutes: 30, priceCents: 5000, depositCents: 0 },
+      { businessId: business.id, name: "Alfa", durationMinutes: 45, priceCents: 8000, depositCents: 0 },
+    ]);
+    await db.insert(businessHours).values([
+      { businessId: business.id, weekday: 3, opensAt: "09:00:00", closesAt: "18:00:00" },
+      { businessId: business.id, weekday: 1, opensAt: "09:00:00", closesAt: "18:00:00" },
+    ]);
+    const png = await sharp({ create: { width: 16, height: 16, channels: 3, background: { r: 4, g: 5, b: 6 } } }).png().toBuffer();
+    const saved = await saveBusinessLogo(business.id, ownerId, png, db, createFakeBlobStore(() => "logo1"));
+    const listed = await listPublicServices(oldSlug, db);
+    expect(listed.logoUrl).toBe(saved.logoUrl);
+    const catalog = await loadPublicCatalog(oldSlug, db);
+    expect(catalog.services.map((service) => service.name)).toEqual(["Alfa", "Zeta"]);
+    expect(catalog.hours.map((hour) => hour.weekday)).toEqual([1, 3]);
+
+    process.env.NEXT_RUNTIME = "nodejs";
+    revalidateTag.mockClear();
+    const renamed = await updateBusinessProfile(business.id, ownerId, { name: "Estúdio novo", slug: nextSlug }, db);
+    expect(renamed.slug).toBe(nextSlug);
+    expect(revalidateTag).toHaveBeenCalledWith(`public-catalog:${oldSlug}`, { expire: 0 });
+    expect(revalidateTag).toHaveBeenCalledWith(`public-catalog:${nextSlug}`, { expire: 0 });
+    await expect(listPublicServices(oldSlug, db)).rejects.toBeInstanceOf(SlugMoved);
+    await expect(getAvailability(oldSlug, {
+      serviceId: "11111111-1111-4111-8111-111111111111",
+      date: "2030-01-06",
+    }, db)).rejects.toBeInstanceOf(SlugMoved);
+    expect((await listPublicServices(nextSlug, db)).logoUrl).toBe(saved.logoUrl);
+
+    revalidateTag.mockClear();
+    const replaced = await saveBusinessLogo(business.id, ownerId, png, db, createFakeBlobStore(() => "logo2"));
+    expect(revalidateTag).toHaveBeenCalledWith(`public-catalog:${nextSlug}`, { expire: 0 });
+    expect((await listPublicServices(nextSlug, db)).logoUrl).toBe(replaced.logoUrl);
+  } finally {
+    delete process.env.NEXT_RUNTIME;
+    await db.delete(services).where(eq(services.businessId, business.id));
+    await db.delete(businessHours).where(eq(businessHours.businessId, business.id));
+    await cleanup([ownerId]);
   }
 });
 

@@ -36,6 +36,7 @@ function NavLinks({ businesses, variant }: { businesses: FrameBusiness[]; varian
     return (
       <Link
         key={href}
+        prefetch
         href={`${href}${suffix}`}
         aria-current={current ? "page" : undefined}
         className={cn(

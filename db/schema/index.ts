@@ -195,6 +195,7 @@ export const payments = pgTable("payments", {
   unique("payments_business_id_unique").on(table.businessId, table.id),
   foreignKey({ name: "payments_booking_tenant_fk", columns: [table.businessId, table.bookingId], foreignColumns: [bookings.businessId, bookings.id] }),
   index("payments_business_booking_idx").on(table.businessId, table.bookingId),
+  index("payments_booking_created_idx").on(table.businessId, table.bookingId, table.createdAt.desc()),
   index("payments_reconcile_status_idx").on(table.status, table.updatedAt),
   index("payments_remote_cancel_due_idx").on(table.remoteCancelAttemptedAt, table.expiresAt, table.id).where(sql`${table.remoteCancelledAt} IS NULL AND ${table.externalId} IS NOT NULL AND ${table.status} IN ('pending', 'expired')`),
   unique("payments_provider_external_unique").on(table.provider, table.externalId),

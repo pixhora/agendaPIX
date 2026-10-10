@@ -309,6 +309,10 @@ h1, h2, h3, h4, h5, h6, .font-display {
       transform var(--duration-feedback) var(--ease-standard),
       opacity var(--duration-feedback) var(--ease-standard);
   }
+  /* O estado pressionado usa o mesmo transform de 120ms e permanece enquanto a ação corre. */
+  [data-slot="button"][aria-busy="true"] {
+    transform: scale(0.985);
+  }
   .transition-opening {
     transition: opacity var(--duration-opening) var(--ease-standard),
       transform var(--duration-opening) var(--ease-standard),

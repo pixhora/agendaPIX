@@ -4,6 +4,8 @@ import { ACTION_ICONS } from "@/lib/icons/registry";
 import { DashboardShell, Empty } from "@/components/dashboard/shell";
 import { OwnerBillingNotice } from "@/components/dashboard/owner-billing-notice";
 import { buttonVariants } from "@/components/ui/button";
+import { getBusinessBilling } from "@/lib/billing/status";
+import { getDb } from "@/db";
 import { ownerContext } from "@/lib/dashboard/session";
 import { dashboardCustomers } from "@/lib/dashboard/data";
 
@@ -12,10 +14,15 @@ const initials = (name: string) => name.trim().split(/\s+/).slice(0, 2).map((par
 export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ businessId?: string }> }) {
   const { businessId } = await searchParams;
   const { businesses, business, owner } = await ownerContext(businessId);
-  const customers = business ? await dashboardCustomers(owner.id, business.id) : [];
+  const [customers, billing] = business
+    ? await Promise.all([
+      dashboardCustomers(owner.id, business.id, getDb(), business),
+      getBusinessBilling(business.id, owner.id),
+    ])
+    : [[] as Awaited<ReturnType<typeof dashboardCustomers>>, null];
   const action = "inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-line bg-surface px-4 text-sm font-semibold hover:border-line-strong hover:bg-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
-  return <DashboardShell title="Clientes" description="Os clientes aparecem aqui quando agendam um atendimento pela sua página." path="/dashboard/customers" businesses={businesses} businessId={business?.id} notice={business ? <OwnerBillingNotice ownerId={owner.id} businessId={business.id} timeZone={business.timezone} publicSlug={business.slug} /> : undefined}>
+  return <DashboardShell title="Clientes" description="Os clientes aparecem aqui quando agendam um atendimento pela sua página." path="/dashboard/customers" businesses={businesses} businessId={business?.id} notice={business && billing ? <OwnerBillingNotice ownerId={owner.id} businessId={business.id} timeZone={business.timezone} publicSlug={business.slug} billing={billing} /> : undefined}>
     {business && (!customers.length ? <Empty title="Ainda não há clientes" icon={<Icon icon={ACTION_ICONS.emptyCustomers} size="md" />}>
       <p>Seus clientes entram na lista quando reservam um atendimento.</p>
       <Link href={`/dashboard/services?businessId=${business.id}`} className={buttonVariants({ variant: "outline", className: "mt-4" })}>Conferir serviços</Link>

@@ -7,6 +7,7 @@ import { businesses } from "../../db/schema";
 import { FAKE_BLOB_HOST, LOGO_UPLOAD_FIELD, LOGO_UPLOAD_MAX_BYTES, businessLogoUrlSchema, logoUploadResponseSchema, logoUrlRejection } from "../contracts";
 import { consumeAbuseBucket } from "../abuse-rate-limit";
 import { HttpError } from "../http";
+import { invalidatePublicCatalog } from "../bookings/public-cache";
 import { findOwnedBusiness } from "../tenancy";
 import { reencodeLogo } from "./logo-image";
 
@@ -137,7 +138,7 @@ async function readLogoFile(request: Request) {
 }
 
 async function writeLogo(
-  business: { id: string; logoUrl: string | null },
+  business: { id: string; slug: string; logoUrl: string | null },
   ownerId: string,
   bytes: Uint8Array,
   database: Database,
@@ -160,6 +161,7 @@ async function writeLogo(
       console.error("[logo] delete_failed", error instanceof Error ? error.message : "unknown");
     }
   }
+  await invalidatePublicCatalog(business.slug);
   return logoUploadResponseSchema.parse({ logoUrl: updated.logoUrl });
 }
 

@@ -8,6 +8,7 @@ import { publicBusinessPageUrl } from "../billing/public-url";
 import { HttpError } from "../http";
 import { publicBookingPagePath } from "../public-api";
 import { findOwnedBusiness } from "../tenancy";
+import { invalidatePublicCatalog } from "../bookings/public-cache";
 import { invalidateAliasCache } from "./alias-cache";
 import { isUniqueViolation, rejectTakenSlug } from "./slug-conflict";
 import { ACTIVE_ALIAS_CAP, aliasHoldActive, PROFILE_PATCH_LIMIT, SLUG_CHANGE_LIMIT } from "./slug-policy";
@@ -111,6 +112,9 @@ export async function updateBusinessProfile(businessId: string, ownerId: string,
       return present(updated);
     });
     for (const slug of dropped) invalidateAliasCache(slug);
+    const catalogSlugs = new Set(dropped);
+    catalogSlugs.add(result.slug);
+    for (const slug of catalogSlugs) await invalidatePublicCatalog(slug);
     return result;
   } catch (error) {
     if (error instanceof HttpError) throw error;

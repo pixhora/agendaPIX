@@ -2,6 +2,7 @@ import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import * as schema from "../../db/schema";
+import { invalidatePublicCatalog } from "../bookings/public-cache";
 import { accessGrantingPeriodEnd } from "./access";
 import { addCalendarMonths } from "./period";
 
@@ -106,6 +107,7 @@ export async function activateManualSubscription(
     return planFrom(previous, request?.id ?? null);
   });
   log(formatActivationLog(plan));
+  await invalidatePublicCatalog(plan.slug);
   return plan;
 }
 

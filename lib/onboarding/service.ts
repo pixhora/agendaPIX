@@ -4,6 +4,7 @@ import { getDb } from "../../db";
 import { businessHours, businessSlugHistory, businesses, onboardingRequests, services } from "../../db/schema";
 import { trialEndsAtFromCreation } from "../billing/access";
 import { requestKeySchema } from "../bookings/validation";
+import { invalidatePublicCatalog } from "../bookings/public-cache";
 import { HttpError } from "../http";
 import { aliasHoldActive } from "../business-profile/slug-policy";
 import { isUniqueViolation, rejectTakenSlug } from "../business-profile/slug-conflict";
@@ -24,7 +25,7 @@ export async function provisionBusiness(ownerId: string, key: unknown, body: unk
   const requestHash = createHash("sha256").update(JSON.stringify(input)).digest("hex");
   const db = database ?? getDb();
   try {
-    return await db.transaction(async (tx) => {
+    const outcome = await db.transaction(async (tx) => {
       const predicate = and(eq(onboardingRequests.ownerId, ownerId), eq(onboardingRequests.requestKey, requestKey));
       const inserted = await tx.insert(onboardingRequests).values({ ownerId, requestKey, requestHash }).onConflictDoNothing().returning();
       if (!inserted.length) {
@@ -53,6 +54,8 @@ export async function provisionBusiness(ownerId: string, key: unknown, body: unk
       await tx.update(onboardingRequests).set({ result }).where(predicate);
       return { result, replay: false };
     });
+    await invalidatePublicCatalog(outcome.result.slug);
+    return outcome;
   } catch (error) {
     if (error instanceof HttpError) throw error;
     if (isUniqueViolation(error)) await rejectTakenSlug(db, input.business.slug, "slug");

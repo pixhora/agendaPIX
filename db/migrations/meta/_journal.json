@@ -134,6 +134,13 @@
       "when": 1791600000000,
       "tag": "0018_business_profile",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791700000000,
+      "tag": "0019_read_path_indexes",
+      "breakpoints": true
     }
   ]
 }

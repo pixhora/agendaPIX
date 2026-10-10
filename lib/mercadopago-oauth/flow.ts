@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { isAutoRefundAck, MP_CONNECT_CONSENT_TEXT, MP_CONNECT_CONSENT_VERSION } from "../mercadopago/consent";
+import { invalidatePublicCatalogForBusiness } from "../bookings/public-cache";
 import { normalizeClientAddress } from "../bookings/rate-limit";
 import { findOwnedBusiness } from "../tenancy";
 import { authEnvSchema } from "../env";
@@ -134,6 +135,7 @@ export async function completeMercadoPagoConnect(input: {
   } catch {
     // A consulta do perfil não desfaz a conexão já gravada.
   }
+  await invalidatePublicCatalogForBusiness(opened.payload.businessId);
   return { path: mpResultPath(returnTo, { mp: "connected" }) };
 }
 
@@ -281,6 +283,7 @@ export async function acceptMercadoPagoConsent(input: {
     createdAt: now,
   });
   const status = await getMercadoPagoOwnerStatus(input.businessId, { store, now, env: input.env });
+  await invalidatePublicCatalogForBusiness(input.businessId);
   return { kind: "ok", status };
 }
 

@@ -1,6 +1,6 @@
-import { NextResponse, type NextRequest } from "next/server";
-import { cachedAliasTarget } from "@/lib/business-profile/alias-cache";
-import { aliasTarget, locationForMovedSlug, publicSlugFromPath } from "@/lib/business-profile/public-slug";
+import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server";
+import { boundedAliasTarget, cachedAliasTarget } from "@/lib/business-profile/alias-cache";
+import { aliasTarget, classifyPublicAlias, locationForMovedSlug, publicSlugFromPath } from "@/lib/business-profile/public-slug";
 import { documentSecurityHeaders, shouldSendStrictTransportSecurity, shouldUpgradeInsecureRequests } from "@/lib/security/headers";
 
 type AliasLookup = (slug: string) => Promise<string | null>;
@@ -25,11 +25,15 @@ function documentHeaders(request: NextRequest) {
  * Skips Next prefetch so a nonce is not frozen into a cached payload, and
  * skips files covered by `headers()` in next.config.ts.
  */
-export async function proxy(request: NextRequest, lookup: AliasLookup = aliasTarget) {
+export async function proxy(request: NextRequest, eventOrLookup?: NextFetchEvent | AliasLookup) {
+  // O Next chama `proxy(request, event)`. O segundo argumento só é a busca nos testes.
+  const injected = typeof eventOrLookup === "function" ? eventOrLookup : null;
   const slug = publicSlugFromPath(request.nextUrl.pathname);
   if (slug) {
     try {
-      const target = await cachedAliasTarget(slug, lookup);
+      const target = injected
+        ? await cachedAliasTarget(slug, injected)
+        : await boundedAliasTarget(slug, (value) => classifyPublicAlias(value, aliasTarget));
       if (target && target !== slug) {
         const location = new URL(locationForMovedSlug(request.url, slug, target), request.url);
         const response = NextResponse.redirect(location, 308);
@@ -47,6 +51,7 @@ export async function proxy(request: NextRequest, lookup: AliasLookup = aliasTar
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
   requestHeaders.set("Content-Security-Policy", csp);
+  requestHeaders.set("x-agenda-search", request.nextUrl.search);
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   for (const header of headers) response.headers.set(header.key, header.value);
   return response;

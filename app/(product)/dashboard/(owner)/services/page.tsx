@@ -7,6 +7,8 @@ import { OwnerBillingNotice } from "@/components/dashboard/owner-billing-notice"
 import { ServiceBlockNotice } from "@/components/dashboard/service-block-notice";
 import { ServiceForm } from "@/components/dashboard/forms";
 import { buttonVariants } from "@/components/ui/button";
+import { getBusinessBilling } from "@/lib/billing/status";
+import { getDb } from "@/db";
 import { ownerContext } from "@/lib/dashboard/session";
 import { dashboardServices } from "@/lib/dashboard/data";
 import { policyListLabel } from "@/lib/policy/text";
@@ -15,7 +17,12 @@ import { cn } from "@/lib/utils";
 export default async function ServicesPage({ searchParams }: { searchParams: Promise<{ businessId?: string }> }) {
   const { businessId } = await searchParams;
   const { businesses, business, owner } = await ownerContext(businessId);
-  const services = business ? await dashboardServices(owner.id, business.id) : [];
+  const [services, billing] = business
+    ? await Promise.all([
+      dashboardServices(owner.id, business.id, getDb(), business),
+      getBusinessBilling(business.id, owner.id),
+    ])
+    : [[] as Awaited<ReturnType<typeof dashboardServices>>, null];
   const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
   return <DashboardShell
@@ -24,7 +31,7 @@ export default async function ServicesPage({ searchParams }: { searchParams: Pro
     path="/dashboard/services"
     businesses={businesses}
     businessId={business?.id}
-    notice={business ? <OwnerBillingNotice ownerId={owner.id} businessId={business.id} timeZone={business.timezone} publicSlug={business.slug} /> : undefined}
+    notice={business && billing ? <OwnerBillingNotice ownerId={owner.id} businessId={business.id} timeZone={business.timezone} publicSlug={business.slug} billing={billing} /> : undefined}
     actions={business && services.length > 0 ? <Link href="#new-service" className={buttonVariants({ className: "w-full sm:w-auto" })}><Plus aria-hidden="true" />Novo serviço</Link> : undefined}
   >
     {business && <div className="grid gap-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(20rem,0.75fr)] lg:items-start lg:gap-8">

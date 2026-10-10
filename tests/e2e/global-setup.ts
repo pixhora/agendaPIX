@@ -10,6 +10,8 @@ import { connectedMercadoPagoValues } from "../helpers/connected-mp";
 import { getAuth } from "../../lib/auth";
 
 const fixturePath = path.resolve("tests/e2e/.auth");
+const confirmedStart = "07:00";
+let seededAgendaDate = "";
 const ownerState = path.join(fixturePath, "owner.json");
 const metaPath = path.join(fixturePath, "meta.json");
 const capturePath = path.resolve("tests/e2e/.auth/magic-link.txt");
@@ -52,9 +54,10 @@ async function ensureBusiness(ownerId: string, name: string, slug: string, seedB
   if (seedBooking) {
     // Reserva confirmada hoje às 07:00 (antes da abertura, não disputa horário com a jornada de agendamento).
     const today = todayInSaoPaulo();
+    seededAgendaDate = today;
     await database.insert(bookings).values({
       businessId: created.id, serviceId: service.id, customerId: customer.id,
-      startsAt: new Date(`${today}T07:00:00-03:00`), endsAt: new Date(`${today}T07:30:00-03:00`),
+      startsAt: new Date(`${today}T${confirmedStart}:00-03:00`), endsAt: new Date(`${today}T07:30:00-03:00`),
       priceCents: 5000, depositCents: 1000, status: "confirmed",
     });
     // Cancelada no mesmo dia: o axe do painel cobre texto muted sem opacity empilhada.
@@ -155,6 +158,8 @@ export default async function globalSetup(config: FullConfig) {
     businessAId: businessA.id, businessBId: businessB.id,
     businessASlug: businessA.slug, businessBSlug: businessB.slug,
     ownerName: owner.name,
+    agendaDate: seededAgendaDate,
+    confirmedStart,
   }, null, 2));
 
   await getDb().$client.end();

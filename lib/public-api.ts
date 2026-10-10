@@ -14,8 +14,10 @@ export function publicServicesUrl(slug: string) {
   return `/api/public/${seg(slug)}/services`;
 }
 
-export function publicAvailabilityUrl(slug: string, serviceId: string, date: string) {
-  return `/api/public/${seg(slug)}/availability?${new URLSearchParams({ serviceId, date })}`;
+export function publicAvailabilityUrl(slug: string, serviceId: string, date: string, extraDates?: string[]) {
+  const params = new URLSearchParams({ serviceId, date });
+  if (extraDates && extraDates.length > 1) params.set("dates", extraDates.join(","));
+  return `/api/public/${seg(slug)}/availability?${params}`;
 }
 
 export function publicBookingsUrl(slug: string) {

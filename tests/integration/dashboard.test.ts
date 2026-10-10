@@ -66,4 +66,21 @@ describe("painel isolado por negócio com PostgreSQL", () => {
     await saveDashboardHours(ownerA, businessA, [], database);
     expect(await dashboardHours(ownerA, businessA, database)).toEqual([]);
   });
+  it("mostra o estorno do pagamento mais recente da reserva", async () => {
+    const [booking] = await database.select({ id: schema.bookings.id }).from(schema.bookings).where(eq(schema.bookings.businessId, businessA)).limit(1);
+    await database.insert(schema.payments).values({
+      businessId: businessA,
+      bookingId: booking.id,
+      provider: "fake",
+      idempotencyKey: randomUUID(),
+      amountCents: 1000,
+      expiresAt: new Date("2030-01-02T02:00:00.000Z"),
+      status: "paid",
+      paidAt: new Date("2030-01-01T12:00:00.000Z"),
+      refundStatus: "in_process",
+    });
+    const [row] = await dashboardBookings(ownerA, businessA, ["2030-01-01"], database);
+    expect(row.refundStatus).toBe("in_process");
+    expect(row.manualRefundOverdue).toBe(false);
+  });
 });
