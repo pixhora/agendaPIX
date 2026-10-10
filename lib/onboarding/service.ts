@@ -4,6 +4,7 @@ import { getDb } from "../../db";
 import { businesses, businessHours, onboardingRequests, services } from "../../db/schema";
 import { trialEndsAtFromCreation } from "../billing/access";
 import { requestKeySchema } from "../bookings/validation";
+import { invalidatePublicCatalog } from "../bookings/public-cache";
 import { HttpError } from "../http";
 import { onboardingInputSchema } from "./validation";
 
@@ -12,7 +13,7 @@ export async function provisionBusiness(ownerId: string, key: unknown, body: unk
   const input = onboardingInputSchema.parse(body);
   const requestHash = createHash("sha256").update(JSON.stringify(input)).digest("hex");
   try {
-    return await (database ?? getDb()).transaction(async (tx) => {
+    const outcome = await (database ?? getDb()).transaction(async (tx) => {
       const predicate = and(eq(onboardingRequests.ownerId, ownerId), eq(onboardingRequests.requestKey, requestKey));
       const inserted = await tx.insert(onboardingRequests).values({ ownerId, requestKey, requestHash }).onConflictDoNothing().returning();
       if (!inserted.length) {
@@ -36,6 +37,8 @@ export async function provisionBusiness(ownerId: string, key: unknown, body: unk
       await tx.update(onboardingRequests).set({ result }).where(predicate);
       return { result, replay: false };
     });
+    await invalidatePublicCatalog(outcome.result.slug);
+    return outcome;
   } catch (error) {
     if (error instanceof HttpError) throw error;
     throw new HttpError(503, "onboarding_unavailable", "Não foi possível concluir o cadastro. Tente novamente.");

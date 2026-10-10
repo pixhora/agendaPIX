@@ -144,6 +144,17 @@ describe("reserva e cobrança do sinal", () => {
     const available = await getAvailability(slugs[0], { serviceId: serviceIds[0], date: "2030-01-01" }, database);
     expect(available.slots.some((slot) => slot.startsAt.toISOString() === "2030-01-01T12:00:00.000Z")).toBe(false);
   });
+  it("vários dias numa consulta batem com uma consulta por dia", async () => {
+    const dates = ["2030-01-01", "2030-01-02", "2030-01-03"];
+    const combined = await getAvailability(slugs[0], { serviceId: serviceIds[0], date: dates[0], dates: dates.join(",") }, database);
+    expect("days" in combined && combined.days?.map((day) => day.date)).toEqual(dates);
+    for (const date of dates) {
+      const single = await getAvailability(slugs[0], { serviceId: serviceIds[0], date }, database);
+      const day = "days" in combined ? combined.days?.find((item) => item.date === date) : undefined;
+      expect(day?.slots.map((slot) => slot.startsAt.toISOString())).toEqual(single.slots.map((slot) => slot.startsAt.toISOString()));
+      expect("days" in single).toBe(false);
+    }
+  });
   it("restrição do Postgres impede sobreposição mesmo sem passar pela aplicação", async () => {
     const { data } = await createBooking(slugs[0], input(), randomUUID(), database, provider);
     const [original] = await database.select().from(schema.bookings).where(eq(schema.bookings.id, data.bookingId));

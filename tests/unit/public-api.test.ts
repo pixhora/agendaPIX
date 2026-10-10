@@ -15,6 +15,9 @@ describe("public API URLs", () => {
     expect(publicAvailabilityUrl("studio-bella", "srv-1", "2026-10-05")).toBe(
       "/api/public/studio-bella/availability?serviceId=srv-1&date=2026-10-05",
     );
+    expect(publicAvailabilityUrl("studio-bella", "srv-1", "2026-10-05", ["2026-10-05", "2026-10-06"])).toBe(
+      "/api/public/studio-bella/availability?serviceId=srv-1&date=2026-10-05&dates=2026-10-05%2C2026-10-06",
+    );
     expect(publicBookingPaymentUrl("studio-bella", "bk-1")).toBe("/api/public/studio-bella/bookings/bk-1/payment");
     expect(devSimulatePixUrl()).toBe("/api/dev/simulate-pix");
   });

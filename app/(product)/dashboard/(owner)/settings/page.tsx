@@ -4,6 +4,8 @@ import { HoursForm, WhatsappForm } from "@/components/dashboard/forms";
 import { PublicLink } from "@/components/dashboard/public-link";
 import { MpStatusPanel } from "@/components/payments/mp-status-panel";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { getBusinessBilling } from "@/lib/billing/status";
+import { getDb } from "@/db";
 import { ownerContext } from "@/lib/dashboard/session";
 import { dashboardHours } from "@/lib/dashboard/data";
 import { readMpFixture } from "@/lib/mercadopago/dev-fixtures";
@@ -16,12 +18,21 @@ import { ACTION_ICONS } from "@/lib/icons/registry";
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ businessId?: string; mpFixture?: string }> }) {
   const { businessId, mpFixture } = await searchParams;
   const { businesses, business, owner } = await ownerContext(businessId);
-  const hours = business ? await dashboardHours(owner.id, business.id) : [];
   const fixture = readMpFixture(mpFixture);
-  const mpStatus = fixture ?? (business
-    ? { ...await getMercadoPagoOwnerStatus(business.id), hadLegacyPixKey: await hasUndismissedLegacyPixKey(business.id) }
-    : null);
-  return <DashboardShell title="Configurações" description="Link público, horários de atendimento, recebimento e aparência do painel." path="/dashboard/settings" businesses={businesses} businessId={business?.id} notice={business ? <OwnerBillingNotice ownerId={owner.id} businessId={business.id} timeZone={business.timezone} publicSlug={business.slug} /> : undefined}>
+  const [hours, mpLive, billing] = business
+    ? await Promise.all([
+      dashboardHours(owner.id, business.id, getDb(), business),
+      fixture
+        ? Promise.resolve(null)
+        : Promise.all([
+          getMercadoPagoOwnerStatus(business.id),
+          hasUndismissedLegacyPixKey(business.id),
+        ]).then(([status, hadLegacyPixKey]) => ({ ...status, hadLegacyPixKey })),
+      getBusinessBilling(business.id, owner.id),
+    ])
+    : [[] as Awaited<ReturnType<typeof dashboardHours>>, null, null];
+  const mpStatus = fixture ?? mpLive;
+  return <DashboardShell title="Configurações" description="Link público, horários de atendimento, recebimento e aparência do painel." path="/dashboard/settings" businesses={businesses} businessId={business?.id} notice={business && billing ? <OwnerBillingNotice ownerId={owner.id} businessId={business.id} timeZone={business.timezone} publicSlug={business.slug} billing={billing} /> : undefined}>
     {business && <div className="grid gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(18rem,0.7fr)] lg:items-start">
       <div className="grid min-w-0 gap-6">
         <MpStatusPanel businessId={business.id} timezone={business.timezone} fixture={mpStatus} />

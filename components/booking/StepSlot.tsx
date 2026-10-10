@@ -117,6 +117,7 @@ export function StepSlot({
   const days = useMemo(() => generateInitialDays(timezone), [timezone]);
   const [selectedDate, setSelectedDate] = useState<string>(() => days[0]?.dateString || "");
   const [daySlotCounts, setDaySlotCounts] = useState<Record<string, number | null>>({});
+  const [slotsByDate, setSlotsByDate] = useState<Record<string, AvailabilitySlot[]>>({});
   const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
   const [isLoadingSlots, setIsLoadingSlots] = useState<boolean>(true);
   const [errorSlots, setErrorSlots] = useState<string | null>(null);
@@ -150,80 +151,114 @@ export function StepSlot({
   }, [updateScrollIndicators, days]);
 
   const getSlotsRef = React.useRef(getSlotsForDate);
+  const selectedDateRef = React.useRef(selectedDate);
+  const slotsByDateRef = React.useRef(slotsByDate);
+  const skipPublicDayFetch = React.useRef(false);
   React.useEffect(() => {
     getSlotsRef.current = getSlotsForDate;
+    selectedDateRef.current = selectedDate;
+    slotsByDateRef.current = slotsByDate;
   });
+  const weekKey = days.map((day) => day.dateString).join(",");
 
-  // Carrega contagens de vagas para todos os 7 dias em background
+  // Sem prévia: uma busca cobre os 7 dias. Com prévia, cada dia segue o callback.
   useEffect(() => {
+    const fetchFn = getSlotsRef.current;
     let isCancelled = false;
     const controllers: AbortController[] = [];
 
-    days.forEach((day) => {
-      const fetchFn = getSlotsRef.current;
-      const controller = new AbortController();
-      controllers.push(controller);
-      const timeoutId = setTimeout(() => {
-        controller.abort();
-      }, 10000);
-
-      const promise = fetchFn
-        ? fetchFn(day.dateString)
-        : fetch(publicAvailabilityUrl(slug, service.id, day.dateString), {
-            signal: controller.signal,
+    if (fetchFn) {
+      days.forEach((day) => {
+        const controller = new AbortController();
+        controllers.push(controller);
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        fetchFn(day.dateString)
+          .then((dataSlots) => {
+            if (isCancelled) return;
+            setDaySlotCounts((prev) => ({ ...prev, [day.dateString]: Array.isArray(dataSlots) ? dataSlots.length : 0 }));
           })
-            .then((res) => (res.ok ? res.json() : Promise.reject()))
-            .then((data: { slots?: AvailabilitySlot[]; bookable?: boolean }) => {
-              if (!isCancelled && depositServiceUnbookable(service.depositCents, data?.bookable)) {
-                setBlockedServiceId(service.id);
-              }
-              return data?.slots || [];
-            })
-            .finally(() => clearTimeout(timeoutId));
+          .catch(() => {
+            if (isCancelled) return;
+            setDaySlotCounts((prev) => ({ ...prev, [day.dateString]: 0 }));
+          })
+          .finally(() => clearTimeout(timeoutId));
+      });
+      return () => {
+        isCancelled = true;
+        controllers.forEach((controller) => controller.abort());
+      };
+    }
 
-      promise
-        .then((dataSlots: AvailabilitySlot[]) => {
-          if (isCancelled) return;
-          const count = Array.isArray(dataSlots) ? dataSlots.length : 0;
-          setDaySlotCounts((prev) => ({ ...prev, [day.dateString]: count }));
-        })
-        .catch(() => {
-          if (isCancelled) return;
-          setDaySlotCounts((prev) => ({ ...prev, [day.dateString]: 0 }));
-        });
-    });
+    skipPublicDayFetch.current = true;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const dates = days.map((day) => day.dateString);
+    const anchor = dates[0];
+    if (!anchor) return;
+    void fetch(publicAvailabilityUrl(slug, service.id, anchor, dates), { signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error("slots_unavailable"))))
+      .then((data: { slots?: AvailabilitySlot[]; days?: { date: string; slots?: AvailabilitySlot[] }[]; bookable?: boolean }) => {
+        if (isCancelled) return;
+        if (depositServiceUnbookable(service.depositCents, data?.bookable)) setBlockedServiceId(service.id);
+        const byDate: Record<string, AvailabilitySlot[]> = {};
+        if (Array.isArray(data.days) && data.days.length > 0) {
+          for (const day of data.days) byDate[day.date] = day.slots ?? [];
+        } else {
+          byDate[anchor] = data.slots ?? [];
+        }
+        setSlotsByDate(byDate);
+        setDaySlotCounts(Object.fromEntries(dates.map((date) => [date, (byDate[date] ?? []).length])));
+        const current = selectedDateRef.current;
+        setSlots(byDate[current] ?? byDate[anchor] ?? []);
+        setErrorSlots(null);
+      })
+      .catch((err: unknown) => {
+        if (isCancelled) return;
+        console.error(err);
+        setErrorSlots(isOfflineError(err) ? OFFLINE_MESSAGE : SLOTS_LOAD_MESSAGE);
+        setDaySlotCounts(Object.fromEntries(dates.map((date) => [date, 0])));
+      })
+      .finally(() => {
+        clearTimeout(timeoutId);
+        if (!isCancelled) setIsLoadingSlots(false);
+      });
 
     return () => {
       isCancelled = true;
-      controllers.forEach((c) => c.abort());
+      clearTimeout(timeoutId);
+      controller.abort();
     };
-  }, [slug, service.id, service.depositCents, days]);
+  }, [slug, service.id, service.depositCents, days, weekKey, slotsReload]);
 
-  // Carrega horários detalhados da data selecionada
+  // Dia selecionado: a prévia busca de novo. A página pública pinta o cache e revalida só esse dia.
   useEffect(() => {
     if (!selectedDate) return;
+    const fetchFn = getSlotsRef.current;
+    if (!fetchFn && skipPublicDayFetch.current) {
+      skipPublicDayFetch.current = false;
+      return;
+    }
 
     let isCancelled = false;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => {
-      controller.abort();
-    }, 10000);
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     const loadSlots = async () => {
-      setIsLoadingSlots(true);
-      setErrorSlots(null);
+      const cached = !fetchFn ? slotsByDateRef.current[selectedDate] : undefined;
+      if (cached && slotsRetryCount === 0) {
+        setSlots(cached);
+        setIsLoadingSlots(false);
+        setErrorSlots(null);
+      } else {
+        setIsLoadingSlots(true);
+        setErrorSlots(null);
+      }
       try {
         let loadedSlots: AvailabilitySlot[] = [];
-        const fetchFn = getSlotsRef.current;
         if (fetchFn) {
           loadedSlots = await fetchFn(selectedDate);
         } else {
-          const res = await fetch(
-            publicAvailabilityUrl(slug, service.id, selectedDate),
-            {
-              signal: controller.signal,
-            }
-          );
+          const res = await fetch(publicAvailabilityUrl(slug, service.id, selectedDate), { signal: controller.signal });
           if (!res.ok) {
             console.error("slots load failed", res.status);
             throw new Error("slots_unavailable");
@@ -238,17 +273,18 @@ export function StepSlot({
         }
         if (isCancelled) return;
         setSlots(loadedSlots);
+        setSlotsByDate((prev) => ({ ...prev, [selectedDate]: loadedSlots }));
+        setDaySlotCounts((prev) => ({ ...prev, [selectedDate]: loadedSlots.length }));
         setErrorSlots(null);
       } catch (err: unknown) {
         if (isCancelled) return;
+        if (cached) return;
         console.error(err);
         const msg = isOfflineError(err) ? OFFLINE_MESSAGE : SLOTS_LOAD_MESSAGE;
         setErrorSlots(msg);
       } finally {
         clearTimeout(timeoutId);
-        if (!isCancelled) {
-          setIsLoadingSlots(false);
-        }
+        if (!isCancelled) setIsLoadingSlots(false);
       }
     };
 
@@ -263,6 +299,14 @@ export function StepSlot({
 
   const handleSelectDay = (dateStr: string) => {
     if (dateStr === selectedDate) return;
+    const cached = slotsByDateRef.current[dateStr];
+    if (!getSlotsRef.current && cached) {
+      setSlots(cached);
+      setErrorSlots(null);
+      setIsLoadingSlots(false);
+      setSelectedDate(dateStr);
+      return;
+    }
     setIsLoadingSlots(true);
     setSelectedDate(dateStr);
   };

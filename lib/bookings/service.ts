@@ -1,5 +1,5 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-import { and, eq, gt, inArray, lt, lte, or, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, lt, or, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { getDb } from "../../db";
@@ -7,18 +7,20 @@ import * as schema from "../../db/schema";
 import { bookingAccessSecret } from "../env";
 import { HttpError } from "../http";
 import { paymentsConfig } from "../payments/config";
-import { assertMpConnectedForDeposit, getServiceBlockedReason, readMpDepositGate } from "../mercadopago-oauth/bookability";
+import { assertMpConnectedForDeposit } from "../mercadopago-oauth/bookability";
 import { createDrizzleMpStore } from "../mercadopago-oauth/repository";
 import { getPaymentProvider } from "../payments";
 import { MpAccountNotConnectedError } from "../payments/seller-account";
 import { pixChargeSchema, type PaymentProvider, type PixCharge } from "../payments/provider";
 import { callProvider, ProviderTimeoutError } from "../payments/timeout";
+import { getBookingAccess } from "../billing/access";
 import { loadBookingAccess } from "../billing/load";
 import { depositPolicySchema, POLICY_CHANGED_CODE, POLICY_CHANGED_MESSAGE } from "../policy/schema";
 import { policyHashFor } from "../policy/hash";
 import { clientPolicyText, policySummary, refundWindowClosedAtBooking } from "../policy/text";
 import { availableSlots, localDate } from "./availability";
-import { assertDepositBookable, serviceListingBookability } from "./deposit-bookability";
+import { availabilityDates, busyIntervals, loadPublicCatalog, presentPublicServices, readCachedCatalog, slotsForCatalog } from "./public-catalog";
+import { assertDepositBookable } from "./deposit-bookability";
 import { availabilitySchema, bookingInputSchema, requestKeySchema, slugSchema } from "./validation";
 import { depositSlotAllowed } from "./hold";
 import { bookingConfig, type BookingConfig } from "./config";
@@ -74,12 +76,18 @@ export async function lockBusiness(database: Database, businessId: string) {
   await database.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${businessId}, 0))`);
 }
 export async function expirePending(database: Database, businessId: string, now: Date) {
-  await database.update(schema.bookings).set({ status: "expired" }).where(and(eq(schema.bookings.businessId, businessId), eq(schema.bookings.status, "pending_payment"), lte(schema.bookings.expiresAt, now)));
-  await database.update(schema.payments).set({ status: "expired" }).where(and(
-    eq(schema.payments.businessId, businessId),
-    inArray(schema.payments.status, ["creating", "pending"]),
-    lte(schema.payments.expiresAt, now),
-  ));
+  // As duas atualizações são independentes. Um único comando segura o lock do negócio por menos tempo.
+  await database.execute(sql`
+    WITH expired_bookings AS (
+      UPDATE bookings SET status = 'expired', updated_at = ${now}
+      WHERE business_id = ${businessId} AND status = 'pending_payment' AND expires_at <= ${now}
+      RETURNING id
+    )
+    UPDATE payments SET status = 'expired', updated_at = ${now}
+    WHERE business_id = ${businessId}
+      AND status IN ('creating', 'pending')
+      AND expires_at <= ${now}
+  `);
 }
 async function businessBySlug(slug: string, database: Database) {
   const [business] = await database.select().from(schema.businesses).where(eq(schema.businesses.slug, slugSchema.parse(slug))).limit(1);
@@ -93,58 +101,13 @@ async function serviceById(businessId: string, serviceId: string, database: Data
 }
 const BOOKINGS_PAUSED_MESSAGE = "Este estabelecimento não está aceitando novos agendamentos no momento.";
 
-function publicPolicy(service: { depositCents: number; depositPolicy: unknown }, businessName: string) {
-  if (service.depositCents <= 0) return { depositPolicy: null, policySummary: null, policyHash: null };
-  const policy = depositPolicySchema.parse(service.depositPolicy);
-  return {
-    depositPolicy: policy,
-    policySummary: policySummary(policy, { depositCents: service.depositCents, businessName }),
-    policyHash: policyHashFor(policy, { depositCents: service.depositCents }),
-  };
-}
-
 function deadlineAt(startsAt: Date, hours: number | null) {
   return hours === null ? null : new Date(startsAt.getTime() - hours * 3_600_000);
 }
 
-export async function listPublicServices(slug: string, database: Database = getDb()) {
-  const business = await businessBySlug(slug, database);
-  const access = await loadBookingAccess(business, database);
-  const facts = await getPublicBookingFacts(business.id);
-  const mpGate = await readMpDepositGate(business.id, { store: createDrizzleMpStore(database) });
-  const rows = await database.select({
-    id: schema.services.id,
-    name: schema.services.name,
-    durationMinutes: schema.services.durationMinutes,
-    priceCents: schema.services.priceCents,
-    depositCents: schema.services.depositCents,
-    depositPolicy: schema.services.depositPolicy,
-  }).from(schema.services).where(and(eq(schema.services.businessId, business.id), eq(schema.services.active, true)));
-  return {
-    name: business.name,
-    timezone: business.timezone,
-    address: null,
-    phone: null,
-    logoUrl: null,
-    contactWhatsapp: business.contactWhatsapp,
-    bookingsPaused: access.bookingsPaused,
-    requiresPayerCpf: facts.requiresPayerCpf,
-    pixRecipientDisplayName: facts.pixRecipientDisplayName,
-    services: rows.map((service) => {
-      const listing = serviceListingBookability(business, service, access);
-      const mpReason = listing.blockedReason === "bookings_paused" ? null : getServiceBlockedReason(service, mpGate);
-      const bookability = mpReason ? { bookable: false, blockedReason: mpReason } : listing;
-      return {
-        id: service.id,
-        name: service.name,
-        durationMinutes: service.durationMinutes,
-        priceCents: service.priceCents,
-        depositCents: service.depositCents,
-        ...publicPolicy(service, business.name),
-        ...bookability,
-      };
-    }),
-  };
+export async function listPublicServices(slug: string, database?: Database) {
+  const catalog = database ? await loadPublicCatalog(slug, database) : await readCachedCatalog(slug);
+  return presentPublicServices(catalog);
 }
 async function slotsFor(business: typeof schema.businesses.$inferSelect, service: typeof schema.services.$inferSelect, date: string, now: Date, database: Database) {
   const weekday = new Date(`${date}T12:00:00Z`).getUTCDay();
@@ -159,13 +122,25 @@ async function slotsFor(business: typeof schema.businesses.$inferSelect, service
   const holdMinutes = bookingConfig().BOOKING_HOLD_MINUTES;
   return slots.filter((slot) => depositSlotAllowed(slot.startsAt, now, holdMinutes));
 }
-export async function getAvailability(slug: string, query: unknown, database: Database = getDb()) {
+export async function getAvailability(slug: string, query: unknown, database?: Database) {
   const input = availabilitySchema.parse(query);
-  const business = await businessBySlug(slug, database);
-  const access = await loadBookingAccess(business, database);
-  if (access.bookingsPaused) return { timezone: business.timezone, slots: [], bookingsPaused: true as const };
-  const service = await serviceById(business.id, input.serviceId, database);
-  return { timezone: business.timezone, slots: await slotsFor(business, service, input.date, new Date(), database), bookingsPaused: false as const };
+  const db = database ?? getDb();
+  const catalog = database ? await loadPublicCatalog(slug, database) : await readCachedCatalog(slug);
+  const now = new Date();
+  const dates = availabilityDates(input.date, input.dates);
+  const paused = getBookingAccess(catalog, catalog.subscription, now).bookingsPaused;
+  const emptySlots = dates.map((date) => ({ date, slots: [] as Awaited<ReturnType<typeof slotsFor>> }));
+  if (paused) {
+    const body = { timezone: catalog.timezone, slots: [] as Awaited<ReturnType<typeof slotsFor>>, bookingsPaused: true as const };
+    return dates.length > 1 ? { ...body, days: emptySlots } : body;
+  }
+  const service = catalog.services.find((item) => item.id === input.serviceId);
+  if (!service) throw new HttpError(404, "service_not_found", "Serviço não encontrado.");
+  const busy = await busyIntervals(db, catalog.id, dates, now);
+  const days = dates.map((date) => ({ date, slots: slotsForCatalog(catalog, service, date, busy, now) }));
+  const slots = days.find((day) => day.date === input.date)?.slots ?? [];
+  const body = { timezone: catalog.timezone, slots, bookingsPaused: false as const };
+  return dates.length > 1 ? { ...body, days } : body;
 }
 function paymentView(payment: typeof schema.payments.$inferSelect | undefined, now: Date) {
   if (!payment) return null;
@@ -277,11 +252,11 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
   const requestKey = requestKeySchema.parse(key);
   const requestHash = bookingRequestDigest(input);
   const business = await businessBySlug(slug, database);
-  const [prior] = await database.select({ id: schema.bookings.id }).from(schema.bookings).where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.requestKey, requestKey))).limit(1);
-  if (!prior) {
-    const access = await loadBookingAccess(business, database);
-    if (access.bookingsPaused) throw new HttpError(403, "bookings_paused", BOOKINGS_PAUSED_MESSAGE);
-  }
+  const [priorRows, access] = await Promise.all([
+    database.select({ id: schema.bookings.id }).from(schema.bookings).where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.requestKey, requestKey))).limit(1),
+    loadBookingAccess(business, database),
+  ]);
+  if (!priorRows[0] && access.bookingsPaused) throw new HttpError(403, "bookings_paused", BOOKINGS_PAUSED_MESSAGE);
   await consumeBookingRateLimit(database, business.id, clientIdentity, config);
   const clientHash = clientIdentity ? tenantScopedHash("booking-client:v1", business.id, clientIdentity) : null;
   const paymentProvider = provider ?? (undefined as PaymentProvider | undefined);
@@ -404,8 +379,11 @@ export async function getBookingPayment(
   const token = bearerToken(authorization);
   if (!token) throw new HttpError(404, "booking_not_found", "Agendamento não encontrado.");
   const business = await businessBySlug(slug, database);
-  await consumePaymentPollRateLimit(database, business.id, identity, config);
-  const [booking] = await database.select().from(schema.bookings).where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.id, bookingId))).limit(1);
+  const [, bookingRows] = await Promise.all([
+    consumePaymentPollRateLimit(database, business.id, identity, config),
+    database.select().from(schema.bookings).where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.id, bookingId))).limit(1),
+  ]);
+  const booking = bookingRows[0];
   if (!booking || !tokenMatches(token, booking.accessTokenHash)) {
     throw new HttpError(404, "booking_not_found", "Agendamento não encontrado.");
   }

@@ -1,3 +1,4 @@
+import { invalidatePublicCatalogForBusiness } from "../bookings/public-cache";
 import { storedConsentIsCurrent } from "../mercadopago/consent";
 import { accountIdLast4 } from "./account-profile";
 import { mpOAuthConfig } from "./config";
@@ -117,6 +118,7 @@ export async function disconnectMercadoPago(businessId: string, deps?: RefreshDe
   if (!row || row.status === "disconnected") return;
   const now = deps?.now ?? new Date();
   await store.markDisconnected(businessId, now);
+  await invalidatePublicCatalogForBusiness(businessId);
   const hold = await store.disconnectTokenHold(businessId, now);
   if (disconnectedTokensReadyToPurge(hold, now)) await store.clearDisconnectedTokens(businessId);
 }
