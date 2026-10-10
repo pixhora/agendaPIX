@@ -31,7 +31,7 @@ function ServiceBody({ service }: { service: PublicService }) {
             {formatDuration(service.durationMinutes)}
           </span>
           {service.depositCents > 0 ? (
-            <span className="inline-flex items-center rounded-full bg-pix-soft px-2 py-0.5 text-xs font-semibold text-pix">
+            <span className="inline-flex max-w-full items-center rounded-lg bg-pix-soft px-2 py-1 text-left text-xs font-semibold leading-snug text-pix [overflow-wrap:anywhere]">
               Sinal {formatCurrency(service.depositCents)} no Pix
             </span>
           ) : (
