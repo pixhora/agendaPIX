@@ -4,6 +4,7 @@ import { useEffect, useRef, type ReactNode, type RefObject } from "react";
 import { ExternalLink, Loader2 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { MpInstallHelp } from "@/components/payments/mp-install-help";
 import { MP_CONNECT_CONSENT_TEXT, MP_CONNECT_CONSENT_VERSION } from "@/lib/mercadopago/consent";
 import { MP_AUTO_REFUND_ACK_HINT } from "@/lib/mercadopago/connect-copy";
 import { AUTO_REFUND_ACK_ERROR, gateConnectSubmit, mpConnectAction, type MpReturnTo } from "@/lib/mercadopago/contract";
@@ -108,6 +109,7 @@ export function MpConnectForm({
   ackInvalid,
   pending,
   submitLabel,
+  installHelp = false,
   onBlocked,
   buttonVariant = "pix",
   beside,
@@ -124,6 +126,8 @@ export function MpConnectForm({
   ackInvalid: boolean;
   pending?: boolean;
   submitLabel: string;
+  /** Mostra o tutorial de instalação abaixo do botão. Fica fora do formulário de consentimento. */
+  installHelp?: boolean;
   onBlocked: () => void;
   buttonVariant?: "pix" | "default" | "outline" | "link";
   beside?: ReactNode;
@@ -157,6 +161,7 @@ export function MpConnectForm({
   ) : null;
 
   return (
+    <>
     <form
       method="post"
       action={mpConnectAction(businessId)}
@@ -213,5 +218,7 @@ export function MpConnectForm({
         {footer}
       </div>
     </form>
+    {installHelp ? <MpInstallHelp /> : null}
+    </>
   );
 }
