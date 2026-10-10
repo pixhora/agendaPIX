@@ -148,7 +148,7 @@ stage_visual() {
     -e PIX_KEY_ENCRYPTION_KEY="$(openssl rand -hex 32)" \
     -e PAYMENT_PROVIDER=fake \
     -v "$PWD":/src:ro -v "$PWD/tests/e2e":/out "$PW_IMAGE" bash -lc \
-    "set -e; mkdir -p /work && cd /src && tar --exclude=./node_modules --exclude=./.next --exclude=./.git --exclude=./test-results --exclude=./playwright-report -cf - . | tar -xf - -C /work && cd /work && corepack enable pnpm && pnpm install --frozen-lockfile >/tmp/install.log 2>&1 && pnpm exec playwright test --config=playwright.visual.config.ts --project=desktop $update && if [ -n '$update' ]; then cp -r /work/tests/e2e/visual.spec.ts-snapshots /out/; fi" \
+    "set -e; mkdir -p /work && cd /src && tar --exclude=./node_modules --exclude=./.next --exclude=./.git --exclude=./test-results --exclude=./playwright-report -cf - . | tar -xf - -C /work && cd /work && corepack enable pnpm && pnpm install --frozen-lockfile >/tmp/install.log 2>&1 && pnpm exec playwright test --config=playwright.visual.config.ts --project=desktop $update && if [ -n '$update' ]; then cp -r /work/tests/e2e/visual.spec.ts-snapshots /out/ && chown -R $(id -u):$(id -g) /out/visual.spec.ts-snapshots; fi" \
     || { stop_pg; die "regressão visual"; }
   stop_pg
 }
