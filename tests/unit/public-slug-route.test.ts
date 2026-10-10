@@ -3,17 +3,16 @@ import { clearAliasCache } from "../../lib/business-profile/alias-cache";
 import { SlugMoved } from "../../lib/business-profile/public-slug";
 import { withPublicSlug } from "../../lib/business-profile/public-route";
 
-const state = vi.hoisted(() => ({ mode: "down" as "down" | "alias" | "none" }));
+const state = vi.hoisted(() => ({ mode: "down" as "down" | "alias" | "none" | "boom" }));
 
 vi.mock("../../db", () => ({
   getDb: () => ({
     select() {
-      if (state.mode === "down") {
-        const error = new Error('relation "business_slug_history" does not exist');
-        (error as Error & { cause?: unknown }).cause = {
-          code: "42P01",
-          detail: "postgres://user:super-secret@db.internal/app",
-        };
+      if (state.mode === "down" || state.mode === "boom") {
+        const error = new Error(state.mode === "down" ? 'relation "business_slug_history" does not exist' : "connection refused");
+        (error as Error & { cause?: unknown }).cause = state.mode === "down"
+          ? { code: "42P01", detail: "postgres://user:super-secret@db.internal/app" }
+          : { code: "08006", detail: "postgres://user:super-secret@db.internal/app" };
         throw error;
       }
       const chain = {
@@ -34,9 +33,11 @@ describe("withPublicSlug", () => {
   });
 
   it("keeps the public route when the alias table is missing", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const request = new Request("https://agenda.example/api/public/salao/bookings");
     const run = vi.fn(async () => Response.json({ ok: true }, { status: 201 }));
     const response = await withPublicSlug(request, "salao", run);
+    expect(logged).toHaveBeenCalledWith("[alias] code=42P01");
     expect(run).toHaveBeenCalledOnce();
     expect(response.status).toBe(201);
     expect(response.headers.get("location")).toBeNull();
@@ -49,6 +50,28 @@ describe("withPublicSlug", () => {
     const again = await withPublicSlug(request, "salao", run);
     expect(again.status).toBe(201);
     expect(run).toHaveBeenCalledTimes(2);
+    expect(logged).toHaveBeenCalledTimes(2);
+    expect(logged.mock.calls.flat().join(" ")).not.toContain("super-secret");
+    logged.mockRestore();
+  });
+
+  it("rethrows alias lookup errors that are not a missing table", async () => {
+    state.mode = "boom";
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const run = vi.fn(async () => Response.json({ ok: true }));
+    const response = await withPublicSlug(
+      new Request("https://agenda.example/api/public/salao/bookings"),
+      "salao",
+      run,
+    );
+    expect(run).not.toHaveBeenCalled();
+    expect(response.status).toBe(500);
+    const body = await response.text();
+    expect(body).toContain("internal_error");
+    expect(body).not.toContain("super-secret");
+    expect(body).not.toContain("08006");
+    expect(logged.mock.calls.flat().join(" ")).not.toContain("[alias] code=42P01");
+    logged.mockRestore();
   });
 
   it("still answers 308 when the alias lookup succeeds", async () => {

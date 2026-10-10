@@ -102,6 +102,10 @@ Commit `8349c54` finaliza CORS público/onboarding idempotente/migration0006 e p
 
 Pedido: quando o PR de integração de `feat/backend` abrir/mergiar, avisar para rebasear `feat/dashboard-v2`. Não atualizar nem mergear o PR #1 (`feat/dashboard`). Registrar colisão de rota com `feat/conversion` (`app/dashboard/page.tsx` placeholder) sem alterar aquela branch.
 
+## 2026-10-10 — 404 do slug e teto do proxy
+
+`docs/CONTRATOS.md`: a migration `0018` roda antes do deploy. Sem `logo_url`, o SELECT responde 500. O proxy não guarda negativo de slug que existe em `businesses`. `/api/public/{slug}/...` só ignora `42P01`.
+
 ## P-PERF — 2026-10-10 — leitura pública mais curta
 
 `GET /api/public/[slug]/availability` ganhou `dates` opcional (até 7 dias) e o campo `days` só quando há mais de uma data. O catálogo público passa a ser cacheado no servidor por 30 s, com invalidação imediata nas gravações do dono. A ocupação dos horários continua ao vivo e o `Cache-Control` da resposta continua `no-store`. Migration `0019_read_path_indexes` (o `0018` está na branch `cursor/business-profile-backend-ad02`).

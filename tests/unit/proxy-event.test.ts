@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, type NextFetchEvent } from "next/server";
 import { beforeEach, expect, it, vi } from "vitest";
 import { clearAliasCache } from "../../lib/business-profile/alias-cache";
 import { proxy } from "../../proxy";
@@ -19,7 +19,8 @@ beforeEach(() => {
 });
 
 it("usa aliasTarget quando o Next manda o evento no segundo argumento", async () => {
-  const response = await proxy(new NextRequest("https://agenda.example/antiga?ref=wa"), { waitUntil() { return undefined; } } as never);
+  const event = { waitUntil() { return undefined; } } as unknown as NextFetchEvent;
+  const response = await proxy(new NextRequest("https://agenda.example/antiga?ref=wa"), event);
   expect(aliasTarget).toHaveBeenCalledWith("antiga");
   expect(response.status).toBe(308);
   expect(response.headers.get("location")).toBe("https://agenda.example/nova?ref=wa");

@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import sharp from "sharp";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { clearAliasCache } from "../../lib/business-profile/alias-cache";
+import { ABSENT_ALIAS_TTL_MS, ALIAS_LOOKUP_LIMIT, boundedAliasTarget, clearAliasCache } from "../../lib/business-profile/alias-cache";
 import { LOGO_UPLOAD_MAX_BYTES } from "../../lib/contracts";
 import { HttpError } from "../../lib/http";
 import { assertLogoBytes, reencodeLogo } from "../../lib/business-profile/logo-image";
@@ -330,6 +330,56 @@ describe("slug redirect", () => {
     expect(await aliasTarget("antiga", database as never)).toBe("velha");
     await expect(listPublicServices("antiga", database as never)).rejects.toMatchObject({ slug: "nova" });
     expect(await aliasTarget("antiga", database as never)).toBe("velha");
+  });
+
+  it("does not cache a live slug, so another instance still redirects at once", async () => {
+    clearAliasCache();
+    let result: "live" | "absent" | { alias: string } = "live";
+    let calls = 0;
+    const classify = async () => {
+      calls += 1;
+      return result;
+    };
+    expect(await boundedAliasTarget("loja", classify)).toBeNull();
+    expect(await boundedAliasTarget("loja", classify)).toBeNull();
+    expect(calls).toBe(2);
+    result = { alias: "loja-nova" };
+    expect(await boundedAliasTarget("loja", classify)).toBe("loja-nova");
+    expect(calls).toBe(3);
+  });
+
+  it("remembers an unknown slug for a few seconds and caps lookups without storing a live slug", async () => {
+    clearAliasCache();
+    let absentCalls = 0;
+    expect(await boundedAliasTarget("sumiu", async () => {
+      absentCalls += 1;
+      return "absent";
+    }, 1_000)).toBeNull();
+    expect(await boundedAliasTarget("sumiu", async () => {
+      absentCalls += 1;
+      return "absent";
+    }, 1_000 + ABSENT_ALIAS_TTL_MS - 1)).toBeNull();
+    expect(absentCalls).toBe(1);
+    expect(await boundedAliasTarget("sumiu", async () => {
+      absentCalls += 1;
+      return "absent";
+    }, 1_000 + ABSENT_ALIAS_TTL_MS)).toBeNull();
+    expect(absentCalls).toBe(2);
+
+    clearAliasCache();
+    let liveCalls = 0;
+    const live = async () => {
+      liveCalls += 1;
+      return "live" as const;
+    };
+    for (let index = 0; index < ALIAS_LOOKUP_LIMIT; index += 1) {
+      expect(await boundedAliasTarget(`loja-${index}`, live, 50_000)).toBeNull();
+    }
+    expect(liveCalls).toBe(ALIAS_LOOKUP_LIMIT);
+    expect(await boundedAliasTarget("loja-extra", live, 50_000)).toBeNull();
+    expect(liveCalls).toBe(ALIAS_LOOKUP_LIMIT);
+    expect(await boundedAliasTarget("loja-extra", live, 51_000)).toBeNull();
+    expect(liveCalls).toBe(ALIAS_LOOKUP_LIMIT + 1);
   });
 
   it("remembers an alias lookup for a minute and does not remember a database error", async () => {
