@@ -208,6 +208,30 @@ export const slotLinks = pgTable("slot_links", {
   check("slot_links_pay_idempotency_hash_format", sql`${table.payIdempotencyHash} IS NULL OR ${table.payIdempotencyHash} ~ '^[a-f0-9]{64}$'`),
 ]);
 
+/**
+ * Reserva que nasceu deste link. A retomada troca `slot_links.booking_id`,
+ * mas um Pix atrasado da reserva antiga ainda acha o link.
+ */
+export const slotLinkBookings = pgTable("slot_link_bookings", {
+  businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "cascade" }),
+  slotLinkId: uuid("slot_link_id").notNull(),
+  bookingId: uuid("booking_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.bookingId] }),
+  index("slot_link_bookings_link_idx").on(table.businessId, table.slotLinkId),
+  foreignKey({
+    name: "slot_link_bookings_link_fk",
+    columns: [table.businessId, table.slotLinkId],
+    foreignColumns: [slotLinks.businessId, slotLinks.id],
+  }).onDelete("cascade"),
+  foreignKey({
+    name: "slot_link_bookings_booking_fk",
+    columns: [table.businessId, table.bookingId],
+    foreignColumns: [bookings.businessId, bookings.id],
+  }).onDelete("cascade"),
+]);
+
 export const payments = pgTable("payments", {
   id: uuid("id").defaultRandom().primaryKey(),
   businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "restrict" }),

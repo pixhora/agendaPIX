@@ -2580,6 +2580,117 @@
       },
       "isRLSEnabled": false
     },
+    "public.slot_link_bookings": {
+      "name": "slot_link_bookings",
+      "schema": "",
+      "columns": {
+        "business_id": {
+          "name": "business_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "slot_link_id": {
+          "name": "slot_link_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "booking_id": {
+          "name": "booking_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "slot_link_bookings_link_idx": {
+          "name": "slot_link_bookings_link_idx",
+          "columns": [
+            {
+              "expression": "business_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "slot_link_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "slot_link_bookings_business_id_businesses_id_fk": {
+          "name": "slot_link_bookings_business_id_businesses_id_fk",
+          "tableFrom": "slot_link_bookings",
+          "tableTo": "businesses",
+          "columnsFrom": [
+            "business_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "slot_link_bookings_link_fk": {
+          "name": "slot_link_bookings_link_fk",
+          "tableFrom": "slot_link_bookings",
+          "tableTo": "slot_links",
+          "columnsFrom": [
+            "business_id",
+            "slot_link_id"
+          ],
+          "columnsTo": [
+            "business_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "slot_link_bookings_booking_fk": {
+          "name": "slot_link_bookings_booking_fk",
+          "tableFrom": "slot_link_bookings",
+          "tableTo": "bookings",
+          "columnsFrom": [
+            "business_id",
+            "booking_id"
+          ],
+          "columnsTo": [
+            "business_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "slot_link_bookings_booking_id_pk": {
+          "name": "slot_link_bookings_booking_id_pk",
+          "columns": [
+            "booking_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.slot_links": {
       "name": "slot_links",
       "schema": "",
