@@ -1,6 +1,6 @@
 import { AppFrame } from "@/components/dashboard/app-frame";
 import { businessesWithDeposit } from "@/lib/dashboard/data";
-import { cachedOwnedBusinesses, requireOwner } from "@/lib/dashboard/session";
+import { cachedOwnedBusinesses, rememberedBusinessId, requireOwner } from "@/lib/dashboard/session";
 
 export default async function OwnerLayout({ children }: { children: React.ReactNode }) {
   const owner = await requireOwner();
@@ -12,5 +12,7 @@ export default async function OwnerLayout({ children }: { children: React.ReactN
     slug: business.slug,
     hasDepositService: deposits.has(business.id),
   }));
-  return <AppFrame ownerName={owner.name} businesses={framed}>{children}</AppFrame>;
+  const rememberedId = await rememberedBusinessId();
+  const defaultBusinessId = framed.find((business) => business.id === rememberedId)?.id;
+  return <AppFrame ownerName={owner.name} businesses={framed} defaultBusinessId={defaultBusinessId}>{children}</AppFrame>;
 }

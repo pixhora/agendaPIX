@@ -8,9 +8,9 @@ export const fieldControl =
   "h-12 w-full min-w-0 bg-transparent px-3.5 text-base text-ink outline-none placeholder:text-muted disabled:cursor-not-allowed disabled:text-muted";
 
 /** Campo de texto ≥48px e fonte 16px (evita zoom no iOS). O anel fica no invólucro. */
-function Input({ className, type = "text", ...props }: React.ComponentProps<"input">) {
+function Input({ className, shellClassName, type = "text", ...props }: React.ComponentProps<"input"> & { shellClassName?: string }) {
   return (
-    <div className={fieldShell}>
+    <div className={cn(fieldShell, shellClassName)}>
       <input
         type={type}
         data-slot="input"

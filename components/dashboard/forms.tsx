@@ -27,7 +27,9 @@ import { cn } from "@/lib/utils";
 
 export const weekdays = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
 const labelClass = "grid gap-1.5 text-sm font-semibold";
+// O Input já traz o próprio invólucro com borda; aqui o invólucro vem do FieldShell, então o interno fica sem visual.
 const bareInput = "border-0 bg-transparent shadow-none outline-none focus-visible:border-transparent focus-visible:shadow-none";
+const bareShell = "min-h-0 border-0 bg-transparent shadow-none focus-within:border-transparent focus-within:shadow-none has-[[aria-invalid=true]]:border-0 has-[:disabled]:border-0 has-[:disabled]:bg-transparent";
 const countSchema = z.object({ count: z.number().int().nonnegative() });
 
 type FutureStatus = { kind: "idle" } | { kind: "loading" } | { kind: "ready"; count: number } | { kind: "error" };
@@ -82,7 +84,7 @@ function MoneyInput({ id, invalid, className, value, disabled, readOnly, ...prop
 }
 
 function TextInput({ invalid, className, ...props }: React.ComponentProps<"input"> & { invalid?: boolean }) {
-  return <FieldShell invalid={invalid}><Input aria-invalid={invalid || undefined} className={cn(bareInput, "dash-disabled", className)} {...props} /></FieldShell>;
+  return <FieldShell invalid={invalid}><Input shellClassName={bareShell} aria-invalid={invalid || undefined} className={cn(bareInput, "dash-disabled", className)} {...props} /></FieldShell>;
 }
 
 type Service = { id: string; name: string; durationMinutes: number; priceCents: number; depositCents: number; active: boolean; depositPolicy?: DepositPolicy };
@@ -222,20 +224,18 @@ export function ServiceForm({ businessId, businessName, contactWhatsapp = null, 
       <label htmlFor={`${prefix}-duration`} className={cn(labelClass, "min-w-0 sm:col-span-2")}>Duração (minutos)
         <TextInput id={`${prefix}-duration`} name="durationMinutes" type="number" min={1} max={1440} required className="tabular-nums" value={values.duration} onChange={(event) => setValues({ ...values, duration: event.target.value })} />
       </label>
-      <label htmlFor={`${prefix}-price`} className={cn(labelClass, "min-w-0")}>Preço
+      <label htmlFor={`${prefix}-price`} className={cn(labelClass, "min-w-0 content-start")}>Preço
         <MoneyInput id={`${prefix}-price`} name="price" required placeholder="0,00" value={values.price} onChange={(event) => setValues({ ...values, price: event.target.value })} />
       </label>
-      <div className="grid min-w-0 gap-1.5">
-        <label className="flex min-h-11 items-center justify-between gap-2 text-sm font-semibold">
-          Cobrar sinal no Pix
-          <span className="control-shell inline-flex rounded-full border border-transparent">
-            <Switch className="dash-disabled" checked={policyState.chargeDeposit} onChange={(event) => setPolicyState(setChargeDeposit(policyState, event.target.checked))} />
-          </span>
-        </label>
-        {policyState.chargeDeposit
-          ? <label htmlFor={`${prefix}-deposit`} className="grid gap-1.5 text-sm font-semibold">Sinal via Pix<MoneyInput id={`${prefix}-deposit`} name="deposit" required invalid={depositInvalid} aria-describedby={depositInvalid ? `${prefix}-deposit-error` : undefined} value={values.deposit} onChange={(event) => setValues({ ...values, deposit: event.target.value })} /></label>
-          : <input type="hidden" name="deposit" value="0,00" />}
-      </div>
+      {policyState.chargeDeposit
+        ? <label htmlFor={`${prefix}-deposit`} className={cn(labelClass, "min-w-0 content-start")}>Sinal via Pix<MoneyInput id={`${prefix}-deposit`} name="deposit" required invalid={depositInvalid} aria-describedby={depositInvalid ? `${prefix}-deposit-error` : undefined} value={values.deposit} onChange={(event) => setValues({ ...values, deposit: event.target.value })} /></label>
+        : <input type="hidden" name="deposit" value="0,00" />}
+      <label className="flex min-h-11 items-center justify-between gap-2 text-sm font-semibold sm:col-span-2">
+        Cobrar sinal no Pix
+        <span className="control-shell inline-flex rounded-full border border-transparent">
+          <Switch className="dash-disabled" checked={policyState.chargeDeposit} onChange={(event) => setPolicyState(setChargeDeposit(policyState, event.target.checked))} />
+        </span>
+      </label>
     </div>
     {depositInvalid && <p id={`${prefix}-deposit-error`} role="alert" className="text-sm font-medium text-danger">O sinal não pode ser maior que o preço.</p>}
     {!depositInvalid && <p className="text-sm text-muted">O sinal deve ser menor ou igual ao preço. Sinal zero confirma o horário sem cobrança.</p>}
