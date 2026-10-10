@@ -19,7 +19,7 @@ import { policyHashFor } from "../policy/hash";
 import { clientPolicyText, policySummary, refundWindowClosedAtBooking } from "../policy/text";
 import { availableSlots, localDate } from "./availability";
 import { assertDepositBookable, serviceListingBookability } from "./deposit-bookability";
-import { SlugMoved, aliasTarget } from "../business-profile/public-slug";
+import { SlugMoved, readAliasTarget } from "../business-profile/public-slug";
 import { availabilitySchema, bookingInputSchema, requestKeySchema, slugSchema } from "./validation";
 import { depositSlotAllowed } from "./hold";
 import { bookingConfig, type BookingConfig } from "./config";
@@ -86,7 +86,8 @@ async function businessBySlug(slug: string, database: Database) {
   const parsed = slugSchema.parse(slug);
   const [business] = await database.select().from(schema.businesses).where(eq(schema.businesses.slug, parsed)).limit(1);
   if (business) return business;
-  const moved = await aliasTarget(parsed, database);
+  // Slug sumido: lê o alias no banco, sem o cache de 60s.
+  const moved = await readAliasTarget(parsed, database);
   if (moved) throw new SlugMoved(moved);
   throw new HttpError(404, "business_not_found", "Negócio não encontrado.");
 }
