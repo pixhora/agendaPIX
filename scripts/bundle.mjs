@@ -5,7 +5,9 @@
 import { existsSync, rmSync } from "node:fs";
 import { build } from "esbuild";
 
-const common = { bundle: true, platform: "node", target: "node22", external: ["pg-native"], logLevel: "info" };
+// next/* fica de fora: lib/bookings usa import() dinâmico de next/cache, que nunca roda no reconciliador.
+// Sem isso o esbuild puxa o tracing do Next e falha por @opentelemetry/api ausente.
+const common = { bundle: true, platform: "node", target: "node22", external: ["pg-native", "next", "next/*"], logLevel: "info" };
 
 rmSync("dist", { recursive: true, force: true });
 await build({ ...common, entryPoints: ["scripts/migrate.mjs"], format: "cjs", outfile: "dist/migrate.cjs" });
