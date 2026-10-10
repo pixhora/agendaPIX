@@ -9,7 +9,7 @@ test.describe("painel do dono — jornadas", () => {
   test.use({ storageState: ownerStorageState });
 
   test("agenda do dia: KPIs, reserva confirmada e detalhe no painel lateral", async ({ page }) => {
-    await page.goto(withBusiness("/dashboard"));
+    await page.goto(withBusiness(`/dashboard?date=${meta.agendaDate}`));
     await expect(page.getByRole("heading", { level: 1, name: "Agenda de Negócio E2E A" })).toBeVisible();
     const agendaHeader = page.locator("header").filter({ has: page.getByRole("heading", { level: 1, name: "Agenda de Negócio E2E A" }) });
     await expect(agendaHeader).not.toContainText("America/Sao_Paulo");
@@ -20,8 +20,9 @@ test.describe("painel do dono — jornadas", () => {
     await expect(summary.getByText(/R\$\s?[1-9]\d*,\d{2}/).first()).toBeVisible();
     await expectNoHorizontalOverflow(page);
 
-    const row = page.getByRole("button", { name: /Cliente E2E/ }).first();
-    await expect(row).toContainText("07:00");
+    const row = page.getByRole("button").filter({ hasText: meta.confirmedStart }).filter({ hasText: "Cliente E2E" }).filter({ hasText: "Confirmado" });
+    await expect(row).toHaveCount(1);
+    await expect(row).toContainText(meta.confirmedStart);
     await row.click();
     const dialog = page.getByRole("dialog", { name: "Cliente E2E" });
     await expect(dialog).toBeVisible();
