@@ -20,7 +20,7 @@ test.describe("regressão visual", () => {
         test(`${target.name} ${theme} ${width}px`, async ({ page }, testInfo) => {
           test.skip(testInfo.project.name !== "desktop", "projeto desktop troca o viewport");
           await page.addInitScript((value) => localStorage.setItem("agenda-theme", value), theme);
-          // Movimento reduzido: a sequência animada do hero vira o estado final, e a captura fica determinística.
+          // Movimento reduzido: a composição do hero fica parada, e a captura fica determinística.
           await page.emulateMedia({ reducedMotion: "reduce" });
           await page.setViewportSize({ width, height: width < 768 ? 844 : 900 });
           await page.goto(target.path, { waitUntil: "load" });
