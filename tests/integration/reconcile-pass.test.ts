@@ -154,6 +154,33 @@ describe("reconciliação isola falha e não reprocessa cancelamento", () => {
     expect(logs.join("\n")).toContain("code=mp_account_not_connected");
   });
 
+  it("Pix vencido de negócio sem Mercado Pago conectado falha uma vez, fecha com auditoria e não repete", async () => {
+    const created = await createBooking(slug, input(0), randomUUID(), database, provider);
+    await backdate(created.data.payment!.id, created.data.bookingId, new Date(Date.now() - 60_000));
+    const calls: string[] = [];
+    const disconnected = bindProvider({
+      cancelCharge: async (externalId) => {
+        calls.push(externalId);
+        throw new MpAccountNotConnectedError();
+      },
+    });
+
+    const first = await reconcileOnce(database, disconnected, config, new Date(), openBudget);
+
+    expect(first.failures).toBeGreaterThanOrEqual(1);
+    expect(logs.join("\n")).toContain("stage=cancel");
+    expect(logs.join("\n")).toContain("code=mp_account_not_connected");
+    const [closed] = await database.select().from(schema.payments).where(eq(schema.payments.id, created.data.payment!.id));
+    expect(closed.remoteCancelledAt).not.toBeNull();
+    const audits = await database.select().from(schema.paymentAudit).where(eq(schema.paymentAudit.paymentId, created.data.payment!.id));
+    expect(audits.some((row) => row.action === "expired_pending_cancel_skipped" && (row.detail as { reason?: string } | null)?.reason === "mp_account_not_connected")).toBe(true);
+    expect(audits.some((row) => row.action === "expired_pending_cancelled")).toBe(false);
+
+    await reconcileOnce(database, disconnected, config, new Date(), openBudget);
+
+    expect(calls).toHaveLength(1);
+  });
+
   it("não cancela de novo quem já foi cancelado e, no meio do orçamento, ainda faz o polling", async () => {
     const older = await createBooking(slug, input(0), randomUUID(), database, provider);
     const newer = await createBooking(slug, input(1, "+5511999999901"), randomUUID(), database, provider);
