@@ -138,6 +138,10 @@ export function StepService({
                 >
                   {isSelected ? <Check className="size-3.5" strokeWidth={3} /> : null}
                 </span>
+                {service.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- URL de upload próprio já validada pelo servidor
+                  <img src={service.imageUrl} alt="" loading="lazy" className="size-14 shrink-0 rounded-field object-cover" />
+                ) : null}
                 <ServiceBody service={service} />
               </button>
             );

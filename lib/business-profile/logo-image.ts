@@ -35,12 +35,12 @@ export function assertLogoBytes(bytes: Uint8Array) {
  * No máximo 512 px no lado maior. `rotate()` aplica a orientação e o WebP sai sem EXIF.
  * Sharp omite metadados por padrão: https://sharp.pixelplumbing.com/api-output
  */
-export async function reencodeLogo(bytes: Uint8Array) {
+export async function reencodeLogo(bytes: Uint8Array, maxEdge = LOGO_UPLOAD_MAX_EDGE_PX) {
   assertLogoBytes(bytes);
   try {
     return await sharp(bytes, { failOn: "error", animated: false, limitInputPixels: 20_000_000 })
       .rotate()
-      .resize({ width: LOGO_UPLOAD_MAX_EDGE_PX, height: LOGO_UPLOAD_MAX_EDGE_PX, fit: "inside", withoutEnlargement: true })
+      .resize({ width: maxEdge, height: maxEdge, fit: "inside", withoutEnlargement: true })
       .webp({ quality: 80 })
       .toBuffer();
   } catch (error) {

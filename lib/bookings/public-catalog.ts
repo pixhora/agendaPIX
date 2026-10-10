@@ -6,6 +6,7 @@ import { depositGate } from "../mercadopago-oauth/credentials";
 import type { MpConnection } from "../mercadopago-oauth/types";
 import { getServiceBlockedReason } from "../mercadopago-oauth/bookability";
 import { payerCpfRequired, resolvePixRecipientDisplayName } from "../marketing/facts";
+import { logoUrlRejection } from "../contracts";
 import { depositPolicySchema } from "../policy/schema";
 import { policyHashFor } from "../policy/hash";
 import { policySummary } from "../policy/text";
@@ -28,6 +29,7 @@ export type CatalogService = {
   depositCents: number;
   depositPolicy: unknown;
   active: boolean;
+  imageUrl: string | null;
 };
 
 export type CatalogHour = { weekday: number; opensAt: string; closesAt: string };
@@ -143,7 +145,8 @@ export async function loadPublicCatalog(slug: string, database: Database): Promi
           'priceCents', s.price_cents,
           'depositCents', s.deposit_cents,
           'depositPolicy', s.deposit_policy,
-          'active', s.active
+          'active', s.active,
+          'imageUrl', s.image_url
         ) ORDER BY s.name, s.id)
         FROM services s
         WHERE s.business_id = b.id AND s.active = true
@@ -174,6 +177,7 @@ export async function loadPublicCatalog(slug: string, database: Database): Promi
     priceCents: Number(service.priceCents),
     depositCents: Number(service.depositCents),
     active: Boolean(service.active),
+    imageUrl: service.imageUrl ?? null,
   }));
   const hours = asJson<CatalogHour[]>(row.hours, []).map((hour) => ({
     weekday: Number(hour.weekday),
@@ -288,6 +292,7 @@ export function presentPublicServices(catalog: PublicCatalog, now = new Date()) 
         durationMinutes: service.durationMinutes,
         priceCents: service.priceCents,
         depositCents: service.depositCents,
+        imageUrl: service.imageUrl && logoUrlRejection(service.imageUrl) === null ? service.imageUrl : null,
         ...publicPolicy(service, catalog.name),
         ...bookability,
       };
