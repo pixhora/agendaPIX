@@ -9,4 +9,6 @@ export default defineConfig({
   ...base,
   testIgnore: [],
   testMatch: "visual.spec.ts",
+  // Sem retry: uma captura que só passa de segunda vez é instabilidade, não pode virar "passou".
+  retries: 0,
 });
