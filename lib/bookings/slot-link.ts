@@ -46,6 +46,7 @@ const LINK_EXPIRED_MESSAGE = "Este link expirou.";
 const LINK_USED_MESSAGE = "Este horário já foi confirmado.";
 const LINK_IN_PROGRESS_MESSAGE = "Este horário já está em pagamento.";
 const LINK_CANCELLED_MESSAGE = "Este link não está mais disponível.";
+const LINK_REPLACED_MESSAGE = "Este link foi trocado. Peça outro ao negócio.";
 const SLOT_TAKEN_MESSAGE = "Esse horário acabou de ser reservado.";
 const SLOT_TAKEN_OWNER_MESSAGE = "Esse horário acabou de ser ocupado. Escolha outro.";
 const MP_OWNER_MESSAGE = "Conecte o Mercado Pago para cobrar sinal.";
@@ -113,7 +114,7 @@ function claimIsFresh(payStartedAt: Date | null, now: Date, holdMinutes: number)
 }
 
 function isCancellable(link: LinkRow, now: Date, holdMinutes: number) {
-  if (link.status === "paid" || link.status === "cancelled" || link.bookingId) return false;
+  if (link.status === "paid" || link.status === "cancelled" || link.status === "replaced" || link.bookingId) return false;
   return !claimIsFresh(link.payStartedAt, now, holdMinutes);
 }
 
@@ -235,21 +236,21 @@ async function confirmedSlotLinkBooking(database: Database, link: LinkRow) {
 }
 
 async function pointLinkAtPaidBooking(database: Database, link: LinkRow, bookingId: string, now: Date): Promise<SlotLinkStatus> {
-  if (link.status === "cancelled") return "cancelled";
+  if (link.status === "cancelled" || link.status === "replaced") return link.status;
   await database.update(schema.slotLinks).set({ status: "paid", bookingId, updatedAt: now }).where(and(
     eq(schema.slotLinks.businessId, link.businessId),
     eq(schema.slotLinks.id, link.id),
-    sql`${schema.slotLinks.status} <> 'cancelled'`,
+    sql`${schema.slotLinks.status} NOT IN ('cancelled', 'replaced')`,
   ));
   return "paid";
 }
 
 async function writeStatus(database: Database, link: LinkRow, status: SlotLinkStatus, now: Date) {
-  if (link.status === status || link.status === "cancelled" || link.status === "paid") return link.status;
+  if (link.status === status || link.status === "cancelled" || link.status === "paid" || link.status === "replaced") return link.status;
   const [updated] = await database.update(schema.slotLinks).set({ status, updatedAt: now }).where(and(
     eq(schema.slotLinks.businessId, link.businessId),
     eq(schema.slotLinks.id, link.id),
-    sql`${schema.slotLinks.status} NOT IN ('cancelled', 'paid')`,
+    sql`${schema.slotLinks.status} NOT IN ('cancelled', 'paid', 'replaced')`,
   )).returning({ status: schema.slotLinks.status });
   return updated?.status ?? status;
 }
@@ -260,7 +261,7 @@ function holdStillActive(booking: typeof schema.bookings.$inferSelect, now: Date
 
 /** Recalcula o status no banco. Pago e cancelado não voltam atrás. */
 export async function refreshSlotLinkStatus(database: Database, link: LinkRow, now: Date): Promise<SlotLinkStatus> {
-  if (link.status === "cancelled") return "cancelled";
+  if (link.status === "cancelled" || link.status === "replaced") return link.status;
   if (link.status === "paid") return "paid";
   const [booking, overlap, origin] = await Promise.all([
     linkedBooking(database, link),
@@ -320,6 +321,88 @@ export async function createSlotLink(businessId: string, ownerId: string, body: 
     token,
     path: `/api/public/${business.slug}/slot-links/${token}`,
   });
+}
+
+function createdLinkResponse(link: LinkRow, service: ServiceRow, business: BusinessRow, token: string) {
+  return slotLinkCreatedResponseSchema.parse({
+    ...presentOwner(link, service),
+    token,
+    path: `/api/public/${business.slug}/slot-links/${token}`,
+  });
+}
+
+/**
+ * Troca um link pendente por outro do mesmo horário. Claim ativo não muda o link.
+ * Horário ocupado também não. O token antigo passa a responder `link_replaced`.
+ */
+export async function reissueSlotLink(businessId: string, ownerId: string, linkId: string, database: Database = getDb()) {
+  if (!z.uuid().safeParse(linkId).success) throw invalidLink();
+  const config = bookingConfig();
+  const business = await requireOwned(businessId, ownerId, database);
+  await consumeSlotLinkCreateRateLimit(database, business.id, ownerId, config);
+  await requireMercadoPago(business.id, database, MP_OWNER_MESSAGE);
+  const access = await loadBookingAccess(business, database);
+  if (access.bookingsPaused) throw new HttpError(403, "bookings_paused", BOOKINGS_PAUSED_MESSAGE);
+  const issued = await database.transaction(async (tx) => {
+    const [clock] = (await tx.execute(sql`SELECT now() AS now`)).rows as { now: Date | string }[];
+    const now = new Date(clock?.now ?? Date.now());
+    const [locked] = await tx.select().from(schema.slotLinks).where(and(
+      eq(schema.slotLinks.businessId, business.id),
+      eq(schema.slotLinks.id, linkId),
+    )).for("update").limit(1);
+    if (!locked) throw invalidLink();
+    if (locked.status === "replaced") throw new HttpError(409, "link_replaced", LINK_REPLACED_MESSAGE);
+    if (locked.status === "cancelled") throw new HttpError(409, "link_cancelled", LINK_CANCELLED_MESSAGE);
+    if (locked.status === "expired") throw new HttpError(410, "link_expired", LINK_EXPIRED_MESSAGE);
+    if (locked.status !== "pending") throw new HttpError(409, "link_used", LINK_USED_MESSAGE);
+    const booking = locked.bookingId ? await tx.select().from(schema.bookings).where(and(
+      eq(schema.bookings.businessId, locked.businessId),
+      eq(schema.bookings.id, locked.bookingId),
+    )).limit(1).then((rows) => rows[0] ?? null) : null;
+    if ((booking && holdStillActive(booking, now)) || claimIsFresh(locked.payStartedAt, now, config.BOOKING_HOLD_MINUTES)) {
+      throw new HttpError(409, "link_in_progress", LINK_IN_PROGRESS_MESSAGE);
+    }
+    const service = await serviceForBusiness(tx, business.id, locked.serviceId, true).catch((error) => {
+      if (error instanceof HttpError && error.code === "service_not_found") return null;
+      throw error;
+    });
+    if (!service || service.depositCents <= 0) throw new HttpError(409, "slot_unavailable", SLOT_TAKEN_OWNER_MESSAGE);
+    const slots = await listBookableSlots(business, service, localDate(locked.startsAt, business.timezone), now, tx);
+    if (!slots.some((slot) => slot.startsAt.getTime() === locked.startsAt.getTime())) {
+      throw new HttpError(409, "slot_unavailable", SLOT_TAKEN_OWNER_MESSAGE);
+    }
+    const expiresAt = slotLinkExpiresAt(now, locked.startsAt, config.SLOT_LINK_TTL_MINUTES);
+    if (expiresAt.getTime() <= now.getTime() || expiresAt.getTime() > locked.startsAt.getTime()) {
+      throw new HttpError(409, "slot_unavailable", SLOT_TAKEN_OWNER_MESSAGE);
+    }
+    const token = createSlotLinkToken();
+    const previewId = createSlotLinkPreviewId();
+    const [created] = await tx.insert(schema.slotLinks).values({
+      businessId: business.id,
+      serviceId: locked.serviceId,
+      startsAt: locked.startsAt,
+      endsAt: locked.endsAt,
+      expiresAt,
+      status: "pending",
+      tokenHash: slotLinkTokenHash(token),
+      previewId,
+      customerLabel: locked.customerLabel,
+      createdAt: now,
+      updatedAt: now,
+    }).returning();
+    const [replaced] = await tx.update(schema.slotLinks).set({
+      status: "replaced",
+      replacedByLinkId: created.id,
+      updatedAt: now,
+    }).where(and(
+      eq(schema.slotLinks.businessId, business.id),
+      eq(schema.slotLinks.id, locked.id),
+      eq(schema.slotLinks.status, "pending"),
+    )).returning({ id: schema.slotLinks.id });
+    if (!replaced) throw new HttpError(409, "link_in_progress", LINK_IN_PROGRESS_MESSAGE);
+    return { created, service, token };
+  });
+  return createdLinkResponse(issued.created, issued.service, business, issued.token);
 }
 
 export async function listSlotLinks(businessId: string, ownerId: string, query: unknown, database: Database = getDb()) {
@@ -427,6 +510,7 @@ export async function openSlotLink(slug: string, token: string, identity: string
   await consumeSlotLinkOpenRateLimit(database, business.id, identity, config);
   const now = new Date();
   const status = await refreshSlotLinkStatus(database, link, now);
+  if (status === "replaced" || link.status === "replaced") throw new HttpError(409, "link_replaced", LINK_REPLACED_MESSAGE);
   const service = await serviceForBusiness(database, business.id, link.serviceId, false);
   const policy = policyView(service, business, link.startsAt);
   return slotLinkOpenResponseSchema.parse({
@@ -449,12 +533,58 @@ export async function openSlotLink(slug: string, token: string, identity: string
 }
 
 function payRefusal(link: LinkRow, status: SlotLinkStatus, now: Date) {
+  if (status === "replaced" || link.status === "replaced") return new HttpError(409, "link_replaced", LINK_REPLACED_MESSAGE);
   if (status === "cancelled" || link.status === "cancelled") return new HttpError(409, "link_cancelled", LINK_CANCELLED_MESSAGE);
   if (status === "paid" || link.status === "paid") return new HttpError(409, "link_used", LINK_USED_MESSAGE);
   // `expiresAt` do link não bloqueia aqui: a mesma chave ainda retoma o Pix se o hold da reserva vale.
   if (link.startsAt <= now) return new HttpError(410, "link_expired", LINK_EXPIRED_MESSAGE);
   if (status === "taken") return new HttpError(409, "slot_unavailable", SLOT_TAKEN_MESSAGE);
   return null;
+}
+
+/** Recria o vínculo se a reserva nasceu e o processo caiu antes de gravar `slot_link_bookings`. */
+export async function ensureSlotLinkBooking(database: Database, businessId: string, bookingId: string) {
+  const [have] = await database.select({ slotLinkId: schema.slotLinkBookings.slotLinkId }).from(schema.slotLinkBookings).where(and(
+    eq(schema.slotLinkBookings.businessId, businessId),
+    eq(schema.slotLinkBookings.bookingId, bookingId),
+  )).limit(1);
+  if (have) return have.slotLinkId;
+  const [pointed] = await database.select({ id: schema.slotLinks.id, status: schema.slotLinks.status }).from(schema.slotLinks).where(and(
+    eq(schema.slotLinks.businessId, businessId),
+    eq(schema.slotLinks.bookingId, bookingId),
+  )).limit(1);
+  let slotLinkId = pointed && pointed.status !== "replaced" && pointed.status !== "cancelled" ? pointed.id : null;
+  if (!slotLinkId) {
+    const [booking] = await database.select({ requestKey: schema.bookings.requestKey }).from(schema.bookings).where(and(
+      eq(schema.bookings.businessId, businessId),
+      eq(schema.bookings.id, bookingId),
+    )).limit(1);
+    if (booking?.requestKey) {
+      const candidates = await database.select({
+        id: schema.slotLinks.id,
+        status: schema.slotLinks.status,
+        payIdempotencyHash: schema.slotLinks.payIdempotencyHash,
+      }).from(schema.slotLinks).where(and(
+        eq(schema.slotLinks.businessId, businessId),
+        isNotNull(schema.slotLinks.payIdempotencyHash),
+      ));
+      slotLinkId = candidates.find((candidate) => (
+        candidate.payIdempotencyHash
+        && candidate.status !== "replaced"
+        && candidate.status !== "cancelled"
+        && slotLinkRequestKey(candidate.payIdempotencyHash) === booking.requestKey
+      ))?.id ?? null;
+    }
+  }
+  if (!slotLinkId) return null;
+  await database.insert(schema.slotLinkBookings).values({ businessId, slotLinkId, bookingId }).onConflictDoNothing();
+  await database.update(schema.slotLinks).set({ bookingId, updatedAt: new Date() }).where(and(
+    eq(schema.slotLinks.businessId, businessId),
+    eq(schema.slotLinks.id, slotLinkId),
+    isNull(schema.slotLinks.bookingId),
+    sql`${schema.slotLinks.status} NOT IN ('cancelled', 'replaced')`,
+  ));
+  return slotLinkId;
 }
 
 async function attachSlotLinkBooking(database: Database, link: LinkRow, hash: string, bookingId: string) {
@@ -513,6 +643,7 @@ async function claimForPay(database: Database, link: LinkRow, hash: string, hold
       eq(schema.slotLinks.id, link.id),
     )).for("update").limit(1);
     if (!locked) throw invalidLink();
+    if (locked.status === "replaced") throw new HttpError(409, "link_replaced", LINK_REPLACED_MESSAGE);
     if (locked.status === "cancelled") throw new HttpError(409, "link_cancelled", LINK_CANCELLED_MESSAGE);
     if (locked.status === "paid") throw new HttpError(409, "link_used", LINK_USED_MESSAGE);
     if (locked.status === "taken") throw new HttpError(409, "slot_unavailable", SLOT_TAKEN_MESSAGE);
@@ -654,8 +785,9 @@ export async function paySlotLink(
       startsAt: link.startsAt.toISOString(),
       customer: input.customer,
       policyHash: input.policyHash,
-    }, requestKey, database, provider, identity);
-    await attachSlotLinkBooking(database, link, hash, result.data.bookingId);
+    }, requestKey, database, provider, identity, async (tx, bookingId) => {
+      await attachSlotLinkBooking(tx, link, hash, bookingId);
+    });
     return payJson(result.data);
   } catch (error) {
     if (postgresCode(error) === "23P01" || (error instanceof HttpError && error.code === "slot_unavailable")) {

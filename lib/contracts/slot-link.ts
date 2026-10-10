@@ -35,11 +35,12 @@ export const SLOT_LINK_IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
 
 export const SLOT_LINKS_PATH = "/api/businesses/[businessId]/slot-links";
 export const SLOT_LINK_CANCEL_PATH = "/api/businesses/[businessId]/slot-links/[linkId]/cancel";
+export const SLOT_LINK_REISSUE_PATH = "/api/businesses/[businessId]/slot-links/[linkId]/reissue";
 export const SLOT_LINK_OPEN_PATH = "/api/public/[slug]/slot-links/[token]";
 export const SLOT_LINK_PAY_PATH = "/api/public/[slug]/slot-links/[token]/pay";
 export const SLOT_LINK_PREVIEW_PATH = "/api/public/slot-link-previews/[previewId]";
 
-export const slotLinkStatusSchema = z.enum(["pending", "paid", "expired", "taken", "cancelled"]);
+export const slotLinkStatusSchema = z.enum(["pending", "paid", "expired", "taken", "cancelled", "replaced"]);
 export type SlotLinkStatus = z.infer<typeof slotLinkStatusSchema>;
 
 /**
@@ -51,6 +52,7 @@ export const SLOT_LINK_ERROR_CODES = [
   "link_used",
   "link_in_progress",
   "link_cancelled",
+  "link_replaced",
   "link_invalid",
   "slot_unavailable",
   "mp_not_connected",

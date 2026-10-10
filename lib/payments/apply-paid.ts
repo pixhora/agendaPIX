@@ -1,6 +1,7 @@
 import { and, eq, or, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "../../db/schema";
+import { ensureSlotLinkBooking } from "../bookings/slot-link";
 import { expirePending, hash, lockBusiness } from "../bookings/service";
 import { HttpError } from "../http";
 import type { LateRefundCause } from "./notices";
@@ -176,6 +177,7 @@ async function resolveLatePayment(database: Database, input: {
 }
 
 async function markSlotLinkPaid(database: Database, businessId: string, bookingId: string, now: Date) {
+  await ensureSlotLinkBooking(database, businessId, bookingId);
   const [origin] = await database.select({ slotLinkId: schema.slotLinkBookings.slotLinkId }).from(schema.slotLinkBookings).where(and(
     eq(schema.slotLinkBookings.businessId, businessId),
     eq(schema.slotLinkBookings.bookingId, bookingId),
@@ -184,14 +186,14 @@ async function markSlotLinkPaid(database: Database, businessId: string, bookingI
     await database.update(schema.slotLinks).set({ status: "paid", bookingId, updatedAt: now }).where(and(
       eq(schema.slotLinks.businessId, businessId),
       eq(schema.slotLinks.id, origin.slotLinkId),
-      sql`${schema.slotLinks.status} <> 'cancelled'`,
+      sql`${schema.slotLinks.status} NOT IN ('cancelled', 'replaced')`,
     ));
     return;
   }
   await database.update(schema.slotLinks).set({ status: "paid", updatedAt: now }).where(and(
     eq(schema.slotLinks.businessId, businessId),
     eq(schema.slotLinks.bookingId, bookingId),
-    sql`${schema.slotLinks.status} <> 'cancelled'`,
+    sql`${schema.slotLinks.status} NOT IN ('cancelled', 'replaced')`,
   ));
 }
 

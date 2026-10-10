@@ -268,7 +268,7 @@ async function enforcePendingHoldLimits(database: Database, businessId: string, 
   }
 }
 
-export async function createBooking(slug: string, body: unknown, key: unknown, database: Database = getDb(), provider?: PaymentProvider, clientIdentity: string | null = null) {
+export async function createBooking(slug: string, body: unknown, key: unknown, database: Database = getDb(), provider?: PaymentProvider, clientIdentity: string | null = null, onReserved?: (database: Database, bookingId: string) => Promise<void>) {
   const config = bookingConfig();
   const input = bookingInputSchema.parse(body);
   const requestKey = requestKeySchema.parse(key);
@@ -297,6 +297,7 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
     if (existing) {
       if (!bookingRequestMatches(existing.requestHash, input)) throw new HttpError(409, "idempotency_conflict", "Essa chave já foi usada em outro agendamento.");
       const [payment] = await transaction.select().from(schema.payments).where(and(eq(schema.payments.businessId, business.id), eq(schema.payments.bookingId, existing.id))).limit(1);
+      if (onReserved) await onReserved(transaction, existing.id);
       return { kind: "existing" as const, booking: existing, payment, token: accessToken(business.id, existing.id), now };
     }
     const access = await loadBookingAccess(business, transaction);
@@ -350,6 +351,7 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
         amountCents: service.depositCents, expiresAt, status: "creating",
       }).returning();
     }
+    if (onReserved) await onReserved(transaction, booking.id);
     return { kind: "created" as const, booking, payment, token, now, providerName: expiresAt ? (paymentProvider ?? getPaymentProvider()).name : null };
   });
 
