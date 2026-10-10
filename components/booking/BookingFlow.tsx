@@ -32,6 +32,7 @@ import { GENERIC_SUBMIT_MESSAGE, OFFLINE_MESSAGE, POLICY_CHANGED_MESSAGE, busine
 import { migratedPixResumePayload, pixResumePayload, pixResumeStorageKey, readPixResume, shouldClearExpiredResume, shouldResumePix, type PixResumeSession } from "./pix-resume";
 import { buildPublicBookingBody } from "./booking-payload";
 import { PausedState } from "./PausedState";
+import { AgendaPixFooter } from "@/components/slot-link/agenda-pix-footer";
 const PolicySheet = React.lazy(() => import("@/components/policy/PolicySheet").then((mod) => ({ default: mod.PolicySheet })));
 
 interface BookingFlowProps {
@@ -509,6 +510,7 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
           <PausedState businessName={business.name} contactWhatsapp={business.contactWhatsapp} services={business.services} autoFocus />
         </main>
         {pageFooter}
+        <AgendaPixFooter campaign="pagina_publica" />
       </div>
     );
   }
@@ -535,6 +537,7 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
           </React.Suspense>
         </main>
         {pageFooter}
+        <AgendaPixFooter campaign="reserva_confirmada" />
       </div>
     );
   }
@@ -557,6 +560,7 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
             )}
           </div>
         </main>
+        <AgendaPixFooter campaign="pagina_publica" />
       </div>
     );
   }
@@ -672,6 +676,7 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
         </aside>}
       </main>
       {pageFooter}
+      {step === 4 && bookingResponse ? null : <AgendaPixFooter campaign="pagina_publica" />}
       {selectedService ? (
         <React.Suspense fallback={null}>
         <PolicySheet

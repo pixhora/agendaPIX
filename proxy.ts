@@ -2,6 +2,8 @@ import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server
 import { boundedAliasTarget, cachedAliasTarget } from "@/lib/business-profile/alias-cache";
 import { aliasTarget, classifyPublicAlias, locationForMovedSlug, publicSlugFromPath } from "@/lib/business-profile/public-slug";
 import { documentSecurityHeaders, shouldSendStrictTransportSecurity, shouldUpgradeInsecureRequests } from "@/lib/security/headers";
+import { isSlotLinkPagePath } from "@/lib/slot-link/paths";
+import { slotLinkPageHeaders } from "@/lib/slot-link/privacy";
 
 type AliasLookup = (slug: string) => Promise<string | null>;
 
@@ -54,6 +56,9 @@ export async function proxy(request: NextRequest, eventOrLookup?: NextFetchEvent
   requestHeaders.set("x-agenda-search", request.nextUrl.search);
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   for (const header of headers) response.headers.set(header.key, header.value);
+  if (isSlotLinkPagePath(request.nextUrl.pathname)) {
+    for (const header of slotLinkPageHeaders()) response.headers.set(header.key, header.value);
+  }
   return response;
 }
 
