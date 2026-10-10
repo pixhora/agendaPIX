@@ -75,6 +75,38 @@ const frames = [
   { name: "desktop", width: 1440, height: 900 },
 ] as const;
 
+async function submitDeposit(page: Page, phone: string) {
+  await page.getByLabel("Li e concordo com a política").check();
+  await page.getByLabel("Nome").fill("Ana Souza");
+  await page.getByLabel("WhatsApp").fill(phone);
+  const cpf = page.getByLabel("CPF");
+  if (await cpf.isVisible()) await cpf.fill("529.982.247-25");
+  const responsePromise = page.waitForResponse((response) => (
+    response.request().method() === "POST"
+    && response.url().includes("/slot-links/")
+    && response.url().endsWith("/pay")
+  ));
+  await page.getByRole("button", { name: /Pagar sinal de/ }).click();
+  return responsePromise;
+}
+
+async function replaceStoredPayKey(page: Page, idempotencyKey: string) {
+  await page.evaluate((nextKey) => {
+    const prefix = "agendapix.slot-link.pay.";
+    const rewrite = (storage: Storage) => {
+      for (let index = 0; index < storage.length; index += 1) {
+        const key = storage.key(index);
+        if (!key?.startsWith(prefix)) continue;
+        const data = JSON.parse(storage.getItem(key) ?? "{}") as { idempotencyKey?: string };
+        data.idempotencyKey = nextKey;
+        storage.setItem(key, JSON.stringify(data));
+      }
+    };
+    rewrite(sessionStorage);
+    rewrite(localStorage);
+  }, idempotencyKey);
+}
+
 async function shoot(page: Page, name: string) {
   await mkdir(shots, { recursive: true });
   await page.screenshot({ path: path.join(shots, `${name}.png`), fullPage: true });
@@ -177,6 +209,65 @@ test("caminho feliz até a tela de Pix, com rodapé fora do pagamento", async ({
   await expect(page.getByRole("button", { name: /Copiar código/ })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByRole("link", { name: "Crie a sua grátis" })).toHaveCount(0);
   if (testInfo.project.name === "desktop") await shootMatrix(page, "cliente-pix");
+});
+
+test("retomada com o prazo do link vencido devolve o mesmo Pix", async ({ page }, testInfo) => {
+  test.setTimeout(180_000);
+  const phone = testInfo.project.name === "desktop" ? "11987653002" : "11987653001";
+  const service = await serviceId(page);
+  const slot = await freeSlot(page, service.id, saoPauloDay(7));
+  const created = await createLink(page, service.id, slot.date, slot.time);
+  expect(created.status).toBe(201);
+  const token = created.body.token as string;
+
+  await page.goto(`/${meta.businessASlug}/h/${token}`);
+  await expect(page.getByLabel("Nome")).toHaveValue("");
+  await withPool((pool) => pool.query(
+    "update bookings set status = 'expired' where business_id = $1 and status = 'pending_payment'",
+    [meta.businessAId],
+  ));
+  const first = await submitDeposit(page, phone);
+  expect(first.status()).toBe(201);
+  const firstBody = await first.json() as { payment?: { copyPaste?: string | null } };
+  const copyPaste = firstBody.payment?.copyPaste ?? "";
+  expect(copyPaste.length).toBeGreaterThan(10);
+  const firstKey = first.request().headers()["idempotency-key"];
+  expect(firstKey).toMatch(/^[A-Za-z0-9_-]{16,128}$/);
+  await expect(page.getByTestId("pix-copypaste")).toHaveValue(copyPaste);
+  await expect(page.getByRole("heading", { name: "Este link expirou." })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Este horário já foi confirmado." })).toHaveCount(0);
+
+  await withPool((pool) => pool.query(
+    "update slot_links set created_at = now() - interval '2 minutes', expires_at = now() - interval '1 minute' where id = $1",
+    [created.body.id],
+  ));
+  await page.goto(`/${meta.businessASlug}/h/${token}`);
+  await expect(page.getByLabel("Nome")).toHaveValue("");
+  await expect(page.getByRole("heading", { name: "Este link expirou." })).toHaveCount(0);
+
+  const resumed = await submitDeposit(page, phone);
+  expect(resumed.status()).toBe(201);
+  const resumedBody = await resumed.json() as { payment?: { copyPaste?: string | null; id?: string } };
+  expect(resumed.request().headers()["idempotency-key"]).toBe(firstKey);
+  expect(resumedBody.payment?.copyPaste).toBe(copyPaste);
+  await expect(page.getByTestId("pix-copypaste")).toHaveValue(copyPaste);
+  await expect(page.getByRole("heading", { name: "Este link expirou." })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Este horário já foi confirmado." })).toHaveCount(0);
+
+  const otherKey = "22222222-2222-4222-8222-222222222222";
+  expect(otherKey).not.toBe(firstKey);
+  await replaceStoredPayKey(page, otherKey);
+  await page.goto(`/${meta.businessASlug}/h/${token}`);
+  await expect(page.getByLabel("Nome")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Este link expirou." })).toHaveCount(0);
+  const refused = await submitDeposit(page, phone);
+  expect(refused.status()).toBe(410);
+  expect(refused.request().headers()["idempotency-key"]).toBe(otherKey);
+  const refusedBody = await refused.json() as { error?: { code?: string } };
+  expect(refusedBody.error?.code).toBe("link_expired");
+  await expect(page.getByRole("heading", { name: "Este link expirou." })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Pagar sinal/ })).toHaveCount(0);
+  await expect(page.getByTestId("pix-copypaste")).toHaveCount(0);
 });
 
 test("link expirado e link cancelado", async ({ page }, testInfo) => {
