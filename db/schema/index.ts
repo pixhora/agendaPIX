@@ -247,6 +247,18 @@ export const webhookDeliveries = pgTable("webhook_deliveries", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [unique("webhook_deliveries_provider_event_unique").on(table.provider, table.eventId)]);
 
+// Entrega já autenticada do webhook, uma linha por x-request-id. O conflito não repete o efeito.
+// Limpeza operacional (não roda na migration): DELETE FROM webhook_events WHERE received_at < now() - interval '30 days';
+export const webhookEvents = pgTable("webhook_events", {
+  provider: text("provider").notNull(),
+  requestId: text("request_id").notNull(),
+  receivedAt: timestamp("received_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  primaryKey({ name: "webhook_events_pkey", columns: [table.provider, table.requestId] }),
+  index("webhook_events_received_at_idx").on(table.receivedAt),
+  check("webhook_events_id_not_empty", sql`length(trim(${table.provider})) > 0 AND length(trim(${table.requestId})) > 0 AND char_length(${table.requestId}) <= 128`),
+]);
+
 // Arquivo somente leitura das entregas anteriores à verificação prévia (não verificadas ou duplicadas), preservado para auditoria.
 export const webhookDeliveriesLegacy = pgTable("webhook_deliveries_legacy", {
   id: uuid("id").primaryKey(),

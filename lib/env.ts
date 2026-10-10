@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { bookingConfig } from "./bookings/config";
 
 const postgresUrl = z.url().refine((value) => ["postgres:", "postgresql:"].includes(new URL(value).protocol), "Use uma URL PostgreSQL.");
 
@@ -76,6 +77,13 @@ export const productionRuntimeEnvSchema = z.object({
   if (value.SMTP_FROM?.trim() && smtpFromUsesExampleDomain(value.SMTP_FROM)) ctx.addIssue({ code: "custom", message: productionBootMessage.from });
 });
 
+const productionPkceMessage = "MP_OAUTH_PKCE deve ser on quando MERCADOPAGO_ENV=production.";
+
+/**
+ * Boot de produção. Chamado por `instrumentation.ts` e pelo worker de reconciliação.
+ * Não cria um segundo caminho: PKCE em produção e `bookingConfig` passam por aqui.
+ * O `next build` não é boot. A mensagem de PKCE não repete o valor configurado.
+ */
 export function assertProductionSafeEnv(env: Readonly<Record<string, string | undefined>> = process.env) {
   const parsed = productionRuntimeEnvSchema.safeParse({
     NODE_ENV: env.NODE_ENV,
@@ -84,9 +92,14 @@ export function assertProductionSafeEnv(env: Readonly<Record<string, string | un
     MP_CAPTURE: env.MP_CAPTURE,
     SMTP_FROM: env.SMTP_FROM,
   });
-  if (parsed.success) return;
-  const messages = [...new Set(parsed.error.issues.map((issue) => issue.message))];
-  throw new Error(messages.join(" "));
+  if (!parsed.success) {
+    const messages = [...new Set(parsed.error.issues.map((issue) => issue.message))];
+    throw new Error(messages.join(" "));
+  }
+  if (env.NEXT_PHASE !== "phase-production-build" && env.MERCADOPAGO_ENV === "production" && env.MP_OAUTH_PKCE?.trim() !== "on") {
+    throw new Error(productionPkceMessage);
+  }
+  bookingConfig(env);
 }
 
 const staticRedirectUri = z.url().refine((value) => {

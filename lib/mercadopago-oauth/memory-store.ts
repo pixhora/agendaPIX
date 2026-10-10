@@ -45,6 +45,11 @@ export function createMemoryMpStore(seed: MpConnection[] = []): MpConnectionStor
       }
       return null;
     },
+    async findByMpUserId(mpUserId) {
+      const matches = [...rows.values()].filter((row) => row.mpUserId === mpUserId);
+      const row = matches.find((item) => item.status === "connected" && item.accessTokenEnc) ?? matches.find((item) => item.accessTokenEnc);
+      return row ? clone(row) : null;
+    },
     async saveConnected(connection) {
       return withKeyLock(`user:${connection.mpUserId}`, async () => {
         for (const row of rows.values()) {

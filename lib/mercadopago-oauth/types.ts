@@ -66,6 +66,8 @@ export type DisconnectTokenHold = {
 export type MpConnectionStore = {
   findByBusinessId(businessId: string): Promise<MpConnection | null>;
   findConnectedBusinessId(mpUserId: string): Promise<string | null>;
+  /** Linha desse usuário do Mercado Pago que ainda tem access token. Prefere `connected`. */
+  findByMpUserId(mpUserId: string): Promise<MpConnection | null>;
   saveConnected(connection: MpConnection): Promise<"ok" | "already_linked_elsewhere">;
   deleteByBusinessId(businessId: string): Promise<void>;
   markDeauthorized(mpUserId: string): Promise<string[]>;

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { encryptMpToken } from "../../lib/mercadopago-oauth/crypto";
 import { mercadoPagoManifest, handleMpConnectWebhook } from "../../lib/mercadopago-oauth/connect-webhook";
 import { createMemoryMpStore } from "../../lib/mercadopago-oauth/memory-store";
+import { createMemoryWebhookEvents } from "../../lib/mercadopago-oauth/webhook-events";
 import { refreshMercadoPagoConnection } from "../../lib/mercadopago-oauth/refresh";
 import type { MpConnection } from "../../lib/mercadopago-oauth/types";
 
@@ -87,7 +88,13 @@ describe("invalidação do catálogo na conexão Mercado Pago", () => {
     process.env.NEXT_RUNTIME = "nodejs";
     const store = createMemoryMpStore([connection()]);
     const signed = signedWebhook(JSON.stringify({ action: "application.deauthorized", type: "mp-connect", user_id: "4242" }));
-    await handleMpConnectWebhook({ ...signed, env, store });
+    await handleMpConnectWebhook({
+      ...signed,
+      env,
+      store,
+      events: createMemoryWebhookEvents((mpUserId) => store.markDeauthorized(mpUserId)),
+      fetchImpl: async () => new Response(null, { status: 401 }),
+    });
     expect(revalidateTag).toHaveBeenCalledWith("public-catalog:studio", { expire: 0 });
   });
 

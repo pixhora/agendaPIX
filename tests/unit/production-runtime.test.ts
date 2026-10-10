@@ -53,6 +53,52 @@ describe("boot de produção", () => {
       SMTP_FROM: "AgendaPix <ci@agendapix.dev.br>",
     })).not.toThrow();
   });
+
+  it("exige PKCE ligado quando o Mercado Pago está em produção e não repete o valor", () => {
+    const secretValue = "segredo-nao-pode-vazar";
+    const env = {
+      NODE_ENV: "production",
+      MERCADOPAGO_ENV: "production",
+      MP_OAUTH_PKCE: secretValue,
+      SMTP_FROM: "AgendaPix <ci@agendapix.dev.br>",
+    };
+    expect(() => assertProductionSafeEnv(env)).toThrow("MP_OAUTH_PKCE deve ser on quando MERCADOPAGO_ENV=production.");
+    expect(() => assertProductionSafeEnv({ ...env, MP_OAUTH_PKCE: "off" })).toThrow(/MP_OAUTH_PKCE deve ser on/);
+    expect(() => assertProductionSafeEnv({ ...env, MP_OAUTH_PKCE: undefined })).toThrow(/MP_OAUTH_PKCE deve ser on/);
+    try {
+      assertProductionSafeEnv(env);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      expect(message).not.toContain(secretValue);
+      expect(message).not.toContain("ci@agendapix");
+    }
+    expect(() => assertProductionSafeEnv({ ...env, MP_OAUTH_PKCE: " on " })).not.toThrow();
+    expect(() => assertProductionSafeEnv({
+      NODE_ENV: "production",
+      MERCADOPAGO_ENV: "sandbox",
+      MP_OAUTH_PKCE: "off",
+      SMTP_FROM: "AgendaPix <ci@agendapix.dev.br>",
+    })).not.toThrow();
+    expect(() => assertProductionSafeEnv({
+      NODE_ENV: "production",
+      NEXT_PHASE: "phase-production-build",
+      MERCADOPAGO_ENV: "production",
+      MP_OAUTH_PKCE: "off",
+      SMTP_FROM: "AgendaPix <ci@agendapix.dev.br>",
+    })).not.toThrow();
+  });
+
+  it("rejeita bookingConfig inválido no boot, antes da primeira reserva", () => {
+    expect(() => assertProductionSafeEnv({ BOOKING_HOLD_MINUTES: "27" })).toThrow(/BOOKING_HOLD_MINUTES inválido/);
+    expect(() => assertProductionSafeEnv({ BOOKING_TRUST_PROXY: "yes" })).toThrow("Agendamento indisponível. Tente novamente mais tarde.");
+    try {
+      assertProductionSafeEnv({ BOOKING_HOLD_MINUTES: "27", SMTP_FROM: "AgendaPix <ci-secreta@example.com>" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      expect(message).not.toContain("27");
+      expect(message).not.toContain("ci-secreta");
+    }
+  });
 });
 
 describe("captura e fixture fora do boot", () => {

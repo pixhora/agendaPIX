@@ -1,5 +1,9 @@
 # PEDIDOS ENTRE TERMINAIS
 
+## P10 — Contrato: boot PKCE, cache de alias e dedupe do mp-connect
+
+Estado: implementado neste branch, sem merge e sem deploy. `assertProductionSafeEnv` passa a exigir `MP_OAUTH_PKCE=on` quando `MERCADOPAGO_ENV=production` e a validar `bookingConfig` no boot. Antes do merge, confirmar que `MP_OAUTH_PKCE=on` já está em Production na Vercel. Migration `0020_webhook_events` precisa rodar antes do deploy e não foi aplicada. Limpeza de `webhook_events` com 30 dias está só documentada em `docs/CONTRATOS.md`.
+
 ## P09 — T1 → Humano/T2/T4: chave do Pix e confirmação
 
 T1 implementa armazenamento cifrado da chave Pix por negócio e API autenticada. A chave permite endereçar um Pix estático, mas não confirma recebimento. Definir se o MVP aceita confirmação manual pelo dono ou exige provedor com webhook que pague na conta do estabelecimento. Até essa decisão, não trocar provider fake, não exibir QR pagável e não confirmar reserva pela exibição do QR. T2 integra o campo somente após contrato backend. T4 mantém mock identificado.

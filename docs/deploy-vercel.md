@@ -48,7 +48,7 @@ O lembrete da véspera da devolução manual não espera 09:00. Sai na primeira 
 | `MP_CLIENT_ID` / `MP_CLIENT_SECRET` | credenciais OAuth da aplicação; o Pix do sinal usa o token do vendedor, não o da plataforma |
 | `MP_OAUTH_REDIRECT_URI` | `https://<domínio>/api/integrations/mercadopago/callback` (https, sem query nem fragmento) |
 | `MP_TOKEN_ENCRYPTION_KEY` | `openssl rand -hex 32` (cifra o token OAuth do dono) |
-| `MP_OAUTH_PKCE` | ausente ou `off`. Nunca vazio: string vazia derruba o boot (`mp_oauth_pkce_invalid`) |
+| `MP_OAUTH_PKCE` | `on` quando `MERCADOPAGO_ENV=production`. Sem isso o boot de produção não sobe. Ausente ou `off` só vale fora disso. Nunca vazio: string vazia derruba o boot (`mp_oauth_pkce_invalid`) |
 | `CRON_SECRET` | `openssl rand -hex 32` |
 | `SUPPORT_WHATSAPP_NUMBER` | dígitos E.164 sem `+`. Sem isso o checkout da assinatura fica `available: false` |
 | `SUBSCRIPTION_MANUAL_ACTIVATION_HOURS` | inteiro ≥ 1, sem zero à esquerda. Sem isso o checkout responde 503 |

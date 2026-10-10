@@ -3,11 +3,12 @@ import { and, eq } from "drizzle-orm";
 import { getDb } from "../../db";
 import { businessHours, businessSlugHistory, businesses, onboardingRequests, services } from "../../db/schema";
 import { trialEndsAtFromCreation } from "../billing/access";
-import { requestKeySchema } from "../bookings/validation";
 import { invalidatePublicCatalog } from "../bookings/public-cache";
-import { HttpError } from "../http";
-import { aliasHoldActive } from "../business-profile/slug-policy";
+import { requestKeySchema } from "../bookings/validation";
+import { invalidateAliasCache } from "../business-profile/alias-cache";
 import { isUniqueViolation, rejectTakenSlug } from "../business-profile/slug-conflict";
+import { aliasHoldActive } from "../business-profile/slug-policy";
+import { HttpError } from "../http";
 import { onboardingInputSchema } from "./validation";
 
 export async function provisionBusiness(ownerId: string, key: unknown, body: unknown, database?: ReturnType<typeof getDb>) {
@@ -54,6 +55,7 @@ export async function provisionBusiness(ownerId: string, key: unknown, body: unk
       await tx.update(onboardingRequests).set({ result }).where(predicate);
       return { result, replay: false };
     });
+    invalidateAliasCache(outcome.result.slug);
     await invalidatePublicCatalog(outcome.result.slug);
     return outcome;
   } catch (error) {

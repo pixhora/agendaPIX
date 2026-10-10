@@ -68,6 +68,23 @@ function toValues(connection: MpConnection) {
   };
 }
 
+/** Colunas que o webhook de desconexão grava. O mesmo objeto entra na transação do dedupe. */
+export function deauthorizedConnectionPatch(now = new Date()) {
+  return {
+    status: "needs_reconnect" as const,
+    accessTokenEnc: null,
+    refreshTokenEnc: null,
+    lastError: "application.deauthorized",
+    disconnectedAt: null,
+    updatedAt: now,
+  };
+}
+
+export async function markMpUserDeauthorized(database: Pick<Database, "update">, mpUserId: string) {
+  const rows = await database.update(mercadopagoConnections).set(deauthorizedConnectionPatch()).where(eq(mercadopagoConnections.mpUserId, mpUserId)).returning({ businessId: mercadopagoConnections.businessId });
+  return rows.map((row) => row.businessId);
+}
+
 export function createDrizzleMpStore(database: Database = getDb()): MpConnectionStore {
   return {
     async findByBusinessId(businessId) {
@@ -80,6 +97,10 @@ export function createDrizzleMpStore(database: Database = getDb()): MpConnection
         eq(mercadopagoConnections.status, "connected"),
       )).limit(1);
       return row?.businessId ?? null;
+    },
+    async findByMpUserId(mpUserId) {
+      const rows = (await database.select().from(mercadopagoConnections).where(eq(mercadopagoConnections.mpUserId, mpUserId))).map(fromRow);
+      return rows.find((row) => row.status === "connected" && row.accessTokenEnc) ?? rows.find((row) => row.accessTokenEnc) ?? null;
     },
     async saveConnected(connection) {
       try {
@@ -127,15 +148,7 @@ export function createDrizzleMpStore(database: Database = getDb()): MpConnection
       await database.delete(mercadopagoConnections).where(eq(mercadopagoConnections.businessId, businessId));
     },
     async markDeauthorized(mpUserId) {
-      const rows = await database.update(mercadopagoConnections).set({
-        status: "needs_reconnect",
-        accessTokenEnc: null,
-        refreshTokenEnc: null,
-        lastError: "application.deauthorized",
-        disconnectedAt: null,
-        updatedAt: new Date(),
-      }).where(eq(mercadopagoConnections.mpUserId, mpUserId)).returning({ businessId: mercadopagoConnections.businessId });
-      return rows.map((row) => row.businessId);
+      return markMpUserDeauthorized(database, mpUserId);
     },
     async markDisconnected(businessId, disconnectedAt) {
       await database.update(mercadopagoConnections).set({

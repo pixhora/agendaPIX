@@ -16,9 +16,12 @@ export type PublicAliasClass = "live" | "absent" | { alias: string };
  * O proxy e as rotas são bundles diferentes. O Map no módulo não é o mesmo.
  * `globalThis` é o processo, então o PATCH apaga o alias que o proxy guardou.
  */
-const globalStore = globalThis as typeof globalThis & { __agendaAliasCache?: Map<string, CacheEntry> };
+const globalStore = globalThis as typeof globalThis & {
+  __agendaAliasCache?: Map<string, CacheEntry>;
+  __agendaAbsentAliasCache?: Map<string, AbsentEntry>;
+};
 const aliasCache = globalStore.__agendaAliasCache ??= new Map<string, CacheEntry>();
-const absentCache = new Map<string, AbsentEntry>();
+const absentCache = globalStore.__agendaAbsentAliasCache ??= new Map<string, AbsentEntry>();
 let lookupWindow = { start: 0, count: 0 };
 
 function dropOldest<T>(cache: Map<string, T>, max: number) {
@@ -35,9 +38,14 @@ export function clearAliasCache() {
   lookupWindow = { start: 0, count: 0 };
 }
 
-/** Drop one slug after this process changes it, including a release that must stop redirecting. */
+/**
+ * Drop one slug in this process after it is renamed, claimed by a new store, or released.
+ * Clears the positive alias and the short absent entry. Both maps live on `globalThis`,
+ * so the route bundle and the proxy bundle drop the same key.
+ */
 export function invalidateAliasCache(slug: string) {
   aliasCache.delete(slug);
+  absentCache.delete(slug);
 }
 
 /**
