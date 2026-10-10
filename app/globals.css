@@ -379,3 +379,9 @@ h1, h2, h3, h4, h5, h6, .font-display {
   color: var(--muted);
   opacity: 1;
 }
+
+/* Opções nativas do <select>: no modo escuro o popup herda o texto claro e o navegador pinta o fundo de branco. */
+:where(select option, select optgroup) {
+  background-color: var(--surface);
+  color: var(--ink);
+}
