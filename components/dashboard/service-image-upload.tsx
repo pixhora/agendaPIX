@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { ImageIcon } from "lucide-react";
-import { logoRejection, shrinkLogoIfNeeded, uploadLogoFile } from "@/lib/store-profile/logo";
+import { logoRejection, prepareLogoFile, uploadLogoFile } from "@/lib/store-profile/logo";
 import { cn } from "@/lib/utils";
 
 /** Foto do serviço. Usa o mesmo caminho de envio da logo: reduz no aparelho e o servidor confere os bytes. */
@@ -26,7 +26,7 @@ export function ServiceImageUpload({
   const shown = localPreview || url;
 
   async function send(original: File) {
-    const file = await shrinkLogoIfNeeded(original);
+    const file = await prepareLogoFile(original);
     const rejection = logoRejection(file);
     if (rejection) {
       setError(rejection);
@@ -80,7 +80,7 @@ export function ServiceImageUpload({
           <input
             ref={inputRef}
             type="file"
-            accept="image/png,image/jpeg,image/webp"
+            accept="image/*"
             aria-label="Foto do serviço"
             disabled={busy}
             className="absolute inset-0 size-full cursor-pointer opacity-0"
@@ -98,7 +98,7 @@ export function ServiceImageUpload({
               Trocar foto
             </button>
           ) : null}
-          {!busy && !shown ? <p className="text-sm text-muted">PNG, JPEG ou WebP. A foto aparece na lista de serviços.</p> : null}
+          {!busy && !shown ? <p className="text-sm text-muted">Foto do celular ou imagem comum. Se for grande, reduzimos sozinhos.</p> : null}
           {error ? <p role="alert" className="text-sm font-medium text-danger">{error}</p> : null}
         </div>
       </div>
