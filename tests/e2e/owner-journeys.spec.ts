@@ -77,16 +77,6 @@ test("cadastro concluído → \"Ir para o painel\" abre /dashboard com o negóci
   const email = `e2e-novo-${id}@example.com`;
   const name = `Estúdio Novo ${id}`;
 
-  const draftBodies: { data?: { business?: Record<string, unknown> } }[] = [];
-  page.on("request", (request) => {
-    if (!request.url().includes("/api/onboarding/drafts")) return;
-    if (request.method() !== "POST" && request.method() !== "PATCH") return;
-    try {
-      draftBodies.push(request.postDataJSON() as { data?: { business?: Record<string, unknown> } });
-    } catch {
-      draftBodies.push({});
-    }
-  });
   await page.goto("/onboarding");
   await expect(page.getByRole("heading", { name: "Sua loja" })).toBeVisible();
   await page.getByLabel("Nome da loja").fill(name);
@@ -114,13 +104,22 @@ test("cadastro concluído → \"Ir para o painel\" abre /dashboard com o negóci
   await page.getByLabel("E-mail").fill(email);
   const send = page.getByRole("button", { name: "Enviar código" });
   await expect(send).not.toHaveAttribute("aria-disabled", "true");
+  const draftSent = page.waitForRequest((request) => {
+    if (!request.url().includes("/api/onboarding/drafts")) return false;
+    if (request.method() !== "POST" && request.method() !== "PATCH") return false;
+    try {
+      const body = request.postDataJSON() as { data?: { business?: unknown } };
+      return Boolean(body.data?.business);
+    } catch {
+      return false;
+    }
+  }, { timeout: 20_000 });
   await send.click();
+  const draftRequest = await draftSent;
+  const draftBody = draftRequest.postDataJSON() as { data?: { business?: Record<string, unknown> } };
+  expect(draftBody.data?.business).toBeTruthy();
+  expect(draftBody.data?.business).not.toHaveProperty("logoUrl");
   await expect(page.getByRole("heading", { name: "Digite o código que mandamos" })).toBeVisible();
-  const profileDrafts = draftBodies.filter((body) => body.data?.business);
-  expect(profileDrafts.length).toBeGreaterThan(0);
-  for (const body of profileDrafts) {
-    expect(body.data?.business).not.toHaveProperty("logoUrl");
-  }
 
   await openAccessLink(page, await capturedLink(email), email);
   await expect(page).toHaveURL(/\/onboarding\/recebimento$/, { timeout: 20_000 });
