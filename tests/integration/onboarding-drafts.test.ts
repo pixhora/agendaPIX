@@ -135,7 +135,7 @@ describe.sequential("rascunho de cadastro", () => {
     await db.delete(onboardingDrafts).where(eq(onboardingDrafts.id, draftId));
   });
 
-  it("atualiza o e-mail e apaga o código anterior", async () => {
+  it("atualiza o e-mail e mantém o código anterior até expirar", async () => {
     const ownerId = randomUUID();
     owners.push(ownerId);
     const email = `${ownerId}@example.com`;
@@ -154,7 +154,9 @@ describe.sequential("rascunho de cadastro", () => {
     }), { params: Promise.resolve({ id: created.draftId }) });
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ email: "no••@example.com", draftId: created.draftId });
-    expect(await db.select().from(verification).where(eq(verification.identifier, signInOtpIdentifier(email)))).toHaveLength(0);
+    // O OTP do e-mail antigo não é apagado: a tabela verification não guarda o rascunho.
+    expect(await db.select().from(verification).where(eq(verification.identifier, signInOtpIdentifier(email)))).toHaveLength(1);
+    await db.delete(verification).where(eq(verification.identifier, signInOtpIdentifier(email)));
     await db.delete(onboardingDrafts).where(eq(onboardingDrafts.id, created.draftId));
   });
 
