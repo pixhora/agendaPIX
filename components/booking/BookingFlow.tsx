@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import Link from "next/link";
 import type {
   PublicBusinessData,
   PublicService,
@@ -26,8 +25,9 @@ import { BUSINESS_HEADER_ICONS, PIX_ICONS } from "@/lib/icons/registry";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
-import { BrandMark } from "@/components/ui/brand";
+import { poweredByCampaign } from "@/lib/brand/powered-by";
 import { BookingSummary } from "./BookingSummary";
+import { PoweredByFooter } from "./PoweredByFooter";
 import { GENERIC_SUBMIT_MESSAGE, OFFLINE_MESSAGE, POLICY_CHANGED_MESSAGE, businessLoadCopy, isOfflineError, publicBookingErrorView, whatsappHref } from "./booking-error";
 import { migratedPixResumePayload, pixResumePayload, pixResumeStorageKey, readPixResume, shouldClearExpiredResume, shouldResumePix, type PixResumeSession } from "./pix-resume";
 import { buildPublicBookingBody } from "./booking-payload";
@@ -441,20 +441,22 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
     </header>
   );
 
+  const attributionCampaign = poweredByCampaign(
+    isCompleted ? "booking_confirmed" : step === 4 && bookingResponse ? "payment" : "public_page",
+  );
+
   const pageFooter = (
-    <footer className="mx-auto flex max-w-5xl flex-col items-center gap-3 px-4 pb-10 pt-4 text-center text-xs text-muted sm:flex-row sm:justify-between sm:px-6 sm:text-left">
-      {noBookingFlow ? null : (
-        <p className="inline-flex items-center gap-1.5">
-          <Icon icon={PIX_ICONS.lock} />
-          O sinal garante o horário. Seus dados são usados só para este agendamento.
-        </p>
-      )}
-      <div className="flex items-center gap-3">
+    <footer className="mx-auto w-full max-w-5xl px-4 pb-10 pt-4 sm:px-6">
+      <div className="flex flex-col items-center gap-3 text-center text-xs text-muted sm:flex-row sm:justify-between sm:text-left">
+        {noBookingFlow ? null : (
+          <p className="inline-flex items-center gap-1.5">
+            <Icon icon={PIX_ICONS.lock} />
+            O sinal garante o horário. Seus dados são usados só para este agendamento.
+          </p>
+        )}
         <ThemeToggle className="sm:hidden" />
-        <Link href="/" className="inline-flex min-h-11 items-center gap-2 font-semibold text-ink">
-          <BrandMark className="size-6 rounded-[7.5px]" /> Feito com AgendaPix
-        </Link>
       </div>
+      {attributionCampaign ? <PoweredByFooter campaign={attributionCampaign} /> : null}
     </footer>
   );
 
@@ -557,6 +559,7 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
             )}
           </div>
         </main>
+        {pageFooter}
       </div>
     );
   }
