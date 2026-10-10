@@ -19,7 +19,7 @@ function draftBody(email: string, slug: string, segment = "barbearia") {
     segment,
     plan: "base",
     data: {
-      business: { name: "Studio Bella", slug },
+      business: { name: "Studio Bella", slug, timezone: "America/Sao_Paulo" },
       service: { name: "Corte", durationMinutes: 30, priceCents: 5000, depositCents: 1000 },
       hours: [{ weekday: 1, opensAt: "09:00", closesAt: "18:00" }],
     },
@@ -68,6 +68,42 @@ describe.sequential("rascunho de cadastro", () => {
     const replay = await commitOnboardingDraft(created.draftId, { userId: ownerId, email }, db);
     expect(replay.replay).toBe(true);
     expect(replay.result.businessId).toBe(first.result.businessId);
+  });
+
+  it("recusa logoUrl no POST do rascunho e no commit", async () => {
+    const ownerId = randomUUID();
+    owners.push(ownerId);
+    const email = `${ownerId}@example.com`;
+    await db.insert(user).values({ id: ownerId, name: "Dono", email, emailVerified: true });
+    const slug = `logo-${ownerId.slice(0, 8)}`;
+    const clean = draftBody(email, slug);
+    const attacked = {
+      ...clean,
+      data: {
+        ...clean.data,
+        business: {
+          ...clean.data.business,
+          logoUrl: "https://attacker-store.public.blob.vercel-storage.com/evil.png",
+        },
+      },
+    };
+    const response = await createDraft(originRequest("http://localhost:3000/api/onboarding/drafts", {
+      method: "POST",
+      ip: "203.0.113.91",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(attacked),
+    }));
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: { code: "invalid_input" } });
+    expect(await db.select().from(onboardingDrafts).where(eq(onboardingDrafts.email, email))).toHaveLength(0);
+
+    const created = await createOnboardingDraft(clean, db);
+    await db.execute(sql`update onboarding_drafts set data = jsonb_set(data, '{business,logoUrl}', ${JSON.stringify("https://attacker-store.public.blob.vercel-storage.com/evil.png")}::jsonb) where id = ${created.draftId}`);
+    await expect(commitOnboardingDraft(created.draftId, { userId: ownerId, email }, db)).rejects.toMatchObject({
+      status: 400,
+      code: "invalid_input",
+    });
+    expect(await db.select().from(businesses).where(eq(businesses.ownerId, ownerId))).toHaveLength(0);
   });
 
   it("exige cookie ou sessão para ler e recusa commit sem sessão", async () => {
@@ -214,6 +250,7 @@ describe.sequential("rascunho de cadastro", () => {
         plan: "completo" as const,
         businessName: "Studio Repro",
         slug: `repro-${id.slice(0, 8)}`,
+        logoUrl: "https://ce0rcu23vrrdzqap.public.blob.vercel-storage.com/logos/test.webp",
         serviceName: "Corte",
         durationMinutes: 45,
         priceCents: 5000,

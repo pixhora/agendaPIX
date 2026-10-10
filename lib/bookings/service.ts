@@ -21,6 +21,7 @@ import { clientPolicyText, policySummary, refundWindowClosedAtBooking } from "..
 import { availableSlots, localDate } from "./availability";
 import { availabilityDates, busyIntervals, loadPublicCatalog, presentPublicServices, readCachedCatalog, slotsForCatalog } from "./public-catalog";
 import { assertDepositBookable } from "./deposit-bookability";
+import { SlugMoved, aliasTarget } from "../business-profile/public-slug";
 import { availabilitySchema, bookingInputSchema, requestKeySchema, slugSchema } from "./validation";
 import { depositSlotAllowed } from "./hold";
 import { bookingConfig, type BookingConfig } from "./config";
@@ -90,9 +91,12 @@ export async function expirePending(database: Database, businessId: string, now:
   `);
 }
 async function businessBySlug(slug: string, database: Database) {
-  const [business] = await database.select().from(schema.businesses).where(eq(schema.businesses.slug, slugSchema.parse(slug))).limit(1);
-  if (!business) throw new HttpError(404, "business_not_found", "Negócio não encontrado.");
-  return business;
+  const parsed = slugSchema.parse(slug);
+  const [business] = await database.select().from(schema.businesses).where(eq(schema.businesses.slug, parsed)).limit(1);
+  if (business) return business;
+  const moved = await aliasTarget(parsed, database);
+  if (moved) throw new SlugMoved(moved);
+  throw new HttpError(404, "business_not_found", "Negócio não encontrado.");
 }
 async function serviceById(businessId: string, serviceId: string, database: Database) {
   const [service] = await database.select().from(schema.services).where(and(eq(schema.services.businessId, businessId), eq(schema.services.id, serviceId), eq(schema.services.active, true))).limit(1);
@@ -105,9 +109,20 @@ function deadlineAt(startsAt: Date, hours: number | null) {
   return hours === null ? null : new Date(startsAt.getTime() - hours * 3_600_000);
 }
 
+async function loadCatalogOrMoved(slug: string, database?: Database) {
+  try {
+    return database ? await loadPublicCatalog(slug, database) : await readCachedCatalog(slug);
+  } catch (error) {
+    if (error instanceof HttpError && error.code === "business_not_found") {
+      const moved = await aliasTarget(slug, database ?? getDb());
+      if (moved) throw new SlugMoved(moved);
+    }
+    throw error;
+  }
+}
+
 export async function listPublicServices(slug: string, database?: Database) {
-  const catalog = database ? await loadPublicCatalog(slug, database) : await readCachedCatalog(slug);
-  return presentPublicServices(catalog);
+  return presentPublicServices(await loadCatalogOrMoved(slug, database));
 }
 async function slotsFor(business: typeof schema.businesses.$inferSelect, service: typeof schema.services.$inferSelect, date: string, now: Date, database: Database) {
   const weekday = new Date(`${date}T12:00:00Z`).getUTCDay();
@@ -125,7 +140,7 @@ async function slotsFor(business: typeof schema.businesses.$inferSelect, service
 export async function getAvailability(slug: string, query: unknown, database?: Database) {
   const input = availabilitySchema.parse(query);
   const db = database ?? getDb();
-  const catalog = database ? await loadPublicCatalog(slug, database) : await readCachedCatalog(slug);
+  const catalog = await loadCatalogOrMoved(slug, database);
   const now = new Date();
   const dates = availabilityDates(input.date, input.dates);
   const paused = getBookingAccess(catalog, catalog.subscription, now).bookingsPaused;

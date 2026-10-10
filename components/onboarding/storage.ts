@@ -1,3 +1,4 @@
+import { localDraftEnvelope } from "@/lib/onboarding/local-draft";
 import type { OnboardingData, OnboardingStep } from "./types";
 
 /** Para onde o link mágico do cadastro leva: provisiona o negócio já com a sessão ativa. */
@@ -61,9 +62,9 @@ export function readOnboardingDraftRaw(): unknown {
   }
 }
 
-export function writeOnboardingDraft(data: OnboardingData) {
+export function writeOnboardingDraft(data: OnboardingData, boundEmail: string | null = null, savedAt = new Date().toISOString()) {
   try {
-    storage()?.setItem(DRAFT_KEY, JSON.stringify(data));
+    storage()?.setItem(DRAFT_KEY, JSON.stringify(localDraftEnvelope(data, boundEmail, savedAt)));
   } catch {
     // localStorage indisponível: o rascunho fica só na memória.
   }

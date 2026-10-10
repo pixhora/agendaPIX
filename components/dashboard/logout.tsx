@@ -5,6 +5,7 @@ import { Icon } from "@/components/ui/icon";
 import { DASHBOARD_NAV_ICONS } from "@/lib/icons/registry";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
+import { clearOnboardingProgress } from "@/components/onboarding/storage";
 import { Button } from "@/components/ui/button";
 
 export function Logout({ compact = false }: { compact?: boolean }) {
@@ -15,6 +16,7 @@ export function Logout({ compact = false }: { compact?: boolean }) {
     try {
       const result = await authClient.signOut();
       if (result.error) throw new Error();
+      clearOnboardingProgress();
       router.replace("/login");
       router.refresh();
     } catch {

@@ -38,6 +38,16 @@ export async function handleHttp(run: () => Promise<Response>) {
   }
 }
 
+/** Malformed JSON is 400. A body-size HttpError from the reader is left alone. */
+export function parseJsonBody(raw: string): unknown {
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new HttpError(400, "invalid_input", "Confira os dados enviados.");
+  }
+}
+
 export const MAX_BODY_BYTES = 16384;
 
 export async function readBody(request: Request) {

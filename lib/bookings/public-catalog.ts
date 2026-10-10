@@ -38,6 +38,7 @@ export type PublicCatalog = {
   slug: string;
   timezone: string;
   contactWhatsapp: string | null;
+  logoUrl: string | null;
   trialEndsAt: Date;
   ownerName: string;
   subscription: SubscriptionAccess | null;
@@ -59,6 +60,7 @@ type CatalogJson = {
   slug: string;
   timezone: string;
   contactWhatsapp: string | null;
+  logoUrl: string | null;
   trialEndsAt: string;
   ownerName: string;
   subscription: { status: SubscriptionAccess["status"]; currentPeriodEnd: string | null; provider: string | null } | null;
@@ -99,6 +101,7 @@ export async function loadPublicCatalog(slug: string, database: Database): Promi
     slug: string;
     timezone: string;
     contact_whatsapp: string | null;
+    logo_url: string | null;
     trial_ends_at: Date | string;
     owner_name: string;
     sub_status: SubscriptionAccess["status"] | null;
@@ -119,6 +122,7 @@ export async function loadPublicCatalog(slug: string, database: Database): Promi
       b.slug,
       b.timezone,
       b.contact_whatsapp,
+      b.logo_url,
       b.trial_ends_at,
       u.name AS owner_name,
       sub.status AS sub_status,
@@ -140,7 +144,7 @@ export async function loadPublicCatalog(slug: string, database: Database): Promi
           'depositCents', s.deposit_cents,
           'depositPolicy', s.deposit_policy,
           'active', s.active
-        ))
+        ) ORDER BY s.name, s.id)
         FROM services s
         WHERE s.business_id = b.id AND s.active = true
       ), '[]'::json) AS services,
@@ -149,7 +153,7 @@ export async function loadPublicCatalog(slug: string, database: Database): Promi
           'weekday', h.weekday,
           'opensAt', to_char(h.opens_at, 'HH24:MI:SS'),
           'closesAt', to_char(h.closes_at, 'HH24:MI:SS')
-        ))
+        ) ORDER BY h.weekday)
         FROM business_hours h
         WHERE h.business_id = b.id
       ), '[]'::json) AS hours
@@ -182,6 +186,7 @@ export async function loadPublicCatalog(slug: string, database: Database): Promi
     slug: row.slug,
     timezone: row.timezone,
     contactWhatsapp: row.contact_whatsapp,
+    logoUrl: row.logo_url,
     trialEndsAt,
     ownerName: row.owner_name,
     subscription: row.sub_status ? {
@@ -268,7 +273,7 @@ export function presentPublicServices(catalog: PublicCatalog, now = new Date()) 
     timezone: catalog.timezone,
     address: null,
     phone: null,
-    logoUrl: null,
+    logoUrl: catalog.logoUrl,
     contactWhatsapp: catalog.contactWhatsapp,
     bookingsPaused: access.bookingsPaused,
     requiresPayerCpf: payerCpfRequired(),
@@ -296,14 +301,30 @@ export function addCalendarDays(isoDate: string, days: number) {
   return shifted.toISOString().slice(0, 10);
 }
 
-/** Datas pedidas na query, no máximo 7, sempre incluindo o dia principal. */
-export function availabilityDates(date: string, dates: string | undefined) {
-  if (!dates) return [date];
-  const unique = [...new Set(dates.split(",").filter(Boolean))];
-  if (unique.length > 7 || unique.some((value) => !/^\d{4}-\d{2}-\d{2}$/.test(value))) {
+function assertRealIsoDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new HttpError(400, "invalid_input", "Confira os dados enviados.");
+  const year = Number(value.slice(0, 4));
+  const month = Number(value.slice(5, 7));
+  const day = Number(value.slice(8, 10));
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) {
     throw new HttpError(400, "invalid_input", "Confira os dados enviados.");
   }
-  return unique.includes(date) ? unique : [date, ...unique].slice(0, 7);
+}
+
+/** Dias pedidos na query. Só entram `date` e os 6 dias seguintes, no máximo 7, sempre com o dia principal. */
+export function availabilityDates(date: string, dates: string | undefined) {
+  assertRealIsoDate(date);
+  if (!dates) return [date];
+  const unique = [...new Set(dates.split(",").filter(Boolean))];
+  for (const value of unique) assertRealIsoDate(value);
+  const last = addCalendarDays(date, 6);
+  if (unique.some((value) => value < date || value > last)) {
+    throw new HttpError(400, "invalid_input", "Confira os dados enviados.");
+  }
+  const withPrimary = unique.includes(date) ? unique : [date, ...unique];
+  if (withPrimary.length > 7) throw new HttpError(400, "invalid_input", "Confira os dados enviados.");
+  return withPrimary;
 }
 
 export function slotsForCatalog(catalog: PublicCatalog, service: CatalogService, date: string, busy: Slot[], now: Date) {
@@ -322,6 +343,26 @@ export function slotsForCatalog(catalog: PublicCatalog, service: CatalogService,
 }
 
 /**
+ * A assinatura muda pelo CLI, fora do Next, onde `revalidateTag` não roda.
+ * O restante do catálogo continua em cache; a linha de assinatura é lida ao vivo.
+ */
+async function overlayLiveSubscription(catalog: PublicCatalog): Promise<PublicCatalog> {
+  const [row] = await getDb().select({
+    status: schema.subscriptions.status,
+    currentPeriodEnd: schema.subscriptions.currentPeriodEnd,
+    provider: schema.subscriptions.provider,
+  }).from(schema.subscriptions).where(eq(schema.subscriptions.businessId, catalog.id)).limit(1);
+  return {
+    ...catalog,
+    subscription: row ? {
+      status: row.status,
+      currentPeriodEnd: row.currentPeriodEnd,
+      provider: row.provider,
+    } : null,
+  };
+}
+
+/**
  * Catálogo público (serviços, horários, perfil). A ocupação dos horários não entra aqui.
  * Fora do Next (testes) lê direto do banco. No servidor, revalida na hora em que o dono muda o cadastro.
  */
@@ -333,7 +374,7 @@ export async function readCachedCatalog(slug: string): Promise<PublicCatalog> {
     tags: [publicCatalogTag(slug)],
     revalidate: PUBLIC_CATALOG_REVALIDATE_SECONDS,
   });
-  return hydrateCatalog(await cached());
+  return overlayLiveSubscription(hydrateCatalog(await cached()));
 }
 
 /** Horários ocupados de um intervalo. A disponibilidade continua lendo isto ao vivo. */

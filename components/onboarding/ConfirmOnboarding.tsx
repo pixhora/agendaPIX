@@ -18,7 +18,10 @@ import { followUpFromFailure } from "@/lib/onboarding/commit-follow-up";
 import { signInWithEmailOtp } from "@/lib/onboarding/auth-otp";
 import { OTP_LENGTH, mapOtpError, otpDigits, wrongCodeMessage } from "@/lib/onboarding/otp";
 import { clearOnboardingProgress, readOnboardingDraftRaw, writeCommitResult } from "./storage";
+import { uploadLogoFile } from "@/lib/store-profile/logo";
+import { clearPendingLogo, peekPendingLogo } from "@/lib/store-profile/pending-logo";
 import { onboardingPlanForEnv, restoreOnboardingDraft } from "@/lib/onboarding/flow";
+import { storedDraftPayload } from "@/lib/onboarding/local-draft";
 
 const HAS_BUSINESS_TOAST = "Você já tem uma página. Abrimos o seu painel.";
 const CONSUMED_TOAST = "Esse cadastro já virou uma página. Abrimos o seu painel.";
@@ -46,12 +49,12 @@ export function ConfirmOnboarding({ draftId }: { draftId: string }) {
   const [status, setStatus] = useState<OtpVisualStatus>("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [attemptsUsed, setAttemptsUsed] = useState(0);
-  const local = restoreOnboardingDraft(readOnboardingDraftRaw(), onboardingPlanForEnv(null));
+  const local = restoreOnboardingDraft(storedDraftPayload(readOnboardingDraftRaw()), onboardingPlanForEnv(null));
 
   useEffect(() => {
     const fragmentCode = readFragmentCode();
     clearFragment();
-    const stored = restoreOnboardingDraft(readOnboardingDraftRaw(), onboardingPlanForEnv(null));
+    const stored = restoreOnboardingDraft(storedDraftPayload(readOnboardingDraftRaw()), onboardingPlanForEnv(null));
     const storedEmail = isUsableEmail(stored.email) ? stored.email : "";
     queueMicrotask(() => {
       if (fragmentCode.length === OTP_LENGTH) {
@@ -139,8 +142,23 @@ export function ConfirmOnboarding({ draftId }: { draftId: string }) {
       return;
     }
     const committed = await commitOnboardingDraft(draftId);
-    setPending(false);
     if (committed.ok) {
+      const file = peekPendingLogo();
+      if (file && committed.businessId) {
+        const uploaded = await uploadLogoFile(file, {
+          signal: new AbortController().signal,
+          onProgress: () => undefined,
+          endpoint: `/api/businesses/${encodeURIComponent(committed.businessId)}/logo`,
+        });
+        if (!uploaded.ok) {
+          setPending(false);
+          setStatus("error");
+          setMessage(uploaded.message || "Não deu para enviar a logo. Toque em Confirmar código de novo.");
+          return;
+        }
+        clearPendingLogo();
+      }
+      setPending(false);
       writeCommitResult({
         slug: committed.slug,
         publicPath: committed.publicPath,
@@ -151,9 +169,11 @@ export function ConfirmOnboarding({ draftId }: { draftId: string }) {
       router.push("/onboarding/recebimento");
       return;
     }
+    setPending(false);
     const follow = followUpFromFailure(committed.status, committed.error);
     if (follow.type === "has_business") {
       toast(HAS_BUSINESS_TOAST);
+      clearOnboardingProgress();
       router.push("/dashboard");
       return;
     }

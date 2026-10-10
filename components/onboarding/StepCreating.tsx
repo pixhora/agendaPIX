@@ -10,6 +10,7 @@ export type CreatingAlert =
   | { kind: "expired_local" }
   | { kind: "expired_empty" }
   | { kind: "unauthorized" }
+  | { kind: "logo"; message: string }
   | null;
 
 function alertCopy(alert: CreatingAlert): string | null {
@@ -19,6 +20,7 @@ function alertCopy(alert: CreatingAlert): string | null {
   if (alert.kind === "expired_local") return "Seu cadastro guardado venceu, mas os dados ainda estão neste aparelho.";
   if (alert.kind === "expired_empty") return "Seu cadastro guardado venceu (7 dias). Vamos começar de novo? Leva poucos minutos.";
   if (alert.kind === "unauthorized") return "Sua sessão expirou. Entre de novo com um código.";
+  if (alert.kind === "logo") return alert.message;
   return "Algo deu errado do nosso lado. Seus dados estão guardados; tente de novo.";
 }
 

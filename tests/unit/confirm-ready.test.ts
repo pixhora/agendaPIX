@@ -45,10 +45,11 @@ describe("confirm email hint from the draft", () => {
 });
 
 describe("onboarding save status", () => {
-  it("leaves Salvando… after the save succeeds", () => {
+  it("says the draft is on this device only after a local write", () => {
     expect(onboardingSaveStatus(true, false)).toBe("Salvando…");
-    expect(onboardingSaveStatus(false, false)).toBe("Salvo neste aparelho");
-    expect(onboardingSaveStatus(false, true)).toBe("Cadastro guardado");
+    expect(onboardingSaveStatus(false, false)).toBeNull();
+    expect(onboardingSaveStatus(false, false, true)).toBe("Salvo neste aparelho");
+    expect(onboardingSaveStatus(false, true, true)).toBe("Cadastro guardado");
   });
 });
 

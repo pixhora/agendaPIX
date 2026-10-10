@@ -15,6 +15,7 @@ const catalog: PublicCatalog = {
   slug: "studio",
   timezone: "America/Sao_Paulo",
   contactWhatsapp: null,
+  logoUrl: "https://blob.fake.local/logos/studio.webp",
   trialEndsAt: new Date("2030-01-08T02:59:59.000Z"),
   ownerName: "Ana",
   subscription: { status: "trialing", currentPeriodEnd: new Date("2030-02-01T00:00:00.000Z"), provider: null },
@@ -40,19 +41,24 @@ describe("catálogo público", () => {
     expect(publicCatalogTag("barbearia-demo")).toBe("public-catalog:barbearia-demo");
   });
 
-  it("aceita até 7 datas e exige o dia principal", () => {
+  it("aceita os 7 dias a partir da data e inclui o dia principal", () => {
     expect(availabilityDates("2030-01-01", undefined)).toEqual(["2030-01-01"]);
-    expect(availabilityDates("2030-01-02", "2030-01-01,2030-01-02,2030-01-01")).toEqual(["2030-01-01", "2030-01-02"]);
-    expect(availabilityDates("2030-01-03", "2030-01-01,2030-01-02")).toEqual(["2030-01-03", "2030-01-01", "2030-01-02"]);
+    expect(availabilityDates("2030-01-01", "2030-01-01,2030-01-03,2030-01-01")).toEqual(["2030-01-01", "2030-01-03"]);
+    expect(availabilityDates("2030-01-01", "2030-01-02,2030-01-07")).toEqual(["2030-01-01", "2030-01-02", "2030-01-07"]);
   });
 
-  it("rejeita lista longa ou data malformada", () => {
-    expect(() => availabilityDates("2030-01-01", "2030-01-01,2030-01-02,2030-01-03,2030-01-04,2030-01-05,2030-01-06,2030-01-07,2030-01-08")).toThrow();
-    expect(() => availabilityDates("2030-01-01", "amanha")).toThrow();
+  it("rejeita dia fora da janela, mês inválido e dia que não existe", () => {
+    expect(() => availabilityDates("2030-01-03", "2030-01-01,2030-01-02")).toThrow(expect.objectContaining({ status: 400, code: "invalid_input" }));
+    expect(() => availabilityDates("2030-01-01", "2030-01-08")).toThrow(expect.objectContaining({ status: 400 }));
+    expect(() => availabilityDates("2030-01-01", "2030-01-01,2030-01-02,2030-01-03,2030-01-04,2030-01-05,2030-01-06,2030-01-07,2030-01-08")).toThrow(expect.objectContaining({ status: 400 }));
+    expect(() => availabilityDates("2030-01-01", "amanha")).toThrow(expect.objectContaining({ status: 400 }));
+    expect(() => availabilityDates("2030-01-01", "2030-13-01")).toThrow(expect.objectContaining({ status: 400, code: "invalid_input" }));
+    expect(() => availabilityDates("2030-01-01", "2030-02-31")).toThrow(expect.objectContaining({ status: 400, code: "invalid_input" }));
   });
 
   it("reidrata as datas do catálogo serializado", () => {
     const hydrated = hydrateCatalog(serializeCatalog(catalog));
+    expect(hydrated.logoUrl).toBe(catalog.logoUrl);
     expect(hydrated.trialEndsAt.toISOString()).toBe(catalog.trialEndsAt.toISOString());
     expect(hydrated.subscription?.currentPeriodEnd?.toISOString()).toBe("2030-02-01T00:00:00.000Z");
     expect(hydrated.mp?.expiresAt?.toISOString()).toBe("2030-03-01T00:00:00.000Z");

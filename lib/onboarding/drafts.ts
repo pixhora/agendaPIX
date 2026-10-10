@@ -5,7 +5,7 @@ import { getDb } from "../../db";
 import { businesses, onboardingDrafts, onboardingRequests, verification, type OnboardingDraftData } from "../../db/schema";
 import { requestKeySchema } from "../bookings/validation";
 import { HttpError } from "../http";
-import { ONBOARDING_SEGMENTS, suggestFreeSlugs } from "../slug-availability";
+import { ONBOARDING_SEGMENTS, suggestFreeSlugs, takenSlugs } from "../slug-availability";
 import { normalizeSlug } from "../slug";
 import { onboardingInputSchema } from "./validation";
 import { maskEmail } from "../privacy/mask-email";
@@ -67,8 +67,8 @@ function parseDraftData(data: unknown): OnboardingDraftData {
 }
 
 async function assertSlugFree(slug: string, segment: string | null, database: Database) {
-  const [row] = await database.select({ slug: businesses.slug }).from(businesses).where(eq(businesses.slug, slug)).limit(1);
-  if (!row) return;
+  const taken = await takenSlugs([slug], database);
+  if (!taken.has(slug)) return;
   throw new HttpError(409, "slug_unavailable", "Esse endereço já está em uso. Escolha outro.", undefined, {
     suggestions: await suggestFreeSlugs(slug, segment, database),
   });

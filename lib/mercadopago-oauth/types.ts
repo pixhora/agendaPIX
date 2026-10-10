@@ -68,7 +68,7 @@ export type MpConnectionStore = {
   findConnectedBusinessId(mpUserId: string): Promise<string | null>;
   saveConnected(connection: MpConnection): Promise<"ok" | "already_linked_elsewhere">;
   deleteByBusinessId(businessId: string): Promise<void>;
-  markDeauthorized(mpUserId: string): Promise<void>;
+  markDeauthorized(mpUserId: string): Promise<string[]>;
   markDisconnected(businessId: string, disconnectedAt: Date): Promise<void>;
   clearDisconnectedTokens(businessId: string): Promise<void>;
   listDisconnectedWithTokens(): Promise<MpConnection[]>;

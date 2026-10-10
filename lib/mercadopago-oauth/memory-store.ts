@@ -60,8 +60,10 @@ export function createMemoryMpStore(seed: MpConnection[] = []): MpConnectionStor
       rows.delete(businessId);
     },
     async markDeauthorized(mpUserId) {
+      const businessIds: string[] = [];
       for (const row of rows.values()) {
         if (row.mpUserId !== mpUserId) continue;
+        businessIds.push(row.businessId);
         rows.set(row.businessId, {
           ...row,
           status: "needs_reconnect",
@@ -71,6 +73,7 @@ export function createMemoryMpStore(seed: MpConnection[] = []): MpConnectionStor
           disconnectedAt: null,
         });
       }
+      return businessIds;
     },
     async markDisconnected(businessId, disconnectedAt) {
       const row = rows.get(businessId);

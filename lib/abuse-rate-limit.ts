@@ -6,12 +6,20 @@ import { bookingClientIdentity } from "./bookings/rate-limit";
 import { authEnvSchema } from "./env";
 import { HttpError } from "./http";
 
-type WindowName = "minute" | "hour";
+type WindowName = "minute" | "hour" | "day30";
 
-const WINDOW_MS: Record<WindowName, number> = { minute: 60_000, hour: 3_600_000 };
+const WINDOW_MS: Record<WindowName, number> = {
+  minute: 60_000,
+  hour: 3_600_000,
+  day30: 30 * 24 * 60 * 60 * 1000,
+};
+
+type AbuseDb = Pick<ReturnType<typeof getDb>, "execute" | "select">;
 
 function windowInterval(window: WindowName) {
-  return window === "hour" ? sql`interval '1 hour'` : sql`interval '1 minute'`;
+  if (window === "day30") return sql`interval '30 days'`;
+  if (window === "hour") return sql`interval '1 hour'`;
+  return sql`interval '1 minute'`;
 }
 
 function clientHash(scope: string, identity: string) {
@@ -29,12 +37,13 @@ export async function consumeAbuseBucket(
   identity: string,
   limit: number,
   window: WindowName,
-  database: ReturnType<typeof getDb> = getDb(),
+  database: AbuseDb = getDb(),
 ) {
   const hash = clientHash(scope, identity);
   const interval = windowInterval(window);
-  await database.execute(sql`DELETE FROM abuse_rate_limits WHERE window_started_at < now() - interval '24 hours' AND (scope, client_hash) IN
-    (SELECT scope, client_hash FROM abuse_rate_limits WHERE window_started_at < now() - interval '24 hours' LIMIT 100)`);
+  // 31 days keeps a 30-day slug window. A 24-hour cleanup would reset that limit every day.
+  await database.execute(sql`DELETE FROM abuse_rate_limits WHERE window_started_at < now() - interval '31 days' AND (scope, client_hash) IN
+    (SELECT scope, client_hash FROM abuse_rate_limits WHERE window_started_at < now() - interval '31 days' LIMIT 100)`);
   const inserted = await database.execute(sql`INSERT INTO abuse_rate_limits (scope, client_hash, attempts)
     VALUES (${scope}, ${hash}, 1)
     ON CONFLICT (scope, client_hash) DO UPDATE SET

@@ -127,14 +127,15 @@ export function createDrizzleMpStore(database: Database = getDb()): MpConnection
       await database.delete(mercadopagoConnections).where(eq(mercadopagoConnections.businessId, businessId));
     },
     async markDeauthorized(mpUserId) {
-      await database.update(mercadopagoConnections).set({
+      const rows = await database.update(mercadopagoConnections).set({
         status: "needs_reconnect",
         accessTokenEnc: null,
         refreshTokenEnc: null,
         lastError: "application.deauthorized",
         disconnectedAt: null,
         updatedAt: new Date(),
-      }).where(eq(mercadopagoConnections.mpUserId, mpUserId));
+      }).where(eq(mercadopagoConnections.mpUserId, mpUserId)).returning({ businessId: mercadopagoConnections.businessId });
+      return rows.map((row) => row.businessId);
     },
     async markDisconnected(businessId, disconnectedAt) {
       await database.update(mercadopagoConnections).set({

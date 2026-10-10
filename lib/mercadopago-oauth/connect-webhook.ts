@@ -1,5 +1,6 @@
 import { createHmac } from "node:crypto";
 import { z } from "zod";
+import { invalidatePublicCatalogForBusiness } from "../bookings/public-cache";
 import { HttpError } from "../http";
 import { MERCADOPAGO_WEBHOOK_FRESHNESS_MS, mercadoPagoTimestampMs } from "../payments/mercadopago";
 import { webhookSecret } from "./config";
@@ -74,7 +75,8 @@ export async function handleMpConnectWebhook(input: {
   if (!parsed.success) throw new HttpError(400, "invalid_event", "Evento inválido.");
   const mpUserId = String(parsed.data.user_id);
   if (parsed.data.action === "application.deauthorized") {
-    await (input.store ?? createDrizzleMpStore()).markDeauthorized(mpUserId);
+    const businessIds = await (input.store ?? createDrizzleMpStore()).markDeauthorized(mpUserId);
+    for (const businessId of businessIds) await invalidatePublicCatalogForBusiness(businessId);
     return { outcome: "deauthorized" as const };
   }
   // application.authorized não traz tokens. A vinculação válida continua sendo a troca do code.
