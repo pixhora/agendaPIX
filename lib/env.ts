@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { bookingConfig } from "./bookings/config";
 
 const postgresUrl = z.url().refine((value) => ["postgres:", "postgresql:"].includes(new URL(value).protocol), "Use uma URL PostgreSQL.");
 
@@ -76,6 +77,43 @@ export const productionRuntimeEnvSchema = z.object({
   if (value.SMTP_FROM?.trim() && smtpFromUsesExampleDomain(value.SMTP_FROM)) ctx.addIssue({ code: "custom", message: productionBootMessage.from });
 });
 
+const productionPkceMessage = "MP_OAUTH_PKCE deve ser on quando MERCADOPAGO_ENV=production.";
+
+/** " on " e "on" são o mesmo valor. O boot e `assertMpOAuthPkce` leem por aqui. */
+export function readMpOAuthPkce(raw: string | undefined): "on" | "off" | "missing" | "invalid" {
+  if (raw === undefined) return "missing";
+  const value = raw.trim();
+  if (value === "on") return "on";
+  if (value === "off") return "off";
+  return "invalid";
+}
+
+function productionBoot(env: Readonly<Record<string, string | undefined>>) {
+  return env.NODE_ENV === "production" && env.NEXT_PHASE !== "phase-production-build";
+}
+
+const vercelProductionPkceMessage = "MP_OAUTH_PKCE deve ser on quando VERCEL_ENV=production.";
+
+/**
+ * O `register()` do instrumentation só roda quando a instância sobe. Na Vercel isso é
+ * depois do deploy, e um throw vira 500 em toda rota, inclusive `/api/health`.
+ * `next.config.ts` chama isto ao carregar: o `next build` de produção falha e a Vercel
+ * recusa o deploy. Preview (`VERCEL_ENV=preview`) e dev não entram.
+ * ` on ` vale `on`. A mensagem não repete o valor.
+ */
+export function assertVercelProductionBuild(env: Readonly<Record<string, string | undefined>> = process.env) {
+  if (env.VERCEL_ENV !== "production") return;
+  if (readMpOAuthPkce(env.MP_OAUTH_PKCE) !== "on") throw new Error(vercelProductionPkceMessage);
+  bookingConfig(env);
+}
+
+/**
+ * Boot de produção. Chamado por `instrumentation.ts` e pelo worker de reconciliação.
+ * Não cria um segundo caminho: PKCE em produção e `bookingConfig` passam por aqui.
+ * `bookingConfig` só roda com `NODE_ENV=production`. O `next build` não é boot:
+ * a recusa do deploy de produção fica em `assertVercelProductionBuild`.
+ * A mensagem de PKCE não repete o valor configurado.
+ */
 export function assertProductionSafeEnv(env: Readonly<Record<string, string | undefined>> = process.env) {
   const parsed = productionRuntimeEnvSchema.safeParse({
     NODE_ENV: env.NODE_ENV,
@@ -84,9 +122,15 @@ export function assertProductionSafeEnv(env: Readonly<Record<string, string | un
     MP_CAPTURE: env.MP_CAPTURE,
     SMTP_FROM: env.SMTP_FROM,
   });
-  if (parsed.success) return;
-  const messages = [...new Set(parsed.error.issues.map((issue) => issue.message))];
-  throw new Error(messages.join(" "));
+  if (!parsed.success) {
+    const messages = [...new Set(parsed.error.issues.map((issue) => issue.message))];
+    throw new Error(messages.join(" "));
+  }
+  if (!productionBoot(env)) return;
+  if (env.MERCADOPAGO_ENV === "production" && readMpOAuthPkce(env.MP_OAUTH_PKCE) !== "on") {
+    throw new Error(productionPkceMessage);
+  }
+  bookingConfig(env);
 }
 
 const staticRedirectUri = z.url().refine((value) => {

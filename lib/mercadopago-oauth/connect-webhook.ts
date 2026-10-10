@@ -3,10 +3,14 @@ import { z } from "zod";
 import { invalidatePublicCatalogForBusiness } from "../bookings/public-cache";
 import { HttpError } from "../http";
 import { MERCADOPAGO_WEBHOOK_FRESHNESS_MS, mercadoPagoTimestampMs } from "../payments/mercadopago";
-import { webhookSecret } from "./config";
+import { webhookSecret, mpOAuthConfig } from "./config";
+import { decryptMpToken } from "./crypto";
 import { createDrizzleMpStore } from "./repository";
+import { checkAccessTokenRevoked, revocationLogCode } from "./revocation-check";
 import { safeEqualHex } from "./timing";
 import type { MpConnectionStore } from "./types";
+import type { MpFetch } from "./token-client";
+import { createDrizzleWebhookEvents, mpConnectRequestId, type WebhookEventPort } from "./webhook-events";
 
 const notificationSchema = z.object({
   action: z.string().min(1),
@@ -59,6 +63,14 @@ export function assertMpWebhookSignature(input: { url: string; headers: Headers;
   }
 }
 
+function revocationUnconfirmed() {
+  return new HttpError(503, "mp_revocation_unconfirmed", "Não foi possível confirmar o desligamento no Mercado Pago. A conexão continua ativa.");
+}
+
+function logRevocationUnconfirmed(code: string) {
+  console.error(`[mp-connect] revocation_unconfirmed code=${revocationLogCode(code)}`);
+}
+
 export async function handleMpConnectWebhook(input: {
   body: string;
   headers: Headers;
@@ -66,6 +78,9 @@ export async function handleMpConnectWebhook(input: {
   env?: Readonly<Record<string, string | undefined>>;
   store?: MpConnectionStore;
   now?: Date;
+  fetchImpl?: MpFetch;
+  events?: WebhookEventPort;
+  revocationTimeoutMs?: number;
 }) {
   assertMpWebhookSignature({ url: input.url, headers: input.headers, secret: webhookSecret(input.env), now: input.now });
   let payload: unknown;
@@ -73,13 +88,47 @@ export async function handleMpConnectWebhook(input: {
   catch { throw new HttpError(400, "invalid_event", "Evento inválido."); }
   const parsed = notificationSchema.safeParse(payload);
   if (!parsed.success) throw new HttpError(400, "invalid_event", "Evento inválido.");
+  const requestId = mpConnectRequestId(input.headers.get("x-request-id"));
+  if (!requestId) throw new HttpError(400, "invalid_event", "Evento inválido.");
+  const events = input.events ?? createDrizzleWebhookEvents();
   const mpUserId = String(parsed.data.user_id);
-  if (parsed.data.action === "application.deauthorized") {
-    const businessIds = await (input.store ?? createDrizzleMpStore()).markDeauthorized(mpUserId);
-    for (const businessId of businessIds) await invalidatePublicCatalogForBusiness(businessId);
-    return { outcome: "deauthorized" as const };
+  if (parsed.data.action !== "application.deauthorized") {
+    const recorded = await events.record(requestId);
+    if (recorded === "duplicate") return { outcome: "duplicate" as const };
+    // application.authorized não traz tokens. A vinculação válida continua sendo a troca do code.
+    if (parsed.data.action === "application.authorized") return { outcome: "ignored" as const, reason: "authorized_without_token_exchange" };
+    return { outcome: "ignored" as const, reason: "unsupported_action" };
   }
-  // application.authorized não traz tokens. A vinculação válida continua sendo a troca do code.
-  if (parsed.data.action === "application.authorized") return { outcome: "ignored" as const, reason: "authorized_without_token_exchange" };
-  return { outcome: "ignored" as const, reason: "unsupported_action" };
+  // Antes do GET /users/me: entrega já vista não consulta o Mercado Pago nem desconecta.
+  if (await events.seen(requestId)) return { outcome: "duplicate" as const };
+
+  const store = input.store ?? createDrizzleMpStore();
+  const connection = await store.findByMpUserId(mpUserId);
+  if (!connection?.accessTokenEnc) {
+    const recorded = await events.record(requestId);
+    if (recorded === "duplicate") return { outcome: "duplicate" as const };
+    return { outcome: "ignored" as const, reason: "no_token" };
+  }
+
+  let accessToken: string;
+  try {
+    accessToken = decryptMpToken(connection.accessTokenEnc, connection.businessId, "access", mpOAuthConfig(input.env).encryptionKey);
+  } catch {
+    logRevocationUnconfirmed("token_unreadable");
+    throw revocationUnconfirmed();
+  }
+  const verdict = await checkAccessTokenRevoked(accessToken, input.fetchImpl, input.revocationTimeoutMs);
+  if (verdict.result === "unavailable") {
+    logRevocationUnconfirmed(verdict.code);
+    throw revocationUnconfirmed();
+  }
+  if (verdict.result === "active") {
+    // Token ainda válido. Não grava webhook_events: o replay viraria duplicate e o Mercado Pago não reenviaria.
+    throw revocationUnconfirmed();
+  }
+
+  const claimed = await events.deauthorize(requestId, mpUserId);
+  if (claimed.kind === "duplicate") return { outcome: "duplicate" as const };
+  for (const businessId of claimed.businessIds) await invalidatePublicCatalogForBusiness(businessId);
+  return { outcome: "deauthorized" as const };
 }

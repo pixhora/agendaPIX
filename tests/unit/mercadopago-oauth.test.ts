@@ -6,6 +6,7 @@ import { encryptMpToken } from "../../lib/mercadopago-oauth/crypto";
 import { disconnectMercadoPago, findBusinessIdByMpUserId, getMercadoPagoOwnerStatus, getSellerAccessToken, getSellerAccessTokenForSettlement, isMpConnected } from "../../lib/mercadopago-oauth/credentials";
 import { MP_CONNECT_CONSENT_TEXT, MP_CONNECT_CONSENT_VERSION } from "../../lib/mercadopago/consent";
 import { MP_USERS_ME_URL } from "../../lib/mercadopago-oauth/account-profile";
+import { createMemoryWebhookEvents } from "../../lib/mercadopago-oauth/webhook-events";
 import { maskEmail } from "../../lib/privacy/mask-email";
 import { acceptMercadoPagoConsent, assertPlaintextAbsent, beginMercadoPagoConnect, completeMercadoPagoConnect, submitMercadoPagoConnect } from "../../lib/mercadopago-oauth/flow";
 import { GET as connectGet } from "../../app/api/businesses/[businessId]/mercadopago/connect/route";
@@ -445,31 +446,36 @@ describe("OAuth Mercado Pago por negócio", () => {
 
   it("revogação do MP marca needs_reconnect e não assume que o token ainda funciona", async () => {
     const store = createMemoryMpStore([connection({ status: "disconnected", disconnectedAt: now })]);
+    const events = createMemoryWebhookEvents((mpUserId) => store.markDeauthorized(mpUserId));
     const dataId = "AbC123";
     const ts = "1700000000";
-    const requestId = "req-1";
-    const manifest = mercadoPagoManifest({ dataId, requestId, ts });
-    const signature = createHmac("sha256", webhookSecret).update(manifest).digest("hex");
-    const headers = new Headers({ "x-signature": `ts=${ts},v1=${signature}`, "x-request-id": requestId });
     const url = `https://app.example.com/api/webhooks/payments/mercadopago?data.id=${dataId}&type=mp-connect`;
     const signatureNow = new Date(Number(ts) * 1000);
+    const headersFor = (requestId: string) => {
+      const manifest = mercadoPagoManifest({ dataId, requestId, ts });
+      const signature = createHmac("sha256", webhookSecret).update(manifest).digest("hex");
+      return new Headers({ "x-signature": `ts=${ts},v1=${signature}`, "x-request-id": requestId });
+    };
     const ignored = await handleMpConnectWebhook({
       body: JSON.stringify({ action: "application.authorized", type: "mp-connect", user_id: 4242 }),
-      headers,
+      headers: headersFor("req-authorized"),
       url,
       env,
       store,
+      events,
       now: signatureNow,
     });
     expect(ignored).toEqual({ outcome: "ignored", reason: "authorized_without_token_exchange" });
     expect((await store.findByBusinessId(businessId))?.accessTokenEnc).toContain("v1.");
     const deauthorized = await handleMpConnectWebhook({
       body: JSON.stringify({ action: "application.deauthorized", type: "mp-connect", user_id: "4242" }),
-      headers,
+      headers: headersFor("req-deauthorized"),
       url,
       env,
       store,
+      events,
       now: signatureNow,
+      fetchImpl: async () => new Response(null, { status: 401 }),
     });
     expect(deauthorized).toEqual({ outcome: "deauthorized" });
     const row = await store.findByBusinessId(businessId);

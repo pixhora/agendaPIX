@@ -1,4 +1,4 @@
-import { authEnvSchema, mercadoPagoOAuthEnvSchema } from "../env";
+import { authEnvSchema, mercadoPagoOAuthEnvSchema, readMpOAuthPkce } from "../env";
 import { HttpError } from "../http";
 
 /** Guia geral de OAuth e o SDK mercadopago. O host .com.br aparece só no guia de Split 1:1. */
@@ -18,13 +18,11 @@ export type MpOAuthConfig = {
   pkce: boolean;
 };
 
-/** `MP_OAUTH_PKCE=on|off`. Ausente vale off. Qualquer outro valor é erro de configuração. */
+/** `MP_OAUTH_PKCE=on|off`. Ausente vale off. Espaços nas pontas não mudam o valor. Qualquer outro texto é erro de configuração. */
 export function assertMpOAuthPkce(env: Readonly<Record<string, string | undefined>> = process.env) {
-  const raw = env.MP_OAUTH_PKCE;
-  if (raw === undefined) return false;
-  const value = raw.trim();
-  if (value === "on") return true;
-  if (value === "off") return false;
+  const mode = readMpOAuthPkce(env.MP_OAUTH_PKCE);
+  if (mode === "on") return true;
+  if (mode === "missing" || mode === "off") return false;
   throw new HttpError(503, "mp_oauth_pkce_invalid", "MP_OAUTH_PKCE deve ser on ou off.");
 }
 

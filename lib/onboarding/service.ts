@@ -5,6 +5,7 @@ import { businessHours, businessSlugHistory, businesses, onboardingRequests, ser
 import { trialEndsAtFromCreation } from "../billing/access";
 import { requestKeySchema } from "../bookings/validation";
 import { invalidatePublicCatalog } from "../bookings/public-cache";
+import { invalidateAliasCache } from "../business-profile/alias-cache";
 import { HttpError } from "../http";
 import { aliasHoldActive } from "../business-profile/slug-policy";
 import { isUniqueViolation, rejectTakenSlug } from "../business-profile/slug-conflict";
@@ -54,6 +55,7 @@ export async function provisionBusiness(ownerId: string, key: unknown, body: unk
       await tx.update(onboardingRequests).set({ result }).where(predicate);
       return { result, replay: false };
     });
+    invalidateAliasCache(outcome.result.slug);
     await invalidatePublicCatalog(outcome.result.slug);
     return outcome;
   } catch (error) {

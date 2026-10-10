@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import sharp from "sharp";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ABSENT_ALIAS_TTL_MS, ALIAS_LOOKUP_LIMIT, boundedAliasTarget, clearAliasCache } from "../../lib/business-profile/alias-cache";
+import { ABSENT_ALIAS_TTL_MS, ALIAS_LOOKUP_LIMIT, boundedAliasTarget, cachedAliasTarget, clearAliasCache, invalidateAliasCache } from "../../lib/business-profile/alias-cache";
 import { LOGO_UPLOAD_MAX_BYTES } from "../../lib/contracts";
 import { HttpError } from "../../lib/http";
 import { assertLogoBytes, reencodeLogo } from "../../lib/business-profile/logo-image";
@@ -365,6 +365,41 @@ describe("slug redirect", () => {
       return "absent";
     }, 1_000 + ABSENT_ALIAS_TTL_MS)).toBeNull();
     expect(absentCalls).toBe(2);
+
+    const absentMap = (globalThis as { __agendaAbsentAliasCache?: Map<string, unknown> }).__agendaAbsentAliasCache;
+    expect(absentMap?.has("sumiu")).toBe(true);
+    invalidateAliasCache("sumiu");
+    expect(absentMap?.has("sumiu")).toBe(false);
+    expect(await boundedAliasTarget("sumiu", async () => {
+      absentCalls += 1;
+      return { alias: "loja" };
+    }, 1_000 + ABSENT_ALIAS_TTL_MS)).toBe("loja");
+    expect(absentCalls).toBe(3);
+
+    let target: string | null = "loja";
+    let aliasCalls = 0;
+    const lookup = async () => {
+      aliasCalls += 1;
+      return target;
+    };
+    expect(await cachedAliasTarget("antiga", lookup, 2_000)).toBe("loja");
+    expect(await cachedAliasTarget("antiga", lookup, 2_000)).toBe("loja");
+    expect(aliasCalls).toBe(1);
+    target = null;
+    invalidateAliasCache("antiga");
+    expect(await cachedAliasTarget("antiga", lookup, 2_000)).toBeNull();
+    expect(aliasCalls).toBe(2);
+    expect(await cachedAliasTarget("antiga", lookup, 2_000)).toBeNull();
+    expect(aliasCalls).toBe(3);
+
+    await boundedAliasTarget("outra", async () => "absent", 3_000);
+    let otherCalls = 0;
+    invalidateAliasCache("sumiu");
+    expect(await boundedAliasTarget("outra", async () => {
+      otherCalls += 1;
+      return "absent";
+    }, 3_000)).toBeNull();
+    expect(otherCalls).toBe(0);
 
     clearAliasCache();
     let liveCalls = 0;

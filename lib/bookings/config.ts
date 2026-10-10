@@ -36,16 +36,49 @@ export const bookingEnvSchema = z.object({
   PAYMENT_POLL_RATE_LIMIT_PER_CLIENT: z.preprocess(blankAsUndefined, int(1, 100000, 120)),
   // 50 sinais pendentes × 15/min = 750. 2400 deixa folga e ainda corta rajada no negócio.
   PAYMENT_POLL_RATE_LIMIT_PER_BUSINESS: z.preprocess(blankAsUndefined, int(1, 100000, 2400)),
-}).refine((value) => value.BOOKING_RATE_LIMIT_PER_BUSINESS >= value.BOOKING_RATE_LIMIT_PER_CLIENT, "O teto por negócio deve ser maior ou igual ao limite por cliente.")
-  .refine((value) => value.PAYMENT_POLL_RATE_LIMIT_PER_BUSINESS >= value.PAYMENT_POLL_RATE_LIMIT_PER_CLIENT, "O teto de consulta do Pix por negócio deve ser maior ou igual ao limite por cliente.");
+}).superRefine((value, ctx) => {
+  if (value.BOOKING_RATE_LIMIT_PER_BUSINESS < value.BOOKING_RATE_LIMIT_PER_CLIENT) {
+    ctx.addIssue({ code: "custom", path: ["BOOKING_RATE_LIMIT_PER_BUSINESS"], message: "invalid" });
+    ctx.addIssue({ code: "custom", path: ["BOOKING_RATE_LIMIT_PER_CLIENT"], message: "invalid" });
+  }
+  if (value.PAYMENT_POLL_RATE_LIMIT_PER_BUSINESS < value.PAYMENT_POLL_RATE_LIMIT_PER_CLIENT) {
+    ctx.addIssue({ code: "custom", path: ["PAYMENT_POLL_RATE_LIMIT_PER_BUSINESS"], message: "invalid" });
+    ctx.addIssue({ code: "custom", path: ["PAYMENT_POLL_RATE_LIMIT_PER_CLIENT"], message: "invalid" });
+  }
+});
+
+const bookingEnvKeys = new Set([
+  "BOOKING_TRUST_PROXY",
+  "BOOKING_CLIENT_IP_HEADER",
+  "BOOKING_TRUSTED_PROXY_HOPS",
+  "BOOKING_RATE_LIMIT_PER_CLIENT",
+  "BOOKING_RATE_LIMIT_PER_BUSINESS",
+  "BOOKING_HOLD_MINUTES",
+  "BOOKING_MAX_PENDING_PER_CLIENT",
+  "BOOKING_MAX_PENDING_PER_PHONE",
+  "BOOKING_MAX_PENDING_PER_BUSINESS",
+  "PAYMENT_POLL_RATE_LIMIT_PER_CLIENT",
+  "PAYMENT_POLL_RATE_LIMIT_PER_BUSINESS",
+]);
+
+/** Nome da env, sem o valor configurado. */
+export function bookingConfigMessage(error: z.ZodError) {
+  const names = new Set<string>();
+  for (const issue of error.issues) {
+    for (const part of issue.path) {
+      if (typeof part === "string" && bookingEnvKeys.has(part)) names.add(part);
+    }
+  }
+  if (names.size === 1 && names.has("BOOKING_HOLD_MINUTES")) return BOOKING_HOLD_RANGE_MESSAGE;
+  const listed = [...names].sort().join(", ");
+  if (!listed) return "Agendamento indisponível. Tente novamente mais tarde.";
+  return `${listed} inválido. Agendamento indisponível. Tente novamente mais tarde.`;
+}
 
 export type BookingConfig = z.infer<typeof bookingEnvSchema>;
 
 export function bookingConfig(env: Readonly<Record<string, string | undefined>> = process.env): BookingConfig {
   const parsed = bookingEnvSchema.safeParse(env);
-  if (!parsed.success) {
-    const hold = parsed.error.issues.some((issue) => issue.path.includes("BOOKING_HOLD_MINUTES"));
-    throw new HttpError(503, "booking_unavailable", hold ? BOOKING_HOLD_RANGE_MESSAGE : "Agendamento indisponível. Tente novamente mais tarde.");
-  }
+  if (!parsed.success) throw new HttpError(503, "booking_unavailable", bookingConfigMessage(parsed.error));
   return parsed.data;
 }
