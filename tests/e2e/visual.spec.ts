@@ -20,7 +20,7 @@ test.describe("regressão visual", () => {
         test(`${target.name} ${theme} ${width}px`, async ({ page }, testInfo) => {
           test.skip(testInfo.project.name !== "desktop", "projeto desktop troca o viewport");
           await page.addInitScript((value) => localStorage.setItem("agenda-theme", value), theme);
-          // Movimento reduzido: a sequência animada do hero vira o estado final, e a captura fica determinística.
+          // Movimento reduzido: a composição do hero fica parada, e a captura fica determinística.
           await page.emulateMedia({ reducedMotion: "reduce" });
           await page.setViewportSize({ width, height: width < 768 ? 844 : 900 });
           await page.goto(target.path, { waitUntil: "load" });
@@ -68,7 +68,10 @@ test.describe("regressão visual do painel", () => {
           await page.goto(target.path(meta), { waitUntil: "load" });
           await page.waitForLoadState("networkidle");
           await page.evaluate(() => document.fonts.ready);
-          // Textos que dependem do dia de execução (data, "hoje", contagem do teste grátis) ficam fora da comparação.
+          // O aviso de assinatura muda de altura conforme o dia e a hora (contagem do teste grátis).
+          // Tirá-lo do fluxo evita deslocamento de layout; a comparação do resto do painel continua.
+          await page.addStyleTag({ content: '[aria-label="Aviso da assinatura"] { display: none !important; }' });
+          // Textos que dependem do dia de execução (data, "hoje") ficam fora da comparação.
           const dateDependent = page.getByText(DATE_DEPENDENT);
           await expect(page).toHaveScreenshot(`painel-${target.name}-${theme}-${width}.png`, {
             fullPage: false,

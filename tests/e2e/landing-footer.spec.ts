@@ -47,7 +47,14 @@ test.describe("barra fixa da landing", () => {
     const bar = page.locator("#sticky-cta");
 
     await page.evaluate(() => {
-      const hero = document.getElementById("hero-primary-cta");
+      const cta = document.getElementById("hero-primary-cta");
+      if (!cta) return;
+      window.scrollTo(0, cta.getBoundingClientRect().bottom + window.scrollY + 24);
+    });
+    await expect(bar).toHaveAttribute("data-visible", "false");
+
+    await page.evaluate(() => {
+      const hero = document.getElementById("hero");
       if (!hero) return;
       window.scrollTo(0, hero.getBoundingClientRect().bottom + window.scrollY + 24);
     });
@@ -65,7 +72,7 @@ test.describe("barra fixa da landing", () => {
     await expect(bar).toHaveAttribute("data-visible", "false");
 
     await page.evaluate(() => {
-      const hero = document.getElementById("hero-primary-cta");
+      const hero = document.getElementById("hero");
       if (!hero) return;
       window.scrollTo(0, hero.getBoundingClientRect().bottom + window.scrollY + 24);
     });

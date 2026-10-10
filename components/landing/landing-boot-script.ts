@@ -117,7 +117,7 @@ export const landingBootScript = `(function(){
   function updateBar(){
     var node = bar();
     if(!node) return;
-    heroGone = !inView("hero-primary-cta");
+    heroGone = !inView("hero");
     finalVisible = inView("cta-final");
     footerVisible = inView("rodape");
     var visible = heroGone && !finalVisible && !footerVisible && !menuOpen && narrowMedia.matches && !keyboardOpen() && !fieldFocused();
@@ -139,7 +139,7 @@ export const landingBootScript = `(function(){
     if(node && node.parentElement !== document.body) document.body.appendChild(node);
     if(armed) { updateBar(); return; }
     armed = true;
-    var hero = document.getElementById("hero-primary-cta");
+    var hero = document.getElementById("hero");
     var finalCta = document.getElementById("cta-final");
     var footer = document.getElementById("rodape");
     if(hero && finalCta && footer && "IntersectionObserver" in window){

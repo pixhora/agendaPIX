@@ -1,80 +1,158 @@
 import { CheckIcon } from "./icons";
 
 /**
- * Demonstração animada da jornada do cliente, no hero (desktop).
- * Uma única sequência curta (~4 s), CSS puro e sem loop: no fim fica parada no estado de confirmação.
- * Com prefers-reduced-motion, só o estado final aparece (ver `.hero-demo` em app/globals.css).
- * Dados fictícios, como em /exemplo.
+ * Composição do hero. No desktop, cartões flutuantes num quadro que só escala.
+ * Abaixo de lg, os mesmos cartões empilham no fluxo, sem rotação e sem sair da tela.
+ * Dados fictícios. O miolo é decorativo; a legenda fica disponível para leitor de tela.
+ * Movimento só em CSS. prefers-reduced-motion zera a animação.
  */
-const services = [
-  { name: "Corte feminino", time: "1h", price: "R$ 80,00", deposit: "R$ 25,00" },
+const days = [
+  { label: "Qui 15", selected: false },
+  { label: "Sex 16", selected: false },
+  { label: "Sáb 17", selected: true },
+  { label: "Dom 18", selected: false },
 ];
+const times = ["09:00", "11:30", "14:00", "16:30"];
+
+function StoreCard() {
+  return (
+    <>
+      <div className="flex items-center gap-3">
+        <span className="hero-mark flex size-10 shrink-0 items-center justify-center rounded-2xl bg-brand-tile text-[13px] font-bold tracking-tight text-brand-tile-foreground">
+          SB
+        </span>
+        <span className="min-w-0">
+          <span className="block font-display text-[15px] font-bold leading-tight tracking-tight text-ink">Studio Bella</span>
+          <span className="mt-0.5 block text-[12px] text-muted">Página de agendamento</span>
+        </span>
+      </div>
+
+      <p className="mt-4 font-display text-xl font-bold tracking-tight text-ink">Corte feminino</p>
+      <p className="mt-0.5 text-[13px] text-muted">1 h · sábado</p>
+
+      <div className="mt-4 flex gap-1.5">
+        {days.map((day) => (
+          <span
+            key={day.label}
+            className={
+              day.selected
+                ? "inline-flex min-h-9 flex-1 items-center justify-center rounded-full bg-ink px-1 text-[12px] font-semibold text-paper"
+                : "inline-flex min-h-9 flex-1 items-center justify-center rounded-full bg-subtle px-1 text-[12px] font-semibold text-ink"
+            }
+          >
+            {day.label}
+          </span>
+        ))}
+      </div>
+
+      <div className="mt-2.5 grid grid-cols-2 gap-1.5">
+        {times.map((time) =>
+          time === "11:30" ? (
+            <span key={time} className="inline-flex min-h-11 items-center justify-between rounded-full bg-ink px-3 text-[13px] font-semibold text-paper tabular-nums">
+              {time}
+              <CheckIcon className="size-3.5" />
+            </span>
+          ) : (
+            <span key={time} className="inline-flex min-h-11 items-center rounded-full border border-line bg-paper px-3 text-[13px] font-semibold text-ink tabular-nums">
+              {time}
+            </span>
+          ),
+        )}
+      </div>
+
+      <div className="mt-3 flex items-center justify-between gap-3 rounded-field bg-pix-soft px-3 py-2">
+        <span className="text-[12px] font-semibold text-pix">Sinal no Pix</span>
+        <span className="font-display text-sm font-bold text-ink tabular-nums">R$ 40,00</span>
+      </div>
+    </>
+  );
+}
+
+function PixCard() {
+  return (
+    <>
+      <div className="flex items-center gap-2">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-pix text-pix-foreground">
+          <CheckIcon className="size-4" />
+        </span>
+        <p className="whitespace-nowrap text-[13px] font-semibold leading-tight text-ink">Sinal recebido pelo Pix</p>
+      </div>
+      <p className="mt-2.5 font-display text-3xl font-extrabold leading-none tracking-tight text-ink tabular-nums">R$ 40,00</p>
+      <p className="mt-1.5 text-[12px] text-muted">Corte feminino · sáb, 11:30</p>
+    </>
+  );
+}
+
+function ConfirmChip() {
+  return (
+    <>
+      <span className="flex size-7 items-center justify-center rounded-full bg-success-soft text-success">
+        <CheckIcon className="size-3.5" />
+      </span>
+      <span className="text-[13px] font-semibold text-ink">Horário confirmado</span>
+    </>
+  );
+}
 
 export function HeroMotion() {
   return (
-    <div aria-hidden="true" className="hero-demo hidden lg:block">
-      <div className="relative mx-auto w-[300px] rounded-[2.25rem] border border-line bg-surface p-3 shadow-[var(--shadow-raised)]">
-        <div className="relative h-[460px] overflow-hidden rounded-[1.75rem] bg-paper">
-          <div className="flex items-center gap-2 px-5 pt-5">
-            <span className="size-2 rounded-full bg-pix" />
-            <p className="text-[12px] font-semibold text-ink">Studio Bella</p>
-          </div>
-          <div className="hero-progress mx-5 mt-3 flex gap-1.5">
-            <span className="hero-progress-bar" />
-            <span className="hero-progress-bar" />
-            <span className="hero-progress-bar" />
-            <span className="hero-progress-bar" />
-          </div>
-
-          <div className="step step-1 absolute inset-x-4 top-[88px]">
-            <p className="text-[15px] font-bold text-ink">Escolha o serviço</p>
-            {services.map((service) => (
-              <div key={service.name} className="hero-card mt-3 flex items-center justify-between rounded-2xl border border-line bg-surface p-4">
-                <div>
-                  <p className="text-[14px] font-semibold text-ink">{service.name}</p>
-                  <p className="text-[12px] text-muted">{service.time} · sinal {service.deposit} no Pix</p>
-                </div>
-                <p className="text-[14px] font-bold text-ink">{service.price}</p>
+    <figure className="hero-stage hero-frame relative mx-auto w-full min-w-0 max-w-[27.5rem] lg:mx-0 lg:max-w-none lg:justify-self-end">
+      <div className="relative mx-auto w-full max-w-[24rem] lg:hidden">
+        <div aria-hidden="true" className="flex flex-col gap-3">
+          <div className="hero-rise hero-delay-1">
+            <div className="hero-float">
+              <div className="hero-panel rounded-card px-3.5 py-3">
+                <PixCard />
               </div>
-            ))}
-          </div>
-
-          <div className="step step-2 absolute inset-x-4 top-[88px]">
-            <p className="text-[15px] font-bold text-ink">Escolha o horário</p>
-            <div className="mt-3 grid grid-cols-3 gap-2">
-              {["09:30", "10:30", "11:30", "13:30", "15:30", "16:30"].map((slot) => (
-                <span key={slot} className={`rounded-xl border px-2 py-2.5 text-center text-[13px] font-semibold ${slot === "11:30" ? "hero-slot border-ink bg-ink text-paper" : "border-line bg-surface text-ink"}`}>
-                  {slot}
-                </span>
-              ))}
             </div>
           </div>
-
-          <div className="step step-3 absolute inset-x-4 top-[88px]">
-            <p className="text-[15px] font-bold text-ink">Pague o sinal por Pix</p>
-            <div className="mt-3 rounded-2xl border border-line bg-surface p-4">
-              <div className="mx-auto grid size-[132px] grid-cols-6 grid-rows-6 gap-[3px] rounded-xl bg-surface p-2">
-                {Array.from({ length: 36 }, (_, index) => (
-                  <span key={index} className={(index * 7) % 5 < 2 ? "bg-ink" : "bg-transparent"} />
-                ))}
+          <div className="hero-rise">
+            <div className="hero-panel rounded-frame p-4">
+              <StoreCard />
+            </div>
+          </div>
+          <div className="hero-rise hero-delay-2">
+            <div className="hero-float hero-float-late w-fit max-w-full">
+              <div className="hero-panel inline-flex max-w-full items-center gap-2 rounded-full py-1.5 pr-3.5 pl-1.5">
+                <ConfirmChip />
               </div>
-              <p className="mt-3 text-center text-[13px] text-muted">R$ 25,00 · vence em 30 min</p>
             </div>
-          </div>
-
-          <div className="step step-final absolute inset-x-4 top-[88px]">
-            <div className="hero-confirm flex flex-col items-center rounded-2xl border border-pix/30 bg-pix-soft px-5 py-8 text-center">
-              <span className="flex size-12 items-center justify-center rounded-full bg-pix text-pix-foreground">
-                <CheckIcon className="size-6" />
-              </span>
-              <p className="mt-4 text-[16px] font-bold text-ink">Horário confirmado</p>
-              <p className="mt-1 text-[13px] text-muted">Corte feminino · sáb., 11:30</p>
-              <p className="mt-3 text-[12px] font-semibold text-pix">Sinal recebido pelo Pix</p>
-            </div>
-            <p className="mt-4 text-center text-[12px] text-muted">Demonstração com dados fictícios</p>
           </div>
         </div>
       </div>
-    </div>
+
+      <div className="hero-frame-sizer hidden lg:block">
+        <div aria-hidden="true" className="hero-canvas">
+          <div className="bg-dots pointer-events-none absolute inset-0 opacity-80 [mask-image:radial-gradient(ellipse_at_center,black_22%,transparent_74%)]" />
+
+          <div className="hero-panel hero-card-main rounded-frame p-4">
+            <div className="hero-rise">
+              <StoreCard />
+            </div>
+          </div>
+
+          <div className="hero-card-pix">
+            <div className="hero-rise hero-delay-1">
+              <div className="hero-float">
+                <div className="hero-panel rounded-card px-3.5 py-3">
+                  <PixCard />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="hero-card-chip">
+            <div className="hero-rise hero-delay-2">
+              <div className="hero-float hero-float-late">
+                <div className="hero-panel inline-flex items-center gap-2 rounded-full py-1.5 pr-3.5 pl-1.5">
+                  <ConfirmChip />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <figcaption className="mt-3 text-center text-[12px] leading-snug text-muted">Demonstração com dados fictícios</figcaption>
+    </figure>
   );
 }

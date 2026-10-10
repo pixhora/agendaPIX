@@ -114,6 +114,17 @@ describe("landing copy", () => {
     expect(offenders).toEqual([]);
   });
 
+  it("labels the fictional hero composition and keeps the cards decorative", () => {
+    const source = readFileSync("components/landing/HeroMotion.tsx", "utf8");
+    expect(source).toContain("Demonstração com dados fictícios");
+    expect(source).toContain("Studio Bella");
+    expect(source).toContain("Sinal recebido pelo Pix");
+    expect(source).toContain("Horário confirmado");
+    expect(source).toContain("R$ 40,00");
+    expect(source).toContain('aria-hidden="true"');
+    expect(source).not.toMatch(/Ana|Bruna|Exemplo ilustrativo|R\$ 80,00|4 reservas|minutos|chave Pix/);
+  });
+
   it("does not ship invented customers or sample businesses on the landing", () => {
     const files = ["components/landing/LandingHero.tsx", "components/landing/LandingSteps.tsx", "components/landing/DemoSection.tsx"];
     const rendered = files.map((file) => readFileSync(file, "utf8")).join("\n");
