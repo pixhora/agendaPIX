@@ -7,10 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
-import { businessProfileSchema } from "@/lib/dashboard/validation";
+import { businessNameSchema, businessSlugSchema } from "@/lib/contracts";
 import { normalizeSlug } from "@/lib/slug";
+import { fetchSlugAvailability } from "@/lib/onboarding/slug-availability";
 import { patchBusinessProfile } from "@/lib/store-profile/profile-client";
 import { OLD_SLUG_REDIRECT_READY } from "@/lib/store-profile/redirect";
+import { profileErrorCopy } from "@/lib/store-profile/api-copy";
 import { SLUG_COPY } from "@/lib/store-profile/slug-ui";
 import { LogoUpload } from "./LogoUpload";
 import { SlugField } from "./SlugField";
@@ -45,8 +47,10 @@ export function StoreSettingsForm({
   const status = forcedTaken ? "taken" as const : slugState.status;
   const message = status === "taken" && forcedTaken ? SLUG_COPY.taken : slugState.message;
   const suggestions = status === "taken" && forcedTaken ? takenSuggestions.slice(0, 2) : slugState.suggestions;
-  const parsed = businessProfileSchema.safeParse({ name, slug: finalSlug, logoUrl });
-  const canSave = dirty && !pending && status === "available" && parsed.success;
+  const nameOk = businessNameSchema.safeParse(name).success;
+  const slugOk = businessSlugSchema.safeParse(finalSlug).success;
+  const profileDirty = name !== baseline.name || finalSlug !== baseline.slug;
+  const canSave = profileDirty && !pending && status === "available" && nameOk && slugOk;
 
   useEffect(() => {
     if (!dirty) return;
@@ -72,24 +76,28 @@ export function StoreSettingsForm({
   }, [dirty]);
 
   async function save() {
-    if (!parsed.success || status !== "available") return;
+    if (!canSave) return;
+    const patch: { name?: string; slug?: string } = {};
+    if (name !== baseline.name) patch.name = name.trim();
+    if (finalSlug !== baseline.slug) patch.slug = finalSlug;
     setPending(true);
     setError(null);
-    const result = await patchBusinessProfile(businessId, parsed.data);
+    const result = await patchBusinessProfile(businessId, patch);
     setPending(false);
     if (!result.ok) {
-      if (result.code === "slug_taken") {
+      if (result.code === "slug_taken" || result.status === 409) {
         setForcedTaken(true);
-        setTakenSuggestions(result.suggestions);
+        const checked = await fetchSlugAvailability(finalSlug, new AbortController().signal);
+        setTakenSuggestions(result.suggestions.length ? result.suggestions : checked.ok ? checked.availability.suggestions : []);
         document.getElementById("settings-slug")?.focus();
         return;
       }
-      setError("Não deu para salvar agora. Seus dados continuam aqui. Tente de novo.");
+      setError(result.message || profileErrorCopy(result.code));
       document.getElementById("settings-form-error")?.focus();
       return;
     }
-    setBaseline({ name: parsed.data.name, slug: parsed.data.slug, logoUrl: parsed.data.logoUrl });
-    setSlug(parsed.data.slug);
+    setBaseline({ name: patch.name ?? baseline.name, slug: patch.slug ?? baseline.slug, logoUrl });
+    if (patch.slug) setSlug(patch.slug);
     setForcedTaken(false);
     toast("Alterações salvas.");
     router.refresh();
@@ -126,7 +134,17 @@ export function StoreSettingsForm({
           Seu link antigo ({prefix ? `${prefix}/` : ""}{baseline.slug}) vai continuar funcionando e levar para o novo.
         </p>
       ) : null}
-      <LogoUpload url={logoUrl} disabled={pending} onChangeUrl={setLogoUrl} />
+      <LogoUpload
+        url={logoUrl}
+        businessId={businessId}
+        disabled={pending}
+        onChangeUrl={(next) => {
+          if (!next) return;
+          setLogoUrl(next);
+          setBaseline((current) => ({ ...current, logoUrl: next }));
+          toast("Alterações salvas.");
+        }}
+      />
       <Button type="submit" size="lg" disabled={!canSave}>
         {pending ? <Loader2 aria-hidden="true" className="animate-spin" /> : null}
         {pending ? "Salvando…" : "Salvar alterações"}

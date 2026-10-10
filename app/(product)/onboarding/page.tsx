@@ -2,7 +2,7 @@ import React, { Suspense } from "react";
 import { connection } from "next/server";
 import type { Metadata } from "next";
 import { OnboardingFlow } from "@/components/onboarding/OnboardingFlow";
-import { publicLinkPrefix } from "@/lib/site";
+import { siteOrigin } from "@/lib/site";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const metadata: Metadata = {
@@ -20,7 +20,7 @@ export default async function OnboardingPage() {
         </div>
       }
     >
-      <OnboardingFlow legalPagesPublished={process.env.LEGAL_PAGES_PUBLISHED === "true"} publicHost={publicLinkPrefix()} />
+      <OnboardingFlow legalPagesPublished={process.env.LEGAL_PAGES_PUBLISHED === "true"} publicHost={siteOrigin().host} />
     </Suspense>
   );
 }

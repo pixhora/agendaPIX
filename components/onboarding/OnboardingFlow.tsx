@@ -35,6 +35,9 @@ import { StepCode } from "./StepCode";
 import { StepCreating, type CreatingAlert } from "./StepCreating";
 import { StorePreview } from "@/components/store/StorePreview";
 import { StoreProfileForm } from "@/components/store/StoreProfileForm";
+import { uploadLogoFile } from "@/lib/store-profile/logo";
+import { clearPendingLogo, peekPendingLogo } from "@/lib/store-profile/pending-logo";
+import { profileErrorCopy } from "@/lib/store-profile/api-copy";
 import { OnboardingStepper, OnboardingTopBar } from "./chrome";
 import {
   clearOnboardingProgress,
@@ -91,6 +94,7 @@ export function OnboardingFlow({ legalPagesPublished = false, publicHost }: { le
   const [creatingSlow, setCreatingSlow] = useState(false);
   const [creatingAlert, setCreatingAlert] = useState<CreatingAlert>(null);
   const [commitTick, setCommitTick] = useState(0);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const saveTimer = useRef(0);
   const signingIn = useRef(false);
   const decided = useRef(false);
@@ -196,6 +200,20 @@ export function OnboardingFlow({ legalPagesPublished = false, publicHost }: { le
       const result = await commitOnboardingDraft(draftId);
       if (cancelled) return;
       if (result.ok) {
+        const file = peekPendingLogo();
+        if (file && result.businessId) {
+          const uploaded = await uploadLogoFile(file, {
+            signal: new AbortController().signal,
+            onProgress: () => undefined,
+            endpoint: `/api/businesses/${encodeURIComponent(result.businessId)}/logo`,
+          });
+          if (cancelled) return;
+          if (!uploaded.ok) {
+            if (!uploaded.cancelled) setCreatingAlert({ kind: "logo", message: uploaded.message || profileErrorCopy("internal_error") });
+            return;
+          }
+          clearPendingLogo();
+        }
         writeCommitResult({
           slug: result.slug,
           publicPath: result.publicPath,
@@ -537,6 +555,7 @@ export function OnboardingFlow({ legalPagesPublished = false, publicHost }: { le
                 conflict={linkConflict ? { slug: linkConflict.slug, suggestions: linkConflict.suggestions } : null}
                 onChange={(partial) => update(partial)}
                 onContinue={() => void continueBusiness()}
+                onLogoPreview={setLogoPreview}
               />
             ) : null}
             {gate === "form" && step === "email" && (
@@ -598,7 +617,7 @@ export function OnboardingFlow({ legalPagesPublished = false, publicHost }: { le
             )}
           </div>
         </div>
-        {gate === "form" && onStore ? <StorePreview data={data} prefix={publicHost} /> : null}
+        {gate === "form" && onStore ? <StorePreview data={data} prefix={publicHost} logoUrl={logoPreview || data.logoUrl || null} /> : null}
       </div>
     </div>
   );

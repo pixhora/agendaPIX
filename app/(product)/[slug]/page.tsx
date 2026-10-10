@@ -1,11 +1,12 @@
 import { cache } from "react";
 import { connection } from "next/server";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
 import { z } from "zod";
 import { BookingFlow } from "@/components/booking/BookingFlow";
 import { toPublicBusinessData } from "@/components/booking/public-business";
 import { legalPagesPublished } from "@/lib/marketing/flags";
+import { SlugMoved, bookingRedirectPath } from "@/lib/business-profile/public-slug";
 import { listPublicServices } from "@/lib/bookings/service";
 import { HttpError } from "@/lib/http";
 import { siteName } from "@/lib/site";
@@ -15,11 +16,16 @@ const loadPublicBusiness = cache(async (slug: string) => {
   try {
     return await listPublicServices(slug);
   } catch (error) {
+    if (error instanceof SlugMoved) throw error;
     if (error instanceof HttpError && error.status === 404) return null;
     if (error instanceof z.ZodError) return null;
     throw error;
   }
 });
+
+function redirectMovedSlug(error: unknown, search: Record<string, string | string[] | undefined>) {
+  if (error instanceof SlugMoved) permanentRedirect(bookingRedirectPath(error.slug, search));
+}
 
 export async function generateMetadata({
   params,
@@ -27,7 +33,12 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const business = await loadPublicBusiness(slug);
+  let business: Awaited<ReturnType<typeof loadPublicBusiness>> = null;
+  try {
+    business = await loadPublicBusiness(slug);
+  } catch (error) {
+    if (!(error instanceof SlugMoved)) throw error;
+  }
   if (!business) return { title: { absolute: "Página não encontrada · AgendaPix" }, robots: { index: false, follow: false } };
   const primary = business.services[0]?.name;
   const title = `${business.name} · Agende online`;
@@ -59,16 +70,23 @@ export default async function BookingPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams?: Promise<{ bookingId?: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { slug } = await params;
-  const business = await loadPublicBusiness(slug);
-  if (!business) notFound();
   const search = searchParams ? await searchParams : undefined;
+  const bookingId = typeof search?.bookingId === "string" ? search.bookingId : undefined;
+  let business: Awaited<ReturnType<typeof loadPublicBusiness>> = null;
+  try {
+    business = await loadPublicBusiness(slug);
+  } catch (error) {
+    redirectMovedSlug(error, search ?? {});
+    throw error;
+  }
+  if (!business) notFound();
   return (
     <BookingFlow
       slug={slug}
-      initialBookingId={search?.bookingId}
+      initialBookingId={bookingId}
       initialBusiness={toPublicBusinessData(business)}
       legalPagesPublished={legalPagesPublished()}
     />

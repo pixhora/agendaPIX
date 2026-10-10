@@ -13,6 +13,8 @@ export interface OnboardingData {
   plan: "base" | "completo";
   businessName: string;
   slug: string;
+  /** URL https da logo. Vazio até o upload devolver o endereço. A prévia local não entra aqui. */
+  logoUrl: string;
   /** False while the public link still follows the business name. */
   slugTouched?: boolean;
   serviceName: string;
@@ -29,6 +31,4 @@ export interface OnboardingData {
   contactWhatsapp?: string;
   /** Sete dias, todos fechados até a pessoa abrir. */
   days?: StoreDay[];
-  /** URL https gravada pelo upload. A prévia local (blob:) não entra aqui. */
-  logoUrl?: string | null;
 }

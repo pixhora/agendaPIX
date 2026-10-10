@@ -12,12 +12,6 @@ export const serviceFormSchema = z.object({
   priceCents: centsSchema, depositCents: centsSchema, active: z.boolean(),
   depositPolicy: depositPolicySchema.optional(),
 }).strict().refine((value) => value.depositCents <= value.priceCents, { path: ["depositCents"], message: "O sinal não pode superar o preço." });
-/** PATCH do perfil da loja. `logoUrl` fica nulo até o upload do backend existir. */
-export const businessProfileSchema = z.object({
-  name: z.string().trim().min(1, "Digite o nome da sua loja.").max(60, "Digite o nome da sua loja."),
-  slug: z.string().trim().min(3, "Use de 3 a 40 letras, números ou hífens.").max(40, "Use de 3 a 40 letras, números ou hífens.").regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Use de 3 a 40 letras, números ou hífens."),
-  logoUrl: z.union([z.string().trim().url(), z.null()]),
-}).strict();
 
 export const hoursSchema = z.array(z.object({
   weekday: z.number().int().min(0).max(6),

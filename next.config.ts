@@ -12,6 +12,8 @@ const nextConfig: NextConfig = {
     // Tira o CSS do caminho crítico (pedido extra antes da primeira pintura).
     inlineCss: true,
   },
+  // Sharp no runtime Node da Vercel. A rota da logo não usa Edge.
+  serverExternalPackages: ["sharp"],
   async headers() {
     return staticAssetHeaderRules(process.env.NODE_ENV === "development");
   },

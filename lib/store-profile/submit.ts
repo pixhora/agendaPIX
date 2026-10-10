@@ -1,4 +1,5 @@
 import type { OnboardingData } from "@/components/onboarding/types";
+import { businessLogoUrlSchema } from "@/lib/contracts";
 import { storeProfileSchema } from "@/lib/onboarding/validation";
 import { normalizeSlug } from "@/lib/slug";
 import { emptyStoreDays, normalizeStoreDays } from "./model";
@@ -11,11 +12,12 @@ export type StoreFieldErrors = {
   price?: string;
   deposit?: string;
   days?: string;
+  logo?: string;
   dayTimes?: Record<number, string>;
 };
 
 export type StorePayload = {
-  business: { name: string; slug: string; timezone: "America/Sao_Paulo"; logoUrl: string | null };
+  business: { name: string; slug: string; timezone: "America/Sao_Paulo"; logoUrl: string };
   service: { name: string; durationMinutes: number; priceCents: number; depositCents: number };
   hours: { weekday: number; opensAt: string; closesAt: string }[];
 };
@@ -55,14 +57,16 @@ export function profileFromOnboarding(data: OnboardingData) {
     depositEnabled: (data.depositMode ?? "none") !== "none",
     depositCents: (data.depositMode ?? "none") === "none" ? 0 : data.depositCents,
     days: normalizeStoreDays(data.days ?? emptyStoreDays()),
-    logoUrl: data.logoUrl && /^https?:\/\//.test(data.logoUrl) ? data.logoUrl : null,
   };
 }
 
 /** Client validation. An empty form never produces a payload. */
-export function storeSubmission(data: OnboardingData): { ok: true; payload: StorePayload } | { ok: false; errors: StoreFieldErrors } {
+export function storeSubmission(data: OnboardingData, options?: { logoSelected?: boolean }): { ok: true; payload: StorePayload } | { ok: false; errors: StoreFieldErrors } {
   const parsed = storeProfileSchema.safeParse(profileFromOnboarding(data));
-  if (!parsed.success) return { ok: false, errors: mapStoreIssues(parsed.error) };
+  const errors = parsed.success ? {} : mapStoreIssues(parsed.error);
+  const logo = businessLogoUrlSchema.safeParse(data.logoUrl);
+  if (!logo.success && !options?.logoSelected) errors.logo = "Adicione a logo da loja.";
+  if (!parsed.success || errors.logo) return { ok: false, errors };
   const value = parsed.data;
   return {
     ok: true,
@@ -71,7 +75,7 @@ export function storeSubmission(data: OnboardingData): { ok: true; payload: Stor
         name: value.name.trim(),
         slug: value.slug,
         timezone: "America/Sao_Paulo",
-        logoUrl: value.logoUrl,
+        logoUrl: logo.success ? logo.data : "",
       },
       service: {
         name: value.serviceName.trim(),
@@ -100,7 +104,8 @@ export function storeErrorsFromApiFields(fields: unknown): StoreFieldErrors {
   for (const [key, value] of Object.entries(fields as Record<string, unknown>)) {
     const message = typeof value === "string" ? value : null;
     if (!message) continue;
-    if (key.includes("slug")) errors.slug = "Esse link já está em uso. Tente outro.";
+    if (key.includes("logo")) errors.logo = "Adicione a logo da loja.";
+    else if (key.includes("slug")) errors.slug = "Esse link já está em uso. Tente outro.";
     else if (key.includes("duration")) errors.duration = "Escolha a duração.";
     else if (key.includes("deposit")) errors.deposit = "O sinal não pode ser maior que o preço.";
     else if (key.includes("price")) errors.price = "Digite o preço.";

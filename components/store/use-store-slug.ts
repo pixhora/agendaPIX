@@ -9,7 +9,7 @@ const reserved = new Set<string>(RESERVED_BUSINESS_SLUGS);
 
 type Remote = {
   slug: string;
-  phase: "checking" | "ready" | "error";
+  phase: "checking" | "ready" | "error" | "rate_limited";
   available?: boolean;
   reason?: "taken" | "reserved" | "invalid" | "too_short" | null;
   suggestions: string[];
@@ -35,7 +35,7 @@ export function useStoreSlug(value: string, options?: { ownedSlug?: string; paus
         .then((result) => {
           if (cancelled) return;
           if (!result.ok) {
-            setRemote({ slug: finalSlug, phase: "error", suggestions: [] });
+            setRemote({ slug: finalSlug, phase: result.kind === "rate_limited" ? "rate_limited" : "error", suggestions: [] });
             return;
           }
           setRemote({

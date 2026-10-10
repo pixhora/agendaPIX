@@ -20,7 +20,8 @@ Tabelas de domínio têm `id`, `created_at` e `updated_at`. Tabelas de auditoria
 
 | Tabela | Campos principais | Regras |
 | --- | --- | --- |
-| `businesses` | `owner_id`, `name`, `slug`, `timezone` | Dono referencia `user`; slug único em minúsculas, números e hífens; nome não vazio. |
+| `businesses` | `owner_id`, `name`, `slug`, `timezone`, `logo_url` | Dono referencia `user`; slug único em minúsculas, números e hífens; nome não vazio. `logo_url` é nulo ou `https` com caminho. |
+| `business_slug_history` | `old_slug`, `business_id`, `created_at` | `old_slug` é único. Outro negócio não reivindica um alias. O mesmo dono recupera o seu no PATCH. |
 | `business_pix_keys` | `business_id`, `type`, `ciphertext`, `nonce`, `key_version`, `hint`, `deactivated_at`, `deactivation_reason` | Uma chave por negócio. A migration adiciona `deactivated_at` e `deactivation_reason` e marca as linhas existentes como inativas (`deactivation_reason = pix_key_retired`). Não apaga ciphertext. A chave não entra em cobrança nem em payload. |
 | `services` | `business_id`, `name`, `duration_minutes`, `price_cents`, `deposit_cents`, `active` | Duração positiva; preço e sinal não negativos; sinal não supera preço. |
 | `business_hours` | `business_id`, `weekday`, `opens_at`, `closes_at` | Domingo = 0; sábado = 6; um intervalo por dia; abertura anterior ao fechamento. Ausência do dia significa fechado. |
@@ -421,3 +422,28 @@ Quando `current_period_end` passa sem renovação, o acesso cai pela regra do #2
 O #29 tem cron de reconciliação de Pix (`lib/payments/cron.ts`), não de aviso de assinatura. O lembrete idempotente de D-3 do período pago, com botão para o mesmo checkout, fica pendente. Esta entrega não cria essa infra.
 
 Na branch de integração esta migration é a `0015_subscription_requests`, depois das duas do Pix (`0013` e `0014`). O #33 tem duas migrations, então o número não é 0014.
+
+## Perfil do negócio
+
+Contratos Zod em `lib/contracts` (`business-profile.ts`, `errors.ts`, reexportados por `index.ts`). O front importa dali. Não há default de nome, slug ou logo.
+
+| Export | Forma |
+| --- | --- |
+| `businessProfileSchema` | `{ name, slug, logoUrl }` obrigatórios. Nome 2–60, slug 3–40 com a lista reservada de `lib/slug.ts`, logo `https` em `*.public.blob.vercel-storage.com`. |
+| `businessProfilePatchRequestSchema` | parcial, pelo menos um campo. `null` não apaga. |
+| `businessProfileResponseSchema` | `{ id, name, slug, logoUrl, publicPath, publicUrl }`. `logoUrl` e `publicUrl` podem ser `null`. |
+| `logoUploadResponseSchema` | `{ logoUrl }`. |
+| `slugAvailabilityResponseSchema` | `{ input, normalized, valid, available, reason, suggestions }`. `reason`: `taken`, `reserved`, `invalid` ou `too_short` (este último a tela de cadastro já usa). `suggestions` tem no máximo 3 e vem vazio quando o link está livre, inválido ou curto. |
+| `apiErrorCodeSchema` | `invalid_input`, `unauthorized`, `business_unavailable`, `slug_taken`, `rate_limited`, `logo_invalid`, `logo_too_large`, `blob_unavailable`, `internal_error`. |
+
+O corpo de erro continua `{ error: { code, message, details? } }`. `handleHttp` espalha `error.details` no objeto `error`.
+
+`GET /api/public/slugs/availability?slug=&segment=&uf=` permanece o caminho. Sem sessão, só leitura, 30 por minuto por IP. `suggestions` sai de uma consulta só (`businesses.slug` UNION `business_slug_history.old_slug`). Alias conta como tomado. Ordem dos candidatos: sufixo do segmento, sem hífen, UF, depois `-2`…`-12`.
+
+`PATCH /api/businesses/{businessId}/profile` exige sessão e dono. `401 unauthorized`, `404 business_unavailable` (uuid inválido ou negócio de outro), `400 invalid_input` com `details.fields`, `409 slug_taken` com `details.constraint` (`slug`, `slug_alias` ou `businesses_slug_unique`). A corrida do índice único (`23505`) também vira `409 slug_taken`. Resposta `200` no formato acima. `publicPath` é `/{slug}`. `publicUrl` usa `BETTER_AUTH_URL` (`publicBusinessPageUrl`). A origem canônica segue `NEXT_PUBLIC_SITE_URL` (`siteOrigin`). Não há env nova de prefixo.
+
+`POST /api/businesses/{businessId}/logo` é `multipart` no campo `logo`, runtime Node. PNG, JPEG ou WebP até 2 MB, conferidos pelos bytes. SVG e o resto: `400 logo_invalid`. Acima de 2 MB: `413 logo_too_large`. Sharp reduz ao máximo 512 px sem aumentar e grava WebP sem EXIF. `put` usa `access: "public"` e `addRandomSuffix: true` ([docs](https://vercel.com/docs/vercel-blob/using-blob-sdk#put)). 10 envios por hora por dono: `429 rate_limited`. Sem `BLOB_READ_WRITE_TOKEN` em produção: `503 blob_unavailable`, sem cair no host falso. Fora de produção o adaptador falso grava `https://blob.fake.local/...`. A resposta e a coluna `businesses.logo_url` recebem a URL.
+
+Slug antigo vira alias. Outro negócio não o reivindica. O mesmo dono recupera: a linha do alias sai e o slug que ele deixa entra no histórico. Página `/{slug}` e subcaminhos (incluindo `opengraph-image` e query) respondem `308` no proxy. As rotas `/api/public/{slug}/services`, `/availability`, `/bookings` e `/bookings/{id}/payment` também. O `308` leva `Cache-Control: no-store` porque o dono pode recuperar o alias. `/api/public/slugs/availability` e `/api/public/config` não são página de negócio.
+
+Migration `db/migrations/0018_business_profile.sql`: coluna `logo_url` e tabela `business_slug_history`, com gatilho que recusa sobreposição entre slug atual e alias (`23505`). CSP `img-src` inclui `https://*.public.blob.vercel-storage.com`. `https://blob.fake.local` só entra com `NODE_ENV=development`. `serverExternalPackages` inclui `sharp`.

@@ -12,6 +12,7 @@ import { STORE_DURATION_MINUTES } from "@/lib/onboarding/validation";
 import { normalizeSlug } from "@/lib/slug";
 import { STORE_WEEKDAYS, emptyStoreDays } from "@/lib/store-profile/model";
 import { SLUG_COPY } from "@/lib/store-profile/slug-ui";
+import { peekPendingLogo } from "@/lib/store-profile/pending-logo";
 import { storeSubmission, type StoreFieldErrors } from "@/lib/store-profile/submit";
 import type { OnboardingData, StoreDay } from "@/components/onboarding/types";
 import { LogoUpload } from "./LogoUpload";
@@ -20,6 +21,7 @@ import { useStoreSlug } from "./use-store-slug";
 
 const FOCUS: Record<string, string> = {
   name: "store-name",
+  logo: "store-logo-button",
   slug: "store-slug",
   serviceName: "store-service-name",
   duration: "store-duration",
@@ -32,6 +34,7 @@ export function StoreProfileForm({
   data,
   onChange,
   onContinue,
+  onLogoPreview,
   prefix,
   pending,
   conflict,
@@ -40,12 +43,14 @@ export function StoreProfileForm({
   data: OnboardingData;
   onChange: (partial: Partial<OnboardingData>) => void;
   onContinue: () => void;
+  onLogoPreview?: (url: string | null) => void;
   prefix: string;
   pending?: boolean;
   conflict?: { slug: string; suggestions: string[] } | null;
   formError?: string | null;
 }) {
   const [attempted, setAttempted] = useState(false);
+  const [logoPicked, setLogoPicked] = useState(false);
   const [blurred, setBlurred] = useState<Record<string, boolean>>({});
   const days = data.days ?? emptyStoreDays();
   const finalSlug = normalizeSlug(data.slug, { final: true });
@@ -54,7 +59,7 @@ export function StoreProfileForm({
   const status = forced ? "taken" as const : slug.status;
   const message = forced ? SLUG_COPY.taken : slug.message;
   const suggestions = forced ? conflict?.suggestions.slice(0, 2) ?? [] : slug.suggestions;
-  const checked = storeSubmission({ ...data, slug: finalSlug, days });
+  const checked = storeSubmission({ ...data, slug: finalSlug, days }, { logoSelected: logoPicked || Boolean(data.logoUrl) });
   const errors: StoreFieldErrors = checked.ok ? {} : checked.errors;
   const show = (key: keyof StoreFieldErrors) => Boolean((attempted || blurred[key]) && errors[key]);
 
@@ -75,7 +80,7 @@ export function StoreProfileForm({
   }
 
   function focusFirst(next: StoreFieldErrors) {
-    const order = ["name", "slug", "serviceName", "duration", "price", "deposit", "days"] as const;
+    const order = ["name", "slug", "logo", "serviceName", "duration", "price", "deposit", "days"] as const;
     const key = order.find((item) => next[item]);
     const id = key ? FOCUS[key] : "store-slug";
     document.getElementById(id)?.focus();
@@ -87,7 +92,7 @@ export function StoreProfileForm({
       noValidate
       onSubmit={(event) => {
         event.preventDefault();
-        const result = storeSubmission({ ...data, slug: finalSlug, days });
+        const result = storeSubmission({ ...data, slug: finalSlug, days }, { logoSelected: logoPicked || Boolean(peekPendingLogo()) });
         if (!result.ok || status !== "available") {
           const next = result.ok ? {} : result.errors;
           setAttempted(true);
@@ -144,7 +149,13 @@ export function StoreProfileForm({
           onPickSuggestion={(suggestion) => onChange({ slug: suggestion, slugTouched: true })}
         />
 
-        <LogoUpload url={data.logoUrl ?? null} disabled={pending} onChangeUrl={(logoUrl) => onChange({ logoUrl })} />
+        <LogoUpload
+          url={data.logoUrl || null}
+          disabled={pending}
+          onLocalPreview={(url) => { setLogoPicked(Boolean(url)); onLogoPreview?.(url); }}
+          onChangeUrl={(logoUrl) => { if (logoUrl) onChange({ logoUrl }); }}
+        />
+        {show("logo") ? <FieldError id="store-logo-error">{errors.logo}</FieldError> : null}
 
         <div className="grid gap-1.5">
           <Label htmlFor="store-service-name">Nome do serviço</Label>

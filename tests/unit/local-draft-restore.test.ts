@@ -32,6 +32,7 @@ const INCIDENT: OnboardingData = {
   opensAt: "09:00",
   closesAt: "19:00",
   email: "",
+  logoUrl: "",
 };
 
 function decide(raw: unknown, sessionEmail: string | null, step = "service") {

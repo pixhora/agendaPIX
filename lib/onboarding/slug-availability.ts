@@ -1,4 +1,4 @@
-import { slugAvailabilityWireSchema } from "@/lib/onboarding/validation";
+import { slugAvailabilityResponseSchema } from "@/lib/contracts";
 
 export type SlugReason = "too_short" | "invalid" | "reserved" | "taken";
 
@@ -13,24 +13,12 @@ export type SlugAvailability = {
 
 export type SlugCheckResult =
   | { ok: true; availability: SlugAvailability }
-  | { ok: false; kind: "unverified" | "network" };
+  | { ok: false; kind: "unverified" | "network" | "rate_limited"; retryAfter?: number };
 
 export function parseSlugAvailability(body: unknown): SlugAvailability | null {
-  const parsed = slugAvailabilityWireSchema.safeParse(body);
+  const parsed = slugAvailabilityResponseSchema.safeParse(body);
   if (!parsed.success) return null;
-  const reason = parsed.data.reason ?? null;
-  const normalized = parsed.data.normalized ?? "";
-  const suggestions = (parsed.data.suggestions ?? []).filter((item) => item.length > 0).slice(0, 3);
-  const hideSuggestions = parsed.data.available || reason === "invalid" || reason === "too_short";
-  const valid = parsed.data.valid ?? (reason !== "invalid" && reason !== "too_short");
-  return {
-    input: parsed.data.input ?? normalized,
-    normalized,
-    valid,
-    available: parsed.data.available,
-    reason,
-    suggestions: hideSuggestions ? [] : suggestions,
-  };
+  return parsed.data;
 }
 
 function isAbort(error: unknown): boolean {
@@ -62,6 +50,10 @@ export async function fetchSlugAvailability(
   } catch (error) {
     if (isAbort(error)) throw error;
     return { ok: false, kind: "network" };
+  }
+  if (response.status === 429) {
+    const retryAfter = Number(response.headers.get("Retry-After"));
+    return { ok: false, kind: "rate_limited", retryAfter: Number.isFinite(retryAfter) ? retryAfter : undefined };
   }
   if (response.status === 404 || response.status >= 500 || !response.ok) return { ok: false, kind: "unverified" };
   const body = await response.json().catch(() => null);

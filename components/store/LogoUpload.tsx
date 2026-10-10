@@ -3,15 +3,21 @@
 import { useRef, useState } from "react";
 import { ImageIcon } from "lucide-react";
 import { logoRejection, uploadLogoFile } from "@/lib/store-profile/logo";
+import { rememberPendingLogo } from "@/lib/store-profile/pending-logo";
 import { cn } from "@/lib/utils";
 
 export function LogoUpload({
   url,
   onChangeUrl,
+  businessId,
+  onLocalPreview,
   disabled,
 }: {
   url: string | null;
   onChangeUrl: (url: string | null) => void;
+  /** Quando a página já existe, o arquivo vai para POST /api/businesses/{id}/logo. */
+  businessId?: string;
+  onLocalPreview?: (url: string | null) => void;
   disabled?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -44,9 +50,19 @@ export function LogoUpload({
     setCanRetry(true);
     setError(null);
     setConfirmRemove(false);
-    setLocalPreview(URL.createObjectURL(file));
+    const previewUrl = URL.createObjectURL(file);
+    setLocalPreview(previewUrl);
+    onLocalPreview?.(previewUrl);
+    if (!businessId) {
+      rememberPendingLogo(file);
+      return;
+    }
     setProgress(0);
-    const result = await uploadLogoFile(file, { signal: controller.signal, onProgress: setProgress });
+    const result = await uploadLogoFile(file, {
+      signal: controller.signal,
+      onProgress: setProgress,
+      endpoint: `/api/businesses/${encodeURIComponent(businessId)}/logo`,
+    });
     if (controller.signal.aborted || result.ok === false && result.cancelled) {
       setProgress(null);
       return;
@@ -65,6 +81,7 @@ export function LogoUpload({
       <div className="flex items-center gap-4">
         <button
           type="button"
+          id="store-logo-button"
           disabled={disabled || busy}
           aria-busy={busy || undefined}
           aria-describedby={error ? errorId : "store-logo-help"}
@@ -123,15 +140,15 @@ export function LogoUpload({
           {shown && !busy ? (
             <div className="flex flex-wrap gap-2">
               <button type="button" className="inline-flex min-h-11 items-center rounded-full border border-border px-4 text-sm font-semibold" onClick={openPicker} disabled={disabled}>Trocar</button>
-              {confirmRemove ? (
+              {!businessId && confirmRemove ? (
                 <span className="flex flex-wrap items-center gap-2 text-sm">
                   Remover logo?
-                  <button type="button" className="inline-flex min-h-11 items-center font-semibold text-destructive underline" onClick={() => { setConfirmRemove(false); setLocalPreview(null); onChangeUrl(null); }}>Sim</button>
+                  <button type="button" className="inline-flex min-h-11 items-center font-semibold text-destructive underline" onClick={() => { setConfirmRemove(false); setLocalPreview(null); onLocalPreview?.(null); rememberPendingLogo(null); if (!businessId) onChangeUrl(null); }}>Sim</button>
                   <button type="button" className="inline-flex min-h-11 items-center font-semibold underline" onClick={() => setConfirmRemove(false)}>Cancelar</button>
                 </span>
-              ) : (
+              ) : !businessId ? (
                 <button type="button" className="inline-flex min-h-11 items-center rounded-full border border-border px-4 text-sm font-semibold" disabled={disabled} onClick={() => setConfirmRemove(true)}>Remover</button>
-              )}
+              ) : null}
             </div>
           ) : null}
           {error && canRetry ? (

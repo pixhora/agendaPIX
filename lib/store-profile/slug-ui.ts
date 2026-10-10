@@ -9,6 +9,7 @@ export const SLUG_COPY = {
   reserved: "Esse link é reservado pelo sistema. Escolha outro.",
   invalid: "Use de 3 a 40 letras, números ou hífens.",
   error: "Não deu para verificar agora.",
+  rateLimited: "Muitas tentativas. Espere um pouco e tente de novo.",
 } as const;
 
 export type SlugUiStatus = "idle" | "checking" | "available" | "taken" | "reserved" | "invalid" | "error";
@@ -26,7 +27,7 @@ function takenSuggestions(suggestions: string[] | undefined): string[] {
 /** Maps the live check to the four statuses plus a network error. Suggestions only when the server sent some. */
 export function slugView(input: {
   slug: string;
-  phase: "idle" | "checking" | "ready" | "error";
+  phase: "idle" | "checking" | "ready" | "error" | "rate_limited";
   available?: boolean;
   reason?: "taken" | "reserved" | "invalid" | "too_short" | null;
   suggestions?: string[];
@@ -40,6 +41,7 @@ export function slugView(input: {
   if (!isPublicSlug(finalSlug)) return { status: "invalid", message: SLUG_COPY.invalid, suggestions: [] };
   if (reserved.has(finalSlug)) return { status: "reserved", message: SLUG_COPY.reserved, suggestions: [] };
   if (input.phase === "checking") return { status: "checking", message: SLUG_COPY.checking, suggestions: [] };
+  if (input.phase === "rate_limited") return { status: "error", message: SLUG_COPY.rateLimited, suggestions: [] };
   if (input.phase === "error") return { status: "error", message: SLUG_COPY.error, suggestions: [] };
   if (input.phase !== "ready") return { status: "checking", message: SLUG_COPY.checking, suggestions: [] };
   if (input.reason === "reserved") return { status: "reserved", message: SLUG_COPY.reserved, suggestions: [] };

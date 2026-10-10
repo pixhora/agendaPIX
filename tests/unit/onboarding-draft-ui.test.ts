@@ -12,6 +12,7 @@ const body = buildOnboardingDraftBody({
   plan: "base",
   businessName: "Studio Bella",
   slug: "studio-bella-",
+  logoUrl: "https://ce0rcu23vrrdzqap.public.blob.vercel-storage.com/logos/test.webp",
   serviceName: "Design",
   durationMinutes: 45,
   priceCents: 6590,

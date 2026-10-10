@@ -20,8 +20,10 @@ describe("empty store profile", () => {
       openDays: [],
       opensAt: "",
       closesAt: "",
-      logoUrl: null,
+      logoUrl: "",
     });
+    expect(empty.depositMode).not.toBe("30");
+    expect(empty.durationMinutes).not.toBe(45);
     expect(empty.days?.every((day) => !day.open && day.opensAt === "" && day.closesAt === "")).toBe(true);
     expect(JSON.stringify(empty)).not.toMatch(/Gordão|Corte de Cabelo|Studio da Ana|Corte masculino|09:00|19:00/);
 
@@ -35,6 +37,7 @@ describe("empty store profile", () => {
       expect(result.errors.duration).toBe("Escolha a duração.");
       expect(result.errors.price).toBe("Digite o preço.");
       expect(result.errors.days).toBe("Abra pelo menos um dia.");
+      expect(result.errors.logo).toBe("Adicione a logo da loja.");
     }
     expect(onboardingInputSchema.safeParse({
       business: { name: "", slug: "" },
@@ -51,6 +54,7 @@ describe("empty store profile", () => {
       serviceName: "Corte novo",
       durationMinutes: 45,
       priceCents: 4500,
+      logoUrl: "https://ce0rcu23vrrdzqap.public.blob.vercel-storage.com/logos/corte.webp",
       days: (createOnboardingData("base").days ?? []).map((day) => (
         day.weekday === 1 ? { ...day, open: true, opensAt: "10:00", closesAt: "18:00" } : day
       )),
@@ -97,6 +101,6 @@ describe("logo file check", () => {
 
 describe("old slug redirect notice", () => {
   it("stays off until a 308 from the previous link exists", () => {
-    expect(OLD_SLUG_REDIRECT_READY).toBe(false);
+    expect(OLD_SLUG_REDIRECT_READY).toBe(true);
   });
 });

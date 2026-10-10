@@ -1,16 +1,28 @@
+import { businessProfilePatchRequestSchema } from "@/lib/contracts";
 import { readApiError } from "@/lib/onboarding/api-error";
-import { businessProfileSchema } from "@/lib/dashboard/validation";
+import { profileErrorCopy } from "./api-copy";
 
 export type ProfileSaveResult =
   | { ok: true }
-  | { ok: false; status: number; code: string; suggestions: string[] };
+  | { ok: false; status: number; code: string; message: string; suggestions: string[]; fields: Record<string, string> };
+
+function fieldMap(fields: unknown): Record<string, string> {
+  if (!fields || typeof fields !== "object" || Array.isArray(fields)) return {};
+  const mapped: Record<string, string> = {};
+  for (const [key, value] of Object.entries(fields as Record<string, unknown>)) {
+    if (typeof value === "string" && value.length > 0) mapped[key] = value;
+  }
+  return mapped;
+}
 
 export async function patchBusinessProfile(
   businessId: string,
-  body: { name: string; slug: string; logoUrl: string | null },
+  body: { name?: string; slug?: string; logoUrl?: string },
 ): Promise<ProfileSaveResult> {
-  const parsed = businessProfileSchema.safeParse(body);
-  if (!parsed.success) return { ok: false, status: 400, code: "invalid_input", suggestions: [] };
+  const parsed = businessProfilePatchRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return { ok: false, status: 400, code: "invalid_input", message: profileErrorCopy("invalid_input"), suggestions: [], fields: {} };
+  }
   try {
     const response = await fetch(`/api/businesses/${encodeURIComponent(businessId)}/profile`, {
       method: "PATCH",
@@ -20,9 +32,16 @@ export async function patchBusinessProfile(
     });
     if (response.ok) return { ok: true };
     const error = await readApiError(response);
-    const taken = response.status === 409 && (error.code === "slug_taken" || error.code === "slug_unavailable");
-    return { ok: false, status: response.status, code: taken ? "slug_taken" : error.code, suggestions: error.suggestions ?? [] };
+    const code = response.status === 409 ? "slug_taken" : error.code;
+    return {
+      ok: false,
+      status: response.status,
+      code,
+      message: profileErrorCopy(code),
+      suggestions: error.suggestions ?? [],
+      fields: fieldMap(error.fields),
+    };
   } catch {
-    return { ok: false, status: 0, code: "network", suggestions: [] };
+    return { ok: false, status: 0, code: "network", message: profileErrorCopy("internal_error"), suggestions: [], fields: {} };
   }
 }

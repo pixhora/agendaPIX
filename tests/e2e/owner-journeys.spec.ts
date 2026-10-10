@@ -77,6 +77,18 @@ test("cadastro concluído → \"Ir para o painel\" abre /dashboard com o negóci
   const email = `e2e-novo-${id}@example.com`;
   const name = `Estúdio Novo ${id}`;
 
+  await page.route("**/api/onboarding/drafts**", async (route) => {
+    const method = route.request().method();
+    if (method !== "POST" && method !== "PATCH") {
+      await route.continue();
+      return;
+    }
+    const body = route.request().postDataJSON() as { data?: { business?: { logoUrl?: string } } };
+    if (body?.data?.business && !body.data.business.logoUrl) {
+      body.data.business.logoUrl = "https://blob.fake.local/logos/e2e-onboarding.webp";
+    }
+    await route.continue({ postData: JSON.stringify(body) });
+  });
   await page.goto("/onboarding");
   await expect(page.getByRole("heading", { name: "Sua loja" })).toBeVisible();
   await page.getByLabel("Nome da loja").fill(name);
@@ -88,6 +100,11 @@ test("cadastro concluído → \"Ir para o painel\" abre /dashboard com o negóci
   await price.click();
   await price.pressSequentially("5000");
   await expect(price).toHaveValue(/50,00/);
+  await page.locator("input[type=file]").setInputFiles({
+    name: "logo.png",
+    mimeType: "image/png",
+    buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64"),
+  });
   await page.locator("#store-day-1").check();
   await page.locator("#store-open-1").fill("09:00");
   await page.locator("#store-close-1").fill("18:00");

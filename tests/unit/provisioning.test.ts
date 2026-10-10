@@ -14,6 +14,7 @@ const mockOnboardingData: OnboardingData = {
   opensAt: "09:00",
   closesAt: "19:00",
   email: "dono@barbearia.com",
+  logoUrl: "https://ce0rcu23vrrdzqap.public.blob.vercel-storage.com/logos/test.webp",
 };
 
 describe("Provisioning contract (POST /api/onboarding)", () => {

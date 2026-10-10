@@ -22,6 +22,7 @@ export function createOnboardingData(plan: "base" | "completo"): OnboardingData 
     plan,
     businessName: "",
     slug: "",
+    logoUrl: "",
     slugTouched: false,
     serviceName: "",
     durationMinutes: 0,
@@ -33,7 +34,6 @@ export function createOnboardingData(plan: "base" | "completo"): OnboardingData 
     closesAt: "",
     email: "",
     days: emptyStoreDays(),
-    logoUrl: null,
   };
 }
 
@@ -84,7 +84,7 @@ export function restoreOnboardingDraft(raw: unknown, plan: "base" | "completo"):
     email: typeof record.email === "string" ? record.email : base.email,
     segment: typeof record.segment === "string" ? record.segment : undefined,
     days: daysFromRecord(record),
-    logoUrl: typeof record.logoUrl === "string" && record.logoUrl.length > 0 ? record.logoUrl : null,
+    logoUrl: typeof record.logoUrl === "string" ? record.logoUrl : "",
   };
   next.slugTouched = typeof record.slugTouched === "boolean" ? record.slugTouched : inferSlugTouched(next);
   next.depositMode = typeof record.depositMode === "string" && DEPOSIT_MODES.has(record.depositMode as DepositMode)
@@ -135,6 +135,7 @@ export function draftInputFromOnboarding(data: OnboardingData): OnboardingDraftI
     segment: data.segment,
     businessName: data.businessName,
     slug: data.slug,
+    logoUrl: data.logoUrl,
     serviceName: data.serviceName,
     durationMinutes: data.durationMinutes,
     priceCents: data.priceCents,

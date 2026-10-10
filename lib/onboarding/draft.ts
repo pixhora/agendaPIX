@@ -27,6 +27,7 @@ export type OnboardingDraftInput = {
   segment?: string;
   businessName: string;
   slug: string;
+  logoUrl: string;
   serviceName: string;
   durationMinutes: number;
   priceCents: number;
@@ -42,7 +43,7 @@ export type OnboardingDraftBody = {
   plan: "base" | "completo";
   segment: OnboardingSegment;
   data: {
-    business: { name: string; slug: string; timezone: "America/Sao_Paulo" };
+    business: { name: string; slug: string; logoUrl: string; timezone: "America/Sao_Paulo" };
     service: { name: string; durationMinutes: number; priceCents: number; depositCents: number };
     hours: { weekday: number; opensAt: string; closesAt: string }[];
   };
@@ -58,6 +59,7 @@ export function buildOnboardingDraftBody(input: OnboardingDraftInput): Onboardin
       business: {
         name: input.businessName.trim(),
         slug: normalizeSlug(input.slug, { final: true }),
+        logoUrl: input.logoUrl.trim(),
         timezone: "America/Sao_Paulo",
       },
       service: {

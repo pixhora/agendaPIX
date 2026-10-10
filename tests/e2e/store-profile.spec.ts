@@ -86,6 +86,11 @@ test.describe("configurações da loja", () => {
     const name = page.getByLabel("Nome da loja");
     await expect(name).not.toHaveValue("");
     await name.fill("Loja E2E editada");
+    const link = page.getByLabel("Seu link");
+    const current = await link.inputValue();
+    await link.fill(`${current}-novo`);
+    await expect(page.getByText("vai continuar funcionando")).toBeVisible();
+    await link.fill(current);
     await expect(page.getByText("vai continuar funcionando")).toHaveCount(0);
     await page.getByRole("button", { name: "Salvar alterações" }).click();
     await expect(page.getByText("Alterações salvas.")).toBeVisible();

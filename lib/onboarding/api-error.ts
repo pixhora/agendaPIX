@@ -4,6 +4,7 @@ export type ApiErrorBody = {
   retryAfter?: number;
   publicPath?: string;
   fields?: unknown;
+  details?: unknown;
 };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -43,7 +44,8 @@ export async function readApiError(response: Response): Promise<ApiErrorBody> {
     suggestions: stringList(error?.suggestions),
     retryAfter,
     publicPath,
-    fields: error?.fields,
+    fields: error?.fields ?? asRecord(error?.details)?.fields,
+    details: error?.details,
   };
 }
 

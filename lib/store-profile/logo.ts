@@ -1,4 +1,7 @@
-export const LOGO_MAX_BYTES = 2 * 1024 * 1024;
+import { LOGO_UPLOAD_FIELD, LOGO_UPLOAD_MAX_BYTES, logoUploadResponseSchema } from "@/lib/contracts";
+import { profileErrorCopy } from "./api-copy";
+
+export const LOGO_MAX_BYTES = LOGO_UPLOAD_MAX_BYTES;
 
 const ACCEPTED_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 
@@ -27,11 +30,12 @@ export function uploadLogoFile(
 ): Promise<LogoUploadResult> {
   const rejection = logoRejection(file);
   if (rejection) return Promise.resolve({ ok: false, message: rejection });
-  const endpoint = options.endpoint ?? "/api/uploads/logo";
+  const endpoint = options.endpoint;
+  if (!endpoint) return Promise.resolve({ ok: false, message: profileErrorCopy("blob_unavailable") });
   return new Promise((resolve) => {
     const xhr = new XMLHttpRequest();
     const form = new FormData();
-    form.append("file", file);
+    form.append(LOGO_UPLOAD_FIELD, file);
     xhr.open("POST", endpoint);
     xhr.upload.onprogress = (event) => {
       if (!event.lengthComputable || event.total <= 0) return;
@@ -41,9 +45,9 @@ export function uploadLogoFile(
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
-          const body = JSON.parse(xhr.responseText) as { url?: unknown };
-          if (typeof body.url === "string" && body.url.length > 0) {
-            finish({ ok: true, url: body.url });
+          const parsed = logoUploadResponseSchema.safeParse(JSON.parse(xhr.responseText));
+          if (parsed.success) {
+            finish({ ok: true, url: parsed.data.logoUrl });
             return;
           }
         } catch {
@@ -51,15 +55,23 @@ export function uploadLogoFile(
           return;
         }
       }
-      if (xhr.status === 415) {
-        finish({ ok: false, message: "Formato não aceito. Envie PNG, JPEG ou WebP." });
+      if (xhr.status === 400) {
+        finish({ ok: false, message: profileErrorCopy("logo_invalid") });
         return;
       }
       if (xhr.status === 413) {
         finish({ ok: false, message: `A imagem tem ${logoSizeLabel(file.size)} MB. O limite é 2 MB.` });
         return;
       }
-      finish({ ok: false, message: "Não deu para enviar a imagem. Tente de novo." });
+      if (xhr.status === 429) {
+        finish({ ok: false, message: profileErrorCopy("rate_limited") });
+        return;
+      }
+      if (xhr.status === 503) {
+        finish({ ok: false, message: profileErrorCopy("blob_unavailable") });
+        return;
+      }
+      finish({ ok: false, message: profileErrorCopy("internal_error") });
     };
     xhr.onerror = () => finish({ ok: false, message: "Não deu para enviar a imagem. Tente de novo." });
     xhr.onabort = () => finish({ ok: false, message: "", cancelled: true });
