@@ -51,7 +51,9 @@ export async function shrinkLogoIfNeeded(file: File): Promise<File> {
     context.drawImage(bitmap, 0, 0, size.width, size.height);
     bitmap.close();
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", 0.85));
-    if (!blob) return file;
+    // Safari nem sempre codifica WebP: o navegador devolve PNG. Nesse caso o arquivo rotulado como WebP
+    // quebra na prévia, então só usamos o resultado quando o formato veio mesmo como WebP.
+    if (!blob || blob.type !== "image/webp" || blob.size === 0) return file;
     return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".webp", { type: "image/webp" });
   } catch {
     return file;
