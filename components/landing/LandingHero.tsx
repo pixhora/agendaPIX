@@ -1,5 +1,6 @@
 import { CheckIcon } from "./icons";
 import { buttonVariants } from "@/components/ui/button";
+import { HeroMotion } from "./HeroMotion";
 
 const niches = ["Barbearias", "Salões", "Manicures", "Estética", "Clínicas", "Personal trainers"];
 const reassurances = ["7 dias grátis", "Sem cartão de crédito", "Cliente não baixa app"];
@@ -8,7 +9,7 @@ export function LandingHero() {
   return (
     <section className="relative overflow-hidden">
       <div aria-hidden="true" className="bg-dots pointer-events-none absolute inset-x-0 top-0 h-[420px] opacity-40 [mask-image:linear-gradient(to_bottom,black,transparent)]" />
-      <div className="relative mx-auto w-full max-w-[1120px] px-5 pt-8 pb-16 lg:pt-16 lg:pb-28">
+      <div className="relative mx-auto grid w-full max-w-[1120px] items-center gap-12 px-5 pt-8 pb-16 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-10 lg:pt-16 lg:pb-28">
         <div className="max-w-[40rem]">
           <p className="inline-flex min-h-8 items-center gap-2 rounded-full border border-line bg-surface px-3 text-[13px] font-semibold text-ink">
             <span aria-hidden="true" className="size-1.5 rounded-full bg-pix" />
@@ -42,6 +43,7 @@ export function LandingHero() {
             ))}
           </ul>
         </div>
+        <HeroMotion />
       </div>
     </section>
   );
