@@ -21,7 +21,7 @@ import { clientPolicyText, policySummary, refundWindowClosedAtBooking } from "..
 import { availableSlots, localDate } from "./availability";
 import { availabilityDates, busyIntervals, loadPublicCatalog, presentPublicServices, readCachedCatalog, slotsForCatalog } from "./public-catalog";
 import { assertDepositBookable } from "./deposit-bookability";
-import { SlugMoved, aliasTarget } from "../business-profile/public-slug";
+import { SlugMoved, readAliasTarget } from "../business-profile/public-slug";
 import { availabilitySchema, bookingInputSchema, requestKeySchema, slugSchema } from "./validation";
 import { depositSlotAllowed } from "./hold";
 import { bookingConfig, type BookingConfig } from "./config";
@@ -94,7 +94,8 @@ async function businessBySlug(slug: string, database: Database) {
   const parsed = slugSchema.parse(slug);
   const [business] = await database.select().from(schema.businesses).where(eq(schema.businesses.slug, parsed)).limit(1);
   if (business) return business;
-  const moved = await aliasTarget(parsed, database);
+  // Slug sumido: lê o alias no banco, sem o cache de 60s.
+  const moved = await readAliasTarget(parsed, database);
   if (moved) throw new SlugMoved(moved);
   throw new HttpError(404, "business_not_found", "Negócio não encontrado.");
 }
@@ -114,7 +115,7 @@ async function loadCatalogOrMoved(slug: string, database?: Database) {
     return database ? await loadPublicCatalog(slug, database) : await readCachedCatalog(slug);
   } catch (error) {
     if (error instanceof HttpError && error.code === "business_not_found") {
-      const moved = await aliasTarget(slug, database ?? getDb());
+      const moved = await readAliasTarget(slug, database ?? getDb());
       if (moved) throw new SlugMoved(moved);
     }
     throw error;

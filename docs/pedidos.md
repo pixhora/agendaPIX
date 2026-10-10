@@ -94,6 +94,10 @@ Atualização posterior: revisão independente de 8349c54 recebida com OK, nenhu
 
 Commit `8349c54` finaliza CORS público/onboarding idempotente/migration0006 e prova origem única de produção. pnpm lint/typecheck exit0; test88/88; verificação isolada aplicou migrations duas vezes, integração passou e banco temporário removido. Relatório versionado: docs/ENTREGA_T1_ORIGINS_ONBOARDING.md. Banco compartilhado preservado. Revisão enviada ao Codex Revisor e execução confirmada pelo terminal; parecer pendente. Envio via `maestri ask "Hermes"` executado, porém resposta exibiu limite de créditos OpenRouter/HTTP402; depois Hermes desapareceu de `maestri list` e check retornou Terminal not found. Recebimento útil não confirmado. Parado nesse handoff conforme limite de cota; não trocar provedor nem recriar sessão para contornar. Aguardar disponibilidade de Hermes para entrega/revalidação. Sem merge/push/deploy.
 
+## 2026-10-10 — contrato do alias público
+
+`docs/CONTRATOS.md` (perfil do negócio): o cache de slug guarda só alias positivo por 60s. Negativo e erro de banco não entram. Slug ausente em `businesses` lê `readAliasTarget` sem cache. Falha dessa consulta no proxy e em `/api/public/{slug}/...` segue sem redirect e sem detalhe. Sem migration e sem mudança em produção neste pedido.
+
 ## P-DASH-V2 — 2026-10-05 — Humano / dono do backend
 
 Pedido: quando o PR de integração de `feat/backend` abrir/mergiar, avisar para rebasear `feat/dashboard-v2`. Não atualizar nem mergear o PR #1 (`feat/dashboard`). Registrar colisão de rota com `feat/conversion` (`app/dashboard/page.tsx` placeholder) sem alterar aquela branch.
