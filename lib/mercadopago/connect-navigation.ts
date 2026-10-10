@@ -48,9 +48,9 @@ function escapeHtml(value: string) {
   });
 }
 
-function configErrorPage(returnTo: unknown) {
+function configErrorPage(returnTo: unknown, copyText: string = MP_CONNECT_CONFIG_COPY, status = 503) {
   const href = escapeHtml(backHref(returnTo));
-  const copy = escapeHtml(MP_CONNECT_CONFIG_COPY);
+  const copy = escapeHtml(copyText);
   const html = `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -81,7 +81,7 @@ function configErrorPage(returnTo: unknown) {
 </body>
 </html>`;
   return new Response(html, {
-    status: 503,
+    status,
     headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
   });
 }
@@ -92,11 +92,15 @@ function configErrorPage(returnTo: unknown) {
  * genérica de configuração, sem o código.
  */
 export async function presentOwnerConnectResponse(request: Request, response: Response) {
-  if (!browserNavigation(request) || response.status !== 503) return response;
+  // 401 segue como JSON de propósito (sessão expirada tem tratamento próprio no cliente).
+  if (!browserNavigation(request) || response.status < 400 || response.status === 401) return response;
   const payload = await response.clone().json().catch(() => null) as { error?: { code?: unknown } } | null;
   const code = typeof payload?.error?.code === "string" ? payload.error.code : null;
-  if (!ownerConnectConfigCopy(code)) return response;
-  return configErrorPage(await readReturnTo(request));
+  if (response.status === 503 && ownerConnectConfigCopy(code)) {
+    return configErrorPage(await readReturnTo(request));
+  }
+  // Qualquer outro erro do envio nativo vira uma página com botão de volta, não um JSON cru.
+  return configErrorPage(await readReturnTo(request), "Não deu para conectar o Mercado Pago agora. Volte e tente de novo.", response.status);
 }
 
 export async function respondMercadoPagoConnect(request: Request, run: () => Promise<Response>) {

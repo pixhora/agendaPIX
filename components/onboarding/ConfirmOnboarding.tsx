@@ -25,6 +25,8 @@ import { storedDraftPayload } from "@/lib/onboarding/local-draft";
 
 const HAS_BUSINESS_TOAST = "Você já tem uma página. Abrimos o seu painel.";
 const CONSUMED_TOAST = "Esse cadastro já virou uma página. Abrimos o seu painel.";
+const LINK_TAKEN_TOAST = "Esse link já está em uso. Escolha outro nome para continuar.";
+const LOGO_LATER_TOAST = "Sua página foi criada. Não deu para enviar a logo agora: adicione em Configurações.";
 
 function readFragmentCode(): string {
   const hash = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : "";
@@ -74,7 +76,10 @@ export function ConfirmOnboarding({ draftId }: { draftId: string }) {
         if (result.error.code === "draft_consumed") {
           toast(CONSUMED_TOAST);
           router.push("/dashboard");
+          return;
         }
+        // Rede, sessão ou rascunho sumido: sem isso a tela ficava em branco e sem explicação.
+        setMessage("Não conseguimos carregar seu cadastro agora. Verifique a conexão e tente de novo.");
         return;
       }
       if (result.draft.businessName) setBusinessName(result.draft.businessName);
@@ -150,13 +155,9 @@ export function ConfirmOnboarding({ draftId }: { draftId: string }) {
           onProgress: () => undefined,
           endpoint: `/api/businesses/${encodeURIComponent(committed.businessId)}/logo`,
         });
-        if (!uploaded.ok) {
-          setPending(false);
-          setStatus("error");
-          setMessage(uploaded.message || "Não deu para enviar a logo. Toque em Confirmar código de novo.");
-          return;
-        }
-        clearPendingLogo();
+        // A página já foi criada: a logo não pode prender o cadastro. Avisa e segue para o recebimento.
+        if (uploaded.ok) clearPendingLogo();
+        else toast(LOGO_LATER_TOAST);
       }
       setPending(false);
       writeCommitResult({
@@ -184,6 +185,7 @@ export function ConfirmOnboarding({ draftId }: { draftId: string }) {
       return;
     }
     if (follow.type === "slug_taken") {
+      toast(LINK_TAKEN_TOAST);
       router.push("/onboarding");
       return;
     }

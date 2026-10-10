@@ -139,6 +139,7 @@ export function MpConnectForm({
   footer?: ReactNode;
 }) {
   const ackRef = useRef<HTMLInputElement>(null);
+  const submittedRef = useRef(false);
   useEffect(() => {
     if (!ackInvalid || !requireAck) return;
     const timer = window.setTimeout(() => revealAck(ackRef.current), 0);
@@ -166,7 +167,8 @@ export function MpConnectForm({
       method="post"
       action={mpConnectAction(businessId)}
       onSubmit={(event) => {
-        if (pending) {
+        // Um clique duplo antes da navegação criaria dois pedidos de conexão, com states OAuth diferentes.
+        if (pending || submittedRef.current) {
           event.preventDefault();
           return;
         }
@@ -174,7 +176,9 @@ export function MpConnectForm({
           event.preventDefault();
           onBlocked();
           revealAck(ackRef.current);
+          return;
         }
+        submittedRef.current = true;
       }}
       className={pinActions ? "flex min-h-0 flex-1 flex-col md:block" : undefined}
     >
