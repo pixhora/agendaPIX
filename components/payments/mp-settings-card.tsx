@@ -286,6 +286,7 @@ export function MpConnectionCard({
               }}
               ackInvalid={ackInvalid}
               submitLabel={status.status === "not_connected" ? "Conectar Mercado Pago" : "Reconectar"}
+              installHelp={status.status === "not_connected"}
               buttonVariant={reconnect ? "pix" : connected ? "outline" : "pix"}
               onBlocked={() => setAckInvalid(true)}
               beside={showActions ? <DisconnectLink onClick={() => setDialogOpen(true)} /> : null}
