@@ -23,6 +23,8 @@ export interface PublicService {
   durationMinutes: number;
   priceCents: number;
   depositCents: number;
+  /** Foto do serviço, já validada pelo servidor. Ausente ou nula: sem foto. */
+  imageUrl?: string | null;
   /** `false`: o serviço não aceita reserva (sem botão). Ausente: reservável. */
   bookable?: boolean;
   /** Motivo interno quando `bookable` é false. A tela não mostra o código. */

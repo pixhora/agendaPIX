@@ -148,6 +148,13 @@
       "when": 1791800000000,
       "tag": "0020_webhook_events",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1791900000000,
+      "tag": "0021_service_image",
+      "breakpoints": true
     }
   ]
 }
