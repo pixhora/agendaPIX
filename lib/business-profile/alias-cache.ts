@@ -4,7 +4,12 @@ const ALIAS_CACHE_MAX = 256;
 type AliasLookup = (slug: string) => Promise<string | null>;
 type CacheEntry = { target: string | null; expiresAt: number };
 
-const aliasCache = new Map<string, CacheEntry>();
+/**
+ * O proxy e as rotas são bundles diferentes. O Map no módulo não é o mesmo.
+ * `globalThis` é o processo, então o PATCH apaga o negativo que o proxy guardou.
+ */
+const globalStore = globalThis as typeof globalThis & { __agendaAliasCache?: Map<string, CacheEntry> };
+const aliasCache = globalStore.__agendaAliasCache ??= new Map<string, CacheEntry>();
 
 export function clearAliasCache() {
   aliasCache.clear();

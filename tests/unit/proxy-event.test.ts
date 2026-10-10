@@ -3,7 +3,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { clearAliasCache } from "../../lib/business-profile/alias-cache";
 import { proxy } from "../../proxy";
 
-const aliasTarget = vi.fn(async (_slug: string) => "nova");
+const aliasTarget = vi.fn<(slug: string) => Promise<string>>(async () => "nova");
 
 vi.mock("../../lib/business-profile/public-slug", async () => {
   const actual = await vi.importActual<typeof import("../../lib/business-profile/public-slug")>("../../lib/business-profile/public-slug");
