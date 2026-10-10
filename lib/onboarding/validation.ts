@@ -73,7 +73,7 @@ export const onboardingInputSchema = z.object({
   business: z.object({
     name: businessNameSchema,
     slug: businessSlugSchema,
-    logoUrl: businessLogoUrlSchema,
+    logoUrl: businessLogoUrlSchema.optional(),
     timezone: timezoneSchema,
     contactWhatsapp: contactWhatsappSchema.nullable().optional(),
   }).strict(),

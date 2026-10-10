@@ -57,6 +57,8 @@ describe("profile routes", () => {
     expect(businessProfilePatchRequestSchema.safeParse({}).success).toBe(false);
     expect(businessProfilePatchRequestSchema.safeParse({ name: "Ana Luz" }).success).toBe(true);
     expect(businessProfilePatchRequestSchema.safeParse({ logoUrl: null }).success).toBe(false);
+    expect(businessProfilePatchRequestSchema.safeParse({ logoUrl: vercelLogo }).success).toBe(false);
+    expect(businessProfilePatchRequestSchema.safeParse({ name: "Ana Luz", logoUrl: vercelLogo }).success).toBe(false);
   });
 
   it("descreve a resposta do perfil, do upload e do erro", () => {

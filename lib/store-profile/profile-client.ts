@@ -17,7 +17,7 @@ function fieldMap(fields: unknown): Record<string, string> {
 
 export async function patchBusinessProfile(
   businessId: string,
-  body: { name?: string; slug?: string; logoUrl?: string },
+  body: { name?: string; slug?: string },
 ): Promise<ProfileSaveResult> {
   const parsed = businessProfilePatchRequestSchema.safeParse(body);
   if (!parsed.success) {

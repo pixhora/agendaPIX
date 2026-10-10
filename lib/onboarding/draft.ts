@@ -1,3 +1,4 @@
+import { businessLogoUrlSchema } from "@/lib/contracts";
 import { normalizeSlug } from "@/lib/slug";
 
 /** Same list as `ONBOARDING_SEGMENTS` in the draft schema. */
@@ -43,7 +44,7 @@ export type OnboardingDraftBody = {
   plan: "base" | "completo";
   segment: OnboardingSegment;
   data: {
-    business: { name: string; slug: string; logoUrl: string; timezone: "America/Sao_Paulo" };
+    business: { name: string; slug: string; logoUrl?: string; timezone: "America/Sao_Paulo" };
     service: { name: string; durationMinutes: number; priceCents: number; depositCents: number };
     hours: { weekday: number; opensAt: string; closesAt: string }[];
   };
@@ -51,6 +52,7 @@ export type OnboardingDraftBody = {
 
 /** Body of POST /api/onboarding/drafts. One hours row per open day. No policy, WhatsApp or extra ranges. */
 export function buildOnboardingDraftBody(input: OnboardingDraftInput): OnboardingDraftBody {
+  const logo = businessLogoUrlSchema.safeParse(input.logoUrl.trim());
   const body: OnboardingDraftBody = {
     email: input.email.trim().toLowerCase(),
     plan: input.plan,
@@ -59,8 +61,8 @@ export function buildOnboardingDraftBody(input: OnboardingDraftInput): Onboardin
       business: {
         name: input.businessName.trim(),
         slug: normalizeSlug(input.slug, { final: true }),
-        logoUrl: input.logoUrl.trim(),
         timezone: "America/Sao_Paulo",
+        ...(logo.success ? { logoUrl: logo.data } : {}),
       },
       service: {
         name: input.serviceName.trim(),

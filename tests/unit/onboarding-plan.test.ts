@@ -48,6 +48,7 @@ describe("plano completo", () => {
     expect(body.segment).toBe("outro");
     expect(body.email).toBe("dona@studio.com.br");
     expect(body.data.business).toMatchObject({ name: "Studio Repro", slug: "studio-repro", timezone: "America/Sao_Paulo" });
+    expect(body.data.business).not.toHaveProperty("logoUrl");
     expect(body.data.service).toEqual({ name: "Corte", durationMinutes: 45, priceCents: 5000, depositCents: 1500 });
     expect(body.data.hours[0]).toEqual({ weekday: 1, opensAt: "09:00", closesAt: "19:00" });
     expect(body.data.hours).toHaveLength(6);

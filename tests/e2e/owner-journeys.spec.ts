@@ -77,17 +77,15 @@ test("cadastro concluído → \"Ir para o painel\" abre /dashboard com o negóci
   const email = `e2e-novo-${id}@example.com`;
   const name = `Estúdio Novo ${id}`;
 
-  await page.route("**/api/onboarding/drafts**", async (route) => {
-    const method = route.request().method();
-    if (method !== "POST" && method !== "PATCH") {
-      await route.continue();
-      return;
+  const draftBodies: { data?: { business?: Record<string, unknown> } }[] = [];
+  page.on("request", (request) => {
+    if (!request.url().includes("/api/onboarding/drafts")) return;
+    if (request.method() !== "POST" && request.method() !== "PATCH") return;
+    try {
+      draftBodies.push(request.postDataJSON() as { data?: { business?: Record<string, unknown> } });
+    } catch {
+      draftBodies.push({});
     }
-    const body = route.request().postDataJSON() as { data?: { business?: { logoUrl?: string } } };
-    if (body?.data?.business && !body.data.business.logoUrl) {
-      body.data.business.logoUrl = "https://blob.fake.local/logos/e2e-onboarding.webp";
-    }
-    await route.continue({ postData: JSON.stringify(body) });
   });
   await page.goto("/onboarding");
   await expect(page.getByRole("heading", { name: "Sua loja" })).toBeVisible();
@@ -113,6 +111,11 @@ test("cadastro concluído → \"Ir para o painel\" abre /dashboard com o negóci
   await proceed.click();
 
   await expect(page.getByRole("heading", { name: "Para onde mandamos seu código?" })).toBeVisible();
+  expect(draftBodies.length).toBeGreaterThan(0);
+  for (const body of draftBodies) {
+    expect(body.data?.business).toBeTruthy();
+    expect(body.data?.business).not.toHaveProperty("logoUrl");
+  }
   await page.getByLabel("E-mail").fill(email);
   const send = page.getByRole("button", { name: "Enviar código" });
   await expect(send).not.toHaveAttribute("aria-disabled", "true");
@@ -135,4 +138,24 @@ test("cadastro concluído → \"Ir para o painel\" abre /dashboard com o negóci
 
   const publicPage = await page.request.get(`/${slug}`);
   expect(publicPage.status()).toBe(200);
+  const services = await page.request.get(`/api/public/${slug}/services`);
+  expect(services.status()).toBe(200);
+  const servicesBody = await services.json() as { logoUrl: string | null };
+  expect(servicesBody.logoUrl).toMatch(/^https:\/\/blob\.fake\.local\/logos\//);
+
+  const commit = await page.evaluate(() => {
+    const raw = sessionStorage.getItem("agenda_onboarding_commit");
+    return raw ? JSON.parse(raw) as { businessId?: string } : null;
+  });
+  expect(commit?.businessId).toBeTruthy();
+  const next = `${slug}-b`;
+  const patched = await page.request.patch(`/api/businesses/${commit?.businessId}/profile`, {
+    data: { slug: next },
+  });
+  expect(patched.status()).toBe(200);
+  const moved = await page.request.get(`/${slug}?ref=wa`, { maxRedirects: 0 });
+  expect(moved.status()).toBe(308);
+  const location = moved.headers().location ?? "";
+  expect(location).toContain(`/${next}`);
+  expect(location).toContain("ref=wa");
 });

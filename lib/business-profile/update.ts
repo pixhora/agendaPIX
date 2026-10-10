@@ -1,14 +1,15 @@
-import { and, eq } from "drizzle-orm";
-import { sql } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "../../db";
 import { businessSlugHistory, businesses } from "../../db/schema";
+import { consumeAbuseBucket } from "../abuse-rate-limit";
 import { businessProfilePatchRequestSchema, businessProfileResponseSchema } from "../contracts";
 import { publicBusinessPageUrl } from "../billing/public-url";
 import { HttpError } from "../http";
 import { publicBookingPagePath } from "../public-api";
 import { findOwnedBusiness } from "../tenancy";
 import { slugTakenError } from "./slug-conflict";
+import { ACTIVE_ALIAS_CAP, aliasHoldActive, PROFILE_PATCH_LIMIT, SLUG_CHANGE_LIMIT } from "./slug-policy";
 
 type Database = ReturnType<typeof getDb>;
 
@@ -39,43 +40,65 @@ async function lockSlugs(database: Pick<Database, "execute">, slugs: string[]) {
 }
 
 /**
- * O dono pode recuperar um alias do próprio negócio: a linha sai do histórico
- * e o slug que ele deixa entra no lugar. Alias de outro negócio responde 409.
+ * The owner can take back their own alias while it is held: that row leaves the
+ * history and the slug they abandon takes its place. Another business's held
+ * alias is 409. A released alias older than 90 days is deleted and becomes free.
+ * Slug changes are limited to 3 per 30 days. Every PATCH also counts toward the hourly cap.
  */
 export async function updateBusinessProfile(businessId: string, ownerId: string, body: unknown, database: Database = getDb()) {
   const parsed = businessProfilePatchRequestSchema.safeParse(body);
   if (!parsed.success) invalidInput(parsed.error);
   const id = z.uuid().safeParse(businessId);
   if (!id.success) throw new HttpError(404, "business_unavailable", "Este negócio não está disponível para sua conta.");
+  const existing = await findOwnedBusiness(id.data, ownerId, database);
+  if (!existing) throw new HttpError(404, "business_unavailable", "Este negócio não está disponível para sua conta.");
+  await consumeAbuseBucket("profile-patch", ownerId, PROFILE_PATCH_LIMIT, "hour", database);
 
   try {
     return await database.transaction(async (tx) => {
       const business = await findOwnedBusiness(id.data, ownerId, tx);
       if (!business) throw new HttpError(404, "business_unavailable", "Este negócio não está disponível para sua conta.");
       const nextName = parsed.data.name ?? business.name;
-      const nextLogo = parsed.data.logoUrl === undefined ? business.logoUrl : parsed.data.logoUrl;
       const nextSlug = parsed.data.slug ?? business.slug;
       if (nextSlug === business.slug) {
-        const [updated] = await tx.update(businesses).set({ name: nextName, logoUrl: nextLogo }).where(and(eq(businesses.id, business.id), eq(businesses.ownerId, ownerId))).returning();
+        const [updated] = await tx.update(businesses).set({ name: nextName }).where(and(eq(businesses.id, business.id), eq(businesses.ownerId, ownerId))).returning();
         if (!updated) throw new HttpError(404, "business_unavailable", "Este negócio não está disponível para sua conta.");
         return present(updated);
       }
 
+      await consumeAbuseBucket("profile-slug", ownerId, SLUG_CHANGE_LIMIT, "day30", tx);
       await lockSlugs(tx, [business.slug, nextSlug]);
-      const [alias] = await tx.select({ businessId: businessSlugHistory.businessId }).from(businessSlugHistory).where(eq(businessSlugHistory.oldSlug, nextSlug)).limit(1);
-      if (alias && alias.businessId !== business.id) {
+      const [alias] = await tx.select({
+        businessId: businessSlugHistory.businessId,
+        releasedAt: businessSlugHistory.releasedAt,
+      }).from(businessSlugHistory).where(eq(businessSlugHistory.oldSlug, nextSlug)).limit(1);
+      if (alias && aliasHoldActive(alias.releasedAt) && alias.businessId !== business.id) {
         throw new HttpError(409, "slug_taken", "Esse endereço já está em uso. Escolha outro.", undefined, { details: { constraint: "slug_alias" } });
       }
-      if (alias) await tx.delete(businessSlugHistory).where(and(eq(businessSlugHistory.oldSlug, nextSlug), eq(businessSlugHistory.businessId, business.id)));
+      if (alias) await tx.delete(businessSlugHistory).where(eq(businessSlugHistory.oldSlug, nextSlug));
       const [taken] = await tx.select({ id: businesses.id }).from(businesses).where(eq(businesses.slug, nextSlug)).limit(1);
       if (taken && taken.id !== business.id) {
         throw new HttpError(409, "slug_taken", "Esse endereço já está em uso. Escolha outro.", undefined, { details: { constraint: "businesses_slug_unique" } });
       }
 
+      const active = await tx.select({ oldSlug: businessSlugHistory.oldSlug }).from(businessSlugHistory).where(and(
+        eq(businessSlugHistory.businessId, business.id),
+        isNull(businessSlugHistory.releasedAt),
+      )).orderBy(asc(businessSlugHistory.createdAt), asc(businessSlugHistory.oldSlug));
+      if (active.length >= ACTIVE_ALIAS_CAP) {
+        const oldest = active[0]?.oldSlug;
+        if (oldest) {
+          await lockSlugs(tx, [oldest]);
+          await tx.update(businessSlugHistory).set({ releasedAt: new Date() }).where(and(
+            eq(businessSlugHistory.oldSlug, oldest),
+            eq(businessSlugHistory.businessId, business.id),
+          ));
+        }
+      }
+
       const [updated] = await tx.update(businesses).set({
         name: nextName,
         slug: nextSlug,
-        logoUrl: nextLogo,
       }).where(and(eq(businesses.id, business.id), eq(businesses.ownerId, ownerId), eq(businesses.slug, business.slug))).returning();
       if (!updated) throw new HttpError(409, "slug_taken", "Esse endereço já está em uso. Escolha outro.", undefined, { details: { constraint: "businesses_slug_unique" } });
       await tx.insert(businessSlugHistory).values({ oldSlug: business.slug, businessId: business.id });

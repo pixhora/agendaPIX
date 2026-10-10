@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { OnboardingData } from "@/components/onboarding/types";
+import { businessLogoUrlSchema } from "@/lib/contracts";
 import { onboardingInputSchema } from "@/lib/onboarding/validation";
 
 /** Rota real de provisionamento neste mesmo app (`app/api/onboarding`). */
@@ -20,12 +21,13 @@ export type ProvisioningResult =
  * validando com o mesmo schema usado pela rota (fonte única de verdade).
  */
 export function buildProvisioningPayload(data: OnboardingData): ProvisioningPayload {
+  const logo = businessLogoUrlSchema.safeParse(data.logoUrl);
   const payload: ProvisioningPayload = {
     business: {
       name: data.businessName,
       slug: data.slug,
-      logoUrl: data.logoUrl,
       timezone: "America/Sao_Paulo",
+      ...(logo.success ? { logoUrl: logo.data } : {}),
       ...(data.contactWhatsapp ? { contactWhatsapp: data.contactWhatsapp } : {}),
     },
     service: {

@@ -64,8 +64,32 @@ describe("empty store profile", () => {
     if (result.ok) {
       expect(result.payload.service).toEqual({ name: "Corte novo", durationMinutes: 45, priceCents: 4500, depositCents: 0 });
       expect(result.payload.hours).toEqual([{ weekday: 1, opensAt: "10:00", closesAt: "18:00" }]);
+      expect(result.payload.business.logoUrl).toBe("https://ce0rcu23vrrdzqap.public.blob.vercel-storage.com/logos/corte.webp");
       expect(JSON.stringify(result.payload)).not.toContain("Studio da Ana");
       expect(JSON.stringify(result.payload)).not.toContain("Corte masculino");
+    }
+  });
+
+  it("omits logoUrl when the file is only picked, and that payload passes the server schema", () => {
+    const data = {
+      ...createOnboardingData("base"),
+      businessName: "Studio da Teste",
+      slug: "studio-da-teste",
+      serviceName: "Corte novo",
+      durationMinutes: 45,
+      priceCents: 4500,
+      logoUrl: "",
+      days: (createOnboardingData("base").days ?? []).map((day) => (
+        day.weekday === 1 ? { ...day, open: true, opensAt: "10:00", closesAt: "18:00" } : day
+      )),
+    };
+    const missing = storeSubmission(data);
+    expect(missing.ok).toBe(false);
+    const result = storeSubmission(data, { logoSelected: true });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.payload.business).not.toHaveProperty("logoUrl");
+      expect(onboardingInputSchema.safeParse(result.payload).success).toBe(true);
     }
   });
 });

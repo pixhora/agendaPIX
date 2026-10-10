@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { cachedAliasTarget } from "@/lib/business-profile/alias-cache";
 import { aliasTarget, locationForMovedSlug, publicSlugFromPath } from "@/lib/business-profile/public-slug";
 import { documentSecurityHeaders, shouldSendStrictTransportSecurity, shouldUpgradeInsecureRequests } from "@/lib/security/headers";
 
@@ -28,7 +29,7 @@ export async function proxy(request: NextRequest, lookup: AliasLookup = aliasTar
   const slug = publicSlugFromPath(request.nextUrl.pathname);
   if (slug) {
     try {
-      const target = await lookup(slug);
+      const target = await cachedAliasTarget(slug, lookup);
       if (target && target !== slug) {
         const location = new URL(locationForMovedSlug(request.url, slug, target), request.url);
         const response = NextResponse.redirect(location, 308);

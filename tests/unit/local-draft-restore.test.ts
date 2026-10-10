@@ -60,7 +60,7 @@ describe("leftover onboarding draft on the same device", () => {
   });
 
   it("keeps a device draft out of the live form until the owner continues it", () => {
-    const decision = decide(INCIDENT, null);
+    const decision = decide(localDraftEnvelope(INCIDENT, null, new Date(NOW).toISOString()), null);
     expect(decision.action).toBe("prompt");
     const hidden = liveOnboardingData(decision, false, "base");
     expect(hidden.businessName).toBe("");
@@ -76,6 +76,17 @@ describe("leftover onboarding draft on the same device", () => {
     expect(draftResumeLines(accepted).detail).toContain("Corte de Cabelo");
     expect(draftResumeLines(accepted).detail).toContain("45,00");
     expect(draftResumeLines(accepted).detail).toContain("22,50");
+  });
+
+  it("drops a draft that has no savedAt, and does not keep a logo url", () => {
+    expect(decide(INCIDENT, null)).toEqual({ action: "discard", reason: "expired" });
+    const raw = localDraftEnvelope(
+      { ...INCIDENT, logoUrl: "https://blob.fake.local/logos/loja.webp" },
+      null,
+      "not-a-date",
+    );
+    expect(raw.data.logoUrl).toBe("");
+    expect(decide(raw, null)).toEqual({ action: "discard", reason: "expired" });
   });
 
   it("drops a draft bound to another account instead of offering it", () => {

@@ -63,7 +63,9 @@ export async function takenSlugs(candidates: string[], database: Pick<ReturnType
   const aliases = sql.join(candidates.map((candidate) => sql`${candidate}`), sql`, `);
   const result = await database.execute(sql`SELECT slug FROM businesses WHERE slug IN (${current})
     UNION
-    SELECT old_slug AS slug FROM business_slug_history WHERE old_slug IN (${aliases})`);
+    SELECT old_slug AS slug FROM business_slug_history
+    WHERE old_slug IN (${aliases})
+      AND (released_at IS NULL OR released_at > now() - interval '90 days')`);
   return new Set((result.rows as { slug: string }[]).map((row) => row.slug));
 }
 

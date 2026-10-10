@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import sharp from "sharp";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { clearAliasCache } from "../../lib/business-profile/alias-cache";
 import { LOGO_UPLOAD_MAX_BYTES } from "../../lib/contracts";
 import { HttpError } from "../../lib/http";
 import { assertLogoBytes, reencodeLogo } from "../../lib/business-profile/logo-image";
@@ -10,10 +11,11 @@ import { slugTakenError } from "../../lib/business-profile/slug-conflict";
 import { slugAvailability, takenSlugs } from "../../lib/slug-availability";
 import { proxy } from "../../proxy";
 
-const { putMock } = vi.hoisted(() => ({ putMock: vi.fn() }));
+const { putMock, delMock } = vi.hoisted(() => ({ putMock: vi.fn(), delMock: vi.fn() }));
 
 vi.mock("@vercel/blob", () => ({
   put: putMock,
+  del: delMock,
 }));
 
 const pngSignature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
@@ -149,6 +151,10 @@ describe("blob store", () => {
 });
 
 describe("slug redirect", () => {
+  beforeEach(() => {
+    clearAliasCache();
+  });
+
   it("maps a unique violation to slug_taken and ignores other codes", () => {
     expect(slugTakenError({ code: "23505" })).toMatchObject({
       status: 409,
@@ -206,6 +212,42 @@ describe("slug redirect", () => {
     });
     expect(lookedUp).toBe(false);
     expect(checker.status).not.toBe(308);
+
+    let skipped = 0;
+    await proxy(new NextRequest("https://agenda.example/dashboard"), async () => {
+      skipped += 1;
+      return "nova";
+    });
+    await proxy(new NextRequest("https://agenda.example/onboarding"), async () => {
+      skipped += 1;
+      return "nova";
+    });
+    await proxy(new NextRequest("https://agenda.example/login"), async () => {
+      skipped += 1;
+      return "nova";
+    });
+    expect(skipped).toBe(0);
+  });
+
+  it("remembers an alias lookup for a minute and does not remember a database error", async () => {
+    let hits = 0;
+    const lookup = async () => {
+      hits += 1;
+      return "nova";
+    };
+    await proxy(new NextRequest("https://agenda.example/antiga?ref=wa"), lookup);
+    await proxy(new NextRequest("https://agenda.example/antiga/opengraph-image?ref=wa"), lookup);
+    expect(hits).toBe(1);
+
+    clearAliasCache();
+    let failures = 0;
+    const failing = async () => {
+      failures += 1;
+      throw new Error("db down");
+    };
+    await proxy(new NextRequest("https://agenda.example/antiga"), failing);
+    await proxy(new NextRequest("https://agenda.example/antiga"), failing);
+    expect(failures).toBe(2);
   });
 
   it("checks current slugs and aliases in one query and drops an alias from the suggestions", async () => {

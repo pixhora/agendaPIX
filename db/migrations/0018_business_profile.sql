@@ -4,6 +4,7 @@ CREATE TABLE "business_slug_history" (
 	"old_slug" text PRIMARY KEY NOT NULL,
 	"business_id" uuid NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"released_at" timestamp with time zone,
 	CONSTRAINT "business_slug_history_slug_format" CHECK ("old_slug" ~ '^[a-z0-9]+(-[a-z0-9]+)*$')
 );--> statement-breakpoint
 ALTER TABLE "business_slug_history" ADD CONSTRAINT "business_slug_history_business_id_businesses_id_fk" FOREIGN KEY ("business_id") REFERENCES "public"."businesses"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
@@ -12,7 +13,11 @@ CREATE OR REPLACE FUNCTION "reject_business_slug_overlap"() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
 	IF TG_TABLE_NAME = 'businesses' THEN
-		IF EXISTS (SELECT 1 FROM "business_slug_history" WHERE "old_slug" = NEW."slug") THEN
+		IF EXISTS (
+			SELECT 1 FROM "business_slug_history"
+			WHERE "old_slug" = NEW."slug"
+				AND ("released_at" IS NULL OR "released_at" > now() - interval '90 days')
+		) THEN
 			RAISE EXCEPTION 'slug_taken' USING ERRCODE = '23505';
 		END IF;
 	ELSIF EXISTS (SELECT 1 FROM "businesses" WHERE "slug" = NEW."old_slug") THEN

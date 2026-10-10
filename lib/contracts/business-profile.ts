@@ -9,9 +9,12 @@ import { apiErrorBodySchema } from "./errors";
  * - origem canônica (metadata, sitemap): `NEXT_PUBLIC_SITE_URL` via `siteOrigin()`
  * - URL absoluta no servidor (WhatsApp, e-mail, checkout): `BETTER_AUTH_URL` via `publicBusinessPageUrl()`
  *
- * Alias (`business_slug_history.old_slug`, único): outro negócio não pode reivindicá-lo
- * (409 `slug_taken`, e a disponibilidade responde `taken`). O mesmo dono pode recuperar
- * um alias seu no PATCH: a linha sai do histórico e o slug que ele deixa entra no lugar.
+ * Alias ativo (`released_at` nulo): no máximo 3 por negócio, resposta 308.
+ * O quarto troca libera o mais antigo (`released_at = now()`): para de redirecionar (404)
+ * e segue bloqueado para os outros por 90 dias (`taken`). Depois disso o link fica livre.
+ * O negócio de origem recupera o seu enquanto o bloqueio vale.
+ * Troca de slug: 3 por 30 dias (`429 rate_limited` + `Retry-After`). Todo PATCH também tem teto por hora.
+ * `logoUrl` não entra no PATCH. Só `POST /logo` grava a coluna.
  */
 
 /** Mesma expressão de `slugSchema` e de `PUBLIC_SLUG` em `lib/slug.ts`. */
@@ -76,7 +79,7 @@ export const businessLogoUrlSchema = z.string().trim().min(1).superRefine((value
   if (reason) ctx.addIssue({ code: "custom", message: reason });
 });
 
-/** Onboarding: os três campos são obrigatórios. Não há default. */
+/** Perfil completo. A criação do negócio aceita logo ausente; este objeto não. */
 export const businessProfileSchema = z.object({
   name: businessNameSchema,
   slug: businessSlugSchema,
@@ -85,12 +88,11 @@ export const businessProfileSchema = z.object({
 
 export type BusinessProfile = z.infer<typeof businessProfileSchema>;
 
-/** PATCH parcial. Pelo menos um campo. `null` não apaga. */
+/** PATCH parcial. Pelo menos um campo. Sem `logoUrl`: a logo só entra pelo POST do arquivo. */
 export const businessProfilePatchRequestSchema = z.object({
   name: businessNameSchema.optional(),
   slug: businessSlugSchema.optional(),
-  logoUrl: businessLogoUrlSchema.optional(),
-}).strict().refine((value) => value.name !== undefined || value.slug !== undefined || value.logoUrl !== undefined, {
+}).strict().refine((value) => value.name !== undefined || value.slug !== undefined, {
   message: "nothing_to_update",
 });
 

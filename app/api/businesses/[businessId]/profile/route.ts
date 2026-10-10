@@ -1,6 +1,6 @@
 import { getAuth } from "@/lib/auth";
 import { updateBusinessProfile } from "@/lib/business-profile/update";
-import { HttpError, json, readBody } from "@/lib/http";
+import { HttpError, json, parseJsonBody, readBody } from "@/lib/http";
 import { appPreflight, withAppCors } from "@/lib/origins";
 
 export const runtime = "nodejs";
@@ -14,7 +14,7 @@ async function requireOwner(request: Request) {
 export async function PATCH(request: Request, context: RouteContext<"/api/businesses/[businessId]/profile">) {
   return withAppCors(request, async () => {
     const ownerId = await requireOwner(request);
-    const body = JSON.parse(await readBody(request));
+    const body = parseJsonBody(await readBody(request));
     return json(await updateBusinessProfile((await context.params).businessId, ownerId, body));
   });
 }

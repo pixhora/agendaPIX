@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { getDb } from "../../db";
 import { businessSlugHistory, businesses } from "../../db/schema";
 import { isReservedBusinessSlug } from "../bookings/validation";
@@ -19,7 +19,7 @@ export async function aliasTarget(slug: string, database: Database = getDb()): P
     .select({ slug: businesses.slug })
     .from(businessSlugHistory)
     .innerJoin(businesses, eq(businesses.id, businessSlugHistory.businessId))
-    .where(eq(businessSlugHistory.oldSlug, slug))
+    .where(and(eq(businessSlugHistory.oldSlug, slug), isNull(businessSlugHistory.releasedAt)))
     .limit(1);
   if (!row || row.slug === slug) return null;
   return row.slug;

@@ -23,7 +23,7 @@ export function normalizeAccountEmail(value: string | null | undefined): string 
 }
 
 export function localDraftEnvelope(data: OnboardingData, boundEmail: string | null, savedAt: string): LocalDraftEnvelope {
-  return { v: 1, savedAt, boundEmail: normalizeAccountEmail(boundEmail), data };
+  return { v: 1, savedAt, boundEmail: normalizeAccountEmail(boundEmail), data: { ...data, logoUrl: "" } };
 }
 
 export function draftBoundEmail(formEmail: string, sessionEmail: string | null): string | null {
@@ -58,7 +58,7 @@ function emailsConflict(sessionEmail: string | null, ...candidates: Array<string
 
 /**
  * A device draft never becomes the live form by itself.
- * Another account is dropped. A dated draft older than the TTL is dropped.
+ * Another account is dropped. A draft without a date, or older than the TTL, is dropped.
  * Anything else with real content waits for "Continuar rascunho".
  */
 export function decideLocalDraftRestore(input: {
@@ -73,13 +73,10 @@ export function decideLocalDraftRestore(input: {
   if (!draftHasUserContent(data)) return { action: "start" };
 
   const record = input.raw && typeof input.raw === "object" ? input.raw as Partial<LocalDraftEnvelope> : null;
-  const savedAt = record?.v === 1 && typeof record.savedAt === "string" ? Date.parse(record.savedAt) : null;
-  if (savedAt != null) {
-    const age = input.now - savedAt;
-    if (!Number.isFinite(age) || age < -60_000 || age > LOCAL_DRAFT_TTL_MS) {
-      return { action: "discard", reason: "expired" };
-    }
-  }
+  const savedAt = record?.v === 1 && typeof record.savedAt === "string" ? Date.parse(record.savedAt) : Number.NaN;
+  if (!Number.isFinite(savedAt)) return { action: "discard", reason: "expired" };
+  const age = input.now - savedAt;
+  if (age < -60_000 || age > LOCAL_DRAFT_TTL_MS) return { action: "discard", reason: "expired" };
 
   const boundEmail = record?.v === 1 ? record.boundEmail : null;
   if (emailsConflict(input.sessionEmail, boundEmail, data.email)) {

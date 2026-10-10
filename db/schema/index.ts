@@ -37,11 +37,16 @@ export const businesses = pgTable("businesses", {
   check("businesses_logo_url_https", sql`${table.logoUrl} IS NULL OR ${table.logoUrl} ~ '^https://[^[:space:]]+/[^[:space:]]+$'`),
 ]);
 
-/** Slug antigo. `old_slug` é único: outro negócio não pode reivindicá-lo. O mesmo dono pode recuperá-lo. */
+/**
+ * Slug antigo. `released_at` nulo redireciona (308).
+ * Preenchido: para de redirecionar e segue bloqueado por 90 dias para os outros.
+ * O negócio de origem pode recuperar o seu enquanto o bloqueio vale.
+ */
 export const businessSlugHistory = pgTable("business_slug_history", {
   oldSlug: text("old_slug").primaryKey(),
   businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "restrict" }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  releasedAt: timestamp("released_at", { withTimezone: true }),
 }, (table) => [
   index("business_slug_history_business_idx").on(table.businessId),
   check("business_slug_history_slug_format", sql`${table.oldSlug} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`),
@@ -427,7 +432,7 @@ export const onboardingRequests = pgTable("onboarding_requests", {
 }, (table) => [primaryKey({ columns: [table.ownerId, table.requestKey] })]);
 
 export type OnboardingDraftData = {
-  business: { name: string; slug: string; logoUrl: string; timezone: string };
+  business: { name: string; slug: string; logoUrl?: string; timezone: string };
   service: { name: string; durationMinutes: number; priceCents: number; depositCents: number };
   hours: { weekday: number; opensAt: string; closesAt: string }[];
 };

@@ -12,7 +12,16 @@ it("keeps the name, slug, logo and timezone the client sent", () => {
 it("does not fill an empty profile, service or hours with an example", () => {
   expect(onboardingInputSchema.safeParse({}).success).toBe(false);
   expect(onboardingInputSchema.safeParse({ ...input, business: { slug: "salao", logoUrl, timezone: "America/Sao_Paulo" } }).success).toBe(false);
-  expect(onboardingInputSchema.safeParse({ ...input, business: { ...input.business, logoUrl: undefined } }).success).toBe(false);
+  const withoutLogo = onboardingInputSchema.safeParse({
+    ...input,
+    business: { name: input.business.name, slug: input.business.slug, timezone: input.business.timezone },
+  });
+  expect(withoutLogo.success).toBe(true);
+  if (withoutLogo.success) {
+    expect(withoutLogo.data.business.logoUrl).toBeUndefined();
+    expect(JSON.parse(JSON.stringify(withoutLogo.data.business))).not.toHaveProperty("logoUrl");
+  }
+  expect(onboardingInputSchema.safeParse({ ...input, business: { ...input.business, logoUrl: "" } }).success).toBe(false);
   expect(onboardingInputSchema.safeParse({ ...input, business: { ...input.business, timezone: undefined } }).success).toBe(false);
   expect(onboardingInputSchema.safeParse({ ...input, service: { ...input.service, name: "" } }).success).toBe(false);
   expect(onboardingInputSchema.safeParse({ ...input, hours: [] }).success).toBe(false);

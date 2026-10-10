@@ -84,7 +84,7 @@ export function restoreOnboardingDraft(raw: unknown, plan: "base" | "completo"):
     email: typeof record.email === "string" ? record.email : base.email,
     segment: typeof record.segment === "string" ? record.segment : undefined,
     days: daysFromRecord(record),
-    logoUrl: typeof record.logoUrl === "string" ? record.logoUrl : "",
+    logoUrl: "",
   };
   next.slugTouched = typeof record.slugTouched === "boolean" ? record.slugTouched : inferSlugTouched(next);
   next.depositMode = typeof record.depositMode === "string" && DEPOSIT_MODES.has(record.depositMode as DepositMode)
