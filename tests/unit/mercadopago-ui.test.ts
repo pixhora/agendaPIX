@@ -485,8 +485,10 @@ describe("Mercado Pago status mapping", () => {
     expect(html).not.toContain("temporariamente indisponíveis");
     expect(html).not.toContain("max-w-[34ch]");
     expect(html).not.toContain("Feito com o AgendaPix");
+    expect(html).not.toContain("Feito com AgendaPix");
     expect(html).toContain('tabindex="-1"');
-    expect(html).toContain("Feito com AgendaPix");
+    expect(html).toContain("Agenda com sinal no Pix feita no AgendaPix.");
+    expect(html).toContain("utm_campaign=pagina_publica");
     expect(html).not.toContain("Passo 1 de 4");
     expect(html).not.toContain("O sinal garante o horário");
     expect(html).not.toContain("Agendamento online · sinal por Pix");
