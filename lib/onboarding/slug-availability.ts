@@ -1,3 +1,5 @@
+import { slugAvailabilityWireSchema } from "@/lib/onboarding/validation";
+
 export type SlugReason = "too_short" | "invalid" | "reserved" | "taken";
 
 export type SlugAvailability = {
@@ -13,27 +15,21 @@ export type SlugCheckResult =
   | { ok: true; availability: SlugAvailability }
   | { ok: false; kind: "unverified" | "network" };
 
-const REASONS = new Set<SlugReason>(["too_short", "invalid", "reserved", "taken"]);
-
 export function parseSlugAvailability(body: unknown): SlugAvailability | null {
-  if (!body || typeof body !== "object") return null;
-  const record = body as Record<string, unknown>;
-  if (typeof record.normalized !== "string" || typeof record.valid !== "boolean" || typeof record.available !== "boolean") {
-    return null;
-  }
-  const reason = record.reason === null || (typeof record.reason === "string" && REASONS.has(record.reason as SlugReason))
-    ? (record.reason as SlugReason | null)
-    : null;
-  const suggestions = Array.isArray(record.suggestions)
-    ? record.suggestions.filter((item): item is string => typeof item === "string" && item.length > 0)
-    : [];
+  const parsed = slugAvailabilityWireSchema.safeParse(body);
+  if (!parsed.success) return null;
+  const reason = parsed.data.reason ?? null;
+  const normalized = parsed.data.normalized ?? "";
+  const suggestions = (parsed.data.suggestions ?? []).filter((item) => item.length > 0).slice(0, 3);
+  const hideSuggestions = parsed.data.available || reason === "invalid" || reason === "too_short";
+  const valid = parsed.data.valid ?? (reason !== "invalid" && reason !== "too_short");
   return {
-    input: typeof record.input === "string" ? record.input : record.normalized,
-    normalized: record.normalized,
-    valid: record.valid,
-    available: record.available,
+    input: parsed.data.input ?? normalized,
+    normalized,
+    valid,
+    available: parsed.data.available,
     reason,
-    suggestions,
+    suggestions: hideSuggestions ? [] : suggestions,
   };
 }
 

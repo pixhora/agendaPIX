@@ -39,6 +39,22 @@ export function siteOrigin(): URL {
 
 const localHosts = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1"]);
 
+/**
+ * Prefixo do link público (`domínio/`), só de `NEXT_PUBLIC_SITE_URL`.
+ * Sem domínio inventado: vazio quando a variável falta ou não é http(s).
+ */
+export function publicLinkPrefix(raw: string | undefined = process.env.NEXT_PUBLIC_SITE_URL): string {
+  const configured = raw?.trim();
+  if (!configured) return "";
+  try {
+    const url = new URL(configured);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return "";
+    return url.host;
+  } catch {
+    return "";
+  }
+}
+
 /** Host do mock, sem protocolo. Localhost cai no domínio canônico. */
 export function publicSiteHost(): string {
   const origin = siteOrigin();

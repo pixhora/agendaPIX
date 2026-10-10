@@ -8,7 +8,6 @@ import {
   draftBodyFromOnboarding,
   previousStep,
   saveDraftThenSendOtp,
-  stepperIndex,
   TAKEN_LATER,
   createOnboardingData,
   onboardingPlanForEnv,
@@ -31,13 +30,11 @@ import { BrandLink } from "@/components/ui/brand";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { OnboardingData, OnboardingStep } from "./types";
 import { DraftResume } from "./DraftResume";
-import { StepBusiness } from "./StepBusiness";
-import { StepService } from "./StepService";
-import { StepHours } from "./StepHours";
 import { StepEmail, type EmailAlert } from "./StepEmail";
 import { StepCode } from "./StepCode";
 import { StepCreating, type CreatingAlert } from "./StepCreating";
-import { OnboardingPreview } from "./OnboardingPreview";
+import { StorePreview } from "@/components/store/StorePreview";
+import { StoreProfileForm } from "@/components/store/StoreProfileForm";
 import { OnboardingStepper, OnboardingTopBar } from "./chrome";
 import {
   clearOnboardingProgress,
@@ -51,10 +48,8 @@ import {
 } from "./storage";
 import type { OtpVisualStatus } from "@/components/ui/otp-input";
 
-const STEPPER = [
-  { id: "business", label: "Nome e link" },
-  { id: "service", label: "Serviço" },
-  { id: "hours", label: "Horários" },
+const STORE_STEPS = [
+  { id: "store", label: "Sua loja" },
   { id: "access", label: "Acesso" },
 ];
 
@@ -315,7 +310,7 @@ export function OnboardingFlow({ legalPagesPublished = false, publicHost }: { le
       go("creating");
       return;
     }
-    go("service");
+    go("email");
   }
 
   async function submitEmail() {
@@ -497,8 +492,8 @@ export function OnboardingFlow({ legalPagesPublished = false, publicHost }: { le
   }
 
   const back = previousStep(step);
-  const depositMode = data.depositMode ?? "30";
   const resumeLines = resume ? draftResumeLines(resume.data) : null;
+  const onStore = step === "business" || step === "service" || step === "hours";
 
   if (gate === "checking") {
     return (
@@ -523,7 +518,7 @@ export function OnboardingFlow({ legalPagesPublished = false, publicHost }: { le
               onBack={back ? () => go(back) : undefined}
             />
           ) : <div className="h-14" />}
-          {gate === "form" ? <OnboardingStepper steps={STEPPER} current={stepperIndex(step)} /> : null}
+          {gate === "form" ? <OnboardingStepper steps={STORE_STEPS} current={onStore ? 1 : 2} /> : null}
           <div className="flex flex-1 flex-col" data-step={gate === "prompt" ? "resume" : step}>
             {gate === "prompt" && resumeLines ? (
               <DraftResume
@@ -533,49 +528,17 @@ export function OnboardingFlow({ legalPagesPublished = false, publicHost }: { le
                 onReset={blankForm}
               />
             ) : null}
-            {gate === "form" && step === "business" && (
-              <StepBusiness
-                businessName={data.businessName}
-                slug={data.slug}
-                slugTouched={Boolean(data.slugTouched)}
-                conflict={linkConflict}
-                notice={businessNotice}
+            {gate === "form" && onStore ? (
+              <StoreProfileForm
+                data={data}
+                prefix={publicHost}
                 pending={businessPending}
-                onChangeBusinessName={(businessName) => update({ businessName })}
-                onChangeSlug={(slug) => update({ slug })}
-                onSlugTouched={(slugTouched) => update({ slugTouched })}
-                publicHost={publicHost}
-                onNext={() => void continueBusiness()}
+                formError={businessNotice}
+                conflict={linkConflict ? { slug: linkConflict.slug, suggestions: linkConflict.suggestions } : null}
+                onChange={(partial) => update(partial)}
+                onContinue={() => void continueBusiness()}
               />
-            )}
-            {gate === "form" && step === "service" && (
-              <StepService
-                serviceName={data.serviceName}
-                durationMinutes={data.durationMinutes}
-                priceCents={data.priceCents}
-                depositCents={data.depositCents}
-                depositMode={depositMode}
-                onChangeServiceName={(serviceName) => update({ serviceName })}
-                onChangeDuration={(durationMinutes) => update({ durationMinutes })}
-                onChangePrice={(priceCents) => update({ priceCents })}
-                onChangeDeposit={(depositCents) => update({ depositCents })}
-                onChangeDepositMode={(mode) => update({ depositMode: mode })}
-                onBack={() => go("business")}
-                onNext={() => go("hours")}
-              />
-            )}
-            {gate === "form" && step === "hours" && (
-              <StepHours
-                openDays={data.openDays}
-                opensAt={data.opensAt}
-                closesAt={data.closesAt}
-                onChangeOpenDays={(openDays) => update({ openDays })}
-                onChangeOpensAt={(opensAt) => update({ opensAt })}
-                onChangeClosesAt={(closesAt) => update({ closesAt })}
-                onBack={() => go("service")}
-                onNext={() => go("email")}
-              />
-            )}
+            ) : null}
             {gate === "form" && step === "email" && (
               <StepEmail
                 email={data.email}
@@ -587,7 +550,7 @@ export function OnboardingFlow({ legalPagesPublished = false, publicHost }: { le
                 alert={emailAlert}
                 replacesPreviousCode={Boolean(otpEmail) && otpEmail !== data.email.trim().toLowerCase()}
                 legalPagesPublished={legalPagesPublished}
-                onBack={() => go("hours")}
+                onBack={() => go("business")}
                 onSubmit={() => void submitEmail()}
               />
             )}
@@ -635,7 +598,7 @@ export function OnboardingFlow({ legalPagesPublished = false, publicHost }: { le
             )}
           </div>
         </div>
-        {gate === "form" ? <OnboardingPreview data={data} publicHost={publicHost} /> : null}
+        {gate === "form" && onStore ? <StorePreview data={data} prefix={publicHost} /> : null}
       </div>
     </div>
   );

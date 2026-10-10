@@ -40,12 +40,6 @@ async function openAccessLink(page: Page, link: string, email?: string) {
   await button.click();
 }
 
-async function continueWhenReady(page: Page) {
-  const button = page.getByRole("button", { name: "Continuar" });
-  await expect(button).not.toHaveAttribute("aria-disabled", "true");
-  await button.click();
-}
-
 async function requestLink(page: Page, email: string) {
   await page.getByLabel("E-mail profissional").fill(email);
   await page.getByRole("button", { name: "Receber link de acesso" }).click();
@@ -84,23 +78,22 @@ test("cadastro concluído → \"Ir para o painel\" abre /dashboard com o negóci
   const name = `Estúdio Novo ${id}`;
 
   await page.goto("/onboarding");
-  await expect(page.getByRole("heading", { name: "Nome e link da sua página" })).toBeVisible();
-  await page.getByLabel("Nome do negócio").fill(name);
+  await expect(page.getByRole("heading", { name: "Sua loja" })).toBeVisible();
+  await page.getByLabel("Nome da loja").fill(name);
   await page.getByLabel("Seu link").fill(slug);
-  await expect(page.getByText("Disponível. É seu!")).toBeVisible();
-  await continueWhenReady(page);
-
-  await expect(page.getByRole("heading", { name: "Seu primeiro serviço" })).toBeVisible();
+  await expect(page.getByText("Disponível", { exact: true })).toBeVisible();
   await page.getByLabel("Nome do serviço").fill("Corte novo");
-  await page.getByRole("radio", { name: "45 min", exact: true }).click();
-  const price = page.getByLabel("Preço do serviço em reais");
+  await page.getByLabel("Duração").selectOption("45");
+  const price = page.getByLabel("Preço");
   await price.click();
   await price.pressSequentially("5000");
   await expect(price).toHaveValue(/50,00/);
-  await continueWhenReady(page);
-
-  await expect(page.getByRole("heading", { name: "Quando você atende?" })).toBeVisible();
-  await continueWhenReady(page);
+  await page.locator("#store-day-1").check();
+  await page.locator("#store-open-1").fill("09:00");
+  await page.locator("#store-close-1").fill("18:00");
+  const proceed = page.getByRole("button", { name: "Continuar" });
+  await expect(proceed).toBeEnabled();
+  await proceed.click();
 
   await expect(page.getByRole("heading", { name: "Para onde mandamos seu código?" })).toBeVisible();
   await page.getByLabel("E-mail").fill(email);

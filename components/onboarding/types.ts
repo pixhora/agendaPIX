@@ -1,5 +1,12 @@
 export type DepositMode = "20" | "30" | "50" | "custom" | "none";
 
+export type StoreDay = {
+  weekday: number;
+  open: boolean;
+  opensAt: string;
+  closesAt: string;
+};
+
 export type OnboardingStep = "business" | "service" | "hours" | "email" | "code" | "creating";
 
 export interface OnboardingData {
@@ -20,4 +27,8 @@ export interface OnboardingData {
   segment?: string;
   /** Opcional. O cadastro novo não pede; o provisionamento antigo ainda aceita. */
   contactWhatsapp?: string;
+  /** Sete dias, todos fechados até a pessoa abrir. */
+  days?: StoreDay[];
+  /** URL https gravada pelo upload. A prévia local (blob:) não entra aqui. */
+  logoUrl?: string | null;
 }

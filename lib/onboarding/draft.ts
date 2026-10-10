@@ -12,7 +12,6 @@ export const SEGMENT_UNTIL_STEP: OnboardingSegment = "outro";
 
 const SEGMENT_SET = new Set<string>(ONBOARDING_SEGMENTS);
 
-/** O campo de hora do celular manda `HH:mm:ss`. O contrato guarda `HH:mm`. */
 function draftClock(value: string): string {
   const trimmed = value.trim();
   return /^([01]\d|2[0-3]):[0-5]\d:[0-5]\d$/.test(trimmed) ? trimmed.slice(0, 5) : trimmed;
@@ -35,6 +34,7 @@ export type OnboardingDraftInput = {
   openDays: number[];
   opensAt: string;
   closesAt: string;
+  hours?: { weekday: number; opensAt: string; closesAt: string }[];
 };
 
 export type OnboardingDraftBody = {
@@ -66,9 +66,13 @@ export function buildOnboardingDraftBody(input: OnboardingDraftInput): Onboardin
         priceCents: input.priceCents,
         depositCents: input.depositCents,
       },
-      hours: [...input.openDays]
-        .sort((a, b) => a - b)
-        .map((weekday) => ({ weekday, opensAt: draftClock(input.opensAt), closesAt: draftClock(input.closesAt) })),
+      hours: input.hours
+        ? [...input.hours]
+          .sort((a, b) => a.weekday - b.weekday)
+          .map((row) => ({ weekday: row.weekday, opensAt: draftClock(row.opensAt), closesAt: draftClock(row.closesAt) }))
+        : [...input.openDays]
+          .sort((a, b) => a - b)
+          .map((weekday) => ({ weekday, opensAt: draftClock(input.opensAt), closesAt: draftClock(input.closesAt) })),
     },
   };
   return body;

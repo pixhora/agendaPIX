@@ -3,7 +3,8 @@ import { retryAfterMinutes, type ApiErrorBody } from "@/lib/onboarding/api-error
 import { buildOnboardingDraftBody, type OnboardingDraftBody, type OnboardingDraftInput } from "@/lib/onboarding/draft";
 import type { DraftWriteResult } from "@/lib/onboarding/drafts-client";
 import { normalizeSlug } from "@/lib/slug";
-import type { DepositMode, OnboardingData, OnboardingStep } from "@/components/onboarding/types";
+import { emptyStoreDays, normalizeStoreDays } from "@/lib/store-profile/model";
+import type { DepositMode, OnboardingData, OnboardingStep, StoreDay } from "@/components/onboarding/types";
 
 export const TAKEN_LATER = "Alguém acabou de pegar esse link. Escolha outro, o resto do cadastro está guardado.";
 
@@ -23,15 +24,30 @@ export function createOnboardingData(plan: "base" | "completo"): OnboardingData 
     slug: "",
     slugTouched: false,
     serviceName: "",
-    durationMinutes: 45,
+    durationMinutes: 0,
     priceCents: 0,
     depositCents: 0,
-    depositMode: "30",
-    openDays: [1, 2, 3, 4, 5, 6],
-    opensAt: "09:00",
-    closesAt: "19:00",
+    depositMode: "none",
+    openDays: [],
+    opensAt: "",
+    closesAt: "",
     email: "",
+    days: emptyStoreDays(),
+    logoUrl: null,
   };
+}
+
+function daysFromRecord(record: Partial<OnboardingData>): StoreDay[] {
+  if (Array.isArray(record.days)) return normalizeStoreDays(record.days);
+  if (Array.isArray(record.openDays) && record.openDays.length > 0 && typeof record.opensAt === "string" && record.opensAt.length > 0) {
+    const open = new Set(record.openDays);
+    return emptyStoreDays().map((day) => (
+      open.has(day.weekday)
+        ? { weekday: day.weekday, open: true, opensAt: record.opensAt ?? "", closesAt: typeof record.closesAt === "string" ? record.closesAt : "" }
+        : day
+    ));
+  }
+  return emptyStoreDays();
 }
 
 export function inferSlugTouched(data: { businessName: string; slug: string }): boolean {
@@ -41,7 +57,7 @@ export function inferSlugTouched(data: { businessName: string; slug: string }): 
 
 export function inferDepositMode(data: { priceCents: number; depositCents: number; depositMode?: DepositMode }): DepositMode {
   if (data.depositMode && DEPOSIT_MODES.has(data.depositMode)) return data.depositMode;
-  if (data.depositCents === 0) return data.priceCents > 0 ? "none" : "30";
+  if (data.depositCents === 0) return "none";
   for (const percent of [20, 30, 50] as const) {
     if (depositFromPercent(data.priceCents, percent) === data.depositCents) return String(percent) as DepositMode;
   }
@@ -67,6 +83,8 @@ export function restoreOnboardingDraft(raw: unknown, plan: "base" | "completo"):
     closesAt: typeof record.closesAt === "string" ? record.closesAt : base.closesAt,
     email: typeof record.email === "string" ? record.email : base.email,
     segment: typeof record.segment === "string" ? record.segment : undefined,
+    days: daysFromRecord(record),
+    logoUrl: typeof record.logoUrl === "string" && record.logoUrl.length > 0 ? record.logoUrl : null,
   };
   next.slugTouched = typeof record.slugTouched === "boolean" ? record.slugTouched : inferSlugTouched(next);
   next.depositMode = typeof record.depositMode === "string" && DEPOSIT_MODES.has(record.depositMode as DepositMode)
@@ -104,7 +122,7 @@ export function previousStep(step: OnboardingStep): OnboardingStep | null {
 }
 
 export function depositCentsForDraft(data: OnboardingData): number {
-  const mode = data.depositMode ?? "30";
+  const mode = data.depositMode ?? "none";
   if (mode === "none") return 0;
   if (mode === "custom") return data.depositCents;
   return depositFromPercent(data.priceCents, Number(mode));
@@ -121,9 +139,12 @@ export function draftInputFromOnboarding(data: OnboardingData): OnboardingDraftI
     durationMinutes: data.durationMinutes,
     priceCents: data.priceCents,
     depositCents: depositCentsForDraft(data),
-    openDays: data.openDays,
-    opensAt: data.opensAt,
-    closesAt: data.closesAt,
+    openDays: data.days?.some((day) => day.open) ? data.days.filter((day) => day.open).map((day) => day.weekday) : data.openDays,
+    opensAt: data.days?.find((day) => day.open)?.opensAt || data.opensAt,
+    closesAt: data.days?.find((day) => day.open)?.closesAt || data.closesAt,
+    hours: data.days
+      ? data.days.filter((day) => day.open).map((day) => ({ weekday: day.weekday, opensAt: day.opensAt, closesAt: day.closesAt }))
+      : undefined,
   };
 }
 
@@ -157,7 +178,7 @@ const CHECK_INPUT_MESSAGE = "Confira os dados enviados.";
 
 function fromDraftError(status: number, error: ApiErrorBody, draftId: string | null): DraftSaveOutcome {
   if (status === 0 || error.code === "network") return { type: "offline", draftId };
-  if (error.code === "slug_unavailable") return { type: "slug_taken", suggestions: error.suggestions ?? [], draftId };
+  if (error.code === "slug_unavailable" || error.code === "slug_taken") return { type: "slug_taken", suggestions: error.suggestions ?? [], draftId };
   if (error.code === "rate_limited" || error.code === "RATE_LIMITED") return { type: "rate_limited", minutes: retryAfterMinutes(error.retryAfter), draftId };
   if (error.code === "draft_consumed") return { type: "consumed" };
   if (error.code === "draft_expired" || status === 410) return { type: "expired" };
