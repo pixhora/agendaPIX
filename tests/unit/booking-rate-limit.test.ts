@@ -13,11 +13,18 @@ describe("configuração antiabuso", () => {
       BOOKING_RATE_LIMIT_PER_CLIENT: 10, BOOKING_RATE_LIMIT_PER_BUSINESS: 120,
       BOOKING_HOLD_MINUTES: 30, BOOKING_MAX_PENDING_PER_CLIENT: 3, BOOKING_MAX_PENDING_PER_PHONE: 2, BOOKING_MAX_PENDING_PER_BUSINESS: 50,
       PAYMENT_POLL_RATE_LIMIT_PER_CLIENT: 120, PAYMENT_POLL_RATE_LIMIT_PER_BUSINESS: 2400,
+      SLOT_LINK_TTL_MINUTES: 1440, SLOT_LINK_CREATE_PER_OWNER: 30,
+      SLOT_LINK_OPEN_PER_CLIENT: 60, SLOT_LINK_OPEN_PER_BUSINESS: 600,
+      SLOT_LINK_PAY_PER_CLIENT: 10, SLOT_LINK_PAY_PER_TOKEN: 5, SLOT_LINK_PAY_PER_BUSINESS: 120,
     });
     // 4 s = 15 consultas/min. O padrão cabe essa cadência, outra aba e o botão de verificar.
     expect(bookingConfig({}).PAYMENT_POLL_RATE_LIMIT_PER_CLIENT).toBeGreaterThanOrEqual(15 * 4);
     expect(bookingConfig({ BOOKING_HOLD_MINUTES: "", BOOKING_TRUST_PROXY: "" }).BOOKING_HOLD_MINUTES).toBe(30);
     expect(bookingConfig({ BOOKING_HOLD_MINUTES: "28" }).BOOKING_HOLD_MINUTES).toBe(28);
+    expect(bookingConfig({}).SLOT_LINK_TTL_MINUTES).toBe(1440);
+    expect(() => bookingConfig({ SLOT_LINK_TTL_MINUTES: "14" })).toThrow(expect.objectContaining({
+      status: 503, code: "booking_unavailable", message: expect.stringContaining("SLOT_LINK_TTL_MINUTES"),
+    }));
     expect(bookingConfig({ BOOKING_HOLD_MINUTES: "29" }).BOOKING_HOLD_MINUTES).toBe(29);
   });
   it("recusa hold abaixo de 28 porque o Pix ficaria com menos de 30 minutos", () => {
@@ -39,6 +46,8 @@ describe("configuração antiabuso", () => {
     { BOOKING_HOLD_MINUTES: "1" }, { BOOKING_HOLD_MINUTES: "27" }, { BOOKING_HOLD_MINUTES: "43201" }, { BOOKING_MAX_PENDING_PER_CLIENT: "0" },
     { BOOKING_RATE_LIMIT_PER_CLIENT: "20", BOOKING_RATE_LIMIT_PER_BUSINESS: "10" }, { BOOKING_MAX_PENDING_PER_BUSINESS: "abc" },
     { PAYMENT_POLL_RATE_LIMIT_PER_CLIENT: "50", PAYMENT_POLL_RATE_LIMIT_PER_BUSINESS: "10" },
+    { SLOT_LINK_TTL_MINUTES: "10081" },
+    { SLOT_LINK_OPEN_PER_CLIENT: "20", SLOT_LINK_OPEN_PER_BUSINESS: "10" },
   ])("recusa configuração inválida %o com 503 em vez de cair em padrão silencioso", (env) => {
     expect(() => bookingConfig(env)).toThrow(expect.objectContaining({ status: 503, code: "booking_unavailable" }));
     try {

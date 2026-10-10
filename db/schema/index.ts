@@ -164,6 +164,46 @@ export const bookings = pgTable("bookings", {
   check("bookings_policy_snapshot_pair", sql`(${table.policySnapshot} IS NULL) = (${table.policyText} IS NULL) AND (${table.policySnapshot} IS NULL) = (${table.policyHash} IS NULL)`),
 ]);
 
+export const slotLinkStatus = pgEnum("slot_link_status", ["pending", "paid", "expired", "taken", "cancelled"]);
+
+/**
+ * Link de um horário. Não reserva: o hold nasce só no pagamento.
+ * `token_hash` é o sha256 do token opaco. `preview_id` é outro aleatório e não deriva o token.
+ * `expires_at` nunca passa de `starts_at`.
+ */
+export const slotLinks = pgTable("slot_links", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "restrict" }),
+  serviceId: uuid("service_id").notNull(),
+  startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+  endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  status: slotLinkStatus("status").default("pending").notNull(),
+  tokenHash: text("token_hash").notNull(),
+  previewId: text("preview_id").notNull(),
+  bookingId: uuid("booking_id"),
+  payStartedAt: timestamp("pay_started_at", { withTimezone: true }),
+  /** Lembrete do dono. Não preenche o cadastro da cliente. */
+  customerLabel: text("customer_label"),
+  ...timestamps(),
+}, (table) => [
+  unique("slot_links_business_id_unique").on(table.businessId, table.id),
+  unique("slot_links_token_hash_unique").on(table.tokenHash),
+  unique("slot_links_preview_id_unique").on(table.previewId),
+  uniqueIndex("slot_links_booking_id_unique").on(table.bookingId).where(sql`${table.bookingId} IS NOT NULL`),
+  index("slot_links_business_start_idx").on(table.businessId, table.startsAt),
+  index("slot_links_business_created_idx").on(table.businessId, table.createdAt),
+  foreignKey({ name: "slot_links_service_tenant_fk", columns: [table.businessId, table.serviceId], foreignColumns: [services.businessId, services.id] }),
+  foreignKey({ name: "slot_links_booking_tenant_fk", columns: [table.businessId, table.bookingId], foreignColumns: [bookings.businessId, bookings.id] }),
+  check("slot_links_interval_valid", sql`${table.startsAt} < ${table.endsAt}`),
+  check("slot_links_expires_before_start", sql`${table.expiresAt} <= ${table.startsAt}`),
+  check("slot_links_expires_after_create", sql`${table.expiresAt} > ${table.createdAt}`),
+  check("slot_links_token_hash_format", sql`${table.tokenHash} ~ '^[a-f0-9]{64}$'`),
+  check("slot_links_preview_id_format", sql`${table.previewId} ~ '^[A-Za-z0-9_-]{22}$'`),
+  check("slot_links_customer_label_length", sql`${table.customerLabel} IS NULL OR (length(trim(${table.customerLabel})) > 0 AND char_length(${table.customerLabel}) <= 80)`),
+  check("slot_links_paid_has_booking", sql`${table.status} <> 'paid' OR ${table.bookingId} IS NOT NULL`),
+]);
+
 export const payments = pgTable("payments", {
   id: uuid("id").defaultRandom().primaryKey(),
   businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "restrict" }),

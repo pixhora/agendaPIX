@@ -11,6 +11,12 @@ export const PROFILE_ERROR_COPY: Record<ApiErrorCode, string> = {
   logo_too_large: "A imagem passa de 2 MB. O limite é 2 MB.",
   blob_unavailable: "O envio da logo está indisponível.",
   internal_error: "Não deu para salvar agora. Seus dados continuam aqui. Tente de novo.",
+  link_expired: "Este link expirou.",
+  link_used: "Este horário já foi confirmado.",
+  link_cancelled: "Este link não está mais disponível.",
+  link_invalid: "Este link não está mais disponível.",
+  slot_unavailable: "Esse horário acabou de ser reservado.",
+  mp_not_connected: "Conecte o Mercado Pago para cobrar sinal.",
 };
 
 export function profileErrorCopy(code: string, fallback = PROFILE_ERROR_COPY.internal_error): string {

@@ -100,6 +100,36 @@ export async function consumeBookingRateLimit(database: NodePgDatabase<typeof sc
 }
 
 /** Polling do Pix (a cada 4 s). Balde separado da criação de reserva, sem lock do negócio. */
+/** Geração de link pelo dono. O balde é o dono, no negócio dele. */
+export async function consumeSlotLinkCreateRateLimit(database: NodePgDatabase<typeof schema>, businessId: string, ownerId: string, config: BookingConfig = bookingConfig()) {
+  await consumeWindow(
+    database, businessId, ownerId, "slot-link-create:v1",
+    config.SLOT_LINK_CREATE_PER_OWNER, config.SLOT_LINK_CREATE_PER_OWNER,
+    "Muitos links gerados. Aguarde um minuto e tente de novo.",
+    "Muitos links gerados. Aguarde um minuto e tente de novo.",
+  );
+}
+
+/** Abertura pública do link. A identidade vem de `bookingClientIdentity`. */
+export async function consumeSlotLinkOpenRateLimit(database: NodePgDatabase<typeof schema>, businessId: string, identity: string | null, config: BookingConfig = bookingConfig()) {
+  await consumeWindow(
+    database, businessId, identity, "slot-link-open:v1",
+    config.SLOT_LINK_OPEN_PER_CLIENT, config.SLOT_LINK_OPEN_PER_BUSINESS,
+    "Muitas tentativas. Aguarde um minuto e tente novamente.",
+    "Muitas tentativas neste negócio. Aguarde um minuto e tente novamente.",
+  );
+}
+
+/** Início do Pix pelo link. A identidade vem de `bookingClientIdentity`. O teto por token é outro balde. */
+export async function consumeSlotLinkPayRateLimit(database: NodePgDatabase<typeof schema>, businessId: string, identity: string | null, config: BookingConfig = bookingConfig()) {
+  await consumeWindow(
+    database, businessId, identity, "slot-link-pay:v1",
+    config.SLOT_LINK_PAY_PER_CLIENT, config.SLOT_LINK_PAY_PER_BUSINESS,
+    "Muitas tentativas. Aguarde um minuto e tente novamente.",
+    "Muitas tentativas neste negócio. Aguarde um minuto e tente novamente.",
+  );
+}
+
 export async function consumePaymentPollRateLimit(database: NodePgDatabase<typeof schema>, businessId: string, identity: string | null, config: BookingConfig = bookingConfig()) {
   await consumeWindow(
     database, businessId, identity, "payment-poll:v1",

@@ -50,6 +50,9 @@ export const SLOT_LINK_ERROR_CODES = [
   "invalid_input",
   "rate_limited",
   "unauthorized",
+  "business_unavailable",
+  "origin_not_allowed",
+  "body_too_large",
 ] as const;
 
 export const slotLinkErrorCodeSchema = z.enum(SLOT_LINK_ERROR_CODES);

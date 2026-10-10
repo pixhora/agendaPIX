@@ -439,7 +439,7 @@ Contratos Zod em `lib/contracts` (`business-profile.ts`, `errors.ts`, reexportad
 | `businessProfileResponseSchema` | `{ id, name, slug, logoUrl, publicPath, publicUrl }`. `logoUrl` e `publicUrl` podem ser `null`. |
 | `logoUploadResponseSchema` | `{ logoUrl }`. |
 | `slugAvailabilityResponseSchema` | `{ input, normalized, valid, available, reason, suggestions }`. `reason`: `taken`, `reserved`, `invalid` ou `too_short` (este último a tela de cadastro já usa). `suggestions` tem no máximo 3 e vem vazio quando o link está livre, inválido ou curto. |
-| `apiErrorCodeSchema` | `invalid_input`, `unauthorized`, `business_unavailable`, `slug_taken`, `rate_limited`, `logo_invalid`, `logo_too_large`, `blob_unavailable`, `internal_error`. |
+| `apiErrorCodeSchema` | `invalid_input`, `unauthorized`, `business_unavailable`, `slug_taken`, `rate_limited`, `logo_invalid`, `logo_too_large`, `blob_unavailable`, `internal_error`, e os do link de horário: `link_expired`, `link_used`, `link_cancelled`, `link_invalid`, `slot_unavailable`, `mp_not_connected`. |
 
 O corpo de erro continua `{ error: { code, message, details? } }`. `handleHttp` espalha `error.details` no objeto `error`.
 
@@ -456,3 +456,44 @@ Não há prazo que simplesmente libere um link antigo para qualquer um. Enquanto
 O cadastro cria a página sem URL de logo. `logoUrl` no corpo do rascunho, do commit ou de `POST /api/onboarding` é `400 invalid_input` e não grava a coluna. O arquivo fica no navegador até existir `businessId`; em seguida o POST da logo grava a coluna.
 
 Migration `db/migrations/0018_business_profile.sql` tem de rodar antes do deploy deste código. Sem ela, o SELECT de `businesses.logo_url` responde 500. A migration cria a coluna `logo_url`, a tabela `business_slug_history` com `released_at` e o gatilho que recusa slug atual contra alias ativo ou solto há menos de 90 dias (`23505`). CSP `img-src` inclui `https://*.public.blob.vercel-storage.com`. `https://blob.fake.local` só entra com `NODE_ENV=development`. `serverExternalPackages` inclui `sharp`.
+
+## Link de um horário
+
+Contratos em `lib/contracts/slot-link.ts`, reexportados por `lib/contracts/index.ts`. O corpo de erro é `{ error: { code, message, details? } }` via `handleHttp`. `slotLinkErrorCodeSchema` junta `link_expired`, `link_used`, `link_cancelled`, `link_invalid`, `slot_unavailable`, `mp_not_connected` com `invalid_input`, `rate_limited`, `unauthorized`, `business_unavailable`, `origin_not_allowed` e `body_too_large`.
+
+Gerar o link não cria reserva nem cobrança. O hold e o Pix nascem só no POST de pagamento, pelo mesmo fluxo da reserva pública (`createBooking`). Um `23P01` da exclusão de horário vira `409 slot_unavailable`.
+
+Prazo: `SLOT_LINK_TTL_MINUTES`, padrão **1440** (24 horas), faixa **15–10080**. Valor inválido cai no mesmo `bookingConfig` / `assertProductionSafeEnv` das outras envs de reserva (`503 booking_unavailable` na primeira uso; em produção o boot recusa). O `expiresAt` gravado é `min(agora + prazo, startsAt)`: o link nunca vence depois do início do horário. O check no banco é `expires_at <= starts_at`.
+
+Token: 32 bytes de `crypto.randomBytes`, base64url (43 caracteres), no **path**, nunca no fragmento. A coluna guarda só o sha256. Formato inválido responde `404 link_invalid` sem consultar o banco. Token desconhecido, malformado ou de outro negócio devolve o mesmo `404 link_invalid` e a mesma mensagem, sem dizer se o token existiu. `previewId` é outro aleatório de 16 bytes (22 caracteres). Não deriva o token e não autoriza pagamento.
+
+Nome e WhatsApp da cliente só entram na reserva, com a mesma retenção de `customers` / `bookings`. O `customerLabel` opcional é lembrete do dono: não volta no link público e não preenche o cadastro.
+
+| Método e rota | Schema do pedido | Schema da resposta |
+| --- | --- | --- |
+| `POST /api/businesses/{businessId}/slot-links` | `slotLinkCreateRequestSchema` `{ serviceId, date, time, customerLabel? }` | `201` `slotLinkCreatedResponseSchema` (inclui `token` e `path` uma vez) |
+| `GET /api/businesses/{businessId}/slot-links?date=YYYY-MM-DD&cursor=&limit=` | `slotLinkListQuerySchema` | `slotLinkListResponseSchema` |
+| `POST /api/businesses/{businessId}/slot-links/{linkId}/cancel` | sem corpo | `slotLinkOwnerSchema` |
+| `GET /api/public/{slug}/slot-links/{token}` | — | `slotLinkOpenResponseSchema` |
+| `POST /api/public/{slug}/slot-links/{token}/pay` | `slotLinkPayRequestSchema` `{ customer: { name, phone, cpfCnpj? }, policyHash }` | `201` `slotLinkPayResponseSchema` |
+| `GET /api/public/slot-link-previews/{previewId}` | — | `slotLinkPreviewResponseSchema` `{ businessName, serviceName, date, time }` |
+
+O GET público revalida o horário em toda leitura e devolve `status`: `pending`, `paid`, `expired`, `taken` ou `cancelled`. Também devolve negócio, serviço, `startsAt`, `depositCents`, `remainingCents`, política (`text` + `hash`) e `expiresAt`. Não devolve nome, telefone nem o token. As respostas desse path levam `Cache-Control: no-store` e `Referrer-Policy: no-referrer`. O token não entra em log; `redactSlotLinkToken` cobre o path se uma mensagem de erro o ecoar. Não há Sentry neste processo.
+
+A prévia não traz disponibilidade, sinal, status nem dado da cliente. O cache do WhatsApp pode guardar data e hora porque o horário do link não muda.
+
+O POST de pagamento revalida de novo e só então grava o hold. O uso único é um `UPDATE ... WHERE status = 'pending' AND pay_started_at IS NULL AND booking_id IS NULL AND expires_at > now()`. Duas tentativas concorrentes: uma cria o Pix, a outra recebe `409`. O hold criado não passa de `BOOKING_HOLD_MINUTES`.
+
+Códigos depois que o hash confere: `410 link_expired`, `409 link_used`, `409 link_cancelled`, `409 slot_unavailable`, `409 mp_not_connected`. Antes disso, qualquer token que não casa é `404 link_invalid`.
+
+Limites, janela de 1 minuto, identidade de IP só por `bookingClientIdentity` (o handler não lê `X-Forwarded-For`):
+
+- criar: `SLOT_LINK_CREATE_PER_OWNER` (padrão 30) por dono no negócio
+- abrir: `SLOT_LINK_OPEN_PER_CLIENT` (padrão 60) e `SLOT_LINK_OPEN_PER_BUSINESS` (padrão 600)
+- pagar: `SLOT_LINK_PAY_PER_CLIENT` (padrão 10), `SLOT_LINK_PAY_PER_BUSINESS` (padrão 120) e `SLOT_LINK_PAY_PER_TOKEN` (padrão 5) no hash do token
+
+POST do dono exige sessão e `requireAppOrigin`. O negócio passa por `findOwnedBusiness`. Serviço de outro negócio não entra. Dono A não lista nem cancela link do dono B (`404`).
+
+Status: `paid` quando a reserva ligada confirma ou o pagamento fica `paid`; `expired` quando passa `expiresAt` ou o hold ligado vence sem pagamento; `taken` quando outra reserva ocupa o intervalo; `cancelled` quando o dono cancela; `pending` no restante. `paid` e `cancelled` não voltam atrás.
+
+Migration `0021_slot_links` tem de rodar **antes** do deploy. Sem a tabela, estas rotas respondem 500. O número é o próximo livre no master depois de `0020_webhook_events`. Se outro PR ocupar `0021` antes do merge, renumerar o arquivo, o snapshot e o journal.
