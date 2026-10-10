@@ -458,14 +458,15 @@ h1, h2, h3, h4, h5, h6, .font-display {
   to { opacity: 1; transform: none; }
 }
 @keyframes hero-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
+  from { transform: translateY(-6px); }
+  to { transform: none; }
 }
 .hero-rise { animation: hero-rise 700ms var(--ease-standard) both; }
 .hero-delay-1 { animation-delay: 120ms; }
 .hero-delay-2 { animation-delay: 220ms; }
-.hero-float { animation: hero-float 6.8s ease-in-out infinite; }
-.hero-float-late { animation-duration: 7.6s; animation-delay: 0.45s; }
+/* Assenta uma vez e para: sem animação contínua decorativa (plano de animações do projeto). */
+.hero-float { animation: hero-float 700ms var(--ease-standard) both; }
+.hero-float-late { animation-delay: 450ms; }
 
 @media (prefers-color-scheme: dark) {
   :root:not(.light):not(.dark) .hero-panel {

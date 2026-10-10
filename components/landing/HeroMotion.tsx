@@ -75,7 +75,7 @@ function PixCard() {
         <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-pix text-pix-foreground">
           <CheckIcon className="size-4" />
         </span>
-        <p className="text-[13px] font-semibold leading-tight text-ink">Sinal recebido pelo Pix</p>
+        <p className="whitespace-nowrap text-[13px] font-semibold leading-tight text-ink">Sinal recebido pelo Pix</p>
       </div>
       <p className="mt-2.5 font-display text-3xl font-extrabold leading-none tracking-tight text-ink tabular-nums">R$ 40,00</p>
       <p className="mt-1.5 text-[12px] text-muted">Corte feminino · sáb, 11:30</p>

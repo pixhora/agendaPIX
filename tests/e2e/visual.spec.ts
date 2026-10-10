@@ -68,7 +68,10 @@ test.describe("regressão visual do painel", () => {
           await page.goto(target.path(meta), { waitUntil: "load" });
           await page.waitForLoadState("networkidle");
           await page.evaluate(() => document.fonts.ready);
-          // Textos que dependem do dia de execução (data, "hoje", contagem do teste grátis) ficam fora da comparação.
+          // O aviso de assinatura muda de altura conforme o dia e a hora (contagem do teste grátis).
+          // Tirá-lo do fluxo evita deslocamento de layout; a comparação do resto do painel continua.
+          await page.addStyleTag({ content: '[aria-label="Aviso da assinatura"] { display: none !important; }' });
+          // Textos que dependem do dia de execução (data, "hoje") ficam fora da comparação.
           const dateDependent = page.getByText(DATE_DEPENDENT);
           await expect(page).toHaveScreenshot(`painel-${target.name}-${theme}-${width}.png`, {
             fullPage: false,
