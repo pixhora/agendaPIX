@@ -27,6 +27,12 @@ export const SLOT_LINK_TTL_MAX_MINUTES = 7 * 24 * 60;
 
 export const SLOT_LINK_CUSTOMER_LABEL_MAX = 80;
 
+/**
+ * `Idempotency-Key` do POST de pagamento. Aleatório, gerado pelo cliente.
+ * Aceita base64url e UUID (hífen entra na classe). 16 a 128 caracteres.
+ */
+export const SLOT_LINK_IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
+
 export const SLOT_LINKS_PATH = "/api/businesses/[businessId]/slot-links";
 export const SLOT_LINK_CANCEL_PATH = "/api/businesses/[businessId]/slot-links/[linkId]/cancel";
 export const SLOT_LINK_OPEN_PATH = "/api/public/[slug]/slot-links/[token]";
@@ -43,6 +49,7 @@ export type SlotLinkStatus = z.infer<typeof slotLinkStatusSchema>;
 export const SLOT_LINK_ERROR_CODES = [
   "link_expired",
   "link_used",
+  "link_in_progress",
   "link_cancelled",
   "link_invalid",
   "slot_unavailable",
@@ -109,6 +116,11 @@ export const slotLinkOwnerSchema = z.object({
   createdAt: z.iso.datetime({ offset: true }),
   previewId: z.string().regex(SLOT_LINK_PREVIEW_ID_PATTERN),
   customerLabel: z.string().min(1).max(SLOT_LINK_CUSTOMER_LABEL_MAX).nullable(),
+  /**
+   * O dono cancela quando não há reserva ligada e o claim está livre ou vencido
+   * (`pay_started_at` nulo ou mais velho que `BOOKING_HOLD_MINUTES`).
+   */
+  cancellable: z.boolean(),
 }).strict();
 
 export type SlotLinkOwner = z.infer<typeof slotLinkOwnerSchema>;
@@ -190,12 +202,26 @@ export const slotLinkPayResponseSchema = z.object({
 
 export type SlotLinkPayResponse = z.infer<typeof slotLinkPayResponseSchema>;
 
-/** Prévia OG. Sem disponibilidade, sem sinal, sem dado da cliente. */
-export const slotLinkPreviewResponseSchema = z.object({
+/**
+ * Prévia OG. Sem disponibilidade, sem sinal, sem dado da cliente.
+ * `slot`: link ainda `pending` (nome, logo, serviço, data e hora).
+ * `generic`: qualquer outro status de um previewId conhecido (só nome e logo).
+ */
+const slotLinkPreviewBusinessSchema = z.object({
   businessName: z.string().min(1),
-  serviceName: z.string().min(1),
-  date: z.iso.date(),
-  time: localTime,
+  logoUrl: z.string().nullable(),
 }).strict();
+
+export const slotLinkPreviewResponseSchema = z.discriminatedUnion("kind", [
+  slotLinkPreviewBusinessSchema.extend({
+    kind: z.literal("slot"),
+    serviceName: z.string().min(1),
+    date: z.iso.date(),
+    time: localTime,
+  }).strict(),
+  slotLinkPreviewBusinessSchema.extend({
+    kind: z.literal("generic"),
+  }).strict(),
+]);
 
 export type SlotLinkPreviewResponse = z.infer<typeof slotLinkPreviewResponseSchema>;

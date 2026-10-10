@@ -173,7 +173,7 @@ export const slotLinkStatus = pgEnum("slot_link_status", ["pending", "paid", "ex
  */
 export const slotLinks = pgTable("slot_links", {
   id: uuid("id").defaultRandom().primaryKey(),
-  businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "restrict" }),
+  businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "cascade" }),
   serviceId: uuid("service_id").notNull(),
   startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
   endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
@@ -183,6 +183,8 @@ export const slotLinks = pgTable("slot_links", {
   previewId: text("preview_id").notNull(),
   bookingId: uuid("booking_id"),
   payStartedAt: timestamp("pay_started_at", { withTimezone: true }),
+  /** HMAC do `Idempotency-Key` com segredo do servidor. Não é o segredo nem a chave crua. */
+  payIdempotencyHash: text("pay_idempotency_hash"),
   /** Lembrete do dono. Não preenche o cadastro da cliente. */
   customerLabel: text("customer_label"),
   ...timestamps(),
@@ -202,6 +204,8 @@ export const slotLinks = pgTable("slot_links", {
   check("slot_links_preview_id_format", sql`${table.previewId} ~ '^[A-Za-z0-9_-]{22}$'`),
   check("slot_links_customer_label_length", sql`${table.customerLabel} IS NULL OR (length(trim(${table.customerLabel})) > 0 AND char_length(${table.customerLabel}) <= 80)`),
   check("slot_links_paid_has_booking", sql`${table.status} <> 'paid' OR ${table.bookingId} IS NOT NULL`),
+  check("slot_links_pay_claim_pair", sql`(${table.payStartedAt} IS NULL) = (${table.payIdempotencyHash} IS NULL)`),
+  check("slot_links_pay_idempotency_hash_format", sql`${table.payIdempotencyHash} IS NULL OR ${table.payIdempotencyHash} ~ '^[a-f0-9]{64}$'`),
 ]);
 
 export const payments = pgTable("payments", {

@@ -2653,6 +2653,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "pay_idempotency_hash": {
+          "name": "pay_idempotency_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "customer_label": {
           "name": "customer_label",
           "type": "text",
@@ -2745,7 +2751,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "restrict",
+          "onDelete": "cascade",
           "onUpdate": "no action"
         },
         "slot_links_service_tenant_fk": {
@@ -2833,6 +2839,14 @@
         "slot_links_paid_has_booking": {
           "name": "slot_links_paid_has_booking",
           "value": "\"slot_links\".\"status\" <> 'paid' OR \"slot_links\".\"booking_id\" IS NOT NULL"
+        },
+        "slot_links_pay_claim_pair": {
+          "name": "slot_links_pay_claim_pair",
+          "value": "(\"slot_links\".\"pay_started_at\" IS NULL) = (\"slot_links\".\"pay_idempotency_hash\" IS NULL)"
+        },
+        "slot_links_pay_idempotency_hash_format": {
+          "name": "slot_links_pay_idempotency_hash_format",
+          "value": "\"slot_links\".\"pay_idempotency_hash\" IS NULL OR \"slot_links\".\"pay_idempotency_hash\" ~ '^[a-f0-9]{64}$'"
         }
       },
       "isRLSEnabled": false

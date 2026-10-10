@@ -1,14 +1,19 @@
-import { randomUUID } from "node:crypto";
-import { eq, inArray } from "drizzle-orm";
+import { createHash, randomUUID } from "node:crypto";
+import { eq, inArray, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as schema from "../../db/schema";
 import { bookingConfig } from "../../lib/bookings/config";
-import { createBooking } from "../../lib/bookings/service";
-import { cancelSlotLink, createSlotLink, listSlotLinks, openSlotLink, paySlotLink, readSlotLinkPreview } from "../../lib/bookings/slot-link";
+import { createBooking, hash } from "../../lib/bookings/service";
+import * as bookingService from "../../lib/bookings/service";
+import { cancelSlotLink, createSlotLink, deleteSlotLinksForBusiness, listSlotLinks, openSlotLink, paySlotLink, purgeExpiredSlotLinkLabels, readSlotLinkPreview, slotLinkPayIdempotencyHash } from "../../lib/bookings/slot-link";
 import { databaseEnvSchema } from "../../lib/env";
+import { applyPaidEvent } from "../../lib/payments/apply-paid";
 import { FakePaymentProvider } from "../../lib/payments/fake";
+import { polledPaidEvent } from "../../lib/payments/provider";
+import { drizzleRefundPorts, settleAutomaticLateRefund } from "../../lib/payments/refund-flow";
+import { PIX_APPROVAL_TOLERANCE_MS } from "../../lib/payments/rules";
 import { padraoPolicyHash } from "../helpers/deposit-policy";
 import { insertConnectedMercadoPago } from "../helpers/connected-mp";
 
@@ -41,6 +46,7 @@ async function destroyShop(shop: Shop) {
   await database.delete(schema.slotLinks).where(eq(schema.slotLinks.businessId, shop.businessId));
   await database.delete(schema.paymentRefunds).where(eq(schema.paymentRefunds.businessId, shop.businessId));
   await database.delete(schema.ownerNotices).where(eq(schema.ownerNotices.businessId, shop.businessId));
+  await database.delete(schema.paymentAudit).where(eq(schema.paymentAudit.businessId, shop.businessId));
   await database.delete(schema.payments).where(eq(schema.payments.businessId, shop.businessId));
   await database.delete(schema.bookings).where(eq(schema.bookings.businessId, shop.businessId));
   await database.delete(schema.customers).where(eq(schema.customers.businessId, shop.businessId));
@@ -61,7 +67,7 @@ beforeEach(async () => {
 });
 afterEach(async () => {
   vi.unstubAllEnvs();
-  await database.delete(schema.abuseRateLimits).where(inArray(schema.abuseRateLimits.scope, ["slot-link-open-probe", "slot-link-pay-token", "slot-link-pay-probe"]));
+  await database.delete(schema.abuseRateLimits).where(inArray(schema.abuseRateLimits.scope, ["slot-link-open-probe", "slot-link-pay-token", "slot-link-pay-probe", "slot-link-preview"]));
   for (const current of shops) await destroyShop(current);
   shops.length = 0;
 });
@@ -72,6 +78,23 @@ function payBody(index: number) {
     customer: { name: "Cliente do link", phone: phone(index) },
     policyHash: padraoPolicyHash("Negócio de teste", 2000),
   };
+}
+
+function payKey(index: number) {
+  return `paykey${String(index).padStart(16, "0")}`;
+}
+
+function pay(token: string, index: number, identity: string, key = payKey(index), slug = shop.slug) {
+  return paySlotLink(slug, token, payBody(index), key, identity, database, provider);
+}
+
+async function ageHold(linkId: string, bookingId: string | null) {
+  const born = new Date(Date.now() - (bookingConfig().BOOKING_HOLD_MINUTES + 10) * 60_000);
+  const pastExpiry = new Date(Date.now() - 60_000);
+  await database.update(schema.slotLinks).set({ payStartedAt: born }).where(eq(schema.slotLinks.id, linkId));
+  if (!bookingId) return;
+  await database.update(schema.bookings).set({ createdAt: born, expiresAt: pastExpiry }).where(eq(schema.bookings.id, bookingId));
+  await database.update(schema.payments).set({ createdAt: born, expiresAt: pastExpiry }).where(eq(schema.payments.bookingId, bookingId));
 }
 
 async function makeLink(index = 0, owner = shop) {
@@ -88,6 +111,7 @@ describe("link de um horário", () => {
     expect(created.path).toBe(`/api/public/${shop.slug}/slot-links/${created.token}`);
     expect(created.path.includes("#")).toBe(false);
     expect(created.customerLabel).toBe("Ana da mensagem");
+    expect(created.cancellable).toBe(true);
     expect(new Date(created.expiresAt).getTime()).toBeLessThanOrEqual(new Date(created.startsAt).getTime());
     expect(new Date(created.expiresAt).getTime()).toBeGreaterThanOrEqual(before + bookingConfig().SLOT_LINK_TTL_MINUTES * 60_000 - 5000);
     expect(await database.select().from(schema.bookings).where(eq(schema.bookings.businessId, shop.businessId))).toHaveLength(0);
@@ -103,8 +127,8 @@ describe("link de um horário", () => {
     expect(row.tokenHash).toMatch(/^[a-f0-9]{64}$/);
     expect(JSON.stringify(row)).not.toContain(created.token);
     expect(row.previewId).not.toBe(created.token);
-    const preview = await readSlotLinkPreview(created.previewId, database);
-    expect(preview).toEqual({ businessName: "Negócio de teste", serviceName: "Corte", date: DATE, time: clock(0) });
+    const preview = await readSlotLinkPreview(created.previewId, "peer:192.0.2.1", database);
+    expect(preview).toEqual({ kind: "slot", businessName: "Negócio de teste", logoUrl: null, serviceName: "Corte", date: DATE, time: clock(0) });
     expect(preview).not.toHaveProperty("status");
     expect(JSON.stringify(preview)).not.toContain("Ana");
   });
@@ -134,7 +158,7 @@ describe("link de um horário", () => {
     const opened = await openSlotLink(shop.slug, created.token, "peer:192.0.2.31", database);
     expect(opened.status).toBe("taken");
     const paymentsBefore = await database.select().from(schema.payments).where(eq(schema.payments.businessId, shop.businessId));
-    await expect(paySlotLink(shop.slug, created.token, payBody(4), "peer:192.0.2.32", database, provider)).rejects.toMatchObject({
+    await expect(pay(created.token, 4, "peer:192.0.2.32")).rejects.toMatchObject({
       status: 409, code: "slot_unavailable",
     });
     const paymentsAfter = await database.select().from(schema.payments).where(eq(schema.payments.businessId, shop.businessId));
@@ -144,14 +168,15 @@ describe("link de um horário", () => {
   it("duas cobranças concorrentes: exatamente uma cria o Pix", async () => {
     const created = await makeLink(1);
     const results = await Promise.allSettled([
-      paySlotLink(shop.slug, created.token, payBody(5), "peer:192.0.2.40", database, provider),
-      paySlotLink(shop.slug, created.token, payBody(6), "peer:192.0.2.41", database, provider),
+      pay(created.token, 5, "peer:192.0.2.40"),
+      pay(created.token, 6, "peer:192.0.2.41"),
     ]);
     const won = results.filter((result) => result.status === "fulfilled");
     const lost = results.filter((result) => result.status === "rejected");
     expect(won).toHaveLength(1);
     expect(lost).toHaveLength(1);
-    expect(lost[0]).toMatchObject({ reason: expect.objectContaining({ status: 409 }) });
+    expect(lost[0]).toMatchObject({ reason: expect.objectContaining({ status: 409, code: "link_in_progress" }) });
+    expect(JSON.stringify((lost[0] as PromiseRejectedResult).reason)).not.toContain("Cliente do link");
     const bookings = await database.select().from(schema.bookings).where(eq(schema.bookings.businessId, shop.businessId));
     const payments = await database.select().from(schema.payments).where(eq(schema.payments.businessId, shop.businessId));
     expect(bookings).toHaveLength(1);
@@ -167,7 +192,7 @@ describe("link de um horário", () => {
     const past = new Date(Date.now() - 60_000);
     await database.update(schema.slotLinks).set({ createdAt: new Date(Date.now() - 86_400_000), expiresAt: past }).where(eq(schema.slotLinks.id, created.id));
     expect((await openSlotLink(shop.slug, created.token, "peer:192.0.2.50", database)).status).toBe("expired");
-    await expect(paySlotLink(shop.slug, created.token, payBody(7), "peer:192.0.2.51", database, provider)).rejects.toMatchObject({
+    await expect(pay(created.token, 7, "peer:192.0.2.51")).rejects.toMatchObject({
       status: 410, code: "link_expired",
     });
     expect(await database.select().from(schema.bookings).where(eq(schema.bookings.businessId, shop.businessId))).toHaveLength(0);
@@ -180,7 +205,7 @@ describe("link de um horário", () => {
     const foreign = await makeLink(0, other);
     expect((await cancelSlotLink(shop.businessId, shop.ownerId, created.id, database)).status).toBe("cancelled");
     expect((await openSlotLink(shop.slug, created.token, "peer:192.0.2.60", database)).status).toBe("cancelled");
-    await expect(paySlotLink(shop.slug, created.token, payBody(8), "peer:192.0.2.61", database, provider)).rejects.toMatchObject({
+    await expect(pay(created.token, 8, "peer:192.0.2.61")).rejects.toMatchObject({
       status: 409, code: "link_cancelled",
     });
     const listed = await listSlotLinks(shop.businessId, shop.ownerId, { date: DATE }, database);
@@ -218,8 +243,8 @@ describe("link de um horário", () => {
     await expect(paySlotLink(shop.slug, created.token, {
       customer: { name: "Ana", phone: "invalido" },
       policyHash: "ab".repeat(32),
-    }, "peer:192.0.2.71", database, provider)).rejects.toMatchObject({ status: 400, code: "invalid_input" });
-    await expect(paySlotLink(shop.slug, created.token, payBody(9), "peer:192.0.2.72", database, provider)).rejects.toMatchObject({
+    }, payKey(90), "peer:192.0.2.71", database, provider)).rejects.toMatchObject({ status: 400, code: "invalid_input" });
+    await expect(pay(created.token, 9, "peer:192.0.2.72")).rejects.toMatchObject({
       status: 429, code: "rate_limited",
     });
     expect(await database.select().from(schema.bookings).where(eq(schema.bookings.businessId, shop.businessId))).toHaveLength(0);
@@ -232,7 +257,7 @@ describe("link de um horário", () => {
     await insertConnectedMercadoPago(database, shop.businessId);
     const created = await makeLink(8);
     await database.delete(schema.mercadopagoConnections).where(eq(schema.mercadopagoConnections.businessId, shop.businessId));
-    await expect(paySlotLink(shop.slug, created.token, payBody(10), "peer:192.0.2.80", database, provider)).rejects.toMatchObject({
+    await expect(pay(created.token, 10, "peer:192.0.2.80")).rejects.toMatchObject({
       status: 409, code: "mp_not_connected",
     });
     expect(await database.select().from(schema.bookings).where(eq(schema.bookings.businessId, shop.businessId))).toHaveLength(0);
@@ -249,5 +274,194 @@ describe("link de um horário", () => {
       tokenHash: "ab".repeat(32),
       previewId: "bbbbbbbbbbbbbbbbbbbbbb",
     })).rejects.toThrow();
+  });
+
+  it("a mesma chave retoma o Pix e outra chave no claim ativo recebe link_in_progress", async () => {
+    const created = await makeLink(0);
+    await expect(paySlotLink(shop.slug, created.token, payBody(11), null, "peer:192.0.2.109", database, provider)).rejects.toMatchObject({ status: 400, code: "invalid_input" });
+    await expect(paySlotLink(shop.slug, created.token, payBody(11), "curta", "peer:192.0.2.109", database, provider)).rejects.toMatchObject({ status: 400, code: "invalid_input" });
+    const first = await pay(created.token, 11, "peer:192.0.2.110", payKey(11));
+    const again = await pay(created.token, 11, "peer:192.0.2.111", payKey(11));
+    expect(again.bookingId).toBe(first.bookingId);
+    expect(again.accessToken).toBe(first.accessToken);
+    expect(again.payment?.copyPaste).toBe(first.payment?.copyPaste);
+    expect(again.payment?.expiresAt).toBe(first.payment?.expiresAt);
+    expect(await database.select().from(schema.payments).where(eq(schema.payments.businessId, shop.businessId))).toHaveLength(1);
+    const listed = await listSlotLinks(shop.businessId, shop.ownerId, { date: DATE }, database);
+    expect(listed.links.find((link) => link.id === created.id)?.cancellable).toBe(false);
+    await expect(cancelSlotLink(shop.businessId, shop.ownerId, created.id, database)).rejects.toMatchObject({ status: 409, code: "link_used" });
+    const blocked = await pay(created.token, 12, "peer:192.0.2.112", payKey(12)).catch((error) => error);
+    expect(blocked).toMatchObject({ status: 409, code: "link_in_progress" });
+    const dumped = JSON.stringify(blocked);
+    expect(dumped).not.toContain(first.accessToken);
+    expect(dumped).not.toContain(first.payment?.copyPaste);
+    expect(dumped).not.toContain("Cliente do link");
+    const [row] = await database.select().from(schema.slotLinks).where(eq(schema.slotLinks.id, created.id));
+    expect(row.payIdempotencyHash).toBe(slotLinkPayIdempotencyHash(created.id, payKey(11)));
+    expect(row.payIdempotencyHash).not.toBe(createHash("sha256").update(created.id).digest("hex"));
+  });
+
+  it("claim vencido sem reserva pode ser reassumido e cancelado, e duas chaves disputam uma só", async () => {
+    const created = await makeLink(0);
+    const hash = slotLinkPayIdempotencyHash(created.id, payKey(1));
+    const born = new Date(Date.now() - (bookingConfig().BOOKING_HOLD_MINUTES + 5) * 60_000);
+    await database.update(schema.slotLinks).set({ payStartedAt: born, payIdempotencyHash: hash }).where(eq(schema.slotLinks.id, created.id));
+    const listed = await listSlotLinks(shop.businessId, shop.ownerId, { date: DATE }, database);
+    expect(listed.links[0]?.cancellable).toBe(true);
+    const results = await Promise.allSettled([
+      pay(created.token, 13, "peer:192.0.2.130", payKey(13)),
+      pay(created.token, 14, "peer:192.0.2.131", payKey(14)),
+    ]);
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
+    expect(results.find((result) => result.status === "rejected")).toMatchObject({
+      reason: expect.objectContaining({ status: 409, code: "link_in_progress" }),
+    });
+    expect(await database.select().from(schema.bookings).where(eq(schema.bookings.businessId, shop.businessId))).toHaveLength(1);
+
+    const idle = await makeLink(1);
+    await database.update(schema.slotLinks).set({
+      payStartedAt: born,
+      payIdempotencyHash: slotLinkPayIdempotencyHash(idle.id, payKey(2)),
+    }).where(eq(schema.slotLinks.id, idle.id));
+    expect((await cancelSlotLink(shop.businessId, shop.ownerId, idle.id, database)).status).toBe("cancelled");
+  });
+
+  it("chave nova assume o hold vencido, solta a reserva antiga e o Pix antigo cai no atraso", async () => {
+    await database.update(schema.businesses).set({ latePaymentPolicy: "rebook_if_free" }).where(eq(schema.businesses.id, shop.businessId));
+    const created = await makeLink(0);
+    const first = await pay(created.token, 15, "peer:192.0.2.150", payKey(15));
+    await ageHold(created.id, first.bookingId);
+    const second = await pay(created.token, 16, "peer:192.0.2.151", payKey(16));
+    expect(second.bookingId).not.toBe(first.bookingId);
+    const [oldBooking] = await database.select().from(schema.bookings).where(eq(schema.bookings.id, first.bookingId));
+    expect(oldBooking.status).toBe("expired");
+    const [fresh] = await database.select().from(schema.bookings).where(eq(schema.bookings.id, second.bookingId));
+    expect(fresh.status).toBe("pending_payment");
+    const charge = provider.markPaid(first.payment!.externalId!, new Date(Date.now() + PIX_APPROVAL_TOLERANCE_MS));
+    await database.transaction(async (tx) => {
+      const result = await applyPaidEvent(tx, "fake", polledPaidEvent(charge, hash), new Date());
+      expect(result).toMatchObject({ outcome: "ignored", reason: "late_no_slot", bookingId: first.bookingId });
+    });
+    expect(await settleAutomaticLateRefund(drizzleRefundPorts(database), provider, first.payment!.id, async () => {})).toBe("submitted");
+    const [oldAfter] = await database.select().from(schema.bookings).where(eq(schema.bookings.id, first.bookingId));
+    const [newAfter] = await database.select().from(schema.bookings).where(eq(schema.bookings.id, second.bookingId));
+    const [oldPayment] = await database.select().from(schema.payments).where(eq(schema.payments.bookingId, first.bookingId));
+    expect(oldAfter.status).toBe("expired");
+    expect(newAfter.status).toBe("pending_payment");
+    expect(oldPayment.refundStatus).toBe("refunded");
+    expect(oldPayment.status).toBe("refunded");
+  });
+
+  it("duas chaves disputam a retomada de um hold vencido e só uma vence", async () => {
+    const created = await makeLink(0);
+    const first = await pay(created.token, 17, "peer:192.0.2.170", payKey(17));
+    await ageHold(created.id, first.bookingId);
+    const results = await Promise.allSettled([
+      pay(created.token, 18, "peer:192.0.2.180", payKey(18)),
+      pay(created.token, 19, "peer:192.0.2.181", payKey(19)),
+    ]);
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(results.find((result) => result.status === "rejected")).toMatchObject({
+      reason: expect.objectContaining({ code: "link_in_progress" }),
+    });
+    const bookings = await database.select().from(schema.bookings).where(eq(schema.bookings.businessId, shop.businessId));
+    expect(bookings.filter((booking) => booking.status === "pending_payment")).toHaveLength(1);
+    expect(bookings.filter((booking) => booking.status === "expired")).toHaveLength(1);
+  });
+
+  it("pagamento confirmado marca o link como pago e um novo POST devolve link_used", async () => {
+    const created = await makeLink(0);
+    const first = await pay(created.token, 20, "peer:192.0.2.200", payKey(20));
+    const charge = provider.markPaid(first.payment!.externalId!);
+    await database.transaction(async (tx) => {
+      const result = await applyPaidEvent(tx, "fake", polledPaidEvent(charge, hash), new Date());
+      expect(result.outcome).toBe("processed");
+    });
+    const [row] = await database.select().from(schema.slotLinks).where(eq(schema.slotLinks.id, created.id));
+    expect(row.status).toBe("paid");
+    expect((await openSlotLink(shop.slug, created.token, "peer:192.0.2.201", database)).status).toBe("paid");
+    await expect(pay(created.token, 20, "peer:192.0.2.202", payKey(20))).rejects.toMatchObject({ status: 409, code: "link_used" });
+    await expect(pay(created.token, 21, "peer:192.0.2.203", payKey(21))).rejects.toMatchObject({ status: 409, code: "link_used" });
+    expect(await database.select().from(schema.payments).where(eq(schema.payments.businessId, shop.businessId))).toHaveLength(1);
+  });
+
+  it("23P01 dentro de createBooking vira 409", async () => {
+    const created = await makeLink(0);
+    const boom = Object.assign(new Error("exclusion"), { code: "23P01" });
+    const spy = vi.spyOn(bookingService, "createBooking").mockRejectedValueOnce(boom);
+    await expect(pay(created.token, 22, "peer:192.0.2.220", payKey(22))).rejects.toMatchObject({ status: 409, code: "slot_unavailable" });
+    spy.mockRestore();
+    const [row] = await database.select().from(schema.slotLinks).where(eq(schema.slotLinks.id, created.id));
+    expect(row.status).toBe("taken");
+  });
+
+  it("horário que já passou devolve expirado, mesmo ocupado", async () => {
+    const created = await makeLink(0);
+    const startsAt = new Date(Date.now() - 2 * 60 * 60_000);
+    const expiresAt = new Date(startsAt.getTime() - 60_000);
+    await database.update(schema.slotLinks).set({
+      createdAt: new Date(expiresAt.getTime() - 60_000),
+      startsAt,
+      endsAt: new Date(startsAt.getTime() + 30 * 60_000),
+      expiresAt,
+    }).where(eq(schema.slotLinks.id, created.id));
+    const [customer] = await database.insert(schema.customers).values({ businessId: shop.businessId, name: "Ocupou", phone: phone(40) }).returning();
+    await database.insert(schema.bookings).values({
+      businessId: shop.businessId,
+      serviceId: shop.serviceId,
+      customerId: customer.id,
+      requestKey: randomUUID(),
+      startsAt,
+      endsAt: new Date(startsAt.getTime() + 30 * 60_000),
+      priceCents: 8000,
+      depositCents: 2000,
+      status: "confirmed",
+    });
+    expect((await openSlotLink(shop.slug, created.token, "peer:192.0.2.240", database)).status).toBe("expired");
+    await expect(pay(created.token, 23, "peer:192.0.2.241", payKey(23))).rejects.toMatchObject({ status: 410, code: "link_expired" });
+  });
+
+  it("prévia conhecida fora de pending é genérica e o limite não depende de token aleatório", async () => {
+    const created = await makeLink(0);
+    expect((await cancelSlotLink(shop.businessId, shop.ownerId, created.id, database)).status).toBe("cancelled");
+    const generic = await readSlotLinkPreview(created.previewId, "peer:192.0.2.250", database);
+    expect(generic).toEqual({ kind: "generic", businessName: "Negócio de teste", logoUrl: null });
+    expect(generic).not.toHaveProperty("serviceName");
+    await expect(readSlotLinkPreview("e".repeat(22), "peer:192.0.2.251", database)).rejects.toMatchObject({ status: 404, code: "link_invalid" });
+
+    const before = await database.select().from(schema.abuseRateLimits).where(eq(schema.abuseRateLimits.scope, "slot-link-pay-token"));
+    await expect(paySlotLink(shop.slug, "F".repeat(43), payBody(24), payKey(24), "peer:192.0.2.252", database, provider)).rejects.toMatchObject({
+      status: 404, code: "link_invalid",
+    });
+    const after = await database.select().from(schema.abuseRateLimits).where(eq(schema.abuseRateLimits.scope, "slot-link-pay-token"));
+    expect(after).toHaveLength(before.length);
+
+    vi.stubEnv("SLOT_LINK_OPEN_PER_CLIENT", "1");
+    await readSlotLinkPreview(created.previewId, null, database);
+    await expect(readSlotLinkPreview(created.previewId, null, database)).rejects.toMatchObject({ status: 429, code: "rate_limited" });
+  });
+
+  it("apaga o lembrete depois do início e os links saem com o negócio", async () => {
+    const created = await makeLink(0);
+    const startsAt = new Date(Date.now() - 60_000);
+    const expiresAt = new Date(startsAt.getTime() - 60_000);
+    await database.update(schema.slotLinks).set({
+      createdAt: new Date(expiresAt.getTime() - 60_000),
+      startsAt,
+      endsAt: new Date(startsAt.getTime() + 30 * 60_000),
+      expiresAt,
+      customerLabel: "Ana da mensagem",
+    }).where(eq(schema.slotLinks.id, created.id));
+    const future = await makeLink(1);
+    expect(await purgeExpiredSlotLinkLabels(database)).toBeGreaterThanOrEqual(1);
+    const [purged] = await database.select().from(schema.slotLinks).where(eq(schema.slotLinks.id, created.id));
+    const [kept] = await database.select().from(schema.slotLinks).where(eq(schema.slotLinks.id, future.id));
+    expect(purged.customerLabel).toBeNull();
+    expect(kept.customerLabel).toBe("Ana da mensagem");
+    const definition = await database.execute(sql`SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint WHERE conname = 'slot_links_business_id_businesses_id_fk'`);
+    expect(String((definition.rows[0] as { def: string }).def)).toContain("ON DELETE CASCADE");
+    expect(await deleteSlotLinksForBusiness(shop.businessId, database)).toBe(2);
+    expect(await database.select().from(schema.slotLinks).where(eq(schema.slotLinks.businessId, shop.businessId))).toHaveLength(0);
   });
 });

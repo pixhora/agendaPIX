@@ -13,7 +13,7 @@ export async function POST(request: Request, context: RouteContext<"/api/public/
   const response = await withPublicSlug(request, slug, async () => {
     try {
       const body = parseJsonBody(await readBody(request));
-      return withTiming(json(await paySlotLink(slug, token, body, bookingClientIdentity(request)), 201), started);
+      return withTiming(json(await paySlotLink(slug, token, body, request.headers.get("idempotency-key"), bookingClientIdentity(request)), 201), started);
     } catch (error) {
       throw redactSlotLinkError(error, token);
     }

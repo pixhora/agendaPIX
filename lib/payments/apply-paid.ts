@@ -60,6 +60,7 @@ export async function applyPaidEvent(database: Database, providerName: string, e
     if (decision.confirm) {
       await database.update(schema.bookings).set({ status: "confirmed" })
         .where(and(eq(schema.bookings.businessId, found.businessId), eq(schema.bookings.id, booking.id), eq(schema.bookings.status, "pending_payment")));
+      await markSlotLinkPaid(database, found.businessId, booking.id, processingNow);
       await audit(database, {
         businessId: found.businessId, paymentId: payment.id, bookingId: booking.id, action: "payment_confirmed",
         detail: { eventId: event.eventId, statusDetail: event.statusDetail ?? null },
@@ -116,6 +117,7 @@ async function reclaimOnTimeBooking(database: Database, input: {
         businessId: business.id, paymentId: payment.id, bookingId: booking.id, action: "payment_confirmed",
         detail: { eventId: event.eventId, statusDetail: event.statusDetail ?? null, reclaimed: true },
       });
+      await markSlotLinkPaid(database, business.id, booking.id, now);
       return { outcome: "processed", reason: "on_time_reclaimed", ...ids };
     }
   }
@@ -159,6 +161,7 @@ async function resolveLatePayment(database: Database, input: {
     }
     if (rebooked) {
       await audit(database, { businessId: business.id, paymentId: payment.id, bookingId: booking.id, action: "late_payment_rebooked", detail: { eventId: event.eventId, statusDetail: event.statusDetail ?? null } });
+      await markSlotLinkPaid(database, business.id, booking.id, now);
       return { outcome: "processed", reason: "late_rebooked", paymentId: payment.id, businessId: business.id, bookingId: booking.id };
     }
   }
@@ -170,6 +173,14 @@ async function resolveLatePayment(database: Database, input: {
     },
   });
   return { outcome: "ignored", reason: "late_no_slot", paymentId: payment.id, businessId: business.id, bookingId: booking.id };
+}
+
+async function markSlotLinkPaid(database: Database, businessId: string, bookingId: string, now: Date) {
+  await database.update(schema.slotLinks).set({ status: "paid", updatedAt: now }).where(and(
+    eq(schema.slotLinks.businessId, businessId),
+    eq(schema.slotLinks.bookingId, bookingId),
+    sql`${schema.slotLinks.status} <> 'cancelled'`,
+  ));
 }
 
 function isExclusionViolation(error: unknown): boolean {

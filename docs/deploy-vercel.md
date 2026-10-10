@@ -56,6 +56,16 @@ O lembrete da véspera da devolução manual não espera 09:00. Sai na primeira 
 | `BOOKING_CLIENT_IP_HEADER` | `x-real-ip` |
 | `ENABLE_EXPERIMENTAL_COREPACK` | `1` (pnpm 12 do `packageManager`) |
 
+## Link de um horário e logs da Vercel
+
+O token do link vai no path (`/api/public/{slug}/slot-links/{token}`). A Vercel registra o path nos logs de request, então o token aparece lá. A aplicação não grava o token (só o sha256) e não o manda no `Referrer`. **Decisão pendente com o Matiss:** por quanto tempo esses logs ficam e quem pode lê-los. Não está aceito como risco fechado.
+
+Enquanto isso, o que já vale:
+
+- o prazo do link é `SLOT_LINK_TTL_MINUTES` (padrão 24 horas, teto de 7 dias) e nunca passa do início do horário;
+- depois que o Pix confirma, o token deixa de pagar (`link_used` / status `paid`);
+- o acesso aos logs do projeto na Vercel fica restrito ao dono da conta.
+
 `FAKE_WEBHOOK_SECRET` não é usado em produção. Os demais `BOOKING_*`/`RECONCILE_*` têm padrão. `BOOKING_HOLD_MINUTES` ausente vale 30; abaixo de 28 o agendamento responde `503` `booking_unavailable`. A mensagem cita o nome da env e não o valor. O boot só chama `bookingConfig` com `NODE_ENV=production`. O `next build` com `VERCEL_ENV=production` também valida `bookingConfig` e `MP_OAUTH_PKCE=on` (`assertVercelProductionBuild` em `next.config.ts`); preview e dev não. Fora de produção um valor inválido não derruba o processo; a primeira reserva ainda responde 503. `PIX_KEY_ENCRYPTION_KEY` não é lida pelo código atual (a rota da chave responde 410); não apague a chave se ainda houver ciphertext antigo para guardar.
 
 ## Ordem

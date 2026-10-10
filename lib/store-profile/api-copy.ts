@@ -13,6 +13,7 @@ export const PROFILE_ERROR_COPY: Record<ApiErrorCode, string> = {
   internal_error: "Não deu para salvar agora. Seus dados continuam aqui. Tente de novo.",
   link_expired: "Este link expirou.",
   link_used: "Este horário já foi confirmado.",
+  link_in_progress: "Este horário já está em pagamento.",
   link_cancelled: "Este link não está mais disponível.",
   link_invalid: "Este link não está mais disponível.",
   slot_unavailable: "Esse horário acabou de ser reservado.",

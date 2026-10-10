@@ -1,3 +1,4 @@
+import { purgeExpiredSlotLinkLabels } from "@/lib/bookings/slot-link";
 import { handleHttp, json } from "@/lib/http";
 import { deleteExpiredOnboardingDrafts } from "@/lib/onboarding/drafts";
 import { authorizeCron, runCronTick, runReconcilePass } from "@/lib/payments/cron";
@@ -12,9 +13,13 @@ async function handle(request: Request) {
     authorizeCron(request.headers.get("authorization"));
     return json(await runCronTick({
       deleteExpiredDrafts: () => deleteExpiredOnboardingDrafts(),
+      purgeSlotLinkLabels: () => purgeExpiredSlotLinkLabels(),
       reconcile: () => runReconcilePass(),
       onDraftCleanupError: (code) => {
         console.error(`[reconcile] stage=draft_cleanup code=${code}`);
+      },
+      onSlotLinkLabelError: (code) => {
+        console.error(`[reconcile] stage=slot_link_labels code=${code}`);
       },
     }));
   });

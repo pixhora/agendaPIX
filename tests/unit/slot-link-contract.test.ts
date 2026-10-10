@@ -27,6 +27,7 @@ const owner = {
   createdAt: "2026-10-10T12:00:00.000Z",
   previewId: "aaaaaaaaaaaaaaaaaaaaaa",
   customerLabel: null,
+  cancellable: true,
 };
 
 describe("contrato do link de horário", () => {
@@ -49,7 +50,7 @@ describe("contrato do link de horário", () => {
     expect(SLOT_LINK_TTL_DEFAULT_MINUTES).toBe(1440);
   });
 
-  it("o aberto traz horário e política, e a prévia só nome, serviço, data e hora", () => {
+  it("o aberto traz horário e política, e a prévia distingue horário de capa genérica", () => {
     const opened = slotLinkOpenResponseSchema.parse({
       business: { name: "Salao", slug: "salao-da-ana", logoUrl: null, contactWhatsapp: null, publicPath: "/salao-da-ana" },
       service,
@@ -62,9 +63,16 @@ describe("contrato do link de horário", () => {
       requiresPayerCpf: false,
     });
     expect(opened.status).toBe("taken");
-    expect(slotLinkPreviewResponseSchema.parse({ businessName: "Salao", serviceName: "Corte", date: "2030-01-01", time: "09:00" })).not.toHaveProperty("status");
-    expect(slotLinkPreviewResponseSchema.safeParse({ businessName: "Salao", serviceName: "Corte", date: "2030-01-01", time: "09:00", status: "pending" }).success).toBe(false);
-    expect(slotLinkPreviewResponseSchema.safeParse({ businessName: "Salao", serviceName: "Corte", date: "2030-01-01", time: "09:00", phone: "+5511999999999" }).success).toBe(false);
+    const slot = slotLinkPreviewResponseSchema.parse({
+      kind: "slot", businessName: "Salao", logoUrl: null, serviceName: "Corte", date: "2030-01-01", time: "09:00",
+    });
+    expect(slot).toEqual({ kind: "slot", businessName: "Salao", logoUrl: null, serviceName: "Corte", date: "2030-01-01", time: "09:00" });
+    expect(slotLinkPreviewResponseSchema.parse({ kind: "generic", businessName: "Salao", logoUrl: "https://cdn.example/logo.webp" })).toEqual({
+      kind: "generic", businessName: "Salao", logoUrl: "https://cdn.example/logo.webp",
+    });
+    expect(slotLinkPreviewResponseSchema.safeParse({ kind: "generic", businessName: "Salao", logoUrl: null, serviceName: "Corte", date: "2030-01-01", time: "09:00" }).success).toBe(false);
+    expect(slotLinkPreviewResponseSchema.safeParse({ kind: "slot", businessName: "Salao", logoUrl: null, serviceName: "Corte", date: "2030-01-01", time: "09:00", phone: "+5511999999999" }).success).toBe(false);
+    expect(slotLinkErrorCodeSchema.safeParse("link_in_progress").success).toBe(true);
   });
 
   it("o pagamento pede nome e WhatsApp vazios de dado prévio e recusa CPF inválido", () => {
