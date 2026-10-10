@@ -23,6 +23,7 @@ import {
   type PresetChoice,
 } from "@/lib/dashboard/policy-form";
 import { PolicyEditor } from "@/components/policy/policy-editor";
+import { ServiceImageUpload } from "@/components/dashboard/service-image-upload";
 import { cn } from "@/lib/utils";
 
 export const weekdays = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
@@ -87,7 +88,7 @@ function TextInput({ invalid, className, ...props }: React.ComponentProps<"input
   return <FieldShell invalid={invalid}><Input shellClassName={bareShell} aria-invalid={invalid || undefined} className={cn(bareInput, "dash-disabled", className)} {...props} /></FieldShell>;
 }
 
-type Service = { id: string; name: string; durationMinutes: number; priceCents: number; depositCents: number; active: boolean; depositPolicy?: DepositPolicy };
+type Service = { id: string; name: string; durationMinutes: number; priceCents: number; depositCents: number; active: boolean; depositPolicy?: DepositPolicy; imageUrl?: string | null };
 const initialValues = (service?: Service) => ({ name: service?.name ?? "", duration: String(service?.durationMinutes ?? 30), price: service ? formatMoneyInput(service.priceCents) : "", deposit: service ? formatMoneyInput(service.depositCents) : "0,00", active: service?.active ?? true });
 
 function centsFromInput(value: string) {
@@ -113,6 +114,7 @@ export function ServiceForm({ businessId, businessName, contactWhatsapp = null, 
   const [attempt, setAttempt] = useState(0);
   const prefix = service?.id ?? "new";
   const [values, setValues] = useState(() => initialValues(service));
+  const [imageUrl, setImageUrl] = useState<string | null>(service?.imageUrl ?? null);
   const [policyState, setPolicyState] = useState<PolicyFormState>(() => initialPolicyForm(service));
   const requestKey = service && futureBookingsCount === undefined ? `${service.id}:${attempt}` : "";
   const [trackedKey, setTrackedKey] = useState(requestKey);
@@ -239,6 +241,9 @@ export function ServiceForm({ businessId, businessName, contactWhatsapp = null, 
     </div>
     {depositInvalid && <p id={`${prefix}-deposit-error`} role="alert" className="text-sm font-medium text-danger">O sinal não pode ser maior que o preço.</p>}
     {!depositInvalid && <p className="text-sm text-muted">O sinal deve ser menor ou igual ao preço. Sinal zero confirma o horário sem cobrança.</p>}
+    {service
+      ? <ServiceImageUpload businessId={businessId} serviceId={service.id} url={imageUrl} onChangeUrl={setImageUrl} />
+      : <p className="text-sm text-muted">Salve o serviço para adicionar uma foto.</p>}
     {policyState.chargeDeposit && depositCents > 0 ? <PolicyEditor
       idPrefix={prefix}
       businessName={businessName}

@@ -91,6 +91,8 @@ export const services = pgTable("services", {
   depositCents: integer("deposit_cents").notNull(),
   depositPolicy: jsonb("deposit_policy").$type<DepositPolicy>().notNull().default(sql`'{"version":1,"preset":"padrao","refundUntilHours":24,"rescheduleUntilHours":24,"maxReschedules":1,"lateCancel":"retain","noShow":"retain","creditValidityDays":60}'::jsonb`),
   active: boolean("active").default(true).notNull(),
+  /** Foto do serviço no Vercel Blob. Nulo = sem foto. Só URLs de upload próprio (ver services/ em lib/business-profile). */
+  imageUrl: text("image_url"),
   ...timestamps(),
 }, (table) => [
   unique("services_business_id_unique").on(table.businessId, table.id),
