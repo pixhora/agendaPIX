@@ -17,7 +17,7 @@ export type StoreFieldErrors = {
 };
 
 export type StorePayload = {
-  business: { name: string; slug: string; timezone: "America/Sao_Paulo"; logoUrl?: string };
+  business: { name: string; slug: string; timezone: "America/Sao_Paulo" };
   service: { name: string; durationMinutes: number; priceCents: number; depositCents: number };
   hours: { weekday: number; opensAt: string; closesAt: string }[];
 };
@@ -75,7 +75,6 @@ export function storeSubmission(data: OnboardingData, options?: { logoSelected?:
         name: value.name.trim(),
         slug: value.slug,
         timezone: "America/Sao_Paulo",
-        ...(logo.success ? { logoUrl: logo.data } : {}),
       },
       service: {
         name: value.serviceName.trim(),

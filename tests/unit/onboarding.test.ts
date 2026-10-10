@@ -2,25 +2,22 @@ import { expect, it } from "vitest";
 import { isReservedBusinessSlug, RESERVED_BUSINESS_SLUGS, slugSchema } from "../../lib/bookings/validation";
 import { onboardingInputSchema } from "../../lib/onboarding/validation";
 
-const logoUrl = "https://ce0rcu23vrrdzqap.public.blob.vercel-storage.com/logos/test.webp";
-const input = { business: { name: " Salão ", slug: "salao", logoUrl, timezone: "America/Sao_Paulo" }, service: { name: "Corte", durationMinutes: 30, priceCents: 5000, depositCents: 1000 }, hours: [{ weekday: 1, opensAt: "09:00", closesAt: "18:00" }] };
+const input = { business: { name: " Salão ", slug: "salao", timezone: "America/Sao_Paulo" }, service: { name: "Corte", durationMinutes: 30, priceCents: 5000, depositCents: 1000 }, hours: [{ weekday: 1, opensAt: "09:00", closesAt: "18:00" }] };
 
-it("keeps the name, slug, logo and timezone the client sent", () => {
-  expect(onboardingInputSchema.parse(input).business).toEqual({ name: "Salão", slug: "salao", logoUrl, timezone: "America/Sao_Paulo" });
+it("keeps the name, slug and timezone the client sent and rejects a logo url", () => {
+  expect(onboardingInputSchema.parse(input).business).toEqual({ name: "Salão", slug: "salao", timezone: "America/Sao_Paulo" });
+  expect(onboardingInputSchema.safeParse({
+    ...input,
+    business: { ...input.business, logoUrl: "https://attacker-store.public.blob.vercel-storage.com/evil.png" },
+  }).success).toBe(false);
 });
 
 it("does not fill an empty profile, service or hours with an example", () => {
   expect(onboardingInputSchema.safeParse({}).success).toBe(false);
-  expect(onboardingInputSchema.safeParse({ ...input, business: { slug: "salao", logoUrl, timezone: "America/Sao_Paulo" } }).success).toBe(false);
-  const withoutLogo = onboardingInputSchema.safeParse({
-    ...input,
-    business: { name: input.business.name, slug: input.business.slug, timezone: input.business.timezone },
-  });
-  expect(withoutLogo.success).toBe(true);
-  if (withoutLogo.success) {
-    expect(withoutLogo.data.business.logoUrl).toBeUndefined();
-    expect(JSON.parse(JSON.stringify(withoutLogo.data.business))).not.toHaveProperty("logoUrl");
-  }
+  expect(onboardingInputSchema.safeParse({ ...input, business: { slug: "salao", timezone: "America/Sao_Paulo" } }).success).toBe(false);
+  const parsedBusiness = onboardingInputSchema.parse(input).business;
+  expect(parsedBusiness).not.toHaveProperty("logoUrl");
+  expect(JSON.parse(JSON.stringify(parsedBusiness))).not.toHaveProperty("logoUrl");
   expect(onboardingInputSchema.safeParse({ ...input, business: { ...input.business, logoUrl: "" } }).success).toBe(false);
   expect(onboardingInputSchema.safeParse({ ...input, business: { ...input.business, timezone: undefined } }).success).toBe(false);
   expect(onboardingInputSchema.safeParse({ ...input, service: { ...input.service, name: "" } }).success).toBe(false);

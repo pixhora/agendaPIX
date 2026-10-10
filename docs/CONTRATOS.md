@@ -430,7 +430,7 @@ Contratos Zod em `lib/contracts` (`business-profile.ts`, `errors.ts`, reexportad
 | Export | Forma |
 | --- | --- |
 | `businessProfileSchema` | `{ name, slug, logoUrl }` obrigatórios no perfil completo. Nome 2–60, slug 3–40 com a lista reservada de `lib/slug.ts`, logo `https` em `*.public.blob.vercel-storage.com`. |
-| `onboardingInputSchema` | `business.logoUrl` é opcional. Ausente cria a página sem logo. `""` e host fora da loja continuam inválidos. Quando a URL vem, vale a mesma regra de host. |
+| `onboardingInputSchema` | sem `logoUrl`. O objeto é `.strict()`: a chave `logoUrl` (e qualquer outra desconhecida) é `400 invalid_input`. O cadastro não grava `logo_url`. |
 | `businessProfilePatchRequestSchema` | parcial, pelo menos nome ou slug. Sem `logoUrl`: a chave extra é `400 invalid_input`. `null` não apaga. |
 | `businessProfileResponseSchema` | `{ id, name, slug, logoUrl, publicPath, publicUrl }`. `logoUrl` e `publicUrl` podem ser `null`. |
 | `logoUploadResponseSchema` | `{ logoUrl }`. |
@@ -449,6 +449,6 @@ Todo PATCH conta no teto geral: 30 por dono por hora, `429 rate_limited` com `Re
 
 Não há prazo que simplesmente libere um link antigo para qualquer um. Enquanto o alias está ativo (`released_at` nulo) a página `/{slug}`, os subcaminhos e `/api/public/{slug}/...` respondem `308` (`Cache-Control: no-store`, query preservada). No máximo 3 aliases ativos por negócio. A troca que passaria de 3 grava `released_at = now()` no mais antigo: esse link passa a `404` e continua `taken` para os outros por 90 dias. Só depois disso outro negócio pode usá-lo. O negócio de origem recupera o seu (ativo ou solto dentro dos 90 dias): a linha sai e o slug que ele deixa entra no lugar. O proxy guarda o resultado da consulta por 60 segundos, inclusive o negativo e o alias solto (que não redireciona), e não guarda erro de banco. Trocar o slug neste processo apaga a entrada do link antigo, do novo e do alias que acabou de ser solto. `/dashboard`, `/onboarding`, `/login` e `/api/public/slugs/availability` não consultam alias.
 
-O cadastro cria a página sem URL de logo. O arquivo fica no navegador até existir `businessId`; em seguida o POST da logo grava a coluna.
+O cadastro cria a página sem URL de logo. `logoUrl` no corpo do rascunho, do commit ou de `POST /api/onboarding` é `400 invalid_input` e não grava a coluna. O arquivo fica no navegador até existir `businessId`; em seguida o POST da logo grava a coluna.
 
 Migration `db/migrations/0018_business_profile.sql`: coluna `logo_url`, tabela `business_slug_history` com `released_at` e gatilho que recusa slug atual contra alias ativo ou solto há menos de 90 dias (`23505`). Aplicar em produção só depois que este PR estiver no `master`. CSP `img-src` inclui `https://*.public.blob.vercel-storage.com`. `https://blob.fake.local` só entra com `NODE_ENV=development`. `serverExternalPackages` inclui `sharp`.

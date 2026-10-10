@@ -10,7 +10,7 @@ it("provisions atomically, replays concurrent requests and isolates owners and s
   const owners = [randomUUID(), randomUUID()];
   const key = randomUUID();
   const slug = `onb-${key.replaceAll("-", "").slice(0, 16)}`;
-  const input = { business: { name: "Fixture", slug, logoUrl: "https://ce0rcu23vrrdzqap.public.blob.vercel-storage.com/logos/test.webp", timezone: "America/Sao_Paulo" }, service: { name: "Corte", durationMinutes: 30, priceCents: 5000, depositCents: 1000 }, hours: [{ weekday: 1, opensAt: "09:00", closesAt: "18:00" }] };
+  const input = { business: { name: "Fixture", slug, timezone: "America/Sao_Paulo" }, service: { name: "Corte", durationMinutes: 30, priceCents: 5000, depositCents: 1000 }, hours: [{ weekday: 1, opensAt: "09:00", closesAt: "18:00" }] };
   await db.insert(user).values(owners.map(id => ({ id, name: "Fixture", email: `${id}@example.com` })));
   try {
     const results = await Promise.all(Array.from({ length: 5 }, () => provisionBusiness(owners[0], key, input, db)));
@@ -30,6 +30,12 @@ it("provisions atomically, replays concurrent requests and isolates owners and s
     const second = await provisionBusiness(owners[1], key, { ...input, business: { ...input.business, slug: `oth-${key.replaceAll("-", "").slice(0, 16)}` } }, db);
     expect(second.result.businessId).not.toBe(results[0].result.businessId);
     expect(await db.select().from(businessHours).where(eq(businessHours.businessId, results[0].result.businessId))).toHaveLength(1);
+    const [created] = await db.select({ logoUrl: businesses.logoUrl }).from(businesses).where(eq(businesses.id, results[0].result.businessId));
+    expect(created?.logoUrl).toBeNull();
+    await expect(provisionBusiness(owners[1], randomUUID(), {
+      ...input,
+      business: { ...input.business, logoUrl: "https://attacker-store.public.blob.vercel-storage.com/evil.png" },
+    }, db)).rejects.toMatchObject({ status: 400, code: "invalid_input" });
   } finally {
     await db.delete(onboardingRequests).where(inArray(onboardingRequests.ownerId, owners));
     const rows = await db.select().from(businesses).where(inArray(businesses.ownerId, owners));

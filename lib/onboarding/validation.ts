@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { businessLogoUrlSchema, businessNameSchema, businessSlugSchema } from "../contracts";
+import { businessNameSchema, businessSlugSchema } from "../contracts";
 import { centsSchema } from "../validation/service";
 import { contactWhatsappSchema } from "../validation/whatsapp";
 
@@ -69,11 +69,11 @@ const onboardingServiceSchema = z.object({
   path: ["depositCents"],
 });
 
+/** Sem `logoUrl`. A chave extra cai no `.strict()` e a rota responde 400. Só o POST da logo grava a coluna. */
 export const onboardingInputSchema = z.object({
   business: z.object({
     name: businessNameSchema,
     slug: businessSlugSchema,
-    logoUrl: businessLogoUrlSchema.optional(),
     timezone: timezoneSchema,
     contactWhatsapp: contactWhatsappSchema.nullable().optional(),
   }).strict(),

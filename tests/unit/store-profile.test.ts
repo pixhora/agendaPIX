@@ -64,7 +64,11 @@ describe("empty store profile", () => {
     if (result.ok) {
       expect(result.payload.service).toEqual({ name: "Corte novo", durationMinutes: 45, priceCents: 4500, depositCents: 0 });
       expect(result.payload.hours).toEqual([{ weekday: 1, opensAt: "10:00", closesAt: "18:00" }]);
-      expect(result.payload.business.logoUrl).toBe("https://ce0rcu23vrrdzqap.public.blob.vercel-storage.com/logos/corte.webp");
+      expect(result.payload.business).not.toHaveProperty("logoUrl");
+      expect(onboardingInputSchema.safeParse({
+        ...result.payload,
+        business: { ...result.payload.business, logoUrl: data.logoUrl },
+      }).success).toBe(false);
       expect(JSON.stringify(result.payload)).not.toContain("Studio da Ana");
       expect(JSON.stringify(result.payload)).not.toContain("Corte masculino");
     }

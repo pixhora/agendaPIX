@@ -12,7 +12,6 @@ const body = buildOnboardingDraftBody({
   plan: "base",
   businessName: "Studio Bella",
   slug: "studio-bella-",
-  logoUrl: "https://ce0rcu23vrrdzqap.public.blob.vercel-storage.com/logos/test.webp",
   serviceName: "Design",
   durationMinutes: 45,
   priceCents: 6590,
@@ -27,6 +26,7 @@ describe("onboarding draft body", () => {
     expect(body.email).toBe("ana@studiobella.com.br");
     expect(body.segment).toBe("outro");
     expect(body.data.business.slug).toBe("studio-bella");
+    expect(body.data.business).not.toHaveProperty("logoUrl");
     expect(body.data.service).toEqual({ name: "Design", durationMinutes: 45, priceCents: 6590, depositCents: 1977 });
     expect(body.data.hours).toEqual([{ weekday: 1, opensAt: "09:00", closesAt: "18:00" }]);
     const json = JSON.stringify(body);

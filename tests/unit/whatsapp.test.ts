@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { contactWhatsappSchema, normalizeContactWhatsapp } from "../../lib/validation/whatsapp";
 import { onboardingInputSchema } from "../../lib/onboarding/validation";
-const logoUrl = "https://ce0rcu23vrrdzqap.public.blob.vercel-storage.com/logos/test.webp";
-const input = { business: { name: "Salão", slug: "salao", logoUrl, timezone: "America/Sao_Paulo" }, service: { name: "Corte", durationMinutes: 30, priceCents: 5000, depositCents: 1000 }, hours: [{ weekday: 1, opensAt: "09:00", closesAt: "18:00" }] };
+const input = { business: { name: "Salão", slug: "salao", timezone: "America/Sao_Paulo" }, service: { name: "Corte", durationMinutes: 30, priceCents: 5000, depositCents: 1000 }, hours: [{ weekday: 1, opensAt: "09:00", closesAt: "18:00" }] };
 
 describe("WhatsApp do negócio", () => {
   it("normaliza telefone brasileiro e rejeita lixo", () => {

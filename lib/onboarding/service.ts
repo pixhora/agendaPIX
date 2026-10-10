@@ -11,7 +11,16 @@ import { onboardingInputSchema } from "./validation";
 
 export async function provisionBusiness(ownerId: string, key: unknown, body: unknown, database?: ReturnType<typeof getDb>) {
   const requestKey = requestKeySchema.parse(key);
-  const input = onboardingInputSchema.parse(body);
+  const parsed = onboardingInputSchema.safeParse(body);
+  if (!parsed.success) {
+    const fields: Record<string, string> = {};
+    for (const issue of parsed.error.issues) {
+      const path = issue.path.join(".") || "_";
+      if (!fields[path]) fields[path] = issue.message;
+    }
+    throw new HttpError(400, "invalid_input", "Confira os dados enviados.", undefined, { fields });
+  }
+  const input = parsed.data;
   const requestHash = createHash("sha256").update(JSON.stringify(input)).digest("hex");
   const db = database ?? getDb();
   try {
@@ -32,7 +41,6 @@ export async function provisionBusiness(ownerId: string, key: unknown, body: unk
       const [business] = await tx.insert(businesses).values({
         name: input.business.name,
         slug: input.business.slug,
-        logoUrl: input.business.logoUrl ?? null,
         timezone: input.business.timezone,
         contactWhatsapp: input.business.contactWhatsapp ?? null,
         trialEndsAt: trialEndsAtFromCreation(new Date(), input.business.timezone),

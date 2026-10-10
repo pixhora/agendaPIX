@@ -135,7 +135,6 @@ export function draftInputFromOnboarding(data: OnboardingData): OnboardingDraftI
     segment: data.segment,
     businessName: data.businessName,
     slug: data.slug,
-    logoUrl: data.logoUrl,
     serviceName: data.serviceName,
     durationMinutes: data.durationMinutes,
     priceCents: data.priceCents,

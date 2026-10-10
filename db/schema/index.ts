@@ -432,7 +432,7 @@ export const onboardingRequests = pgTable("onboarding_requests", {
 }, (table) => [primaryKey({ columns: [table.ownerId, table.requestKey] })]);
 
 export type OnboardingDraftData = {
-  business: { name: string; slug: string; logoUrl?: string; timezone: string };
+  business: { name: string; slug: string; timezone: string };
   service: { name: string; durationMinutes: number; priceCents: number; depositCents: number };
   hours: { weekday: number; opensAt: string; closesAt: string }[];
 };
