@@ -447,10 +447,30 @@ async function cancelExpiredPending(
       report.expiredCancelled += 1;
     } catch (error) {
       noteFailure(report, "cancel", payment.id, error);
+      if (error instanceof MpAccountNotConnectedError) {
+        // Sem conta conectada não há token para cancelar no gateway, e isso não muda sozinho. O Pix vence no
+        // próprio Mercado Pago. Fecha a pendência com auditoria em vez de repetir a falha a cada passagem.
+        try { await closeCancelWithoutAccount(database, payment, now, report); }
+        catch (closeError) { noteFailure(report, "cancel", payment.id, closeError); }
+        continue;
+      }
       try { await markCancelAttempt(database, payment, now); }
       catch (markError) { noteFailure(report, "cancel", payment.id, markError); }
     }
   }
+}
+
+/** Encerra a tentativa de cancelamento de um Pix vencido cujo negócio não tem o Mercado Pago conectado. */
+async function closeCancelWithoutAccount(database: Database, payment: PaymentRow, now: Date, report: ReconcileReport) {
+  await database.transaction(async (tx) => {
+    const closed = await tx.update(schema.payments).set({ remoteCancelledAt: now }).where(and(samePayment(payment), isNull(schema.payments.remoteCancelledAt))).returning({ id: schema.payments.id });
+    if (closed.length === 0) return;
+    await audit(tx, {
+      businessId: payment.businessId, paymentId: payment.id, bookingId: payment.bookingId, action: "expired_pending_cancel_skipped",
+      detail: { externalId: payment.externalId, reason: "mp_account_not_connected" },
+    });
+    report.audits += 1;
+  });
 }
 
 async function markCancelAttempt(database: Database, payment: PaymentRow, now: Date) {
