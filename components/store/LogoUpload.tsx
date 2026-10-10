@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { ImageIcon } from "lucide-react";
-import { logoRejection, uploadLogoFile } from "@/lib/store-profile/logo";
+import { logoRejection, shrinkLogoIfNeeded, uploadLogoFile } from "@/lib/store-profile/logo";
 import { rememberPendingLogo } from "@/lib/store-profile/pending-logo";
 import { cn } from "@/lib/utils";
 
@@ -36,7 +36,8 @@ export function LogoUpload({
     inputRef.current?.click();
   }
 
-  async function send(file: File) {
+  async function send(original: File) {
+    const file = await shrinkLogoIfNeeded(original);
     const rejection = logoRejection(file);
     if (rejection) {
       setCanRetry(false);
