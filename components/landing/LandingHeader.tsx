@@ -54,8 +54,7 @@ export function LandingHeader() {
           </button>
         </div>
       </div>
-      <script
-        type="text/plain"
+      <template
         id="landing-menu-source"
         dangerouslySetInnerHTML={{
           __html: `<div id="landing-menu-layer" class="md:hidden"><button id="landing-menu-overlay" type="button" tabindex="-1" aria-hidden="true" class="fixed inset-0 z-40 bg-black/40"></button><div id="landing-menu" role="dialog" aria-modal="true" aria-labelledby="landing-menu-title" class="fixed inset-x-0 top-[60px] z-50 border-b border-line bg-paper px-5 pt-2 pb-5 font-display shadow-[var(--shadow-raised)]"><p id="landing-menu-title" class="sr-only">Menu</p><nav aria-label="Seções" class="flex flex-col">${landingNavLinks
@@ -65,7 +64,7 @@ export function LandingHeader() {
             })
             .join("")}</nav><div class="my-3 h-px bg-line"></div><a href="/login" class="${cn("inline-flex min-h-12 items-center rounded-lg px-2 text-base font-semibold text-ink", focusRing)}">Entrar</a><a href="/onboarding" class="${cn(buttonVariants({ size: "lg", className: "mt-2 w-full" }))}">Criar minha agenda grátis</a></div></div>`,
         }}
-      />
+      ></template>
     </header>
   );
 }

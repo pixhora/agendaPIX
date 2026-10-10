@@ -7,6 +7,7 @@ import { siteDescription, siteName, siteOpenGraph, siteOrigin, siteTitle } from 
 import { MercadoPagoCallback } from "@/components/payments/mp-callback";
 import { themeInitScript } from "@/lib/theme";
 import "./globals.css";
+import Script from "next/script";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin", "latin-ext"],
@@ -50,7 +51,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     <html lang="pt-BR" className={`${plusJakartaSans.variable} ${inter.variable}`} suppressHydrationWarning>
       <head>
         {/* Aplica o tema salvo antes da primeira pintura (sem flash). Nonce vem do proxy. */}
-        <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        <Script id="theme-init" nonce={nonce} strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body className="min-h-dvh bg-paper font-sans text-ink antialiased">
         {children}

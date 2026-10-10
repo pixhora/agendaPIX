@@ -12,6 +12,7 @@ import { LandingSteps } from "@/components/landing/LandingSteps";
 import { MoneyFlow } from "@/components/landing/MoneyFlow";
 import { Roadmap } from "@/components/landing/Roadmap";
 import { StickyCta } from "@/components/landing/StickyCta";
+import Script from "next/script";
 import { landingBootScript } from "@/components/landing/landing-boot-script";
 import { getPublicBookingFacts } from "@/lib/marketing/facts";
 import { siteOpenGraph } from "@/lib/site";
@@ -47,7 +48,7 @@ export default async function Home() {
       </main>
       <LandingFooter />
       <StickyCta />
-      <script nonce={nonce} type="module" dangerouslySetInnerHTML={{ __html: landingBootScript }} />
+      <Script id="landing-boot" nonce={nonce} strategy="afterInteractive" dangerouslySetInnerHTML={{ __html: landingBootScript }} />
     </div>
   );
 }

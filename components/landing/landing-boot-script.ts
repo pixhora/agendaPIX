@@ -39,9 +39,9 @@ export const landingBootScript = `(function(){
 
   function openMenu(){
     var source = template();
-    if(!source || !source.textContent || layer()) return;
+    if(!source || !source.innerHTML || layer()) return;
     var holder = document.createElement("div");
-    holder.innerHTML = source.textContent;
+    holder.innerHTML = source.innerHTML;
     if(!holder.firstElementChild) return;
     document.body.appendChild(holder.firstElementChild);
     menuOpen = true;
