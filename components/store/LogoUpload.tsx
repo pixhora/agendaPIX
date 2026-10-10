@@ -78,49 +78,51 @@ export function LogoUpload({
 
   return (
     <div className="grid gap-2">
-      <div className="flex items-center gap-4">
-        <button
-          type="button"
-          id="store-logo-button"
-          disabled={disabled || busy}
-          aria-busy={busy || undefined}
-          aria-describedby={error ? errorId : "store-logo-help"}
-          onClick={openPicker}
+      <div className="flex min-w-0 items-center gap-4">
+        <div
+          className={cn(
+            "relative size-24 min-w-24 max-w-24 shrink-0 overflow-hidden rounded-full focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring",
+            busy && "opacity-60",
+          )}
           onDragOver={(event) => event.preventDefault()}
           onDrop={(event) => {
             event.preventDefault();
             const file = event.dataTransfer.files[0];
             if (file) void send(file);
           }}
-          className={cn(
-            "relative grid size-24 place-items-center overflow-hidden rounded-full border border-border bg-subtle text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-            busy && "opacity-60",
-          )}
         >
-          {shown ? (
-            // eslint-disable-next-line @next/next/no-img-element -- prévia local ou URL já enviada
-            <img src={shown} alt="" className="size-full object-cover" />
-          ) : (
-            <span className="grid place-items-center gap-1 px-2 text-center text-xs font-semibold">
-              <ImageIcon aria-hidden="true" className="size-5" />
-              Adicionar logo
-            </span>
-          )}
+          <label
+            htmlFor="store-logo-button"
+            className="grid size-full place-items-center overflow-hidden rounded-full border border-border bg-subtle text-muted-foreground"
+          >
+            {shown ? (
+              // eslint-disable-next-line @next/next/no-img-element -- prévia local ou URL já enviada
+              <img src={shown} alt="" className="size-full object-cover" />
+            ) : (
+              <span className="grid place-items-center gap-1 px-2 text-center text-xs font-semibold">
+                <ImageIcon aria-hidden="true" className="size-5" />
+                Adicionar logo
+              </span>
+            )}
+            {shown ? <span className="sr-only">Trocar logo</span> : null}
+          </label>
           <input
             ref={inputRef}
+            id="store-logo-button"
             type="file"
             accept="image/png,image/jpeg,image/webp"
-            className="sr-only"
-            tabIndex={-1}
-            disabled={disabled}
+            aria-busy={busy || undefined}
+            aria-describedby={error ? errorId : !shown && !busy ? "store-logo-help" : undefined}
+            disabled={disabled || busy}
+            className="absolute inset-0 z-10 size-full cursor-pointer opacity-0 focus-visible:outline-none"
             onChange={(event) => {
               const file = event.target.files?.[0];
               event.target.value = "";
               if (file) void send(file);
             }}
           />
-        </button>
-        <div className="grid gap-1">
+        </div>
+        <div className="grid min-w-0 gap-1">
           {!shown && !busy ? <p id="store-logo-help" className="text-sm text-muted-foreground">PNG, JPEG ou WebP, até 2 MB.</p> : null}
           {busy ? (
             <div className="grid gap-1" aria-live="polite">

@@ -524,7 +524,7 @@ export function OnboardingFlow({ legalPagesPublished = false, publicHost }: { le
   return (
     <div className="min-h-dvh bg-paper">
       <div className="mx-auto grid w-full max-w-5xl lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-10 lg:px-6 lg:py-10">
-        <div className="mx-auto flex min-h-dvh w-full max-w-[480px] flex-col bg-paper md:min-h-[40rem] md:rounded-frame md:border md:border-line md:bg-surface md:shadow-[var(--shadow-card)]">
+        <div className="mx-auto flex min-h-dvh w-full min-w-0 max-w-[480px] flex-col bg-paper md:min-h-[40rem] md:rounded-frame md:border md:border-line md:bg-surface md:shadow-[var(--shadow-card)]">
           <div className="flex h-14 items-center px-4">
             <BrandLink href="/onboarding" />
           </div>

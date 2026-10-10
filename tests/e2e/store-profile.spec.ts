@@ -19,7 +19,7 @@ test.describe("cadastro da loja vazio", () => {
 
     const file = page.locator("input[type=file]");
     await file.setInputFiles({ name: "anim.gif", mimeType: "image/gif", buffer: Buffer.from("GIF89a") });
-    await expect(page.getByRole("alert")).toContainText("Formato não aceito. Envie PNG, JPEG ou WebP.");
+    await expect(page.locator("#store-logo-error")).toHaveText("Formato não aceito. Envie PNG, JPEG ou WebP.");
     await file.setInputFiles({
       name: "grande.jpg",
       mimeType: "image/jpeg",
