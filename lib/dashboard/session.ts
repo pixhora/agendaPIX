@@ -1,7 +1,8 @@
 import { cache } from "react";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getOwnerSession } from "./auth-session";
+import { ACTIVE_BUSINESS_COOKIE, resolveBusiness } from "./active-business";
 import { ownedBusinesses } from "./data";
 
 export const requireOwner = cache(async () => {
@@ -14,9 +15,13 @@ export const requireOwner = cache(async () => {
 /** Mesma lista na moldura e na página, dentro de um único render. */
 export const cachedOwnedBusinesses = cache((ownerId: string) => ownedBusinesses(ownerId));
 
+export async function rememberedBusinessId(): Promise<string | undefined> {
+  return (await cookies()).get(ACTIVE_BUSINESS_COOKIE)?.value;
+}
+
 export const ownerContext = cache(async (businessId?: string) => {
   const owner = await requireOwner();
   const businesses = await cachedOwnedBusinesses(owner.id);
-  const business = businessId ? businesses.find((item) => item.id === businessId) : businesses[0];
+  const business = resolveBusiness(businesses, businessId, await rememberedBusinessId());
   return { owner, businesses, business };
 });

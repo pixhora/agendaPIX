@@ -20,17 +20,18 @@ const routes = [
   { href: "/dashboard/settings", label: "Configurações", Icon: DASHBOARD_NAV_ICONS.settings },
 ] as const;
 
-function useFrameState(businesses: FrameBusiness[]) {
+function useFrameState(businesses: FrameBusiness[], defaultBusinessId?: string) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const requested = searchParams.get("businessId");
-  const business = requested ? businesses.find((item) => item.id === requested) : businesses[0];
-  const suffix = requested ? `?businessId=${encodeURIComponent(requested)}` : "";
+  const business = requested ? businesses.find((item) => item.id === requested) : businesses.find((item) => item.id === defaultBusinessId) ?? businesses[0];
+  const effective = requested ?? (business && business.id !== businesses[0]?.id ? business.id : null);
+  const suffix = effective ? `?businessId=${encodeURIComponent(effective)}` : "";
   return { pathname, business, suffix };
 }
 
-function NavLinks({ businesses, variant }: { businesses: FrameBusiness[]; variant: "sidebar" | "tabs" }) {
-  const { pathname, suffix } = useFrameState(businesses);
+function NavLinks({ businesses, defaultBusinessId, variant }: { businesses: FrameBusiness[]; defaultBusinessId?: string; variant: "sidebar" | "tabs" }) {
+  const { pathname, suffix } = useFrameState(businesses, defaultBusinessId);
   return routes.map(({ href, label, Icon: NavIcon }) => {
     const current = pathname === href;
     return (
@@ -55,8 +56,8 @@ function NavLinks({ businesses, variant }: { businesses: FrameBusiness[]; varian
   });
 }
 
-function PublicPageLink({ businesses, className }: { businesses: FrameBusiness[]; className?: string }) {
-  const { business } = useFrameState(businesses);
+function PublicPageLink({ businesses, defaultBusinessId, className }: { businesses: FrameBusiness[]; defaultBusinessId?: string; className?: string }) {
+  const { business } = useFrameState(businesses, defaultBusinessId);
   if (!business) return null;
   return (
     <Link href={`/${business.slug}`} target="_blank" className={cn("flex min-h-11 items-center gap-2 rounded-field px-3 text-sm font-semibold text-pix hover:bg-pix-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring", className)}>
@@ -66,8 +67,8 @@ function PublicPageLink({ businesses, className }: { businesses: FrameBusiness[]
   );
 }
 
-function CurrentBusinessName({ businesses }: { businesses: FrameBusiness[] }) {
-  const { business } = useFrameState(businesses);
+function CurrentBusinessName({ businesses, defaultBusinessId }: { businesses: FrameBusiness[]; defaultBusinessId?: string }) {
+  const { business } = useFrameState(businesses, defaultBusinessId);
   return <>{business?.name ?? "Seu painel"}</>;
 }
 
@@ -76,7 +77,7 @@ function CurrentBusinessName({ businesses }: { businesses: FrameBusiness[] }) {
  * (sticky, não fixed: ficam no fluxo e nunca cobrem o fim do conteúdo — WCAG 2.4.11)
  * (padrão das referências Fresha/Booksy — ver docs/DESIGN_DECISION.md §9).
  */
-export function AppFrame({ ownerName, businesses, children }: { ownerName: string; businesses: FrameBusiness[]; children: ReactNode }) {
+export function AppFrame({ ownerName, businesses, defaultBusinessId, children }: { ownerName: string; businesses: FrameBusiness[]; defaultBusinessId?: string; children: ReactNode }) {
   const fallback = <span className="h-11" />;
   return (
     <div data-app-frame className="min-h-dvh bg-paper lg:grid lg:grid-cols-[16rem_minmax(0,1fr)]">
@@ -86,9 +87,9 @@ export function AppFrame({ ownerName, businesses, children }: { ownerName: strin
         <div className="sticky top-0 flex h-dvh min-w-0 flex-col gap-6 px-4 py-5">
         <BrandLink href="/dashboard" className="px-2" />
         <nav aria-label="Painel" className="grid gap-1">
-          <Suspense fallback={fallback}><NavLinks businesses={businesses} variant="sidebar" /></Suspense>
+          <Suspense fallback={fallback}><NavLinks businesses={businesses} defaultBusinessId={defaultBusinessId} variant="sidebar" /></Suspense>
         </nav>
-        <Suspense fallback={null}><PublicPageLink businesses={businesses} /></Suspense>
+        <Suspense fallback={null}><PublicPageLink businesses={businesses} defaultBusinessId={defaultBusinessId} /></Suspense>
         <div className="mt-auto grid min-w-0 grid-cols-1 gap-4 border-t border-line pt-4">
           <div className="flex items-center justify-between gap-2 px-1">
             <span className="text-xs font-semibold uppercase tracking-wide text-muted">Tema</span>
@@ -98,7 +99,7 @@ export function AppFrame({ ownerName, businesses, children }: { ownerName: strin
             <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-subtle text-sm font-bold">{ownerName.trim().charAt(0).toUpperCase() || "?"}</span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold">{ownerName}</p>
-              <p className="truncate text-xs text-muted"><Suspense fallback="Seu painel"><CurrentBusinessName businesses={businesses} /></Suspense></p>
+              <p className="truncate text-xs text-muted"><Suspense fallback="Seu painel"><CurrentBusinessName businesses={businesses} defaultBusinessId={defaultBusinessId} /></Suspense></p>
             </div>
             <Logout compact />
           </div>
@@ -110,7 +111,7 @@ export function AppFrame({ ownerName, businesses, children }: { ownerName: strin
         <header data-sticky-chrome className="sticky top-0 z-30 flex min-h-16 items-center gap-3 border-b border-line bg-surface/95 px-4 backdrop-blur lg:hidden">
           <Link href="/dashboard" aria-label="AgendaPix, início do painel" className="inline-flex size-11 items-center justify-center rounded-field focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"><BrandMark /></Link>
           <div className="min-w-0 flex-1 leading-tight">
-            <p className="truncate text-sm font-bold"><Suspense fallback="Seu painel"><CurrentBusinessName businesses={businesses} /></Suspense></p>
+            <p className="truncate text-sm font-bold"><Suspense fallback="Seu painel"><CurrentBusinessName businesses={businesses} defaultBusinessId={defaultBusinessId} /></Suspense></p>
             <p className="truncate text-xs text-muted">{ownerName}</p>
           </div>
           <Logout compact />
@@ -124,7 +125,7 @@ export function AppFrame({ ownerName, businesses, children }: { ownerName: strin
         </div>
 
         <nav aria-label="Painel" data-sticky-chrome className="sticky bottom-0 z-30 grid grid-cols-4 gap-1 border-t border-line bg-surface/95 px-2 pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-1 backdrop-blur lg:hidden">
-          <Suspense fallback={fallback}><NavLinks businesses={businesses} variant="tabs" /></Suspense>
+          <Suspense fallback={fallback}><NavLinks businesses={businesses} defaultBusinessId={defaultBusinessId} variant="tabs" /></Suspense>
         </nav>
       </div>
     </div>
