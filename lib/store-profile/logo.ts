@@ -22,6 +22,42 @@ export function logoRejection(file: { type: string; size: number; name?: string 
   return null;
 }
 
+/** Lado maior de referência: o servidor já reduz para 512 px, então 1024 px deixa a imagem nítida na tela. */
+export const LOGO_SHRINK_MAX_EDGE_PX = 1024;
+
+/** Tamanho final da imagem reduzida, mantendo a proporção e sem ampliar. */
+export function logoShrinkSize(width: number, height: number, maxEdge = LOGO_SHRINK_MAX_EDGE_PX): { width: number; height: number } {
+  const longest = Math.max(width, height);
+  if (longest <= maxEdge) return { width, height };
+  const scale = maxEdge / longest;
+  return { width: Math.round(width * scale), height: Math.round(height * scale) };
+}
+
+/**
+ * Foto de celular passa de 2 MB com facilidade e era recusada antes de chegar ao servidor.
+ * Reduz no navegador (WebP) quando precisa; se não conseguir ler a imagem, devolve o arquivo original
+ * para a validação normal mostrar a mensagem.
+ */
+export async function shrinkLogoIfNeeded(file: File): Promise<File> {
+  if (file.size <= LOGO_MAX_BYTES) return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const size = logoShrinkSize(bitmap.width, bitmap.height);
+    const canvas = document.createElement("canvas");
+    canvas.width = size.width;
+    canvas.height = size.height;
+    const context = canvas.getContext("2d");
+    if (!context) return file;
+    context.drawImage(bitmap, 0, 0, size.width, size.height);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", 0.85));
+    if (!blob) return file;
+    return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".webp", { type: "image/webp" });
+  } catch {
+    return file;
+  }
+}
+
 export type LogoUploadResult = { ok: true; url: string } | { ok: false; message: string; cancelled?: boolean };
 
 export function uploadLogoFile(
