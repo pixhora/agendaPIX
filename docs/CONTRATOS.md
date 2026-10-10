@@ -20,7 +20,8 @@ Tabelas de domínio têm `id`, `created_at` e `updated_at`. Tabelas de auditoria
 
 | Tabela | Campos principais | Regras |
 | --- | --- | --- |
-| `businesses` | `owner_id`, `name`, `slug`, `timezone` | Dono referencia `user`; slug único em minúsculas, números e hífens; nome não vazio. |
+| `businesses` | `owner_id`, `name`, `slug`, `timezone`, `logo_url` | Dono referencia `user`; slug único em minúsculas, números e hífens; nome não vazio. `logo_url` é nulo ou `https` com caminho. |
+| `business_slug_history` | `old_slug`, `business_id`, `created_at`, `released_at` | `old_slug` é único. `released_at` nulo redireciona. Preenchido: 404 e bloqueio de 90 dias para os outros. O negócio de origem recupera o seu no PATCH enquanto o bloqueio vale. |
 | `business_pix_keys` | `business_id`, `type`, `ciphertext`, `nonce`, `key_version`, `hint`, `deactivated_at`, `deactivation_reason` | Uma chave por negócio. A migration adiciona `deactivated_at` e `deactivation_reason` e marca as linhas existentes como inativas (`deactivation_reason = pix_key_retired`). Não apaga ciphertext. A chave não entra em cobrança nem em payload. |
 | `services` | `business_id`, `name`, `duration_minutes`, `price_cents`, `deposit_cents`, `active` | Duração positiva; preço e sinal não negativos; sinal não supera preço. |
 | `business_hours` | `business_id`, `weekday`, `opens_at`, `closes_at` | Domingo = 0; sábado = 6; um intervalo por dia; abertura anterior ao fechamento. Ausência do dia significa fechado. |
@@ -421,3 +422,33 @@ Quando `current_period_end` passa sem renovação, o acesso cai pela regra do #2
 O #29 tem cron de reconciliação de Pix (`lib/payments/cron.ts`), não de aviso de assinatura. O lembrete idempotente de D-3 do período pago, com botão para o mesmo checkout, fica pendente. Esta entrega não cria essa infra.
 
 Na branch de integração esta migration é a `0015_subscription_requests`, depois das duas do Pix (`0013` e `0014`). O #33 tem duas migrations, então o número não é 0014.
+
+## Perfil do negócio
+
+Contratos Zod em `lib/contracts` (`business-profile.ts`, `errors.ts`, reexportados por `index.ts`). O front importa dali. Não há default de nome, slug ou logo.
+
+| Export | Forma |
+| --- | --- |
+| `businessProfileSchema` | `{ name, slug, logoUrl }` obrigatórios no perfil completo. Nome 2–60, slug 3–40 com a lista reservada de `lib/slug.ts`, logo `https` em `*.public.blob.vercel-storage.com`. |
+| `onboardingInputSchema` | sem `logoUrl`. O objeto é `.strict()`: a chave `logoUrl` (e qualquer outra desconhecida) é `400 invalid_input`. O cadastro não grava `logo_url`. |
+| `businessProfilePatchRequestSchema` | parcial, pelo menos nome ou slug. Sem `logoUrl`: a chave extra é `400 invalid_input`. `null` não apaga. |
+| `businessProfileResponseSchema` | `{ id, name, slug, logoUrl, publicPath, publicUrl }`. `logoUrl` e `publicUrl` podem ser `null`. |
+| `logoUploadResponseSchema` | `{ logoUrl }`. |
+| `slugAvailabilityResponseSchema` | `{ input, normalized, valid, available, reason, suggestions }`. `reason`: `taken`, `reserved`, `invalid` ou `too_short` (este último a tela de cadastro já usa). `suggestions` tem no máximo 3 e vem vazio quando o link está livre, inválido ou curto. |
+| `apiErrorCodeSchema` | `invalid_input`, `unauthorized`, `business_unavailable`, `slug_taken`, `rate_limited`, `logo_invalid`, `logo_too_large`, `blob_unavailable`, `internal_error`. |
+
+O corpo de erro continua `{ error: { code, message, details? } }`. `handleHttp` espalha `error.details` no objeto `error`.
+
+`GET /api/public/slugs/availability?slug=&segment=&uf=` permanece o caminho. Sem sessão, só leitura, 30 por minuto por IP. `suggestions` sai de uma consulta só (`businesses.slug` UNION alias ainda bloqueado). Alias ativo e alias solto há menos de 90 dias contam como `taken`, mesmo quando o negócio de origem ainda pode recuperá-lo no PATCH. Alias solto há 90 dias ou mais não entra. Ordem dos candidatos: sufixo do segmento, sem hífen, UF, depois `-2`…`-12`.
+
+`PATCH /api/businesses/{businessId}/profile` exige sessão e dono. `401 unauthorized`, `404 business_unavailable` (uuid inválido ou negócio de outro), `400 invalid_input` com `details.fields` (corpo JSON inválido também), `409 slug_taken` com `details.constraint` (`slug`, `slug_alias` ou `businesses_slug_unique`) e `details.suggestions` (até 3 links livres). A corrida do índice único ou do gatilho (`23505`) no PATCH e na criação do negócio usa o mesmo `409 slug_taken` com `details.suggestions`, para a tela oferecer outro link na hora. O rascunho do cadastro continua `409 slug_unavailable` com `suggestions` no topo. Corpo com `logoUrl` é `400 invalid_input` e não grava nada. Resposta `200` no formato acima. `publicPath` é `/{slug}`. `publicUrl` usa `BETTER_AUTH_URL` (`publicBusinessPageUrl`). A origem canônica segue `NEXT_PUBLIC_SITE_URL` (`siteOrigin`). Não há env nova de prefixo.
+
+Todo PATCH conta no teto geral: 30 por dono por hora, `429 rate_limited` com `Retry-After`. Troca de slug (o valor mudou) conta à parte: 3 por dono a cada 30 dias, o mesmo `429`. Conflito `409` não consome uma das 3 trocas.
+
+`POST /api/businesses/{businessId}/logo` é o único caminho que grava `businesses.logo_url`. `multipart` no campo `logo`, runtime Node. Sessão, dono e o teto de 10 envios por hora vêm antes de ler o corpo. `Content-Length` acima de 2 MB mais 16 KB de envelope responde `413 logo_too_large` sem ler o corpo. Sem esse cabeçalho, a leitura para no mesmo teto. PNG, JPEG ou WebP até 2 MB, conferidos pelos bytes. SVG e o resto: `400 logo_invalid`. Sharp reduz ao máximo 512 px sem aumentar e grava WebP sem EXIF. `put` usa `access: "public"` e `addRandomSuffix: true` ([docs](https://vercel.com/docs/vercel-blob/using-blob-sdk#put)). Sem `BLOB_READ_WRITE_TOKEN` em produção: `503 blob_unavailable`, sem cair no host falso. Fora de produção o adaptador falso grava `https://blob.fake.local/...`. Depois que a coluna grava a URL nova, a anterior sai do armazenamento se o host for o nosso e o caminho for `/logos/{businessId}`. Falha ao apagar não desfaz o envio.
+
+Não há prazo que simplesmente libere um link antigo para qualquer um. Enquanto o alias está ativo (`released_at` nulo) a página `/{slug}`, os subcaminhos e `/api/public/{slug}/...` respondem `308` (`Cache-Control: no-store`, query preservada). No máximo 3 aliases ativos por negócio. A troca que passaria de 3 grava `released_at = now()` no mais antigo: esse link passa a `404` e continua `taken` para os outros por 90 dias. Só depois disso outro negócio pode usá-lo. O negócio de origem recupera o seu (ativo ou solto dentro dos 90 dias): a linha sai e o slug que ele deixa entra no lugar. O proxy guarda o resultado da consulta por 60 segundos, inclusive o negativo e o alias solto (que não redireciona), e não guarda erro de banco. Trocar o slug neste processo apaga a entrada do link antigo, do novo e do alias que acabou de ser solto. `/dashboard`, `/onboarding`, `/login` e `/api/public/slugs/availability` não consultam alias.
+
+O cadastro cria a página sem URL de logo. `logoUrl` no corpo do rascunho, do commit ou de `POST /api/onboarding` é `400 invalid_input` e não grava a coluna. O arquivo fica no navegador até existir `businessId`; em seguida o POST da logo grava a coluna.
+
+Migration `db/migrations/0018_business_profile.sql`: coluna `logo_url`, tabela `business_slug_history` com `released_at` e gatilho que recusa slug atual contra alias ativo ou solto há menos de 90 dias (`23505`). Aplicar em produção só depois que este PR estiver no `master`. CSP `img-src` inclui `https://*.public.blob.vercel-storage.com`. `https://blob.fake.local` só entra com `NODE_ENV=development`. `serverExternalPackages` inclui `sharp`.

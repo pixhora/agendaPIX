@@ -14,6 +14,8 @@ import {
   ensureOnboardingIdempotencyKey,
   readCommitResult,
   readCompletedSetup,
+  writeOnboardingDraft,
+  writeOnboardingStep,
 } from "./storage";
 
 type State =
@@ -50,9 +52,9 @@ export function OnboardingComplete() {
     }
     if (result.code === "conflict" || result.code === "idempotency_conflict" || result.code === "invalid_payload") {
       // Os dados precisam mudar: devolve o rascunho ao formulário e descarta a chave usada.
+      writeOnboardingDraft(setup, setup.email);
+      writeOnboardingStep("business");
       try {
-        localStorage.setItem("agenda_onboarding_draft", JSON.stringify(setup));
-        localStorage.setItem("agenda_onboarding_step", "1");
         localStorage.removeItem(IDEMPOTENCY_KEY);
       } catch {
         // localStorage indisponível: o usuário refaz o cadastro.

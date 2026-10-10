@@ -26,6 +26,7 @@ export const businesses = pgTable("businesses", {
   // Fim do teste grátis. Negócios novos: fim do 7º dia local. Já existentes: now() + 7 dias nesta migration.
   trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }).default(sql`(now() + interval '7 days')`).notNull(),
   contactWhatsapp: text("contact_whatsapp"),
+  logoUrl: text("logo_url"),
   ...timestamps(),
 }, (table) => [
   index("businesses_owner_idx").on(table.ownerId),
@@ -33,6 +34,22 @@ export const businesses = pgTable("businesses", {
   check("businesses_slug_format", sql`${table.slug} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`),
   check("businesses_late_payment_policy_valid", sql`${table.latePaymentPolicy} IN ('refund', 'rebook_if_free')`),
   check("businesses_contact_whatsapp_format", sql`${table.contactWhatsapp} IS NULL OR ${table.contactWhatsapp} ~ '^[+][1-9][0-9]{7,14}$'`),
+  check("businesses_logo_url_https", sql`${table.logoUrl} IS NULL OR ${table.logoUrl} ~ '^https://[^[:space:]]+/[^[:space:]]+$'`),
+]);
+
+/**
+ * Slug antigo. `released_at` nulo redireciona (308).
+ * Preenchido: para de redirecionar e segue bloqueado por 90 dias para os outros.
+ * O negócio de origem pode recuperar o seu enquanto o bloqueio vale.
+ */
+export const businessSlugHistory = pgTable("business_slug_history", {
+  oldSlug: text("old_slug").primaryKey(),
+  businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "restrict" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  releasedAt: timestamp("released_at", { withTimezone: true }),
+}, (table) => [
+  index("business_slug_history_business_idx").on(table.businessId),
+  check("business_slug_history_slug_format", sql`${table.oldSlug} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`),
 ]);
 
 export const bookingRateLimits = pgTable("booking_rate_limits", {

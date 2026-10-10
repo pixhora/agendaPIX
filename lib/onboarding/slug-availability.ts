@@ -1,3 +1,5 @@
+import { slugAvailabilityResponseSchema } from "@/lib/contracts";
+
 export type SlugReason = "too_short" | "invalid" | "reserved" | "taken";
 
 export type SlugAvailability = {
@@ -11,30 +13,12 @@ export type SlugAvailability = {
 
 export type SlugCheckResult =
   | { ok: true; availability: SlugAvailability }
-  | { ok: false; kind: "unverified" | "network" };
-
-const REASONS = new Set<SlugReason>(["too_short", "invalid", "reserved", "taken"]);
+  | { ok: false; kind: "unverified" | "network" | "rate_limited"; retryAfter?: number };
 
 export function parseSlugAvailability(body: unknown): SlugAvailability | null {
-  if (!body || typeof body !== "object") return null;
-  const record = body as Record<string, unknown>;
-  if (typeof record.normalized !== "string" || typeof record.valid !== "boolean" || typeof record.available !== "boolean") {
-    return null;
-  }
-  const reason = record.reason === null || (typeof record.reason === "string" && REASONS.has(record.reason as SlugReason))
-    ? (record.reason as SlugReason | null)
-    : null;
-  const suggestions = Array.isArray(record.suggestions)
-    ? record.suggestions.filter((item): item is string => typeof item === "string" && item.length > 0)
-    : [];
-  return {
-    input: typeof record.input === "string" ? record.input : record.normalized,
-    normalized: record.normalized,
-    valid: record.valid,
-    available: record.available,
-    reason,
-    suggestions,
-  };
+  const parsed = slugAvailabilityResponseSchema.safeParse(body);
+  if (!parsed.success) return null;
+  return parsed.data;
 }
 
 function isAbort(error: unknown): boolean {
@@ -66,6 +50,10 @@ export async function fetchSlugAvailability(
   } catch (error) {
     if (isAbort(error)) throw error;
     return { ok: false, kind: "network" };
+  }
+  if (response.status === 429) {
+    const retryAfter = Number(response.headers.get("Retry-After"));
+    return { ok: false, kind: "rate_limited", retryAfter: Number.isFinite(retryAfter) ? retryAfter : undefined };
   }
   if (response.status === 404 || response.status >= 500 || !response.ok) return { ok: false, kind: "unverified" };
   const body = await response.json().catch(() => null);

@@ -14,6 +14,7 @@ const mockOnboardingData: OnboardingData = {
   opensAt: "09:00",
   closesAt: "19:00",
   email: "dono@barbearia.com",
+  logoUrl: "https://ce0rcu23vrrdzqap.public.blob.vercel-storage.com/logos/test.webp",
 };
 
 describe("Provisioning contract (POST /api/onboarding)", () => {
@@ -22,6 +23,8 @@ describe("Provisioning contract (POST /api/onboarding)", () => {
     expect(payload.business.name).toBe("Barbearia do Silva");
     expect(payload.business.slug).toBe("barbearia-do-silva");
     expect(payload.business.timezone).toBe("America/Sao_Paulo");
+    expect(payload.business).not.toHaveProperty("logoUrl");
+    expect(JSON.stringify(payload)).not.toContain("blob.vercel-storage.com");
     expect(payload.service.name).toBe("Corte Social");
     expect(payload.service.priceCents).toBe(5000);
     expect(payload.service.depositCents).toBe(2000);

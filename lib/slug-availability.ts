@@ -1,5 +1,4 @@
-import { inArray } from "drizzle-orm";
-import { businesses } from "../db/schema";
+import { sql } from "drizzle-orm";
 import { getDb } from "../db";
 import { isReservedBusinessSlug } from "./bookings/validation";
 import { normalizeSlug } from "./slug";
@@ -57,13 +56,20 @@ export function suggestionCandidates(slug: string, options?: { segment?: string 
   return list;
 }
 
-async function takenSlugs(candidates: string[], database: ReturnType<typeof getDb>) {
+/** Uma consulta só: slug atual e alias. Sugestão ocupada por qualquer um dos dois sai da lista. */
+export async function takenSlugs(candidates: string[], database: Pick<ReturnType<typeof getDb>, "execute"> = getDb()) {
   if (!candidates.length) return new Set<string>();
-  const rows = await database.select({ slug: businesses.slug }).from(businesses).where(inArray(businesses.slug, candidates));
-  return new Set(rows.map((row) => row.slug));
+  const current = sql.join(candidates.map((candidate) => sql`${candidate}`), sql`, `);
+  const aliases = sql.join(candidates.map((candidate) => sql`${candidate}`), sql`, `);
+  const result = await database.execute(sql`SELECT slug FROM businesses WHERE slug IN (${current})
+    UNION
+    SELECT old_slug AS slug FROM business_slug_history
+    WHERE old_slug IN (${aliases})
+      AND (released_at IS NULL OR released_at > now() - interval '90 days')`);
+  return new Set((result.rows as { slug: string }[]).map((row) => row.slug));
 }
 
-export async function suggestFreeSlugs(slug: string, segment: string | null, database: ReturnType<typeof getDb> = getDb(), uf?: string | null) {
+export async function suggestFreeSlugs(slug: string, segment: string | null, database: Pick<ReturnType<typeof getDb>, "execute"> = getDb(), uf?: string | null) {
   const candidates = suggestionCandidates(slug, { segment, uf });
   const taken = await takenSlugs(candidates, database);
   return candidates.filter((candidate) => !taken.has(candidate)).slice(0, 3);

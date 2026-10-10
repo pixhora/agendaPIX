@@ -1,3 +1,5 @@
+import { FAKE_BLOB_HOST, VERCEL_BLOB_PUBLIC_SUFFIX } from "../contracts/business-profile";
+
 /**
  * Response security headers.
  *
@@ -10,6 +12,9 @@
  * Allowed exceptions:
  * - img-src `data:` and `blob:` — Pix QR codes are `data:image/png;base64`
  *   (generated server-side). `blob:` covers Next image previews.
+ * - img-src `https://*.public.blob.vercel-storage.com` — logo pública gravada
+ *   com `put({ access: "public" })`. Em desenvolvimento também entra o host
+ *   do adaptador falso (`blob.fake.local`). Produção não inclui esse host.
  * - style-src `'unsafe-inline'` — Sonner injects a `<style>` tag at runtime and
  *   has no nonce hook. A nonce in style-src would make browsers ignore
  *   `'unsafe-inline'` and block that tag (style-src-elem). Next's own CSS is a
@@ -61,6 +66,8 @@ export const PERMISSIONS_POLICY = [
   "usb=()",
   "interest-cohort=()",
 ].join(", ");
+
+export const BLOB_IMG_SRC = `https://*${VERCEL_BLOB_PUBLIC_SUFFIX}`;
 
 export type ContentSecurityPolicyOptions = {
   nonce: string;
@@ -146,7 +153,7 @@ export function buildContentSecurityPolicy({ nonce, isDev, upgradeInsecureReques
     "script-src-attr 'none'",
     `style-src ${styleSrc}`,
     "style-src-attr 'unsafe-inline'",
-    "img-src 'self' blob: data:",
+    `img-src 'self' blob: data: ${BLOB_IMG_SRC}${isDev ? ` https://${FAKE_BLOB_HOST}` : ""}`,
     "font-src 'self'",
     "connect-src 'self'",
     "object-src 'none'",

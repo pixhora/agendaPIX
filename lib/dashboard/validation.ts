@@ -12,6 +12,7 @@ export const serviceFormSchema = z.object({
   priceCents: centsSchema, depositCents: centsSchema, active: z.boolean(),
   depositPolicy: depositPolicySchema.optional(),
 }).strict().refine((value) => value.depositCents <= value.priceCents, { path: ["depositCents"], message: "O sinal não pode superar o preço." });
+
 export const hoursSchema = z.array(z.object({
   weekday: z.number().int().min(0).max(6),
   opensAt: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),

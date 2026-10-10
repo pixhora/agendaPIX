@@ -2,13 +2,23 @@
 
 import { Toaster as Sonner } from "sonner";
 
-/** Toasts (Sonner) com os tokens do app. O feedback inline / aria-live continua sendo a fonte principal. */
+/**
+ * Toasts (Sonner) com os tokens do app. O feedback inline / aria-live continua sendo a fonte principal.
+ * O recuo da barra fixa vale só embaixo: no celular o Sonner desconta a margem esquerda duas vezes da largura.
+ */
+const toastOffset = {
+  top: 16,
+  right: 16,
+  bottom: "calc(16px + var(--sticky-cta-height, 0px))",
+  left: 16,
+} as const;
+
 export function Toaster() {
   return (
     <Sonner
       position="bottom-center"
-      offset="calc(16px + var(--sticky-cta-height, 0px))"
-      mobileOffset="calc(16px + var(--sticky-cta-height, 0px))"
+      offset={toastOffset}
+      mobileOffset={toastOffset}
       closeButton
       toastOptions={{
         classNames: {
