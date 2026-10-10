@@ -21,7 +21,8 @@ Holds vencidos já expiram sozinhos em cada leitura/criação de reserva.
 
 - **Hobby:** a Vercel só aceita cron diário (`vercel.json` usa `0 6 * * *` UTC). Expressões mais
   frequentes fazem o deploy falhar. Para rodar a cada 1–5 min, use um agendador externo
-  (cron-job.org, GitHub Actions) chamando `POST /api/cron/reconcile` com o bearer.
+  (cron-job.org, GitHub Actions) chamando `POST /api/cron/reconcile` com o bearer — passo a passo em
+  [`reconcile-scheduler.md`](./reconcile-scheduler.md).
   O polling de webhook perdido só olha cobrança `pending` com `expiresAt` ainda no futuro
   (hold padrão de 30 min). Um cron diário quase nunca pega essa janela; o agendador externo
   precisa ser mais frequente que o hold.
@@ -61,7 +62,7 @@ O lembrete da véspera da devolução manual não espera 09:00. Sai na primeira 
 
 1. `neonctl auth` → criar projeto (Postgres 17, `aws-sa-east-1`); copiar URLs pooled e direta.
 2. `DATABASE_URL=<direta> pnpm db:migrate` (cria `btree_gist` e aplica 0000–0010).
-3. `vercel login` → `vercel link` (projeto novo, ligado ao GitHub `voidFrance/agendaPIX`, branch `master`).
+3. `vercel login` → `vercel link` (projeto novo, ligado ao GitHub `pixhora/agendaPIX`, branch `master`).
 4. `vercel env add ... production` para cada variável acima.
 5. `vercel deploy --prod` (pelo CLI, para ver erros de validação do `vercel.json`).
 6. Conferir `GET /api/health` (200) e `GET /api/ready` (200 = banco + SMTP ok).

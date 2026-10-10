@@ -1,0 +1,57 @@
+name: Reconcile (external scheduler)
+
+# Rede de segurança do Pix na Vercel Hobby (cron nativo só diário): dispara POST /api/cron/reconcile.
+# O webhook do Mercado Pago continua sendo o caminho principal de confirmação.
+#
+# Requisitos (Settings → Secrets and variables → Actions):
+#   - secret   CRON_SECRET    = mesmo valor de CRON_SECRET na Vercel (Production)
+#   - variable RECONCILE_URL  = opcional; padrão https://www.agendapix.dev.br/api/cron/reconcile
+#   - variable RECONCILE_CRON_ENABLED = "true" para LIGAR (desligado por padrão)
+#
+# Agendamentos do GitHub só rodam a partir do branch padrão (master), podem atrasar alguns minutos e
+# cada execução conta 1 minuto de Actions (repo privado). Ver docs/reconcile-scheduler.md.
+on:
+  schedule:
+    # A cada 30 min, fora do minuto 0 (horário de pico do agendador do GitHub). ~1.440 min/mês.
+    - cron: "7,37 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: reconcile-cron
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    name: POST /api/cron/reconcile
+    if: vars.RECONCILE_CRON_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Trigger reconcile pass
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          RECONCILE_URL: ${{ vars.RECONCILE_URL || 'https://www.agendapix.dev.br/api/cron/reconcile' }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET}" ]; then
+            echo "::error::Repository secret CRON_SECRET is not set (Settings → Secrets and variables → Actions)."
+            exit 1
+          fi
+          # O header vai por stdin (--config -) para o segredo não aparecer na linha de comando do processo.
+          status=$(printf 'header = "Authorization: Bearer %s"\n' "${CRON_SECRET}" | curl --silent --show-error \
+            --config - \
+            --request POST \
+            --max-time 75 \
+            --retry 2 --retry-delay 10 --retry-all-errors \
+            --output response.json \
+            --write-out '%{http_code}' \
+            "${RECONCILE_URL}")
+          echo "HTTP ${status}"
+          # Corpo é só o relatório (contadores), sem dados sensíveis.
+          cat response.json; echo
+          if [ "${status}" != "200" ]; then
+            echo "::error::Reconcile returned HTTP ${status}"
+            exit 1
+          fi
