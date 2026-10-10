@@ -7,10 +7,8 @@ import { isValidEmail } from "@/lib/onboarding/email-hint";
 import {
   draftBodyFromOnboarding,
   previousStep,
-  restoreOnboardingDraft,
   saveDraftThenSendOtp,
   stepperIndex,
-  stepFromStored,
   TAKEN_LATER,
   createOnboardingData,
   onboardingPlanForEnv,
@@ -20,8 +18,19 @@ import { commitOnboardingDraft, createOnboardingDraft, patchOnboardingDraft } fr
 import { sendSignInOtp, signInWithEmailOtp } from "@/lib/onboarding/auth-otp";
 import { mapOtpError, RESEND_WAIT_SECONDS, wrongCodeMessage } from "@/lib/onboarding/otp";
 import { normalizeSlug } from "@/lib/slug";
+import { authClient } from "@/lib/auth-client";
+import {
+  decideLocalDraftRestore,
+  draftBoundEmail,
+  draftResumeLines,
+  normalizeAccountEmail,
+  shouldClearDraftOnSessionChange,
+  type LocalDraftDecision,
+} from "@/lib/onboarding/local-draft";
 import { BrandLink } from "@/components/ui/brand";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { OnboardingData, OnboardingStep } from "./types";
+import { DraftResume } from "./DraftResume";
 import { StepBusiness } from "./StepBusiness";
 import { StepService } from "./StepService";
 import { StepHours } from "./StepHours";
@@ -69,6 +78,9 @@ export function OnboardingFlow({ legalPagesPublished = false, publicHost }: { le
   const [data, setData] = useState<OnboardingData>(() => createOnboardingData(initialPlan));
   const [draftId, setDraftId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [savedOnDevice, setSavedOnDevice] = useState(false);
+  const [gate, setGate] = useState<"checking" | "form" | "prompt">("checking");
+  const [resume, setResume] = useState<Extract<LocalDraftDecision, { action: "prompt" }> | null>(null);
   const [linkConflict, setLinkConflict] = useState<LinkConflict | null>(null);
   const [businessNotice, setBusinessNotice] = useState<string | null>(null);
   const [businessPending, setBusinessPending] = useState(false);
@@ -86,18 +98,77 @@ export function OnboardingFlow({ legalPagesPublished = false, publicHost }: { le
   const [commitTick, setCommitTick] = useState(0);
   const saveTimer = useRef(0);
   const signingIn = useRef(false);
+  const decided = useRef(false);
+  const seenSession = useRef<string | null | undefined>(undefined);
+  const sessionState = authClient.useSession();
+  const sessionEmail = sessionState.data?.user?.email ?? null;
+  const sessionReady = sessionState.isPending !== true;
+
+  function blankForm() {
+    clearOnboardingProgress();
+    setDraftId(null);
+    setData(createOnboardingData(initialPlan));
+    setSavedOnDevice(false);
+    setResume(null);
+    setLinkConflict(null);
+    setCreatingAlert(null);
+    setStep("business");
+    setGate("form");
+  }
 
   useEffect(() => {
-    const id = readDraftId();
-    const restored = restoreOnboardingDraft(readOnboardingDraftRaw(), initialPlan);
-    const nextStep = stepFromStored(readOnboardingStep(), Boolean(id));
-    queueMicrotask(() => {
-      setDraftId(id);
-      setData(restored);
-      setStep(nextStep);
-      if (nextStep === "code") setResendSeconds(0);
+    if (decided.current) return;
+    const raw = readOnboardingDraftRaw();
+    const payload = raw && typeof raw === "object" && "v" in raw && (raw as { v?: unknown }).v === 1 && "data" in raw
+      ? (raw as { data?: unknown }).data
+      : raw;
+    const email = payload && typeof payload === "object" && "email" in payload ? (payload as { email?: unknown }).email : null;
+    const bound = raw && typeof raw === "object" && "boundEmail" in raw ? (raw as { boundEmail?: unknown }).boundEmail : null;
+    const needsAccount = (typeof email === "string" && email.trim().length > 0) || (typeof bound === "string" && bound.trim().length > 0);
+    if (needsAccount && !sessionReady) return;
+    decided.current = true;
+    const decision = decideLocalDraftRestore({
+      raw,
+      step: readOnboardingStep(),
+      draftId: readDraftId(),
+      now: Date.now(),
+      sessionEmail: sessionReady ? sessionEmail : null,
+      plan: initialPlan,
     });
-  }, [initialPlan]);
+    queueMicrotask(() => {
+      if (decision.action === "discard") {
+        clearOnboardingProgress();
+        setGate("form");
+        return;
+      }
+      if (decision.action === "prompt") {
+        setResume(decision);
+        setGate("prompt");
+        return;
+      }
+      setGate("form");
+    });
+  }, [initialPlan, sessionEmail, sessionReady]);
+
+  useEffect(() => {
+    if (!sessionReady) return;
+    const next = normalizeAccountEmail(sessionEmail);
+    const previous = seenSession.current;
+    seenSession.current = next;
+    if (previous === undefined) return;
+    if (!shouldClearDraftOnSessionChange(previous, next, data.email)) return;
+    clearOnboardingProgress();
+    queueMicrotask(() => {
+      setDraftId(null);
+      setData(createOnboardingData(initialPlan));
+      setSavedOnDevice(false);
+      setResume(null);
+      setLinkConflict(null);
+      setCreatingAlert(null);
+      setStep("business");
+      setGate("form");
+    });
+  }, [data.email, initialPlan, sessionEmail, sessionReady]);
 
   useEffect(() => {
     if (step !== "code" || resendSeconds <= 0) return;
@@ -149,6 +220,7 @@ export function OnboardingFlow({ legalPagesPublished = false, publicHost }: { le
       }
       if (follow.type === "has_business") {
         toast(HAS_BUSINESS_TOAST);
+        clearOnboardingProgress();
         router.push("/dashboard");
         return;
       }
@@ -201,9 +273,10 @@ export function OnboardingFlow({ legalPagesPublished = false, publicHost }: { le
   }, [creatingAlert, step]);
 
   function update(partial: Partial<OnboardingData>) {
+    setSavedOnDevice(true);
     setData((prev) => {
       const updated = { ...prev, ...partial };
-      writeOnboardingDraft(updated);
+      writeOnboardingDraft(updated, draftBoundEmail(updated.email, normalizeAccountEmail(sessionEmail)));
       return updated;
     });
     setSaving(true);
@@ -236,7 +309,8 @@ export function OnboardingFlow({ legalPagesPublished = false, publicHost }: { le
       }
       setLinkConflict(null);
       setData(next);
-      writeOnboardingDraft(next);
+      writeOnboardingDraft(next, draftBoundEmail(next.email, normalizeAccountEmail(sessionEmail)));
+      setSavedOnDevice(true);
       setCommitTick((current) => current + 1);
       go("creating");
       return;
@@ -408,16 +482,31 @@ export function OnboardingFlow({ legalPagesPublished = false, publicHost }: { le
   }
 
   function restart() {
-    clearOnboardingProgress();
-    setDraftId(null);
-    setData(createOnboardingData(initialPlan));
-    setLinkConflict(null);
-    setCreatingAlert(null);
-    go("business");
+    blankForm();
+  }
+
+  function continueDraft() {
+    if (!resume) return;
+    setData(resume.data);
+    setDraftId(resume.draftId);
+    setSavedOnDevice(true);
+    setStep(resume.step);
+    if (resume.step === "code") setResendSeconds(0);
+    setResume(null);
+    setGate("form");
   }
 
   const back = previousStep(step);
   const depositMode = data.depositMode ?? "30";
+  const resumeLines = resume ? draftResumeLines(resume.data) : null;
+
+  if (gate === "checking") {
+    return (
+      <div role="status" aria-label="Carregando cadastro" className="flex min-h-dvh items-center justify-center p-4">
+        <Skeleton className="h-8 w-48" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-dvh bg-paper">
@@ -426,14 +515,25 @@ export function OnboardingFlow({ legalPagesPublished = false, publicHost }: { le
           <div className="flex h-14 items-center px-4">
             <BrandLink href="/onboarding" />
           </div>
-          <OnboardingTopBar
-            saving={saving}
-            savedOnServer={Boolean(draftId)}
-            onBack={back ? () => go(back) : undefined}
-          />
-          <OnboardingStepper steps={STEPPER} current={stepperIndex(step)} />
-          <div className="flex flex-1 flex-col" data-step={step}>
-            {step === "business" && (
+          {gate === "form" ? (
+            <OnboardingTopBar
+              saving={saving}
+              savedOnServer={Boolean(draftId)}
+              savedOnDevice={savedOnDevice}
+              onBack={back ? () => go(back) : undefined}
+            />
+          ) : <div className="h-14" />}
+          {gate === "form" ? <OnboardingStepper steps={STEPPER} current={stepperIndex(step)} /> : null}
+          <div className="flex flex-1 flex-col" data-step={gate === "prompt" ? "resume" : step}>
+            {gate === "prompt" && resumeLines ? (
+              <DraftResume
+                title={resumeLines.title}
+                detail={resumeLines.detail}
+                onContinue={continueDraft}
+                onReset={blankForm}
+              />
+            ) : null}
+            {gate === "form" && step === "business" && (
               <StepBusiness
                 businessName={data.businessName}
                 slug={data.slug}
@@ -448,7 +548,7 @@ export function OnboardingFlow({ legalPagesPublished = false, publicHost }: { le
                 onNext={() => void continueBusiness()}
               />
             )}
-            {step === "service" && (
+            {gate === "form" && step === "service" && (
               <StepService
                 serviceName={data.serviceName}
                 durationMinutes={data.durationMinutes}
@@ -464,7 +564,7 @@ export function OnboardingFlow({ legalPagesPublished = false, publicHost }: { le
                 onNext={() => go("hours")}
               />
             )}
-            {step === "hours" && (
+            {gate === "form" && step === "hours" && (
               <StepHours
                 openDays={data.openDays}
                 opensAt={data.opensAt}
@@ -476,7 +576,7 @@ export function OnboardingFlow({ legalPagesPublished = false, publicHost }: { le
                 onNext={() => go("email")}
               />
             )}
-            {step === "email" && (
+            {gate === "form" && step === "email" && (
               <StepEmail
                 email={data.email}
                 onChangeEmail={(email) => {
@@ -491,7 +591,7 @@ export function OnboardingFlow({ legalPagesPublished = false, publicHost }: { le
                 onSubmit={() => void submitEmail()}
               />
             )}
-            {step === "code" && (
+            {gate === "form" && step === "code" && (
               <StepCode
                 email={data.email}
                 code={code}
@@ -510,7 +610,7 @@ export function OnboardingFlow({ legalPagesPublished = false, publicHost }: { le
                 onBack={() => go("email")}
               />
             )}
-            {step === "creating" && (
+            {gate === "form" && step === "creating" && (
               <StepCreating
                 slow={creatingSlow}
                 alert={creatingAlert}
@@ -535,7 +635,7 @@ export function OnboardingFlow({ legalPagesPublished = false, publicHost }: { le
             )}
           </div>
         </div>
-        <OnboardingPreview data={data} publicHost={publicHost} />
+        {gate === "form" ? <OnboardingPreview data={data} publicHost={publicHost} /> : null}
       </div>
     </div>
   );

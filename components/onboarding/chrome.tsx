@@ -9,12 +9,14 @@ export function OnboardingTopBar({
   onBack,
   saving,
   savedOnServer,
+  savedOnDevice = false,
 }: {
   onBack?: () => void;
   saving: boolean;
   savedOnServer: boolean;
+  savedOnDevice?: boolean;
 }) {
-  const label = onboardingSaveStatus(saving, savedOnServer);
+  const label = onboardingSaveStatus(saving, savedOnServer, savedOnDevice);
   return (
     <div className="flex h-14 items-center justify-between pr-4 pl-1">
       {onBack ? (
@@ -24,9 +26,13 @@ export function OnboardingTopBar({
       ) : (
         <span className="size-11" />
       )}
-      <span className="inline-flex items-center gap-1.5 text-xs text-muted">
-        {saving ? null : <CircleCheck aria-hidden="true" className="size-3.5 text-success" />}
-        {label}
+      <span className="inline-flex min-h-11 items-center gap-1.5 text-xs text-muted">
+        {label ? (
+          <>
+            {saving ? <Loader2 aria-hidden="true" className="size-3.5 animate-spin motion-reduce:animate-none" /> : <CircleCheck aria-hidden="true" className="size-3.5 text-success" />}
+            {label}
+          </>
+        ) : null}
       </span>
     </div>
   );
