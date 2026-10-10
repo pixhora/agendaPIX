@@ -1,13 +1,13 @@
 import { NextRequest } from "next/server";
 import sharp from "sharp";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { clearAliasCache } from "../../lib/business-profile/alias-cache";
+import { clearAliasCache, invalidateAliasCache } from "../../lib/business-profile/alias-cache";
 import { LOGO_UPLOAD_MAX_BYTES } from "../../lib/contracts";
 import { HttpError } from "../../lib/http";
 import { assertLogoBytes, reencodeLogo } from "../../lib/business-profile/logo-image";
 import { createFakeBlobStore, createVercelBlobStore, resolveBlobStore } from "../../lib/business-profile/logo-store";
-import { locationForMovedSlug, publicSlugFromPath, slugMovedResponse } from "../../lib/business-profile/public-slug";
-import { slugTakenError } from "../../lib/business-profile/slug-conflict";
+import { aliasTarget, locationForMovedSlug, publicSlugFromPath, slugMovedResponse } from "../../lib/business-profile/public-slug";
+import { rejectTakenSlug, slugTakenError } from "../../lib/business-profile/slug-conflict";
 import { slugAvailability, takenSlugs } from "../../lib/slug-availability";
 import { proxy } from "../../proxy";
 
@@ -227,6 +227,66 @@ describe("slug redirect", () => {
       return "nova";
     });
     expect(skipped).toBe(0);
+  });
+
+  it("returns a retryable slug_taken with up to three free suggestions", async () => {
+    await expect(rejectTakenSlug({
+      async execute() {
+        return { rows: [] };
+      },
+    } as never, "loja", "slug")).rejects.toMatchObject({
+      status: 409,
+      code: "slug_taken",
+      details: { details: { constraint: "slug", suggestions: ["loja-2", "loja-3", "loja-4"] } },
+    });
+
+    await expect(rejectTakenSlug({
+      async execute() {
+        throw new Error("db down");
+      },
+    } as never, "loja", "businesses_slug_unique")).rejects.toMatchObject({
+      status: 409,
+      code: "slug_taken",
+      details: { details: { constraint: "businesses_slug_unique", suggestions: [] } },
+    });
+  });
+
+  it("remembers a released alias as a miss and looks again after the slug changes", async () => {
+    let hits = 0;
+    const lookup = async () => {
+      hits += 1;
+      return null;
+    };
+    const first = await proxy(new NextRequest("https://agenda.example/antiga"), lookup);
+    const second = await proxy(new NextRequest("https://agenda.example/antiga/opengraph-image"), lookup);
+    expect(first.status).not.toBe(308);
+    expect(second.status).not.toBe(308);
+    expect(hits).toBe(1);
+
+    invalidateAliasCache("antiga");
+    await proxy(new NextRequest("https://agenda.example/antiga"), lookup);
+    expect(hits).toBe(2);
+
+    clearAliasCache();
+    let selects = 0;
+    const database = {
+      select() {
+        selects += 1;
+        const chain = {
+          from: () => chain,
+          innerJoin: () => chain,
+          where: () => chain,
+          limit: async () => [],
+        };
+        return chain;
+      },
+    };
+    expect(await aliasTarget("antiga", database as never)).toBeNull();
+    expect(await aliasTarget("antiga", database as never)).toBeNull();
+    expect(selects).toBe(1);
+    invalidateAliasCache("antiga");
+    expect(await aliasTarget("antiga", database as never)).toBeNull();
+    expect(selects).toBe(2);
   });
 
   it("remembers an alias lookup for a minute and does not remember a database error", async () => {

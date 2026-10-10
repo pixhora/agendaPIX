@@ -17,7 +17,15 @@ it("provisions atomically, replays concurrent requests and isolates owners and s
     expect(results.filter(value => !value.replay)).toHaveLength(1);
     expect(new Set(results.map(value => value.result.businessId)).size).toBe(1);
     await expect(provisionBusiness(owners[0], key, { ...input, business: { ...input.business, name: "Changed" } }, db)).rejects.toMatchObject({ status: 409, code: "idempotency_conflict" });
-    await expect(provisionBusiness(owners[1], key, input, db)).rejects.toMatchObject({ status: 409, code: "slug_unavailable" });
+    const taken = await provisionBusiness(owners[1], key, input, db).then(() => null, (error: unknown) => error);
+    expect(taken).toMatchObject({
+      status: 409,
+      code: "slug_taken",
+      details: { details: { constraint: "businesses_slug_unique" } },
+    });
+    const suggestions = (taken as { details?: { details?: { suggestions?: unknown } } }).details?.details?.suggestions;
+    expect(Array.isArray(suggestions) && suggestions.length > 0 && suggestions.length <= 3).toBe(true);
+    expect(suggestions).not.toContain(slug);
     expect(await db.select().from(onboardingRequests).where(eq(onboardingRequests.ownerId, owners[1]))).toHaveLength(0);
     const second = await provisionBusiness(owners[1], key, { ...input, business: { ...input.business, slug: `oth-${key.replaceAll("-", "").slice(0, 16)}` } }, db);
     expect(second.result.businessId).not.toBe(results[0].result.businessId);

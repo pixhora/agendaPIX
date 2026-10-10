@@ -41,7 +41,7 @@ export async function readApiError(response: Response): Promise<ApiErrorBody> {
       : undefined;
   return {
     code: typeof error?.code === "string" && error.code.length > 0 ? error.code : "unknown",
-    suggestions: stringList(error?.suggestions),
+    suggestions: stringList(error?.suggestions) ?? stringList(asRecord(error?.details)?.suggestions),
     retryAfter,
     publicPath,
     fields: error?.fields ?? asRecord(error?.details)?.fields,

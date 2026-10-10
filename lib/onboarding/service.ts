@@ -6,15 +6,16 @@ import { trialEndsAtFromCreation } from "../billing/access";
 import { requestKeySchema } from "../bookings/validation";
 import { HttpError } from "../http";
 import { aliasHoldActive } from "../business-profile/slug-policy";
-import { isUniqueViolation } from "../business-profile/slug-conflict";
+import { isUniqueViolation, rejectTakenSlug } from "../business-profile/slug-conflict";
 import { onboardingInputSchema } from "./validation";
 
 export async function provisionBusiness(ownerId: string, key: unknown, body: unknown, database?: ReturnType<typeof getDb>) {
   const requestKey = requestKeySchema.parse(key);
   const input = onboardingInputSchema.parse(body);
   const requestHash = createHash("sha256").update(JSON.stringify(input)).digest("hex");
+  const db = database ?? getDb();
   try {
-    return await (database ?? getDb()).transaction(async (tx) => {
+    return await db.transaction(async (tx) => {
       const predicate = and(eq(onboardingRequests.ownerId, ownerId), eq(onboardingRequests.requestKey, requestKey));
       const inserted = await tx.insert(onboardingRequests).values({ ownerId, requestKey, requestHash }).onConflictDoNothing().returning();
       if (!inserted.length) {
@@ -37,7 +38,7 @@ export async function provisionBusiness(ownerId: string, key: unknown, body: unk
         trialEndsAt: trialEndsAtFromCreation(new Date(), input.business.timezone),
         ownerId,
       }).onConflictDoNothing({ target: businesses.slug }).returning();
-      if (!business) throw new HttpError(409, "slug_unavailable", "Esse endereço já está em uso. Escolha outro.");
+      if (!business) await rejectTakenSlug(db, input.business.slug, "businesses_slug_unique");
       const [service] = await tx.insert(services).values({ ...input.service, businessId: business.id }).returning();
       await tx.insert(businessHours).values(input.hours.map((value) => ({ ...value, businessId: business.id })));
       const result = { businessId: business.id, slug: business.slug, publicPath: `/${business.slug}`, serviceId: service.id };
@@ -46,7 +47,7 @@ export async function provisionBusiness(ownerId: string, key: unknown, body: unk
     });
   } catch (error) {
     if (error instanceof HttpError) throw error;
-    if (isUniqueViolation(error)) throw new HttpError(409, "slug_unavailable", "Esse endereço já está em uso. Escolha outro.");
+    if (isUniqueViolation(error)) await rejectTakenSlug(db, input.business.slug, "slug");
     throw new HttpError(503, "onboarding_unavailable", "Não foi possível concluir o cadastro. Tente novamente.");
   }
 }

@@ -8,7 +8,8 @@ import { publicBusinessPageUrl } from "../billing/public-url";
 import { HttpError } from "../http";
 import { publicBookingPagePath } from "../public-api";
 import { findOwnedBusiness } from "../tenancy";
-import { slugTakenError } from "./slug-conflict";
+import { invalidateAliasCache } from "./alias-cache";
+import { isUniqueViolation, rejectTakenSlug } from "./slug-conflict";
 import { ACTIVE_ALIAS_CAP, aliasHoldActive, PROFILE_PATCH_LIMIT, SLUG_CHANGE_LIMIT } from "./slug-policy";
 
 type Database = ReturnType<typeof getDb>;
@@ -54,8 +55,9 @@ export async function updateBusinessProfile(businessId: string, ownerId: string,
   if (!existing) throw new HttpError(404, "business_unavailable", "Este negócio não está disponível para sua conta.");
   await consumeAbuseBucket("profile-patch", ownerId, PROFILE_PATCH_LIMIT, "hour", database);
 
+  const dropped: string[] = [];
   try {
-    return await database.transaction(async (tx) => {
+    const result = await database.transaction(async (tx) => {
       const business = await findOwnedBusiness(id.data, ownerId, tx);
       if (!business) throw new HttpError(404, "business_unavailable", "Este negócio não está disponível para sua conta.");
       const nextName = parsed.data.name ?? business.name;
@@ -73,21 +75,23 @@ export async function updateBusinessProfile(businessId: string, ownerId: string,
         releasedAt: businessSlugHistory.releasedAt,
       }).from(businessSlugHistory).where(eq(businessSlugHistory.oldSlug, nextSlug)).limit(1);
       if (alias && aliasHoldActive(alias.releasedAt) && alias.businessId !== business.id) {
-        throw new HttpError(409, "slug_taken", "Esse endereço já está em uso. Escolha outro.", undefined, { details: { constraint: "slug_alias" } });
+        await rejectTakenSlug(database, nextSlug, "slug_alias");
       }
       if (alias) await tx.delete(businessSlugHistory).where(eq(businessSlugHistory.oldSlug, nextSlug));
       const [taken] = await tx.select({ id: businesses.id }).from(businesses).where(eq(businesses.slug, nextSlug)).limit(1);
       if (taken && taken.id !== business.id) {
-        throw new HttpError(409, "slug_taken", "Esse endereço já está em uso. Escolha outro.", undefined, { details: { constraint: "businesses_slug_unique" } });
+        await rejectTakenSlug(database, nextSlug, "businesses_slug_unique");
       }
 
       const active = await tx.select({ oldSlug: businessSlugHistory.oldSlug }).from(businessSlugHistory).where(and(
         eq(businessSlugHistory.businessId, business.id),
         isNull(businessSlugHistory.releasedAt),
       )).orderBy(asc(businessSlugHistory.createdAt), asc(businessSlugHistory.oldSlug));
+      let releasedSlug: string | undefined;
       if (active.length >= ACTIVE_ALIAS_CAP) {
         const oldest = active[0]?.oldSlug;
         if (oldest) {
+          releasedSlug = oldest;
           await lockSlugs(tx, [oldest]);
           await tx.update(businessSlugHistory).set({ releasedAt: new Date() }).where(and(
             eq(businessSlugHistory.oldSlug, oldest),
@@ -100,14 +104,17 @@ export async function updateBusinessProfile(businessId: string, ownerId: string,
         name: nextName,
         slug: nextSlug,
       }).where(and(eq(businesses.id, business.id), eq(businesses.ownerId, ownerId), eq(businesses.slug, business.slug))).returning();
-      if (!updated) throw new HttpError(409, "slug_taken", "Esse endereço já está em uso. Escolha outro.", undefined, { details: { constraint: "businesses_slug_unique" } });
+      if (!updated) await rejectTakenSlug(database, nextSlug, "businesses_slug_unique");
       await tx.insert(businessSlugHistory).values({ oldSlug: business.slug, businessId: business.id });
+      dropped.push(business.slug, nextSlug);
+      if (releasedSlug) dropped.push(releasedSlug);
       return present(updated);
     });
+    for (const slug of dropped) invalidateAliasCache(slug);
+    return result;
   } catch (error) {
     if (error instanceof HttpError) throw error;
-    const conflict = slugTakenError(error);
-    if (conflict) throw conflict;
+    if (isUniqueViolation(error) && parsed.data.slug) await rejectTakenSlug(database, parsed.data.slug, "slug");
     throw error;
   }
 }

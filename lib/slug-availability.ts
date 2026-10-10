@@ -69,7 +69,7 @@ export async function takenSlugs(candidates: string[], database: Pick<ReturnType
   return new Set((result.rows as { slug: string }[]).map((row) => row.slug));
 }
 
-export async function suggestFreeSlugs(slug: string, segment: string | null, database: ReturnType<typeof getDb> = getDb(), uf?: string | null) {
+export async function suggestFreeSlugs(slug: string, segment: string | null, database: Pick<ReturnType<typeof getDb>, "execute"> = getDb(), uf?: string | null) {
   const candidates = suggestionCandidates(slug, { segment, uf });
   const taken = await takenSlugs(candidates, database);
   return candidates.filter((candidate) => !taken.has(candidate)).slice(0, 3);

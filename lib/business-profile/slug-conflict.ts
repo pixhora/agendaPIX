@@ -1,4 +1,6 @@
+import { getDb } from "../../db";
 import { HttpError } from "../http";
+import { suggestFreeSlugs } from "../slug-availability";
 
 function postgresCode(error: unknown): string | null {
   if (typeof error === "object" && error !== null && "code" in error && typeof error.code === "string") return error.code;
@@ -15,5 +17,18 @@ export function slugTakenError(error: unknown): HttpError | null {
   if (!isUniqueViolation(error)) return null;
   return new HttpError(409, "slug_taken", "Esse endereço já está em uso. Escolha outro.", undefined, {
     details: { constraint: "slug" },
+  });
+}
+
+/** 409 com até 3 links livres para a tela oferecer na hora. */
+export async function rejectTakenSlug(database: Pick<ReturnType<typeof getDb>, "execute">, slug: string, constraint: string): Promise<never> {
+  let suggestions: string[] = [];
+  try {
+    suggestions = await suggestFreeSlugs(slug, null, database);
+  } catch {
+    suggestions = [];
+  }
+  throw new HttpError(409, "slug_taken", "Esse endereço já está em uso. Escolha outro.", undefined, {
+    details: { constraint, suggestions },
   });
 }

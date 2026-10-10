@@ -10,8 +10,14 @@ export function clearAliasCache() {
   aliasCache.clear();
 }
 
+/** Drop one slug after this process changes it, including a release that must stop redirecting. */
+export function invalidateAliasCache(slug: string) {
+  aliasCache.delete(slug);
+}
+
 /**
- * Short memory for the old-slug lookup, including "not an alias".
+ * Short memory for the old-slug lookup. A miss is stored too: an unknown slug
+ * and a released alias (no redirect) must not hit the database on every request.
  * A thrown lookup is not stored, so a database error is tried again next time.
  */
 export async function cachedAliasTarget(slug: string, lookup: AliasLookup, now = Date.now()): Promise<string | null> {

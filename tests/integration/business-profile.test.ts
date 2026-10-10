@@ -57,6 +57,10 @@ it("returns 409 when two owners take the same slug, and 308 from the old public 
     expect(lost).toHaveLength(1);
     if (!won[0].ok || lost[0].ok) throw new Error("race result");
     expect(lost[0].error).toMatchObject({ status: 409, code: "slug_taken" });
+    const raceSuggestions = (lost[0].error.details?.details as { suggestions?: string[] } | undefined)?.suggestions ?? [];
+    expect(raceSuggestions.length).toBeGreaterThan(0);
+    expect(raceSuggestions.length).toBeLessThanOrEqual(3);
+    expect(raceSuggestions).not.toContain(target);
     expect(won[0].value.slug).toBe(target);
     expect(won[0].value.publicPath).toBe(`/${target}`);
 
@@ -107,11 +111,16 @@ it("lets the owner reclaim an alias, blocks another owner, and skips that alias 
     const aliasCheck = await slugAvailability(alias, { segment: "cilios" }, db);
     expect(aliasCheck).toMatchObject({ available: false, reason: "taken" });
 
-    await expect(updateBusinessProfile(other.id, owners[1], { slug: alias }, db)).rejects.toMatchObject({
+    const denied = await updateBusinessProfile(other.id, owners[1], { slug: alias }, db).then(() => null, (error: unknown) => error);
+    expect(denied).toMatchObject({
       status: 409,
       code: "slug_taken",
       details: { details: { constraint: "slug_alias" } },
     });
+    const offered = ((denied as HttpError).details?.details as { suggestions?: string[] } | undefined)?.suggestions ?? [];
+    expect(offered.length).toBeGreaterThan(0);
+    expect(offered.length).toBeLessThanOrEqual(3);
+    expect(offered).not.toContain(alias);
 
     const reclaimed = await updateBusinessProfile(business.id, owners[0], { slug: alias }, db);
     expect(reclaimed.slug).toBe(alias);

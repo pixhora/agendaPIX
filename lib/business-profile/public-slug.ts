@@ -3,6 +3,7 @@ import { getDb } from "../../db";
 import { businessSlugHistory, businesses } from "../../db/schema";
 import { isReservedBusinessSlug } from "../bookings/validation";
 import { isPublicSlug } from "../slug";
+import { cachedAliasTarget } from "./alias-cache";
 
 export class SlugMoved extends Error {
   constructor(public slug: string) {
@@ -12,8 +13,7 @@ export class SlugMoved extends Error {
 
 type Database = Pick<ReturnType<typeof getDb>, "select">;
 
-/** Slug atual quando `slug` é um alias. Caso contrário, null. */
-export async function aliasTarget(slug: string, database: Database = getDb()): Promise<string | null> {
+async function readAliasTarget(slug: string, database: Database): Promise<string | null> {
   if (!isPublicSlug(slug) || isReservedBusinessSlug(slug)) return null;
   const [row] = await database
     .select({ slug: businesses.slug })
@@ -23,6 +23,14 @@ export async function aliasTarget(slug: string, database: Database = getDb()): P
     .limit(1);
   if (!row || row.slug === slug) return null;
   return row.slug;
+}
+
+/**
+ * Slug atual quando `slug` é um alias ativo. Alias solto e slug desconhecido
+ * devolvem null e ficam no cache por 60s, junto com o proxy.
+ */
+export async function aliasTarget(slug: string, database: Database = getDb()): Promise<string | null> {
+  return cachedAliasTarget(slug, (value) => readAliasTarget(value, database));
 }
 
 function decodeSegment(value: string) {
