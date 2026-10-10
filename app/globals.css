@@ -387,71 +387,180 @@ h1, h2, h3, h4, h5, h6, .font-display {
 }
 
 /* Hero: composição em camadas (components/landing/HeroMotion.tsx).
-   Quadro de 420×480 que só escala com a largura do container. */
+   Quadro de 480×520 que só escala com a largura do container.
+   Abaixo de lg os cartões empilham no fluxo e estas posições não se aplicam. */
 .hero-frame { container-type: inline-size; }
 .hero-stage > * {
   position: relative;
   z-index: 1;
 }
 .hero-frame-sizer {
-  height: calc(100cqi * 480 / 420);
+  height: calc(100cqi * 520 / 480);
 }
 .hero-canvas {
   position: absolute;
   top: 0;
   left: 0;
-  width: 420px;
-  height: 480px;
-  transform: scale(calc(100cqi / 420px));
+  width: 480px;
+  height: 520px;
+  transform: scale(calc(100cqi / 480px));
   transform-origin: top left;
 }
 .hero-card-main {
   position: absolute;
-  top: 108px;
+  top: 104px;
   left: 0;
-  width: 340px;
+  width: 336px;
 }
 .hero-card-pix {
   position: absolute;
-  top: 12px;
-  right: 4px;
+  top: 18px;
+  right: 10px;
   z-index: 2;
-  width: 204px;
-  rotate: 3deg;
+  width: 236px;
+  rotate: 4deg;
 }
 .hero-card-chip {
   position: absolute;
   left: 2px;
-  bottom: 4px;
+  bottom: 18px;
   z-index: 2;
-  rotate: -2.5deg;
+  rotate: -3deg;
 }
 .hero-mark {
-  box-shadow: inset 0 0 0 1px var(--brand-tile-edge);
+  border: 1.5px solid var(--pix);
+  background: color-mix(in srgb, var(--pix) 8%, var(--surface));
+  color: var(--ink);
+}
+.hero-rule {
+  height: 1px;
+  background: color-mix(in srgb, var(--ink) 12%, transparent);
+}
+.hero-day {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.25rem;
+  padding-inline: 0.2rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ink) 16%, transparent);
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+}
+.hero-day-on {
+  border-color: transparent;
+  background: var(--pix-bright);
+  color: var(--pix-bright-foreground);
+}
+.hero-slot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding-inline: 0.85rem;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--ink) 18%, transparent);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.hero-slot-on {
+  border-color: var(--pix);
+  background: color-mix(in srgb, var(--pix) 14%, transparent);
+}
+.hero-deposit {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 2.75rem;
+  padding: 0.55rem 1rem;
+  border-radius: 999px;
+  background: linear-gradient(
+    105deg,
+    var(--pix-deep),
+    color-mix(in srgb, var(--pix-deep) 82%, var(--pix-bright))
+  );
+}
+.hero-deposit-label {
+  color: var(--pix-bright);
+  font-size: 13px;
+  font-weight: 600;
+}
+.hero-deposit-value {
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.hero-check {
+  display: inline-flex;
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--pix-bright);
+  color: var(--pix-bright-foreground);
+}
+.hero-chip .hero-check {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+.hero-chip {
+  border-color: var(--pix);
 }
 .hero-stage::before {
   content: "";
   position: absolute;
   z-index: 0;
   pointer-events: none;
-  inset: -8% -6% -4%;
+  inset: -4% -6% 14%;
   background:
-    radial-gradient(ellipse 72% 58% at 58% 42%, color-mix(in srgb, var(--pix-bright) 40%, transparent), transparent 68%),
-    radial-gradient(ellipse 42% 36% at 18% 78%, color-mix(in srgb, var(--pix) 22%, transparent), transparent 72%);
+    radial-gradient(ellipse 56% 46% at 100% -8%, color-mix(in srgb, var(--pix) 22%, transparent), transparent 68%),
+    radial-gradient(ellipse 40% 34% at 0% 100%, color-mix(in srgb, var(--pix) 12%, transparent), transparent 72%),
+    linear-gradient(118deg, transparent 0 16%, color-mix(in srgb, var(--pix-deep) 14%, transparent) 16% 38%, transparent 38% 52%, color-mix(in srgb, var(--pix) 10%, transparent) 52% 74%, transparent 74%);
 }
 .hero-panel {
-  border: 1px solid color-mix(in srgb, var(--line-strong) 48%, var(--line));
-  background-color: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
+  background-color: color-mix(in srgb, var(--surface) 88%, transparent);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
   box-shadow:
-    inset 0 1px 0 color-mix(in srgb, white 70%, transparent),
-    0 18px 40px -22px rgb(8 24 22 / 0.45),
-    0 2px 8px rgb(11 11 12 / 0.06);
+    inset 0 1px 0 color-mix(in srgb, white 72%, transparent),
+    0 18px 40px -22px rgb(8 24 22 / 0.4);
+}
+.dark .hero-mark {
+  border-color: var(--pix-bright);
+  background: color-mix(in srgb, var(--paper) 72%, transparent);
+}
+.dark .hero-slot-on {
+  border-color: var(--pix-bright);
+  background: color-mix(in srgb, var(--pix-bright) 16%, transparent);
+}
+.dark .hero-chip {
+  border-color: var(--pix-bright);
+}
+.dark .hero-stage::before {
+  background:
+    radial-gradient(ellipse 62% 50% at 104% -10%, color-mix(in srgb, var(--pix-bright) 55%, transparent), transparent 66%),
+    radial-gradient(ellipse 44% 38% at -6% 104%, color-mix(in srgb, var(--pix) 28%, transparent), transparent 70%),
+    linear-gradient(116deg, transparent 0 10%, color-mix(in srgb, var(--pix-deep) 90%, transparent) 10% 34%, transparent 34% 48%, color-mix(in srgb, var(--pix-bright) 13%, transparent) 48% 70%, transparent 70% 82%, color-mix(in srgb, var(--pix-deep) 75%, transparent) 82% 100%);
 }
 .dark .hero-panel {
+  border-color: color-mix(in srgb, var(--ink) 18%, transparent);
+  background-color: color-mix(in srgb, var(--surface) 68%, transparent);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.06),
+    inset 0 1px 0 rgb(255 255 255 / 0.08),
     0 22px 48px -18px rgb(0 0 0 / 0.72),
-    0 0 40px -12px color-mix(in srgb, var(--pix) 28%, transparent);
+    0 0 42px -12px color-mix(in srgb, var(--pix-bright) 32%, transparent);
 }
 @keyframes hero-rise {
   from { opacity: 0; transform: translateY(12px); }
@@ -469,11 +578,30 @@ h1, h2, h3, h4, h5, h6, .font-display {
 .hero-float-late { animation-delay: 450ms; }
 
 @media (prefers-color-scheme: dark) {
+  :root:not(.light):not(.dark) .hero-mark {
+    border-color: var(--pix-bright);
+    background: color-mix(in srgb, var(--paper) 72%, transparent);
+  }
+  :root:not(.light):not(.dark) .hero-slot-on {
+    border-color: var(--pix-bright);
+    background: color-mix(in srgb, var(--pix-bright) 16%, transparent);
+  }
+  :root:not(.light):not(.dark) .hero-chip {
+    border-color: var(--pix-bright);
+  }
+  :root:not(.light):not(.dark) .hero-stage::before {
+    background:
+      radial-gradient(ellipse 62% 50% at 104% -10%, color-mix(in srgb, var(--pix-bright) 55%, transparent), transparent 66%),
+      radial-gradient(ellipse 44% 38% at -6% 104%, color-mix(in srgb, var(--pix) 28%, transparent), transparent 70%),
+      linear-gradient(116deg, transparent 0 10%, color-mix(in srgb, var(--pix-deep) 90%, transparent) 10% 34%, transparent 34% 48%, color-mix(in srgb, var(--pix-bright) 13%, transparent) 48% 70%, transparent 70% 82%, color-mix(in srgb, var(--pix-deep) 75%, transparent) 82% 100%);
+  }
   :root:not(.light):not(.dark) .hero-panel {
+    border-color: color-mix(in srgb, var(--ink) 18%, transparent);
+    background-color: color-mix(in srgb, var(--surface) 68%, transparent);
     box-shadow:
-      inset 0 1px 0 rgb(255 255 255 / 0.06),
+      inset 0 1px 0 rgb(255 255 255 / 0.08),
       0 22px 48px -18px rgb(0 0 0 / 0.72),
-      0 0 40px -12px color-mix(in srgb, var(--pix) 28%, transparent);
+      0 0 42px -12px color-mix(in srgb, var(--pix-bright) 32%, transparent);
   }
 }
 @media (prefers-reduced-motion: reduce) {
