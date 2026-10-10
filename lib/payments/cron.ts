@@ -4,6 +4,7 @@ import { Pool } from "pg";
 import { z } from "zod";
 import * as schema from "../../db/schema";
 import { HttpError } from "../http";
+import { explicitSslMode } from "../db-url";
 import { paymentsConfig } from "./config";
 import { getPaymentProvider } from "./index";
 import { reconcileFailureCode, reconcileOnce, type ReconcileReport } from "./reconcile";
@@ -64,7 +65,7 @@ export async function runReconcilePass() {
   let provider = null;
   try { provider = getPaymentProvider(); }
   catch { provider = null; } // sem gateway: só expira holds locais (mesmo comportamento do script)
-  const pool = new Pool({ connectionString: reconcileDatabaseUrl(), max: 1, connectionTimeoutMillis: 10000 });
+  const pool = new Pool({ connectionString: explicitSslMode(reconcileDatabaseUrl()), max: 1, connectionTimeoutMillis: 10000 });
   try {
     const database = Object.assign(drizzle(pool, { schema }), { $client: pool });
     return await reconcileOnce(database, provider, config);

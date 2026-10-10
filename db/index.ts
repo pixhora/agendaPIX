@@ -1,6 +1,7 @@
 import { attachDatabasePool } from "@vercel/functions";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
+import { explicitSslMode } from "../lib/db-url";
 import { databaseEnvSchema } from "../lib/env";
 import * as schema from "./schema";
 
@@ -10,7 +11,7 @@ function createDatabase() {
   // Na Vercel (Fluid compute) cada instância mantém poucas conexões, recicla as velhas e fecha as ociosas antes de suspender.
   const serverless = Boolean(process.env.VERCEL);
   const pool = new Pool({
-    connectionString: env.DATABASE_URL,
+    connectionString: explicitSslMode(env.DATABASE_URL),
     max: serverless ? 5 : 10,
     connectionTimeoutMillis: 5000,
     ...(serverless ? { idleTimeoutMillis: 5000, maxLifetimeSeconds: 60, allowExitOnIdle: true } : {}),
