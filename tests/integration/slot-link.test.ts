@@ -565,6 +565,31 @@ describe("link de um horário", () => {
     await expect(pay(created.token, 32, "peer:192.0.2.321", payKey(32))).rejects.toMatchObject({ status: 409, code: "link_replaced" });
     const preview = await readSlotLinkPreview(created.previewId, "peer:192.0.2.322", database);
     expect(preview).toEqual({ kind: "generic", businessName: "Negócio de teste", logoUrl: null });
+    expect(JSON.stringify(preview)).not.toContain(renewed.token);
+    expect(preview).not.toHaveProperty("serviceName");
+  });
+
+  it("não reemite um link pago e o link antigo não muda", async () => {
+    const created = await makeLink(0);
+    const first = await pay(created.token, 35, "peer:192.0.2.350", payKey(35));
+    const charge = provider.markPaid(first.payment!.externalId!);
+    await database.transaction(async (tx) => {
+      const result = await applyPaidEvent(tx, "fake", polledPaidEvent(charge, hash), new Date());
+      expect(result.outcome).toBe("processed");
+    });
+    const [before] = await database.select().from(schema.slotLinks).where(eq(schema.slotLinks.id, created.id));
+    expect(before.status).toBe("paid");
+    await expect(reissueSlotLink(shop.businessId, shop.ownerId, created.id, database)).rejects.toMatchObject({ status: 409, code: "link_used" });
+    const [after] = await database.select().from(schema.slotLinks).where(eq(schema.slotLinks.id, created.id));
+    expect(after).toMatchObject({
+      status: "paid",
+      bookingId: before.bookingId,
+      tokenHash: before.tokenHash,
+      previewId: before.previewId,
+      replacedByLinkId: null,
+      payIdempotencyHash: before.payIdempotencyHash,
+    });
+    expect(await database.select().from(schema.slotLinks).where(eq(schema.slotLinks.businessId, shop.businessId))).toHaveLength(1);
   });
 
   it("não reemite com claim ativo e não mexe no link se o horário foi ocupado", async () => {

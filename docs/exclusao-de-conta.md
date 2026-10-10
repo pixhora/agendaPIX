@@ -83,7 +83,7 @@ Tabelas deste schema que têm dado de conta, negócio ou cliente:
 | `"user"` | dono | Anonimizar. A linha fica: `businesses.owner_id` é `ON DELETE RESTRICT` |
 | `session` | `user_id` → `"user"` `ON DELETE CASCADE` | Apagar |
 | `account` | `user_id` → `"user"` `ON DELETE CASCADE` | Apagar (tokens e senha) |
-| `verification` | `identifier` (e-mail), sem FK | Apagar pelo e-mail antigo |
+| `verification` | `identifier` = `sign-in-otp-` + e-mail em minúsculas (`signInOtpIdentifier` em `lib/onboarding/drafts.ts`), sem FK | Apagar por esse identificador, não pelo e-mail cru |
 | `businesses` | `owner_id` → `"user"` | Anonimizar. A linha fica por causa dos pagamentos |
 | `business_slug_history` | `business_id` `ON DELETE RESTRICT` | Apagar |
 | `booking_rate_limits` | `business_id` `ON DELETE CASCADE` | Apagar |
@@ -195,7 +195,7 @@ WHERE id = :business_id;
 
 DELETE FROM session WHERE user_id = :user_id;
 DELETE FROM account WHERE user_id = :user_id;
-DELETE FROM verification WHERE identifier = :email;
+DELETE FROM verification WHERE identifier = 'sign-in-otp-' || lower(trim(:email));
 
 UPDATE "user"
 SET name = 'Conta encerrada',
