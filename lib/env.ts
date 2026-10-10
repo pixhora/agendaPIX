@@ -79,10 +79,24 @@ export const productionRuntimeEnvSchema = z.object({
 
 const productionPkceMessage = "MP_OAUTH_PKCE deve ser on quando MERCADOPAGO_ENV=production.";
 
+/** " on " e "on" são o mesmo valor. O boot e `assertMpOAuthPkce` leem por aqui. */
+export function readMpOAuthPkce(raw: string | undefined): "on" | "off" | "missing" | "invalid" {
+  if (raw === undefined) return "missing";
+  const value = raw.trim();
+  if (value === "on") return "on";
+  if (value === "off") return "off";
+  return "invalid";
+}
+
+function productionBoot(env: Readonly<Record<string, string | undefined>>) {
+  return env.NODE_ENV === "production" && env.NEXT_PHASE !== "phase-production-build";
+}
+
 /**
  * Boot de produção. Chamado por `instrumentation.ts` e pelo worker de reconciliação.
  * Não cria um segundo caminho: PKCE em produção e `bookingConfig` passam por aqui.
- * O `next build` não é boot. A mensagem de PKCE não repete o valor configurado.
+ * `bookingConfig` só roda com `NODE_ENV=production`. O `next build` não é boot.
+ * A mensagem de PKCE não repete o valor configurado.
  */
 export function assertProductionSafeEnv(env: Readonly<Record<string, string | undefined>> = process.env) {
   const parsed = productionRuntimeEnvSchema.safeParse({
@@ -96,7 +110,8 @@ export function assertProductionSafeEnv(env: Readonly<Record<string, string | un
     const messages = [...new Set(parsed.error.issues.map((issue) => issue.message))];
     throw new Error(messages.join(" "));
   }
-  if (env.NEXT_PHASE !== "phase-production-build" && env.MERCADOPAGO_ENV === "production" && env.MP_OAUTH_PKCE?.trim() !== "on") {
+  if (!productionBoot(env)) return;
+  if (env.MERCADOPAGO_ENV === "production" && readMpOAuthPkce(env.MP_OAUTH_PKCE) !== "on") {
     throw new Error(productionPkceMessage);
   }
   bookingConfig(env);

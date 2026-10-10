@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { isDevExampleOpen } from "../../components/preview/preview-badge-gate";
 import { assertProductionSafeEnv, smtpFromUsesExampleDomain } from "../../lib/env";
+import { assertMpOAuthPkce } from "../../lib/mercadopago-oauth/config";
 import { magicLinkCapturePath } from "../../lib/email";
 import { mpFixturesAllowed, readMpFixture } from "../../lib/mercadopago/dev-fixtures";
 
@@ -72,7 +73,9 @@ describe("boot de produção", () => {
       expect(message).not.toContain(secretValue);
       expect(message).not.toContain("ci@agendapix");
     }
+    expect(assertMpOAuthPkce({ MP_OAUTH_PKCE: " on " })).toBe(true);
     expect(() => assertProductionSafeEnv({ ...env, MP_OAUTH_PKCE: " on " })).not.toThrow();
+    expect(assertMpOAuthPkce({ MP_OAUTH_PKCE: " off " })).toBe(false);
     expect(() => assertProductionSafeEnv({
       NODE_ENV: "production",
       MERCADOPAGO_ENV: "sandbox",
@@ -88,15 +91,23 @@ describe("boot de produção", () => {
     })).not.toThrow();
   });
 
-  it("rejeita bookingConfig inválido no boot, antes da primeira reserva", () => {
-    expect(() => assertProductionSafeEnv({ BOOKING_HOLD_MINUTES: "27" })).toThrow(/BOOKING_HOLD_MINUTES inválido/);
-    expect(() => assertProductionSafeEnv({ BOOKING_TRUST_PROXY: "yes" })).toThrow("Agendamento indisponível. Tente novamente mais tarde.");
+  it("rejeita bookingConfig inválido só no boot de produção", () => {
+    expect(() => assertProductionSafeEnv({ BOOKING_HOLD_MINUTES: "27" })).not.toThrow();
+    expect(() => assertProductionSafeEnv({ BOOKING_TRUST_PROXY: "yes" })).not.toThrow();
+    const production = { NODE_ENV: "production", SMTP_FROM: "AgendaPix <ci@agendapix.dev.br>" };
+    expect(() => assertProductionSafeEnv({ ...production, BOOKING_HOLD_MINUTES: "27" })).toThrow(/BOOKING_HOLD_MINUTES inválido/);
+    expect(() => assertProductionSafeEnv({ ...production, BOOKING_TRUST_PROXY: "yes" })).toThrow("Agendamento indisponível. Tente novamente mais tarde.");
+    expect(() => assertProductionSafeEnv({
+      NODE_ENV: "production",
+      NEXT_PHASE: "phase-production-build",
+      BOOKING_HOLD_MINUTES: "27",
+    })).not.toThrow();
     try {
-      assertProductionSafeEnv({ BOOKING_HOLD_MINUTES: "27", SMTP_FROM: "AgendaPix <ci-secreta@example.com>" });
+      assertProductionSafeEnv({ ...production, BOOKING_HOLD_MINUTES: "27" });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       expect(message).not.toContain("27");
-      expect(message).not.toContain("ci-secreta");
+      expect(message).not.toContain("ci@agendapix");
     }
   });
 });

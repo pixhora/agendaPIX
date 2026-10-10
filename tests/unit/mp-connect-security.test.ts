@@ -122,6 +122,8 @@ describe("mp-connect não desconecta sem confirmação nem dedupe", () => {
     const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
     for (const [requestId, fetchImpl] of [
       ["req-500", async () => new Response("upstream", { status: 503 })],
+      ["req-grant-500", async () => Response.json({ error: "invalid_grant" }, { status: 500 })],
+      ["req-grant-402", async () => Response.json({ error: "invalid_grant" }, { status: 402 })],
       ["req-timeout", (_url: string, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
         init?.signal?.addEventListener("abort", () => {
           const error = new Error("aborted");
@@ -143,6 +145,8 @@ describe("mp-connect não desconecta sem confirmação nem dedupe", () => {
     }
     const logged = errorLog.mock.calls.map((call) => call.join(" ")).join("\n");
     expect(logged).toContain("code=http_503");
+    expect(logged).toContain("code=http_500");
+    expect(logged).toContain("code=http_402");
     expect(logged).toContain("code=timeout");
     expect(logged).toContain("code=unreachable");
     expect(logged).toContain("code=http_403");

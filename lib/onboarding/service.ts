@@ -3,12 +3,12 @@ import { and, eq } from "drizzle-orm";
 import { getDb } from "../../db";
 import { businessHours, businessSlugHistory, businesses, onboardingRequests, services } from "../../db/schema";
 import { trialEndsAtFromCreation } from "../billing/access";
-import { invalidatePublicCatalog } from "../bookings/public-cache";
 import { requestKeySchema } from "../bookings/validation";
+import { invalidatePublicCatalog } from "../bookings/public-cache";
 import { invalidateAliasCache } from "../business-profile/alias-cache";
-import { isUniqueViolation, rejectTakenSlug } from "../business-profile/slug-conflict";
-import { aliasHoldActive } from "../business-profile/slug-policy";
 import { HttpError } from "../http";
+import { aliasHoldActive } from "../business-profile/slug-policy";
+import { isUniqueViolation, rejectTakenSlug } from "../business-profile/slug-conflict";
 import { onboardingInputSchema } from "./validation";
 
 export async function provisionBusiness(ownerId: string, key: unknown, body: unknown, database?: ReturnType<typeof getDb>) {

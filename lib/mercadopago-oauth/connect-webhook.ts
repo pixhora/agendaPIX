@@ -6,7 +6,7 @@ import { MERCADOPAGO_WEBHOOK_FRESHNESS_MS, mercadoPagoTimestampMs } from "../pay
 import { webhookSecret, mpOAuthConfig } from "./config";
 import { decryptMpToken } from "./crypto";
 import { createDrizzleMpStore } from "./repository";
-import { checkAccessTokenRevoked } from "./revocation-check";
+import { checkAccessTokenRevoked, revocationLogCode } from "./revocation-check";
 import { safeEqualHex } from "./timing";
 import type { MpConnectionStore } from "./types";
 import type { MpFetch } from "./token-client";
@@ -68,8 +68,7 @@ function revocationUnconfirmed() {
 }
 
 function logRevocationUnconfirmed(code: string) {
-  const safe = /^(timeout|unreachable|invalid_response|token_unreadable|http_[1-5][0-9]{2})$/.test(code) ? code : "invalid_response";
-  console.error(`[mp-connect] revocation_unconfirmed code=${safe}`);
+  console.error(`[mp-connect] revocation_unconfirmed code=${revocationLogCode(code)}`);
 }
 
 export async function handleMpConnectWebhook(input: {
@@ -100,6 +99,7 @@ export async function handleMpConnectWebhook(input: {
     if (parsed.data.action === "application.authorized") return { outcome: "ignored" as const, reason: "authorized_without_token_exchange" };
     return { outcome: "ignored" as const, reason: "unsupported_action" };
   }
+  // Antes do GET /users/me: entrega já vista não consulta o Mercado Pago nem desconecta.
   if (await events.seen(requestId)) return { outcome: "duplicate" as const };
 
   const store = input.store ?? createDrizzleMpStore();

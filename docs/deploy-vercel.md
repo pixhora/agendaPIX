@@ -48,7 +48,7 @@ O lembrete da véspera da devolução manual não espera 09:00. Sai na primeira 
 | `MP_CLIENT_ID` / `MP_CLIENT_SECRET` | credenciais OAuth da aplicação; o Pix do sinal usa o token do vendedor, não o da plataforma |
 | `MP_OAUTH_REDIRECT_URI` | `https://<domínio>/api/integrations/mercadopago/callback` (https, sem query nem fragmento) |
 | `MP_TOKEN_ENCRYPTION_KEY` | `openssl rand -hex 32` (cifra o token OAuth do dono) |
-| `MP_OAUTH_PKCE` | `on` quando `MERCADOPAGO_ENV=production`. Sem isso o boot de produção não sobe. Ausente ou `off` só vale fora disso. Nunca vazio: string vazia derruba o boot (`mp_oauth_pkce_invalid`) |
+| `MP_OAUTH_PKCE` | `on` quando `MERCADOPAGO_ENV=production`. Sem isso o boot de produção não sobe. Ausente ou `off` só vale fora disso. Espaços nas pontas (` on `) valem `on`. Nunca vazio: string vazia derruba o boot (`mp_oauth_pkce_invalid`) |
 | `CRON_SECRET` | `openssl rand -hex 32` |
 | `SUPPORT_WHATSAPP_NUMBER` | dígitos E.164 sem `+`. Sem isso o checkout da assinatura fica `available: false` |
 | `SUBSCRIPTION_MANUAL_ACTIVATION_HOURS` | inteiro ≥ 1, sem zero à esquerda. Sem isso o checkout responde 503 |
@@ -56,7 +56,7 @@ O lembrete da véspera da devolução manual não espera 09:00. Sai na primeira 
 | `BOOKING_CLIENT_IP_HEADER` | `x-real-ip` |
 | `ENABLE_EXPERIMENTAL_COREPACK` | `1` (pnpm 12 do `packageManager`) |
 
-`FAKE_WEBHOOK_SECRET` não é usado em produção. Os demais `BOOKING_*`/`RECONCILE_*` têm padrão. `BOOKING_HOLD_MINUTES` ausente vale 30; abaixo de 28 o agendamento responde `503` `booking_unavailable`. `PIX_KEY_ENCRYPTION_KEY` não é lida pelo código atual (a rota da chave responde 410); não apague a chave se ainda houver ciphertext antigo para guardar.
+`FAKE_WEBHOOK_SECRET` não é usado em produção. Os demais `BOOKING_*`/`RECONCILE_*` têm padrão. `BOOKING_HOLD_MINUTES` ausente vale 30; abaixo de 28 o agendamento responde `503` `booking_unavailable`. O boot só chama `bookingConfig` com `NODE_ENV=production` (o `next build` não conta). Fora de produção um valor inválido não derruba o processo; a primeira reserva ainda responde 503. `PIX_KEY_ENCRYPTION_KEY` não é lida pelo código atual (a rota da chave responde 410); não apague a chave se ainda houver ciphertext antigo para guardar.
 
 ## Ordem
 
