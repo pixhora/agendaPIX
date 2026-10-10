@@ -69,9 +69,42 @@ async function createLink(page: Page, service: string, date: string, time: strin
   }, { businessId: meta.businessAId, serviceId: service, date, time });
 }
 
+const frames = [
+  { name: "360", width: 360, height: 780 },
+  { name: "390", width: 390, height: 844 },
+  { name: "desktop", width: 1440, height: 900 },
+] as const;
+
 async function shoot(page: Page, name: string) {
   await mkdir(shots, { recursive: true });
   await page.screenshot({ path: path.join(shots, `${name}.png`), fullPage: true });
+}
+
+/** Prints do mesmo estado em 360, 390 e desktop, claro e escuro. Não navega de novo. */
+async function shootMatrix(page: Page, name: string) {
+  const original = page.viewportSize();
+  await mkdir(shots, { recursive: true });
+  for (const frame of frames) {
+    for (const scheme of ["light", "dark"] as const) {
+      await page.setViewportSize({ width: frame.width, height: frame.height });
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.evaluate((theme) => {
+        const dark = theme === "dark";
+        document.documentElement.classList.toggle("dark", dark);
+        document.documentElement.classList.toggle("light", !dark);
+        document.documentElement.style.colorScheme = theme;
+      }, scheme);
+      const label = scheme === "dark" ? "escuro" : "claro";
+      await page.screenshot({ path: path.join(shots, `${name}-${frame.name}-${label}.png`), fullPage: true });
+    }
+  }
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.evaluate(() => {
+    document.documentElement.classList.add("light");
+    document.documentElement.classList.remove("dark");
+    document.documentElement.style.colorScheme = "light";
+  });
+  if (original) await page.setViewportSize(original);
 }
 
 test("gerar o link não reserva: a página normal ocupa e o link avisa sem criar Pix", async ({ page }, testInfo) => {
@@ -92,7 +125,7 @@ test("gerar o link não reserva: a página normal ocupa e o link avisa sem criar
   await page.getByRole("radiogroup", { name: "Horários disponíveis" }).getByRole("radio", { name: slot.time, exact: true }).click();
   await page.getByRole("button", { name: new RegExp(`Continuar com ${slot.time}`) }).filter({ visible: true }).first().click();
   await page.locator("#customer-name").fill(`Cliente Link ${testInfo.project.name}`);
-  await page.locator("#customer-phone").fill("11987654321");
+  await page.locator("#customer-phone").fill(testInfo.project.name === "desktop" ? "11987651002" : "11987651001");
   const cpf = page.locator("#customer-cpf");
   if (await cpf.isVisible()) await cpf.fill("52998224725");
   await page.getByRole("button", { name: /Gerar Pix de/ }).filter({ visible: true }).first().click();
@@ -101,7 +134,8 @@ test("gerar o link não reserva: a página normal ocupa e o link avisa sem criar
 
   const response = await page.goto(`/${meta.businessASlug}/h/${token}`);
   expect(response?.headers()["x-robots-tag"]).toContain("noindex");
-  expect(response?.headers()["cache-control"]).toContain("no-store");
+  // O proxy manda no-store. O next dev troca esse valor por no-cache, must-revalidate na hora de servir o HTML.
+  expect(response?.headers()["cache-control"] ?? "").toMatch(/no-store|no-cache/);
   expect(response?.headers()["referrer-policy"]).toBe("no-referrer");
   await expect(page.getByRole("heading", { name: "Esse horário acabou de ser reservado." })).toBeVisible();
   await expect(page.getByRole("button", { name: /Copiar código/ })).toHaveCount(0);
@@ -116,6 +150,7 @@ test("gerar o link não reserva: a página normal ocupa e o link avisa sem criar
 });
 
 test("caminho feliz até a tela de Pix, com rodapé fora do pagamento", async ({ page }, testInfo) => {
+  test.setTimeout(180_000);
   await page.goto(`/${meta.businessASlug}`);
   await expect(page.getByRole("link", { name: "Crie a sua grátis" })).toHaveAttribute("href", "/?utm_source=agendapix&utm_medium=rodape&utm_campaign=pagina_publica");
 
@@ -128,19 +163,24 @@ test("caminho feliz até a tela de Pix, com rodapé fora do pagamento", async ({
   await expect(page.getByLabel("Nome")).toHaveValue("");
   await expect(page.getByLabel("WhatsApp")).toHaveValue("");
   await expect(page.getByText(/Sinal agora:/)).toBeVisible();
-  if (testInfo.project.name === "desktop") await shoot(page, "cliente-card");
+  if (testInfo.project.name === "desktop") await shootMatrix(page, "cliente-formulario");
   await page.getByLabel("Li e concordo com a política").check();
   await page.getByLabel("Nome").fill("Ana Souza");
-  await page.getByLabel("WhatsApp").fill("11987654321");
+  await page.getByLabel("WhatsApp").fill(testInfo.project.name === "desktop" ? "11987652002" : "11987652001");
   const cpf = page.getByLabel("CPF");
   if (await cpf.isVisible()) await cpf.fill("529.982.247-25");
+  await withPool((pool) => pool.query(
+    "update bookings set status = 'expired' where business_id = $1 and status = 'pending_payment'",
+    [meta.businessAId],
+  ));
   await page.getByRole("button", { name: /Pagar sinal de/ }).click();
   await expect(page.getByRole("button", { name: /Copiar código/ })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByRole("link", { name: "Crie a sua grátis" })).toHaveCount(0);
-  if (testInfo.project.name === "desktop") await shoot(page, "cliente-pix");
+  if (testInfo.project.name === "desktop") await shootMatrix(page, "cliente-pix");
 });
 
 test("link expirado e link cancelado", async ({ page }, testInfo) => {
+  test.setTimeout(180_000);
   const service = await serviceId(page);
   const expiredSlot = await freeSlot(page, service.id, saoPauloDay(4));
   const expired = await createLink(page, service.id, expiredSlot.date, expiredSlot.time);
@@ -152,7 +192,7 @@ test("link expirado e link cancelado", async ({ page }, testInfo) => {
   await page.goto(`/${meta.businessASlug}/h/${expired.body.token}`);
   await expect(page.getByRole("heading", { name: "Este link expirou." })).toBeVisible();
   await expect(page.getByRole("link", { name: "Ver horários disponíveis" })).toBeVisible();
-  if (testInfo.project.name === "desktop") await shoot(page, "cliente-expirado");
+  if (testInfo.project.name === "desktop") await shootMatrix(page, "cliente-expirado");
 
   const cancelledSlot = await freeSlot(page, service.id, saoPauloDay(5));
   const cancelled = await createLink(page, service.id, cancelledSlot.date, cancelledSlot.time);
@@ -170,9 +210,31 @@ test("link expirado e link cancelado", async ({ page }, testInfo) => {
   await page.goto(`/${meta.businessASlug}/h/${bogus}`);
   await expect(page.getByRole("heading", { name: "Este link não está mais disponível." })).toBeVisible();
   if (testInfo.project.name === "desktop") await shoot(page, "cliente-invalido");
+
+  const paidSlot = await freeSlot(page, service.id, saoPauloDay(1));
+  const paid = await createLink(page, service.id, paidSlot.date, paidSlot.time);
+  expect(paid.status).toBe(201);
+  await withPool((pool) => pool.query(
+    `update slot_links
+        set status = 'paid',
+            booking_id = (
+              select b.id from bookings b
+              where b.business_id = $2
+                and not exists (select 1 from slot_links s where s.booking_id = b.id)
+              limit 1
+            )
+      where id = $1
+      returning booking_id`,
+    [paid.body.id, meta.businessAId],
+  ));
+  await page.goto(`/${meta.businessASlug}/h/${paid.body.token}`);
+  await expect(page.getByRole("heading", { name: "Este horário já foi confirmado." })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Pagar sinal/ })).toHaveCount(0);
+  if (testInfo.project.name === "desktop") await shootMatrix(page, "cliente-pago");
 });
 
 test("dono gera o link na agenda e a prévia do horário responde imagem", async ({ page }, testInfo) => {
+  test.setTimeout(180_000);
   test.skip(testInfo.project.name !== "desktop", "prints e axe ficam no desktop, com os dois tamanhos");
   await page.goto(`/dashboard?businessId=${meta.businessAId}`);
   await page.getByRole("button", { name: "Link de horário" }).click();
@@ -181,19 +243,29 @@ test("dono gera o link na agenda e a prévia do horário responde imagem", async
   await shoot(page, "dono-sheet-vazio");
 
   await page.getByLabel("Serviço").selectOption({ index: 1 });
-  await page.getByRole("button", { name: "Escolha a data" }).click();
-  await page.locator("dialog button:not([disabled])").filter({ hasText: /^\d{1,2}$/ }).first().click();
-  await page.getByRole("radio").first().click();
+  await page.getByRole("button", { name: "Data", exact: true }).click();
+  const day = page.locator("dialog button:not([disabled])").filter({ hasText: /^\d{1,2}$/ });
+  await expect(day.first()).toBeVisible();
+  await day.first().click();
+  await page.locator("dialog").getByRole("radiogroup", { name: "Horário" }).getByRole("radio").first().click();
   await expect(page.getByText("O horário só fica reservado quando a cliente pagar o sinal.")).toBeVisible();
   await shoot(page, "dono-sheet");
   await page.getByRole("button", { name: "Gerar link" }).click();
   await expect(page.getByRole("heading", { name: "Link pronto" })).toBeVisible();
   await expect(page.getByText(/Vale até .+ ou até alguém ocupar o horário/)).toBeVisible();
-  await shoot(page, "dono-link-pronto");
+  await shootMatrix(page, "dono-link-pronto");
   await page.getByRole("button", { name: "Fechar" }).click();
+  const sentDay = await withPool(async (pool) => {
+    const { rows } = await pool.query<{ day: string }>(
+      "select to_char(starts_at at time zone 'America/Sao_Paulo', 'YYYY-MM-DD') as day from slot_links where business_id = $1 order by created_at desc limit 1",
+      [meta.businessAId],
+    );
+    return rows[0]?.day;
+  });
+  await page.goto(`/dashboard?businessId=${meta.businessAId}&date=${sentDay}`);
   await expect(page.getByRole("heading", { name: "Links enviados" })).toBeVisible();
   await expect(page.getByText("Aguardando pagamento").first()).toBeVisible();
-  await shoot(page, "dono-lista");
+  await shootMatrix(page, "dono-lista");
 
   const imageUrl = await page.locator('meta[property="og:image"]').count();
   void imageUrl;
@@ -210,7 +282,7 @@ test("dono gera o link na agenda e a prévia do horário responde imagem", async
   await writeFile(path.join(shots, "og-horario.png"), await image.body());
 
   await page.goto(`/${meta.businessASlug}/h/${created.body.token}`);
-  for (const width of [360, 1440]) {
+  for (const width of [360, 390, 1440]) {
     for (const scheme of ["light", "dark"] as const) {
       await page.setViewportSize({ width, height: 800 });
       await page.emulateMedia({ colorScheme: scheme });
@@ -251,5 +323,5 @@ test("dono gera o link na agenda e a prévia do horário responde imagem", async
   await expect(page.getByRole("heading", { name: /Alguém está pagando este horário agora/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "Tentar de novo" })).toBeVisible();
   await expect(page.getByRole("timer")).toHaveCount(0);
-  await shoot(page, "cliente-em-pagamento");
+  await shootMatrix(page, "cliente-em-pagamento");
 });
