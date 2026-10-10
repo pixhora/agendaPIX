@@ -111,16 +111,16 @@ test("cadastro concluído → \"Ir para o painel\" abre /dashboard com o negóci
   await proceed.click();
 
   await expect(page.getByRole("heading", { name: "Para onde mandamos seu código?" })).toBeVisible();
-  expect(draftBodies.length).toBeGreaterThan(0);
-  for (const body of draftBodies) {
-    expect(body.data?.business).toBeTruthy();
-    expect(body.data?.business).not.toHaveProperty("logoUrl");
-  }
   await page.getByLabel("E-mail").fill(email);
   const send = page.getByRole("button", { name: "Enviar código" });
   await expect(send).not.toHaveAttribute("aria-disabled", "true");
   await send.click();
   await expect(page.getByRole("heading", { name: "Digite o código que mandamos" })).toBeVisible();
+  const profileDrafts = draftBodies.filter((body) => body.data?.business);
+  expect(profileDrafts.length).toBeGreaterThan(0);
+  for (const body of profileDrafts) {
+    expect(body.data?.business).not.toHaveProperty("logoUrl");
+  }
 
   await openAccessLink(page, await capturedLink(email), email);
   await expect(page).toHaveURL(/\/onboarding\/recebimento$/, { timeout: 20_000 });

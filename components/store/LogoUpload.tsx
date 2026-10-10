@@ -54,7 +54,7 @@ export function LogoUpload({
     setLocalPreview(previewUrl);
     onLocalPreview?.(previewUrl);
     if (!businessId) {
-      rememberPendingLogo(file);
+      await rememberPendingLogo(file);
       return;
     }
     setProgress(0);
@@ -145,7 +145,7 @@ export function LogoUpload({
               {!businessId && confirmRemove ? (
                 <span className="flex flex-wrap items-center gap-2 text-sm">
                   Remover logo?
-                  <button type="button" className="inline-flex min-h-11 items-center font-semibold text-destructive underline" onClick={() => { setConfirmRemove(false); setLocalPreview(null); onLocalPreview?.(null); rememberPendingLogo(null); if (!businessId) onChangeUrl(null); }}>Sim</button>
+                  <button type="button" className="inline-flex min-h-11 items-center font-semibold text-destructive underline" onClick={() => { setConfirmRemove(false); setLocalPreview(null); onLocalPreview?.(null); void rememberPendingLogo(null); if (!businessId) onChangeUrl(null); }}>Sim</button>
                   <button type="button" className="inline-flex min-h-11 items-center font-semibold underline" onClick={() => setConfirmRemove(false)}>Cancelar</button>
                 </span>
               ) : !businessId ? (
