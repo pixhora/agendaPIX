@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { ImageIcon } from "lucide-react";
-import { logoRejection, prepareLogoFile, uploadLogoFile } from "@/lib/store-profile/logo";
+import { LogoUnreadableError, logoRejection, prepareLogoFile, uploadLogoFile } from "@/lib/store-profile/logo";
 import { rememberPendingLogo } from "@/lib/store-profile/pending-logo";
 import { cn } from "@/lib/utils";
 
@@ -37,7 +37,17 @@ export function LogoUpload({
   }
 
   async function send(original: File) {
-    const file = await prepareLogoFile(original);
+    let file: File;
+    try {
+      file = await prepareLogoFile(original);
+    } catch (error) {
+      if (error instanceof LogoUnreadableError) {
+        setLocalPreview(null);
+        setError("Não consegui abrir esta foto. Escolha a foto de novo.");
+        return;
+      }
+      throw error;
+    }
     const rejection = logoRejection(file);
     if (rejection) {
       setCanRetry(false);

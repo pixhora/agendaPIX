@@ -40,7 +40,22 @@ const SERVER_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
  * porque o servidor só aceita PNG, JPEG e WebP. Formato que o navegador não lê volta igual e cai na validação.
  * Quando a imagem já é aceita e cabe no limite, nada muda.
  */
-export async function prepareLogoFile(file: File): Promise<File> {
+/** A foto escolhida não pôde ser lida (o Android às vezes perde o acesso à foto do Google Fotos). */
+export class LogoUnreadableError extends Error {
+  constructor() {
+    super("logo_unreadable");
+  }
+}
+
+export async function prepareLogoFile(picked: File): Promise<File> {
+  // Lê os bytes logo na escolha: a prévia e o envio passam a usar a cópia em memória, não a referência do seletor.
+  let bytes: ArrayBuffer;
+  try {
+    bytes = await picked.arrayBuffer();
+  } catch {
+    throw new LogoUnreadableError();
+  }
+  const file = new File([bytes], picked.name, { type: picked.type });
   const accepted = SERVER_TYPES.has(file.type.toLowerCase());
   if (accepted && file.size <= LOGO_MAX_BYTES) return file;
   try {
