@@ -10,6 +10,8 @@ const baseButtonVariants = cva(
       variant: {
         default: "bg-ink text-paper shadow-[var(--shadow-card)] hover:bg-ink-hover active:scale-[0.985]",
         pix: "bg-pix text-pix-foreground shadow-[var(--shadow-card)] hover:bg-pix-hover active:scale-[0.985]",
+        /** Verde escuro do tema e texto branco nos dois modos. `--pix` no escuro fica claro. */
+        pixDeep: "bg-pix-deep text-slab-foreground shadow-[var(--shadow-card)] hover:bg-pix-deep active:scale-[0.985]",
         outline: "border border-line bg-surface text-ink hover:border-line-strong hover:bg-subtle",
         ghost: "text-ink hover:bg-subtle",
         danger: "border border-danger/40 bg-surface text-danger hover:bg-danger-soft",

@@ -56,6 +56,7 @@ export const SLOT_LINK_ERROR_CODES = [
   "link_invalid",
   "slot_unavailable",
   "mp_not_connected",
+  "idempotency_conflict",
   "invalid_input",
   "rate_limited",
   "unauthorized",

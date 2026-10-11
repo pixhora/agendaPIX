@@ -76,8 +76,8 @@
   --pix-soft: #10302c;
   --pix-bright: #3fd0be;
   --pix-bright-foreground: #0b0b0c;
-  --pix-deep: #0b2f2b;
-  --pix-deep-muted: #9fd9d0;
+  --pix-deep: #0e6b60;
+  --pix-deep-muted: #b4e4db;
   --brand-tile: #0b0b0c;
   --brand-tile-foreground: #f6f5f2;
   --brand-tile-edge: rgb(255 255 255 / 0.14);
@@ -114,8 +114,8 @@
     --pix-soft: #10302c;
     --pix-bright: #3fd0be;
     --pix-bright-foreground: #0b0b0c;
-    --pix-deep: #0b2f2b;
-    --pix-deep-muted: #9fd9d0;
+    --pix-deep: #0e6b60;
+    --pix-deep-muted: #b4e4db;
     --brand-tile: #0b0b0c;
     --brand-tile-foreground: #f6f5f2;
     --brand-tile-edge: rgb(255 255 255 / 0.14);
