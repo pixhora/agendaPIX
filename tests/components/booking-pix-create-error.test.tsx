@@ -86,7 +86,7 @@ async function failTwice(contactWhatsapp: string | null) {
   return { user, keys, names };
 }
 
-it("na primeira falha explica o Pix e guarda a mesma chave", async () => {
+it("na primeira falha explica o Pix e prepara outra chave", async () => {
   const { keys, names } = await failTwice("+5514997504655");
   const alert = await screen.findByRole("alert");
   expect(alert).toHaveTextContent(PIX_CREATE_FAILED_COPY);
@@ -97,7 +97,7 @@ it("na primeira falha explica o Pix e guarda a mesma chave", async () => {
   expect(names).toEqual(["Matheus"]);
 });
 
-it("na segunda falha aponta o WhatsApp da loja e repete a mesma chave", async () => {
+it("na segunda falha aponta o WhatsApp da loja e manda outra chave", async () => {
   const { user, keys, names } = await failTwice("+5514997504655");
   await screen.findByRole("alert");
   await user.click(screen.getByRole("button", { name: /Gerar Pix de R\$\s*0,50/ }));
@@ -106,9 +106,11 @@ it("na segunda falha aponta o WhatsApp da loja e repete a mesma chave", async ()
   expect(link).toHaveAttribute("rel", "noopener noreferrer");
   expect(screen.getByRole("alert")).toHaveTextContent(PIX_CREATE_FAILED_COPY);
   expect(screen.getByLabelText("Seu nome")).toHaveValue("Matheus");
+  expect(screen.getByLabelText("WhatsApp")).toHaveValue("(14) 99750-4655");
   expect(keys).toHaveLength(2);
-  expect(keys[0]).toBe(keys[1]);
+  expect(keys[0]).not.toBe(keys[1]);
   expect(keys[0]).toMatch(/^[0-9a-f-]{36}$/i);
+  expect(keys[1]).toMatch(/^[0-9a-f-]{36}$/i);
   expect(names).toEqual(["Matheus", "Matheus"]);
 });
 
@@ -118,5 +120,68 @@ it("na segunda falha sem WhatsApp mostra a frase e omite o link", async () => {
   await user.click(screen.getByRole("button", { name: /Gerar Pix de R\$\s*0,50/ }));
   expect(await screen.findByText(PIX_CREATE_FAILED_STORE)).toBeVisible();
   expect(screen.queryByRole("link", { name: PIX_CREATE_FAILED_STORE })).toBeNull();
+  expect(keys[0]).not.toBe(keys[1]);
+});
+
+it("o texto antigo sem payment_unavailable explica o Pix e mantém a chave", async () => {
+  const user = userEvent.setup();
+  const keys: string[] = [];
+  vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.includes("/availability")) return availability(url);
+    if (url.includes("/bookings") && init?.method === "POST") {
+      keys.push(new Headers(init.headers).get("Idempotency-Key") ?? "");
+      return new Response(JSON.stringify({ error: { code: "internal_error", message: legacy } }), {
+        status: 503,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    throw new Error(`pedido inesperado: ${url}`);
+  }));
+  render(<BookingFlow slug={slug} previewBusiness={business("+5514997504655")} legalPagesPublished />);
+  await user.click(await screen.findByRole("radio", { name: /Corte/ }));
+  await user.click(screen.getByRole("button", { name: "Escolher horário" }));
+  await user.click(await screen.findByRole("radio", { name: "15:00" }));
+  await user.click(screen.getByRole("button", { name: "Continuar com 15:00" }));
+  await user.type(screen.getByLabelText("Seu nome"), "Matheus");
+  await user.type(screen.getByLabelText("WhatsApp"), "14997504655");
+  await user.click(screen.getByRole("button", { name: /Gerar Pix de R\$\s*0,50/ }));
+  expect(await screen.findByRole("alert")).toHaveTextContent(PIX_CREATE_FAILED_COPY);
+  await user.click(screen.getByRole("button", { name: /Gerar Pix de R\$\s*0,50/ }));
+  expect(await screen.findByRole("link", { name: PIX_CREATE_FAILED_STORE })).toBeVisible();
+  expect(keys).toHaveLength(2);
   expect(keys[0]).toBe(keys[1]);
+  expect(screen.getByLabelText("Seu nome")).toHaveValue("Matheus");
+});
+
+it("outro erro transitório repete a mesma chave", async () => {
+  const user = userEvent.setup();
+  const keys: string[] = [];
+  vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.includes("/availability")) return availability(url);
+    if (url.includes("/bookings") && init?.method === "POST") {
+      keys.push(new Headers(init.headers).get("Idempotency-Key") ?? "");
+      return new Response(JSON.stringify({ error: { code: "internal_error", message: "Tente de novo." } }), {
+        status: 503,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    throw new Error(`pedido inesperado: ${url}`);
+  }));
+  render(<BookingFlow slug={slug} previewBusiness={business("+5514997504655")} legalPagesPublished />);
+  await user.click(await screen.findByRole("radio", { name: /Corte/ }));
+  await user.click(screen.getByRole("button", { name: "Escolher horário" }));
+  await user.click(await screen.findByRole("radio", { name: "15:00" }));
+  await user.click(screen.getByRole("button", { name: "Continuar com 15:00" }));
+  await user.type(screen.getByLabelText("Seu nome"), "Matheus");
+  await user.type(screen.getByLabelText("WhatsApp"), "14997504655");
+  await user.click(screen.getByRole("button", { name: /Gerar Pix de R\$\s*0,50/ }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Tente de novo.");
+  expect(screen.queryByText(PIX_CREATE_FAILED_COPY)).toBeNull();
+  await user.click(screen.getByRole("button", { name: /Gerar Pix de R\$\s*0,50/ }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Tente de novo.");
+  expect(keys).toHaveLength(2);
+  expect(keys[0]).toBe(keys[1]);
+  expect(screen.getByLabelText("Seu nome")).toHaveValue("Matheus");
 });

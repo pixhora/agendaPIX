@@ -38,7 +38,7 @@ export type BookingFailure =
   | { kind: "policy_changed"; update: PolicyChangedUpdate }
   | { kind: "unavailable"; message: string; contactWhatsapp: string | null }
   | { kind: "slot_unavailable"; message: string }
-  | { kind: "pix_create_failed" }
+  | { kind: "pix_create_failed"; rotateKey: boolean }
   | { kind: "message"; message: string };
 
 /** Falha de rede do `fetch` (TypeError ou mensagem de conexão). */
@@ -88,10 +88,20 @@ function readApiErrorMessage(body: unknown): string | null {
   return typeof message === "string" && message.trim() ? message.trim() : null;
 }
 
-/** Cobrança Pix que o gateway não criou. A tela troca o texto do servidor, que cita a chave interna. */
+/**
+ * Cobrança Pix que o gateway não criou.
+ * `payment_unavailable` troca a Idempotency-Key: a recusa definitiva marca o pagamento como failed
+ * e a mesma chave só repete o erro. O texto "mesma chave" ainda reconhece a falha enquanto a #101
+ * não está no master, mas não troca a chave.
+ */
+export function pixCreateFailure(body: unknown): { rotateKey: boolean } | null {
+  if (readApiErrorCode(body) === "payment_unavailable") return { rotateKey: true };
+  if (readApiErrorMessage(body)?.includes("mesma chave")) return { rotateKey: false };
+  return null;
+}
+
 export function isPixCreateFailureBody(body: unknown): boolean {
-  if (readApiErrorCode(body) === "payment_unavailable") return true;
-  return Boolean(readApiErrorMessage(body)?.includes("mesma chave"));
+  return pixCreateFailure(body) !== null;
 }
 
 /** Link `wa.me` a partir de um telefone publicado. Sem número útil, devolve null. */
@@ -125,7 +135,8 @@ export function publicBookingErrorView(status: number, body: unknown): BookingFa
   if (status === 409 && code === "slot_unavailable") {
     return { kind: "slot_unavailable", message: SLOT_TAKEN_MESSAGE };
   }
-  if (isPixCreateFailureBody(body)) return { kind: "pix_create_failed" };
+  const pixFailure = pixCreateFailure(body);
+  if (pixFailure) return { kind: "pix_create_failed", rotateKey: pixFailure.rotateKey };
   const serverMessage = readApiErrorMessage(body);
   if (serverMessage) return { kind: "message", message: serverMessage };
   return { kind: "message", message: GENERIC_SUBMIT_MESSAGE };

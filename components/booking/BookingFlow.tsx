@@ -87,7 +87,7 @@ export function BookingFlow({
     storeLine?: boolean;
     storeHref?: string | null;
   } | null>(null);
-  /** Falhas ao criar o Pix nesta visita. A chave de idempotência não muda junto. */
+  /** Falhas ao criar o Pix nesta visita. Só `payment_unavailable` troca a chave. */
   const pixCreateFailures = React.useRef(0);
   const [depositBlocked, setDepositBlocked] = useState(false);
   const [policySheet, setPolicySheet] = useState<{ open: boolean; notice: string | null; trigger: HTMLElement | null }>({
@@ -121,6 +121,9 @@ export function BookingFlow({
   });
   const rotateIdempotencyKey = () => {
     pixCreateFailures.current = 0;
+    if (typeof crypto !== "undefined" && crypto.randomUUID) setIdempotencyKey(crypto.randomUUID());
+  };
+  const replaceIdempotencyKey = () => {
     if (typeof crypto !== "undefined" && crypto.randomUUID) setIdempotencyKey(crypto.randomUUID());
   };
 
@@ -349,6 +352,7 @@ export function BookingFlow({
         }
         if (failure.kind === "pix_create_failed") {
           pixCreateFailures.current += 1;
+          if (failure.rotateKey) replaceIdempotencyKey();
           const repeated = pixCreateFailures.current >= 2;
           setBookingError({
             message: PIX_CREATE_FAILED_COPY,

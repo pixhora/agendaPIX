@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { SlotLinkCustomer } from "@/components/slot-link/slot-link-customer";
 import { AgendaPixFooter } from "@/components/slot-link/agenda-pix-footer";
 import { SlotLinkNotice } from "@/components/slot-link/slot-link-notice";
-import { lockPayPayload, memorySlotLinkStores, readOrCreatePayKey, slotLinkSessionKey, slotLinkStorageKey } from "@/lib/slot-link/idempotency";
+import { lockPayPayload, memorySlotLinkStores, readOrCreatePayKey, readPayResume, slotLinkSessionKey, slotLinkStorageKey } from "@/lib/slot-link/idempotency";
 import { SlotLinkStorageSweep } from "@/components/slot-link/storage-sweep";
 import { SentLinks } from "@/components/slot-link/sent-links";
 import { createSlotLinkToken } from "../../lib/bookings/slot-link-token";
@@ -474,10 +474,11 @@ describe("página da cliente", () => {
     expect(screen.getByRole("link", { name: "Falar com a loja" })).toHaveAttribute("href", "https://wa.me/5511988887777");
   });
 
-  it("falha ao criar o Pix explica o retry e na segunda tentativa aponta a loja, com a mesma chave", async () => {
+  it("falha ao criar o Pix explica o retry, troca a chave no localStorage e mantém nome e WhatsApp", async () => {
     const user = userEvent.setup();
     const stores = memorySlotLinkStores();
     const keys: string[] = [];
+    const now = new Date("2030-10-01T12:00:00.000Z");
     const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/pay")) {
@@ -486,20 +487,74 @@ describe("página da cliente", () => {
       }
       return json(200, openBody());
     });
-    render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" stores={stores} fetchImpl={fetchImpl} now={() => new Date("2030-10-01T12:00:00.000Z")} />);
+    render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" stores={stores} fetchImpl={fetchImpl} now={() => now} />);
     await fillAndPay(user);
     const first = await screen.findByRole("alert");
     expect(first).toHaveTextContent(PIX_CREATE_FAILED_COPY);
     expect(first).not.toHaveTextContent(PIX_CREATE_FAILED_STORE);
     expect(screen.queryByText(/mesma chave/)).toBeNull();
     expect(screen.getByText("Ana Souza")).toBeVisible();
+    const rotated = await readPayResume(token, stores, now.getTime());
+    expect(rotated?.idempotencyKey).toBeTruthy();
+    expect(rotated?.idempotencyKey).not.toBe(keys[0]);
+    expect(rotated?.payload?.customer).toEqual({ name: "Ana Souza", phone: "+5511987654321" });
     await user.click(screen.getByRole("button", { name: /Pagar sinal de/ }));
     const link = await screen.findByRole("link", { name: PIX_CREATE_FAILED_STORE });
     expect(link).toHaveAttribute("href", "https://wa.me/5511988887777");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
     expect(keys).toHaveLength(2);
-    expect(keys[0]).toBe(keys[1]);
+    expect(keys[1]).toBe(rotated?.idempotencyKey);
+    expect(keys[0]).not.toBe(keys[1]);
+    const again = await readPayResume(token, stores, now.getTime());
+    expect(again?.idempotencyKey).not.toBe(keys[1]);
+    expect(again?.payload?.customer).toEqual({ name: "Ana Souza", phone: "+5511987654321" });
     expect(screen.getByText("Ana Souza")).toBeVisible();
+  });
+
+  it("o texto antigo sem payment_unavailable explica o Pix e mantém a chave", async () => {
+    const user = userEvent.setup();
+    const stores = memorySlotLinkStores();
+    const keys: string[] = [];
+    const now = new Date("2030-10-01T12:00:00.000Z");
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/pay")) {
+        keys.push(new Headers(init?.headers).get("Idempotency-Key") ?? "");
+        return json(503, { error: { code: "internal_error", message: "Não foi possível criar a cobrança. Tente novamente com a mesma chave." } });
+      }
+      return json(200, openBody());
+    });
+    render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" stores={stores} fetchImpl={fetchImpl} now={() => now} />);
+    await fillAndPay(user);
+    expect(await screen.findByRole("alert")).toHaveTextContent(PIX_CREATE_FAILED_COPY);
+    const stored = await readPayResume(token, stores, now.getTime());
+    expect(stored?.idempotencyKey).toBe(keys[0]);
+    await user.click(screen.getByRole("button", { name: /Pagar sinal de/ }));
+    await screen.findByRole("link", { name: PIX_CREATE_FAILED_STORE });
+    expect(keys).toHaveLength(2);
+    expect(keys[0]).toBe(keys[1]);
+    expect((await readPayResume(token, stores, now.getTime()))?.payload?.customer.name).toBe("Ana Souza");
+  });
+
+  it("outro erro transitório não troca a chave guardada", async () => {
+    const user = userEvent.setup();
+    const stores = memorySlotLinkStores();
+    const keys: string[] = [];
+    const now = new Date("2030-10-01T12:00:00.000Z");
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/pay")) {
+        keys.push(new Headers(init?.headers).get("Idempotency-Key") ?? "");
+        return json(503, { error: { code: "internal_error", message: "interno" } });
+      }
+      return json(200, openBody());
+    });
+    render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" stores={stores} fetchImpl={fetchImpl} now={() => now} />);
+    await fillAndPay(user);
+    expect(await screen.findByRole("heading", { name: CUSTOMER_RETRY_TITLE })).toBeVisible();
+    const stored = await readPayResume(token, stores, now.getTime());
+    expect(stored?.idempotencyKey).toBe(keys[0]);
+    expect(stored?.payload?.customer).toEqual({ name: "Ana Souza", phone: "+5511987654321" });
   });
 
   it("segunda falha do Pix sem WhatsApp mostra a frase e omite o link", async () => {

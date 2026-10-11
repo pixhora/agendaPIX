@@ -23,9 +23,9 @@ import {
   shouldClearPayKey,
   type CustomerScreen,
 } from "@/lib/slot-link/customer-state";
-import { browserSlotLinkStores, clearPayKey, createIdempotencyKey, lockPayPayload, payRequestBody, readPayResume, savePayAccess, type SlotLinkPayDraft, type SlotLinkPayPayload, type SlotLinkPayStores } from "@/lib/slot-link/idempotency";
+import { browserSlotLinkStores, clearPayKey, createIdempotencyKey, lockPayPayload, payRequestBody, readPayResume, rotatePayIdempotencyKey, savePayAccess, type SlotLinkPayDraft, type SlotLinkPayPayload, type SlotLinkPayStores } from "@/lib/slot-link/idempotency";
 import { paySlotLinkUrl, publicSlotLinkUrl } from "@/lib/slot-link/paths";
-import { isOfflineError, isPixCreateFailureBody, whatsappHref } from "@/components/booking/booking-error";
+import { isOfflineError, pixCreateFailure as readPixCreateFailure, whatsappHref } from "@/components/booking/booking-error";
 import { PixCreateFailureAlert } from "@/components/booking/pix-create-error";
 import { AgendaPixFooter } from "./agenda-pix-footer";
 import { parsePayResult } from "./pay-result";
@@ -214,8 +214,10 @@ export function SlotLinkCustomer({
       return booking;
     }
     const current = linkRef.current;
-    if (isPixCreateFailureBody(body) && current) {
+    const pixFailure = readPixCreateFailure(body);
+    if (pixFailure && current) {
       pixCreateFailures.current += 1;
+      if (pixFailure.rotateKey) await rotatePayIdempotencyKey(token, payStores, createIdempotencyKey, now().getTime());
       setPixCreateFailure({ repeated: pixCreateFailures.current >= 2 });
       setPhase({ kind: "form", link: current });
       return null;

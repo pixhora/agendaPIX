@@ -79,10 +79,14 @@ describe("serviço com sinal sem conta conectada", () => {
     const view = publicBookingErrorView(503, {
       error: { code: "payment_unavailable", message: legacy },
     });
-    expect(view).toEqual({ kind: "pix_create_failed" });
+    expect(view).toEqual({ kind: "pix_create_failed", rotateKey: true });
     expect(JSON.stringify(view)).not.toContain("mesma chave");
     expect(isPixCreateFailureBody({ error: { code: "internal_error", message: "Tente novamente com a mesma chave." } })).toBe(true);
-    expect(publicBookingErrorView(503, { error: { code: "internal_error", message: "Tente novamente com a mesma chave." } }).kind).toBe("pix_create_failed");
+    expect(publicBookingErrorView(503, { error: { code: "internal_error", message: "Tente novamente com a mesma chave." } })).toEqual({
+      kind: "pix_create_failed",
+      rotateKey: false,
+    });
+    expect(publicBookingErrorView(503, { error: { code: "internal_error", message: "Tente de novo." } }).kind).toBe("message");
   });
 
   it("não trata payout_key_missing como indisponível", () => {

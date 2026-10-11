@@ -286,6 +286,24 @@ export async function lockPayPayload(
   return { storageKey: existing.storageKey, record: next, payload, fresh: true as const };
 }
 
+/**
+ * Troca só a Idempotency-Key no localStorage. Nome e WhatsApp do payload continuam.
+ * Sem claim válido, não grava.
+ */
+export async function rotatePayIdempotencyKey(
+  token: string,
+  stores: SlotLinkPayStores,
+  mint: () => string = createIdempotencyKey,
+  now = Date.now(),
+) {
+  const storageKey = await slotLinkStorageKey(token);
+  const current = readClaim(stores.claim.get(storageKey));
+  if (!current || !isFuture(current.expiresAt, now)) return null;
+  const next: PayClaim = { ...current, idempotencyKey: mint() };
+  stores.claim.set(storageKey, serializeClaim(next));
+  return { storageKey, record: next };
+}
+
 /** Lê a chave já guardada ou cria uma com expiresAt. Sem prazo futuro, não grava. */
 export async function readOrCreatePayKey(
   token: string,
