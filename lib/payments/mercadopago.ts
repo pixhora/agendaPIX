@@ -10,6 +10,7 @@ import { MpAccountNotConnectedError, resolveMpAccessToken, type MpAccessTokenQue
 import {
   chargeInputSchema,
   IgnoredWebhookEvent,
+  ObservedPartialRefundEvent,
   ObservedRefundEvent,
   UnverifiableSellerPayment,
   paidEventSchema,
@@ -42,8 +43,6 @@ export const MERCADOPAGO_WEBHOOK_FRESHNESS_MS = 5 * 60 * 1000;
  */
 export const MERCADOPAGO_PIX_EXPIRATION_MARGIN_MINUTES = PIX_EXPIRATION_MARGIN_MINUTES;
 export const MERCADOPAGO_PIX_MIN_EXPIRATION_MS = PIX_EXPIRATION_MIN_MINUTES * 60_000;
-
-const NO_CONFIRM_DETAILS = new Set(["refunded", "partially_refunded", "charged_back"]);
 
 export type { MpAccessTokenQuery };
 export { resolveMpAccessToken };
@@ -79,6 +78,7 @@ const paymentSchema = z.object({
   status_detail: z.string().nullable().optional(),
   external_reference: z.string().nullable().optional(),
   transaction_amount: z.coerce.number(),
+  transaction_amount_refunded: z.coerce.number().optional(),
   date_of_expiration: z.string().nullable().optional(),
   date_approved: z.string().nullable().optional(),
   date_created: z.string().nullable().optional(),
@@ -213,10 +213,35 @@ export function mercadoPagoTimestampMs(ts: string) {
   return value < 1_000_000_000_000 ? value * 1000 : value;
 }
 
-function isNoConfirm(payment: MpPayment) {
+function moneyCents(amount: number) {
+  return Math.round(amount * 100);
+}
+
+/**
+ * Só o pagamento já buscado no Mercado Pago. O corpo do webhook não entra aqui.
+ * Estorno total: status `refunded` com valor devolvido ausente ou igual ao cobrado.
+ * Contestação: `charged_back`. Parcial: valor devolvido menor que o cobrado, ou `partially_refunded`.
+ */
+export function classifyMercadoPagoDepositReversal(payment: {
+  status: string;
+  status_detail?: string | null;
+  transaction_amount: number;
+  transaction_amount_refunded?: number | null;
+}): "refunded" | "charged_back" | "partial" | null {
   const status = payment.status.toLowerCase();
   const detail = (payment.status_detail ?? "").toLowerCase();
-  return NO_CONFIRM_DETAILS.has(status) || NO_CONFIRM_DETAILS.has(detail);
+  if (status === "charged_back" || detail === "charged_back") return "charged_back";
+  const refundedCents = moneyCents(payment.transaction_amount_refunded ?? 0);
+  const amountCents = moneyCents(payment.transaction_amount);
+  const partialByAmount = refundedCents > 0 && amountCents > 0 && refundedCents < amountCents;
+  if (status === "partially_refunded" || detail === "partially_refunded" || partialByAmount) return "partial";
+  if (status === "refunded" || detail === "refunded") return "refunded";
+  if (refundedCents > 0 && amountCents > 0 && refundedCents >= amountCents) return "refunded";
+  return null;
+}
+
+function isNoConfirm(payment: MpPayment) {
+  return classifyMercadoPagoDepositReversal(payment) !== null;
 }
 
 function isAccredited(payment: MpPayment) {
@@ -307,8 +332,10 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
         ? new Date(mpExpires.getTime() - MERCADOPAGO_PIX_EXPIRATION_MARGIN_MINUTES * 60_000)
         : new Date(now.getTime() + PIX_EXPIRATION_MIN_MINUTES * 60_000));
 
+    const reversalKind = classifyMercadoPagoDepositReversal(payment);
     let status: ProviderCharge["status"];
-    if (isNoConfirm(payment)) status = "refunded";
+    if (reversalKind === "refunded" || reversalKind === "charged_back") status = "refunded";
+    else if (reversalKind === "partial") status = "pending";
     else if (isAccredited(payment)) status = "paid";
     else if (payment.status === "cancelled" || payment.status === "canceled" || payment.status === "rejected") status = "cancelled";
     else if (payment.status === "expired" || expiresAt <= now) status = "expired";
@@ -329,6 +356,7 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
       status,
       paidAt,
       statusDetail: payment.status_detail ?? null,
+      reversalKind,
     };
   }
 
@@ -424,7 +452,7 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
   async cancelCharge(externalId: string, options: ProviderCallOptions = {}) {
     const current = await this.getCharge(externalId, options);
     if (!current) return null;
-    if (current.status === "paid" || current.status === "refunded") return current;
+    if (current.status === "paid" || current.status === "refunded" || current.reversalKind) return current;
     const token = await this.tokenFor(options, "settlement");
     try {
       const updated = paymentSchema.parse(await this.request(`/v1/payments/${encodeURIComponent(externalId)}`, {
@@ -436,7 +464,7 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
       return this.view(updated);
     } catch (error) {
       const after = await this.getCharge(externalId, options);
-      if (after?.status === "paid" || after?.status === "refunded") return after;
+      if (after?.status === "paid" || after?.status === "refunded" || after?.reversalKind) return after;
       if (isNotFound(error)) return null;
       throw error;
     }
@@ -515,7 +543,10 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
       throw error;
     }
     if (!payment) throw new HttpError(404, "payment_not_found", "Pagamento não encontrado.");
-    if (payment.status === "refunded") throw new ObservedRefundEvent(payment.externalId);
+    // O motivo sai do GET /v1/payments/{id} (reversalKind). O corpo do webhook só traz o id.
+    if (payment.reversalKind === "partial") throw new ObservedPartialRefundEvent(payment.externalId);
+    if (payment.reversalKind === "charged_back") throw new ObservedRefundEvent(payment.externalId, "charged_back");
+    if (payment.reversalKind === "refunded" || payment.status === "refunded") throw new ObservedRefundEvent(payment.externalId, "refunded");
     if (payment.status !== "paid") throw new IgnoredWebhookEvent(payload.action ?? payment.statusDetail ?? payment.status);
     const notificationId = payload.id != null ? String(payload.id) : `payment:${payment.externalId}`;
     return paidEventSchema.parse({

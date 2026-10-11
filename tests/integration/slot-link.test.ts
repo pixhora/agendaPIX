@@ -766,6 +766,6 @@ describe("link de um horário", () => {
     const [booking] = await database.select().from(schema.bookings).where(eq(schema.bookings.id, paid.bookingId));
     expect(booking.status).toBe("confirmed");
     const listed = await dashboardBookings(shop.ownerId, shop.businessId, [DATE], database);
-    expect(listed.some((row) => row.id === paid.bookingId && row.status === "confirmed")).toBe(true);
+    expect(listed.bookings.some((row) => row.id === paid.bookingId && row.status === "confirmed")).toBe(true);
   });
 });

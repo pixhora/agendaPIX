@@ -11,7 +11,7 @@ import { StatusChip, ValueSlab } from "@/components/ui/value-slab";
 import { buttonVariants } from "@/components/ui/button";
 import { getBusinessBilling } from "@/lib/billing/status";
 import { getDb } from "@/db";
-import { dashboardBookings, dashboardServices } from "@/lib/dashboard/data";
+import { dashboardBookings, dashboardServices, type DashboardBooking } from "@/lib/dashboard/data";
 import { dashboardAgendaKpis, dashboardAgendaSummary, formatBrlCents } from "@/lib/dashboard/summary";
 import { OwnerBillingNotice } from "@/components/dashboard/owner-billing-notice";
 import { ownerContext } from "@/lib/dashboard/session";
@@ -46,14 +46,15 @@ export default async function AgendaPage({ searchParams }: { searchParams: Promi
   const date = parsedDate.success ? parsedDate.data : today;
   const weekly = query.view === "week";
   const dates = weekly ? weekDates(date) : [date];
-  const [bookings, billing, listedServices, mpGate] = business
+  const [agenda, billing, listedServices, mpGate] = business
     ? await Promise.all([
       dashboardBookings(owner.id, business.id, dates, getDb(), business),
       getBusinessBilling(business.id, owner.id),
       dashboardServices(owner.id, business.id, getDb(), business),
       readMpDepositGate(business.id, { store: createDrizzleMpStore(getDb()) }),
     ])
-    : [[] as Awaited<ReturnType<typeof dashboardBookings>>, null, [], null];
+    : [{ bookings: [] as DashboardBooking[], reversedDepositsPendingCount: 0 }, null, [], null];
+  const bookings = agenda.bookings;
   const depositServices = listedServices
     .filter((service) => service.active && service.depositCents > 0)
     .map((service) => ({

@@ -60,6 +60,19 @@ export function lateRefundNoTokenNotice(input: { customerName: string; serviceNa
   };
 }
 
+export function depositReversedNotice(input: { customerName: string; serviceName: string; when: string; reason: "refunded" | "charged_back" }): OwnerNotice {
+  if (input.reason === "charged_back") {
+    return {
+      subject: "Pix contestado",
+      text: `O sinal de ${input.customerName} para ${input.serviceName} (${input.when}) foi contestado. O horário continua ocupado. Abra a agenda para decidir se libera.`,
+    };
+  }
+  return {
+    subject: "Sinal devolvido",
+    text: `O sinal de ${input.customerName} para ${input.serviceName} (${input.when}) foi devolvido. O horário continua ocupado. Abra a agenda para decidir se libera.`,
+  };
+}
+
 export function unverifiableSellerNotice(input: { deadlineLabel: string }): OwnerNotice {
   return {
     subject: "Confira um Pix no Mercado Pago",

@@ -30,6 +30,11 @@ export const providerChargeSchema = pixChargeSchema.extend({
   status: z.enum(["pending", "paid", "expired", "cancelled", "refunded"]),
   paidAt: z.date().nullable(),
   statusDetail: z.string().min(1).max(80).nullable().optional(),
+  /**
+   * Classificação lida do GET /v1/payments/{id}. `partial` não vira estorno total.
+   * Ausente no fake e em cobranças sem devolução.
+   */
+  reversalKind: z.enum(["refunded", "charged_back", "partial"]).nullable().optional(),
 });
 export const refundResultSchema = z.object({
   status: z.enum(["refunded", "in_process"]),
@@ -61,9 +66,16 @@ export type PaidEvent = z.infer<typeof paidEventSchema>;
 export class IgnoredWebhookEvent extends Error {
   constructor(readonly event: string) { super(`Evento ignorado: ${event}`); this.name = "IgnoredWebhookEvent"; }
 }
-/** O Mercado Pago avisou que o pagamento está estornado. Não confirma a reserva. */
+/** O GET do Mercado Pago mostrou estorno total ou contestação. Não confirma a reserva. */
 export class ObservedRefundEvent extends Error {
-  constructor(readonly externalId: string) { super("Estorno observado."); this.name = "ObservedRefundEvent"; }
+  constructor(readonly externalId: string, readonly reason: "refunded" | "charged_back" = "refunded") {
+    super("Estorno observado.");
+    this.name = "ObservedRefundEvent";
+  }
+}
+/** Devolução parcial vista no GET. Não marca o sinal como devolvido. */
+export class ObservedPartialRefundEvent extends Error {
+  constructor(readonly externalId: string) { super("Devolução parcial observada."); this.name = "ObservedPartialRefundEvent"; }
 }
 /** Webhook assinado, mas sem token para consultar o pagamento. Não confirma às cegas. */
 export class UnverifiableSellerPayment extends Error {
