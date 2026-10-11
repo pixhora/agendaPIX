@@ -40,6 +40,7 @@ function openBody(status = "pending") {
     expiresAt: "2030-10-18T14:00:00.000Z",
     status,
     requiresPayerCpf: false,
+    bookingsPaused: false,
   };
 }
 

@@ -23,6 +23,7 @@ const openBase = {
   policy: { text: "Política do sinal.", hash: "a".repeat(64) },
   expiresAt: "2030-01-01T14:00:00.000Z",
   requiresPayerCpf: false,
+  bookingsPaused: false,
 };
 
 const owner = {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import type {
   PublicBusinessData,
@@ -9,7 +9,7 @@ import type {
   BookingResponse,
 } from "./types";
 import { cpfDigitsOnly, formatCurrency, normalizePhoneToE164 } from "./formatters";
-import { publicBookingPagePath, publicBookingPaymentUrl, publicBookingsUrl, publicServicesUrl } from "@/lib/public-api";
+import { publicBookingPagePath, publicBookingsUrl, publicServicesUrl } from "@/lib/public-api";
 import { parsePaymentStatusResponse } from "@/lib/public/payment-status";
 import { showDepositUnavailableCard } from "./deposit-availability";
 import { DepositUnavailableCard } from "./DepositUnavailable";
@@ -29,7 +29,8 @@ import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { BrandMark } from "@/components/ui/brand";
 import { BookingSummary } from "./BookingSummary";
 import { GENERIC_SUBMIT_MESSAGE, OFFLINE_MESSAGE, POLICY_CHANGED_MESSAGE, businessLoadCopy, isOfflineError, publicBookingErrorView, whatsappHref } from "./booking-error";
-import { migratedPixResumePayload, pixResumePayload, pixResumeStorageKey, readPixResume, shouldClearExpiredResume, shouldResumePix, type PixResumeSession } from "./pix-resume";
+import { pixRetryPaymentRequest } from "./pix-retry";
+import { PIX_RESUME_UNKNOWN, getPixResumeServerSnapshot, migratedPixResumePayload, pixResumePayload, pixResumeStorageKey, readPixResume, readPixResumeRaw, replacePixResume, subscribePixResume, shouldClearExpiredResume, shouldResumePix, type PixResumeSession } from "./pix-resume";
 import { keptAccessToken } from "@/lib/slot-link/idempotency";
 import { TrackingUnavailable } from "./tracking-unavailable";
 import { buildPublicBookingBody } from "./booking-payload";
@@ -76,6 +77,13 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
   });
   const [bookingResponse, setBookingResponse] = useState<BookingResponse | null>(null);
   const [trackingMiss, setTrackingMiss] = useState(false);
+  const [pixResumeFailure, setPixResumeFailure] = useState<"retry" | "gone" | null>(null);
+  const [pixResumePending, setPixResumePending] = useState(false);
+  const [pixResumeAttempt, setPixResumeAttempt] = useState(0);
+  const resumeRaw = useSyncExternalStore(subscribePixResume, () => readPixResumeRaw(slug), getPixResumeServerSnapshot);
+  const holdingPixResume = resumeRaw === PIX_RESUME_UNKNOWN
+    ? Boolean(initialBookingId)
+    : shouldResumePix(readPixResume(migratedPixResumePayload(resumeRaw)), initialBookingId);
 
   useEffect(() => {
     if (step < 2 && !selectedService) return;
@@ -148,48 +156,46 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
     if (!business || step !== 1 || isCompleted || bookingResponse || trackingMiss) return;
     if (typeof window === "undefined") return;
 
-    const storageKey = pixResumeStorageKey(slug);
+    if (resumeRaw === PIX_RESUME_UNKNOWN) return;
+
     let stored: PixResumeSession | null = null;
-    try {
-      const raw = sessionStorage.getItem(storageKey);
-      if (raw) {
-        const migrated = migratedPixResumePayload(raw);
-        if (!migrated) {
-          sessionStorage.removeItem(storageKey);
-        } else {
-          if (migrated !== raw) sessionStorage.setItem(storageKey, migrated);
-          stored = readPixResume(migrated);
-        }
-      }
-    } catch {
-      stored = null;
+    const migrated = migratedPixResumePayload(resumeRaw);
+    if (resumeRaw && !migrated) {
+      replacePixResume(slug, null);
+      return;
     }
+    if (migrated && migrated !== resumeRaw) {
+      replacePixResume(slug, migrated);
+      return;
+    }
+    stored = readPixResume(migrated);
 
     if (shouldClearExpiredResume(stored, initialBookingId)) {
-      try {
-        sessionStorage.removeItem(storageKey);
-      } catch {
-        // ignore
-      }
+      replacePixResume(slug, null);
       return;
     }
 
     if (!shouldResumePix(stored, initialBookingId) || !stored) return;
 
+    const session = stored;
+    const retry = pixRetryPaymentRequest(slug, session);
     let isCancelled = false;
 
-    fetch(publicBookingPaymentUrl(slug, stored.bookingId), {
-      cache: "no-store",
-      headers: {
-        Authorization: `Bearer ${stored.accessToken}`,
-      },
-    })
+    fetch(retry.url, retry.init)
       .then(async (res) => {
         if (res.status === 404) {
           if (!isCancelled) setTrackingMiss(true);
           return null;
         }
-        if (!res.ok) throw new Error("Reserva não encontrada ou expirada");
+        // Token vencido ou horário já liberado: apaga a sessão (com o accessToken) e a tela é final.
+        if (res.status === 401 || res.status === 403 || res.status === 410) {
+          if (!isCancelled) {
+            replacePixResume(slug, null);
+            setPixResumeFailure("gone");
+          }
+          return null;
+        }
+        if (!res.ok) throw new Error("pix_resume_unavailable");
         return parsePaymentStatusResponse(await res.json());
       })
       .then((paymentData) => {
@@ -202,8 +208,8 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
           || paymentData.payment?.status === "expired"
           || paymentData.payment?.status === "cancelled"
         ) {
+          replacePixResume(slug, null);
           try {
-            sessionStorage.removeItem(storageKey);
             window.history.replaceState(null, "", publicBookingPagePath(slug));
           } catch {
             // ignore
@@ -211,7 +217,7 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
           return;
         }
 
-        const matchedService = business.services.find((s) => s.id === stored.serviceId) ?? null;
+        const matchedService = business.services.find((s) => s.id === session.serviceId) ?? null;
         if (matchedService) setSelectedService(matchedService);
 
         if (paymentData.startsAt && paymentData.endsAt) {
@@ -223,8 +229,8 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
 
         if (paymentData.status === "confirmed") {
           setIsCompleted(true);
+          replacePixResume(slug, null);
           try {
-            sessionStorage.removeItem(storageKey);
             window.history.replaceState(null, "", publicBookingPagePath(slug));
           } catch {
             // ignore
@@ -238,7 +244,7 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
           startsAt: paymentData.startsAt,
           endsAt: paymentData.endsAt,
           expiresAt: paymentData.expiresAt,
-          accessToken: stored.accessToken,
+          accessToken: session.accessToken,
           payment: paymentData.payment
             ? { ...paymentData.payment, expiresAt: paymentData.payment.expiresAt ?? null }
             : null,
@@ -253,23 +259,23 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
             : null,
         };
 
+        setPixResumeFailure(null);
         setBookingResponse(fullResponse);
         setStep(4);
       })
       .catch(() => {
         if (isCancelled) return;
-        try {
-          sessionStorage.removeItem(storageKey);
-          window.history.replaceState(null, "", publicBookingPagePath(slug));
-        } catch {
-          // ignore
-        }
+        // A rede falhou ou o servidor respondeu 500: a reserva continua neste separador.
+        setPixResumeFailure("retry");
+      })
+      .finally(() => {
+        if (!isCancelled) setPixResumePending(false);
       });
 
     return () => {
       isCancelled = true;
     };
-  }, [business, slug, initialBookingId, step, isCompleted, bookingResponse, trackingMiss]);
+  }, [business, slug, initialBookingId, step, isCompleted, bookingResponse, trackingMiss, pixResumeAttempt, resumeRaw]);
 
   // Cria a reserva chamando POST /api/public/[slug]/bookings
   const handleCreateBooking = async () => {
@@ -381,6 +387,21 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
       setBookingError({ message: msg, contactHref: null, tone: "danger" });
     } finally {
       setIsSubmittingBooking(false);
+    }
+  };
+
+  const returnToSchedule = () => {
+    replacePixResume(slug, null);
+    setPixResumeFailure(null);
+    setPixResumePending(false);
+    setSelectedService(null);
+    setSelectedSlot(null);
+    setBookingResponse(null);
+    setStep(1);
+    try {
+      window.history.replaceState(null, "", publicBookingPagePath(slug));
+    } catch {
+      // history indisponível
     }
   };
 
@@ -515,6 +536,61 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
         {pageHeader}
         <main id="content" className="mx-auto w-full max-w-xl px-4 py-8">
           <TrackingUnavailable slug={slug} whatsapp={business.contactWhatsapp ?? null} />
+        </main>
+      </div>
+    );
+  }
+
+  if (pixResumeFailure === "gone") {
+    return (
+      <div className="min-h-dvh bg-paper">
+        {pageHeader}
+        <main id="content" className="mx-auto w-full max-w-xl px-4 py-8">
+          <section role="alert" className="rounded-frame bg-surface px-6 py-8 text-center shadow-[var(--shadow-card)]">
+            <h1 className="mx-auto max-w-[28ch] font-display text-xl font-extrabold tracking-tight text-ink sm:text-2xl">Este pagamento não está mais disponível.</h1>
+            <p className="mx-auto mt-3 max-w-[36ch] text-sm leading-relaxed text-muted">O horário pode ter sido liberado. Escolha um horário de novo para continuar.</p>
+            <Button type="button" variant="pixDeep" size="lg" className="mt-6 w-full" onClick={returnToSchedule}>
+              Ver horários
+            </Button>
+          </section>
+        </main>
+      </div>
+    );
+  }
+
+  if (pixResumeFailure === "retry") {
+    return (
+      <div className="min-h-dvh bg-paper">
+        {pageHeader}
+        <main id="content" className="mx-auto w-full max-w-xl px-4 py-8">
+          <section role="alert" className="rounded-frame bg-surface px-6 py-8 text-center shadow-[var(--shadow-card)]">
+            <h1 className="mx-auto max-w-[28ch] font-display text-xl font-extrabold tracking-tight text-ink sm:text-2xl">Não conseguimos carregar seu Pix</h1>
+            <p className="mx-auto mt-3 max-w-[36ch] text-sm leading-relaxed text-muted">Sua reserva continua guardada. Verifique sua internet e tente de novo.</p>
+            <Button
+              type="button"
+              variant="pixDeep"
+              size="lg"
+              className="mt-6 w-full"
+              disabled={pixResumePending}
+              onClick={() => {
+                setPixResumePending(true);
+                setPixResumeAttempt((attempt) => attempt + 1);
+              }}
+            >
+              Tentar de novo
+            </Button>
+          </section>
+        </main>
+      </div>
+    );
+  }
+
+  if (holdingPixResume && step === 1 && !bookingResponse && !isCompleted) {
+    return (
+      <div className="min-h-dvh bg-paper">
+        {pageHeader}
+        <main id="content" className="mx-auto flex min-h-[40vh] w-full max-w-xl items-center justify-center px-4 py-8" role="status">
+          <p className="text-sm text-muted">Carregando seu Pix…</p>
         </main>
       </div>
     );

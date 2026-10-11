@@ -116,7 +116,7 @@ export function MpOnboardingStep({
   }, [errorView]);
 
   return (
-    <div className="bg-paper max-md:fixed max-md:inset-0 max-md:overflow-hidden md:static md:min-h-dvh md:py-10" style={{ scrollPaddingBottom: "calc(var(--sticky-cta-height) + 16px)" }}>
+    <div data-mp-shell="" className="bg-paper max-md:fixed max-md:inset-0 max-md:overflow-clip md:static md:min-h-dvh md:py-10" style={{ scrollPaddingBottom: "calc(var(--sticky-cta-height) + 16px)" }}>
       <div className="mx-auto flex w-full max-w-[480px] flex-col bg-paper max-md:h-full max-md:overflow-hidden md:min-h-0 md:rounded-frame md:border md:border-line md:bg-surface md:shadow-[var(--shadow-card)]">
         <header className="flex h-14 shrink-0 items-center px-4">
           <BrandLink href="/onboarding" />

@@ -163,12 +163,8 @@ export const slotLinkOpenResponseSchema = z.object({
   expiresAt: z.iso.datetime({ offset: true }),
   status: slotLinkStatusSchema,
   requiresPayerCpf: z.boolean(),
-  /**
-   * Agenda fechada para horário novo. Opcional neste master: o GET ainda não envia o campo.
-   * No conflito com a #90, fica `z.boolean()` obrigatório.
-   * Pix já começado neste link continua no formulário.
-   */
-  bookingsPaused: z.boolean().optional(),
+  /** Agenda fechada para horário novo. O Pix já começado neste link ainda retoma. */
+  bookingsPaused: z.boolean(),
 }).strict();
 
 export type SlotLinkOpenResponse = z.infer<typeof slotLinkOpenResponseSchema>;

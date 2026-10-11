@@ -65,9 +65,13 @@ describe("contrato do link de horário", () => {
       expiresAt: owner.expiresAt,
       status: "taken",
       requiresPayerCpf: false,
+      bookingsPaused: false,
     });
+    expect(opened.bookingsPaused).toBe(false);
+    expect(slotLinkOpenResponseSchema.safeParse({ ...opened, bookingsPaused: undefined }).success).toBe(false);
+    expect(slotLinkErrorCodeSchema.safeParse("bookings_paused").success).toBe(true);
+    expect(slotLinkErrorCodeSchema.safeParse("idempotency_conflict").success).toBe(true);
     expect(opened.status).toBe("taken");
-    expect(opened.bookingsPaused).toBeUndefined();
     expect(slotLinkOpenResponseSchema.parse({ ...opened, bookingsPaused: true }).bookingsPaused).toBe(true);
     const slot = slotLinkPreviewResponseSchema.parse({
       kind: "slot", businessName: "Salao", logoUrl: null, serviceName: "Corte", date: "2030-01-01", time: "09:00",
