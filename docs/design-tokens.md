@@ -20,7 +20,7 @@
 | `--subtle` | `#EFEEEA` | `#222225` | Fundos sutis: skeleton, prefixo de campo, cabeçalho de tabela, hover |
 | `--ink` / `--ink-hover` | `#0B0B0C` / `#26262A` | `#F6F5F2` / `#E2E1DD` | Texto principal e botão primário |
 | `--muted` | `#5B5B5F` | `#A3A3A8` | Texto secundário (só texto) |
-| `--line` / `--line-strong` | `#DEDCD6` / `#8D8C88` | `#2C2C2F` / `#6B6B70` | Divisores / borda de campo (3:1 contra a superfície) |
+| `--line` / `--line-strong` | `#DEDCD6` / `#8D8C88` | `#6E6E74` / `#A8A8AE` | Borda de cartão / borda de campo. No escuro as duas passam de 3:1 contra a superfície; o campo usa `--line-strong` a 60% |
 | `--slab` / `--slab-foreground` / `--slab-muted` | `#0B0B0C` / `#FFF` / `#C9C9CC` | `#000` / `#FFF` / `#B8B8BD` | Placa de Valor e faixas escuras |
 | `--pix` / `--pix-hover` / `--pix-foreground` | `#0A6E63` / `#085A52` / `#FFF` | `#3FD0BE` / `#5FDCCC` / `#0B0B0C` | Acento único: Pix, dinheiro, estado ativo |
 | `--pix-soft` | `#E8F6F3` | `#10302C` | Fundo de destaque Pix (aviso, próximo atendimento) |
@@ -49,7 +49,9 @@ Aliases shadcn: `background`, `foreground`, `primary`, `primary-foreground`, `mu
 | `pix-deep-muted` sobre `pix-deep` | 7,4:1 | 4,6:1 |
 | `success` / `warning` / `danger` sobre o `-soft` | 5,8 / 5,7 / 5,6:1 | 7,7 / 8,0 / 7,0:1 |
 | `slab-muted` sobre `slab` | 11,9:1 | — |
-| `line-strong` sobre `surface` (borda de campo, 1.4.11) | 3,4:1 | 3,3:1 |
+| `line` sobre `surface` (borda de cartão, 1.4.11) | 1,4:1 | 3,5:1 |
+| `line-strong` sobre `surface` (token cheio) | 3,4:1 | 7,4:1 |
+| `line-strong` a 60% sobre `surface` (borda de campo, 1.4.11) | 1,9:1 | 3,5:1 |
 
 ## 3. Tipografia
 

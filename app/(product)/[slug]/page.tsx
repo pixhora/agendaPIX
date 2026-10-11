@@ -6,6 +6,7 @@ import { z } from "zod";
 import { BookingFlow } from "@/components/booking/BookingFlow";
 import { toPublicBusinessData } from "@/components/booking/public-business";
 import { legalPagesPublished } from "@/lib/marketing/flags";
+import { supportWhatsappUrl } from "@/lib/support-contact";
 import { SlugMoved, bookingRedirectPath } from "@/lib/business-profile/public-slug";
 import { listPublicServices } from "@/lib/bookings/service";
 import { HttpError } from "@/lib/http";
@@ -89,6 +90,7 @@ export default async function BookingPage({
       initialBookingId={bookingId}
       initialBusiness={toPublicBusinessData(business)}
       legalPagesPublished={legalPagesPublished()}
+      supportWhatsappHref={supportWhatsappUrl()}
     />
   );
 }

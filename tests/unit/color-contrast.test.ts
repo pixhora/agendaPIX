@@ -66,6 +66,49 @@ describe("botão pixDeep", () => {
   });
 });
 
+/** Mistura sRGB de uma cor com alfa sobre um fundo opaco. O campo usa `--line-strong` a 60%. */
+function composite(foreground: string, background: string, alpha: number): string {
+  const channels = [0, 2, 4].map((offset) => {
+    const fg = Number.parseInt(foreground.slice(offset + 1, offset + 3), 16);
+    const bg = Number.parseInt(background.slice(offset + 1, offset + 3), 16);
+    return Math.round(fg * alpha + bg * (1 - alpha));
+  });
+  return `#${channels.map((channel) => channel.toString(16).padStart(2, "0")).join("")}`;
+}
+
+describe("bordas do tema escuro", () => {
+  const fieldSource = readFileSync(resolve(process.cwd(), "components/ui/input.tsx"), "utf8");
+  const opacity = fieldSource.match(/border-line-strong\/(\d+)/);
+  const fieldAlpha = opacity ? Number(opacity[1]) / 100 : 1;
+  const darkBlocks = {
+    ".dark": themes.dark,
+    "sistema": block(css, ":root:not(.light):not(.dark)"),
+  };
+
+  it("o invólucro do campo continua usando a borda forte com transparência", () => {
+    expect(fieldAlpha).toBe(0.6);
+  });
+
+  for (const [name, cssBlock] of Object.entries(darkBlocks)) {
+    it(`${name}: borda de cartão (--line) passa de 3:1 contra papel, cartão e superfície sutil`, () => {
+      const line = token(cssBlock, "--line");
+      for (const surface of surfaces) {
+        const background = token(cssBlock, surface);
+        expect(contrast(line, background), `${line} sobre ${surface} ${background}`).toBeGreaterThanOrEqual(3);
+      }
+    });
+
+    it(`${name}: borda de campo (--line-strong a 60%) passa de 3:1 contra papel, cartão e superfície sutil`, () => {
+      const strong = token(cssBlock, "--line-strong");
+      for (const surface of surfaces) {
+        const background = token(cssBlock, surface);
+        const painted = composite(strong, background, fieldAlpha);
+        expect(contrast(painted, background), `${painted} (${strong} a ${fieldAlpha}) sobre ${surface} ${background}`).toBeGreaterThanOrEqual(3);
+      }
+    });
+  }
+});
+
 describe("contraste dos tokens de texto", () => {
   for (const [theme, cssBlock] of Object.entries(themes)) {
     it(`${theme}: tinta e texto secundário passam de 4,5:1 em papel, cartão e superfície sutil`, () => {

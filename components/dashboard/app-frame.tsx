@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
-import { DASHBOARD_NAV_ICONS } from "@/lib/icons/registry";
+import { ACTION_ICONS, DASHBOARD_NAV_ICONS } from "@/lib/icons/registry";
 import { BrandLink, BrandMark } from "@/components/ui/brand";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { cn } from "@/lib/utils";
@@ -56,6 +56,32 @@ function NavLinks({ businesses, defaultBusinessId, variant }: { businesses: Fram
   });
 }
 
+const frameLinkClass = "inline-flex min-h-11 items-center rounded-field px-3 text-sm font-semibold text-ink hover:bg-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+
+function SupportWhatsappLink({ href, className }: { href: string; className?: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={cn(frameLinkClass, "gap-2", className)}
+    >
+      <Icon icon={ACTION_ICONS.whatsapp} size="md" />
+      Suporte no WhatsApp
+      <span className="sr-only"> (abre em nova aba)</span>
+    </a>
+  );
+}
+
+function LegalPageLinks() {
+  return (
+    <>
+      <Link href="/termos" className={frameLinkClass}>Termos de uso</Link>
+      <Link href="/privacidade" className={frameLinkClass}>Política de privacidade</Link>
+    </>
+  );
+}
+
 function PublicPageLink({ businesses, defaultBusinessId, className }: { businesses: FrameBusiness[]; defaultBusinessId?: string; className?: string }) {
   const { business } = useFrameState(businesses, defaultBusinessId);
   if (!business) return null;
@@ -77,7 +103,23 @@ function CurrentBusinessName({ businesses, defaultBusinessId }: { businesses: Fr
  * (sticky, não fixed: ficam no fluxo e nunca cobrem o fim do conteúdo — WCAG 2.4.11)
  * (padrão das referências Fresha/Booksy — ver docs/DESIGN_DECISION.md §9).
  */
-export function AppFrame({ ownerName, businesses, defaultBusinessId, children }: { ownerName: string; businesses: FrameBusiness[]; defaultBusinessId?: string; children: ReactNode }) {
+export function AppFrame({
+  ownerName,
+  businesses,
+  defaultBusinessId,
+  legalPagesPublished = false,
+  supportWhatsappHref = null,
+  children,
+}: {
+  ownerName: string;
+  businesses: FrameBusiness[];
+  defaultBusinessId?: string;
+  /** Espelha `LEGAL_PAGES_PUBLISHED`. O layout do dono manda o valor do servidor. */
+  legalPagesPublished?: boolean;
+  /** Link wa.me do suporte. O layout do dono calcula no servidor. Null esconde o link. */
+  supportWhatsappHref?: string | null;
+  children: ReactNode;
+}) {
   const fallback = <span className="h-11" />;
   return (
     <div data-app-frame className="min-h-dvh bg-paper lg:grid lg:grid-cols-[16rem_minmax(0,1fr)]">
@@ -91,6 +133,12 @@ export function AppFrame({ ownerName, businesses, defaultBusinessId, children }:
         </nav>
         <Suspense fallback={null}><PublicPageLink businesses={businesses} defaultBusinessId={defaultBusinessId} /></Suspense>
         <div className="mt-auto grid min-w-0 grid-cols-1 gap-4 border-t border-line pt-4">
+          {legalPagesPublished || supportWhatsappHref ? (
+            <nav aria-label="AgendaPix" className="grid">
+              {legalPagesPublished ? <LegalPageLinks /> : null}
+              {supportWhatsappHref ? <SupportWhatsappLink href={supportWhatsappHref} /> : null}
+            </nav>
+          ) : null}
           <div className="flex items-center justify-between gap-2 px-1">
             <span className="text-xs font-semibold uppercase tracking-wide text-muted">Tema</span>
             <ThemeToggle />
@@ -108,13 +156,21 @@ export function AppFrame({ ownerName, businesses, defaultBusinessId, children }:
       </aside>
 
       <div className="flex min-h-dvh min-w-0 flex-col">
-        <header data-sticky-chrome className="sticky top-0 z-30 flex min-h-16 items-center gap-3 border-b border-line bg-surface/95 px-4 backdrop-blur lg:hidden">
-          <Link href="/dashboard" aria-label="AgendaPix, início do painel" className="inline-flex size-11 items-center justify-center rounded-field focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"><BrandMark /></Link>
-          <div className="min-w-0 flex-1 leading-tight">
-            <p className="truncate text-sm font-bold"><Suspense fallback="Seu painel"><CurrentBusinessName businesses={businesses} defaultBusinessId={defaultBusinessId} /></Suspense></p>
-            <p className="truncate text-xs text-muted">{ownerName}</p>
+        <header data-sticky-chrome className="sticky top-0 z-30 border-b border-line bg-surface/95 backdrop-blur lg:hidden">
+          <div className="flex min-h-16 items-center gap-3 px-4">
+            <Link href="/dashboard" aria-label="AgendaPix, início do painel" className="inline-flex size-11 items-center justify-center rounded-field focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"><BrandMark /></Link>
+            <div className="min-w-0 flex-1 leading-tight">
+              <p className="truncate text-sm font-bold"><Suspense fallback="Seu painel"><CurrentBusinessName businesses={businesses} defaultBusinessId={defaultBusinessId} /></Suspense></p>
+              <p className="truncate text-xs text-muted">{ownerName}</p>
+            </div>
+            <Logout compact />
           </div>
-          <Logout compact />
+          {legalPagesPublished || supportWhatsappHref ? (
+            <nav aria-label="AgendaPix" className="flex flex-wrap items-center px-2 pb-2">
+              {legalPagesPublished ? <LegalPageLinks /> : null}
+              {supportWhatsappHref ? <SupportWhatsappLink href={supportWhatsappHref} /> : null}
+            </nav>
+          ) : null}
         </header>
 
         <div className="flex-1">

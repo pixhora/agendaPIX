@@ -32,12 +32,6 @@ export function isPlaceholderEmail(value: string): boolean {
 
 export const supportEmailSchema = z.string().trim().toLowerCase().email().refine((value) => !isPlaceholderEmail(value));
 
-/**
- * Só o link "Fale com a gente" quando SUPPORT_WHATSAPP_NUMBER falta ou é inválido.
- * O checkout da assinatura não usa este padrão: sem a env ele fica indisponível.
- */
-const SUPPORT_WHATSAPP_FALLBACK = "5514997504655";
-
 /** E-mail de apoio quando SUPPORT_EMAIL falta ou é inválido. O checkout não usa este padrão. */
 const SUPPORT_EMAIL_FALLBACK = "francatorresmatheus@gmail.com";
 
@@ -49,9 +43,10 @@ export function readSupportWhatsappNumber(env: Env = process.env): string | null
   return parsed.success ? parsed.data : null;
 }
 
-/** Link wa.me do "Fale com a gente". Usa a env e, se ela faltar, o número de apoio. */
-export function supportWhatsappUrl(env: Env = process.env): string {
-  return `https://wa.me/${readSupportWhatsappNumber(env) ?? SUPPORT_WHATSAPP_FALLBACK}`;
+/** Link wa.me do suporte. Null quando SUPPORT_WHATSAPP_NUMBER falta ou é inválida. A mesma leitura do checkout. */
+export function supportWhatsappUrl(env: Env = process.env): string | null {
+  const number = readSupportWhatsappNumber(env);
+  return number ? `https://wa.me/${number}` : null;
 }
 
 /** E-mail válido da env, ou null. Não aplica o padrão do link público. */

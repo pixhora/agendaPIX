@@ -5,11 +5,11 @@ import userEvent from "@testing-library/user-event";
 import { SlotLinkCustomer } from "@/components/slot-link/slot-link-customer";
 import { AgendaPixFooter } from "@/components/slot-link/agenda-pix-footer";
 import { SlotLinkNotice } from "@/components/slot-link/slot-link-notice";
-import { memorySlotLinkStores, readOrCreatePayKey, slotLinkSessionKey, slotLinkStorageKey } from "@/lib/slot-link/idempotency";
+import { lockPayPayload, memorySlotLinkStores, readOrCreatePayKey, slotLinkSessionKey, slotLinkStorageKey } from "@/lib/slot-link/idempotency";
 import { SlotLinkStorageSweep } from "@/components/slot-link/storage-sweep";
 import { SentLinks } from "@/components/slot-link/sent-links";
 import { createSlotLinkToken } from "../../lib/bookings/slot-link-token";
-import { CANCEL_EXPIRED, CANCEL_PAID, CONNECT_MERCADO_PAGO, CUSTOMER_CONFLICT_BODY, CUSTOMER_CONFLICT_TITLE, CUSTOMER_CPF_REQUIRED, CUSTOMER_IN_PROGRESS, CUSTOMER_RETRY_BODY, CUSTOMER_RETRY_TITLE, CUSTOMER_USED_TITLE, OWNER_NETWORK, REISSUE_BODY, REISSUE_EXPIRED, REISSUE_IN_PROGRESS, REISSUE_MP, REISSUE_PAID, REISSUE_TAKEN, REISSUE_TITLE, formatDayMonth, isoDateInZone, weekdayShort } from "@/lib/slot-link/copy";
+import { CANCEL_EXPIRED, CANCEL_PAID, CONNECT_MERCADO_PAGO, CUSTOMER_BOOKINGS_PAUSED, CUSTOMER_CONFLICT_BODY, CUSTOMER_CONFLICT_TITLE, CUSTOMER_CPF_REQUIRED, CUSTOMER_IN_PROGRESS, CUSTOMER_PAUSED_LATER, CUSTOMER_PAUSED_RECEIPT, CUSTOMER_RETRY_BODY, CUSTOMER_RETRY_TITLE, CUSTOMER_USED_TITLE, OWNER_NETWORK, REISSUE_BODY, REISSUE_EXPIRED, REISSUE_IN_PROGRESS, REISSUE_MP, REISSUE_PAID, REISSUE_TAKEN, REISSUE_TITLE, formatDayMonth, isoDateInZone, weekdayShort } from "@/lib/slot-link/copy";
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
@@ -381,6 +381,91 @@ describe("página da cliente", () => {
     expect(screen.getByRole("link", { name: "Ver horários disponíveis" })).toBeVisible();
   });
 
+  it("403 bookings_paused pede para falar com a loja e esconde o texto do servidor", async () => {
+    const user = userEvent.setup();
+    const stores = memorySlotLinkStores();
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith("/pay")) {
+        return json(403, {
+          error: {
+            code: "bookings_paused",
+            message: "Este estabelecimento não está aceitando novos agendamentos no momento.",
+          },
+        });
+      }
+      return json(200, openBody());
+    });
+    render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" contactWhatsapp="+5511988887777" stores={stores} fetchImpl={fetchImpl} now={() => new Date("2030-10-01T12:00:00.000Z")} />);
+    await fillAndPay(user);
+    expect(await screen.findByRole("heading", { name: CUSTOMER_BOOKINGS_PAUSED })).toBeVisible();
+    const talk = screen.getByRole("link", { name: "Falar com a loja" });
+    expect(talk).toHaveAttribute("href", "https://wa.me/5511988887777");
+    expect(talk).toHaveAttribute("target", "_blank");
+    expect(talk.className).toMatch(/bg-pix-deep/);
+    expect(screen.queryByText(/estabelecimento não está aceitando/)).toBeNull();
+    expect(screen.queryByText(/assinatura|teste grátis|pagamento do dono/i)).toBeNull();
+    expect(screen.queryByRole("button", { name: /Pagar sinal/ })).toBeNull();
+  });
+
+  it("GET 403 bookings_paused usa o WhatsApp da página", async () => {
+    const fetchImpl = vi.fn(async () => json(403, { error: { code: "bookings_paused", message: "interno" } }));
+    render(
+      <SlotLinkCustomer
+        slug="salao"
+        token={token}
+        timezone="America/Sao_Paulo"
+        businessName="Salao da Ana"
+        contactWhatsapp="+5511988887777"
+        fetchImpl={fetchImpl}
+        now={() => new Date("2030-10-01T12:00:00.000Z")}
+      />,
+    );
+    expect(await screen.findByRole("heading", { name: CUSTOMER_BOOKINGS_PAUSED })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Falar com a loja" })).toHaveAttribute("href", "https://wa.me/5511988887777");
+    expect(screen.queryByText("interno")).toBeNull();
+    expect(screen.queryByText(/assinatura|teste grátis/i)).toBeNull();
+  });
+
+  it("GET 403 bookings_paused sem WhatsApp não abre link vazio", async () => {
+    const fetchImpl = vi.fn(async () => json(403, { error: { code: "bookings_paused", message: "interno" } }));
+    const { container } = render(
+      <SlotLinkCustomer
+        slug="salao"
+        token={token}
+        timezone="America/Sao_Paulo"
+        businessName="Salao da Ana"
+        contactWhatsapp=""
+        fetchImpl={fetchImpl}
+        now={() => new Date("2030-10-01T12:00:00.000Z")}
+      />,
+    );
+    expect(await screen.findByRole("heading", { name: CUSTOMER_BOOKINGS_PAUSED })).toBeVisible();
+    expect(screen.getByText(CUSTOMER_PAUSED_LATER)).toBeVisible();
+    expect(screen.getByText(CUSTOMER_PAUSED_RECEIPT)).toBeVisible();
+    expect(screen.queryByRole("link", { name: "Falar com a loja" })).toBeNull();
+    expect(container.querySelector('a[href=""], a[href="#"]')).toBeNull();
+  });
+
+  it("bookingsPaused no GET mostra a pausa, e o Pix já começado continua no formulário", async () => {
+    const stores = memorySlotLinkStores();
+    const paused = vi.fn(async () => json(200, { ...openBody(), bookingsPaused: true }));
+    const { unmount } = render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" stores={memorySlotLinkStores()} fetchImpl={paused} now={() => new Date("2030-10-01T12:00:00.000Z")} />);
+    expect(await screen.findByRole("heading", { name: CUSTOMER_BOOKINGS_PAUSED })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Falar com a loja" }).className).toMatch(/bg-pix-deep/);
+    unmount();
+    await lockPayPayload(
+      token,
+      stores,
+      { customer: { name: "Ana Souza", phone: "+5511987654321" }, policyHash: "ab".repeat(32) },
+      "2030-10-18T18:00:00.000Z",
+      () => "11111111-1111-4111-8111-111111111111",
+      Date.parse("2030-10-01T12:00:00.000Z"),
+    );
+    render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" stores={stores} fetchImpl={paused} now={() => new Date("2030-10-01T12:00:00.000Z")} />);
+    expect(await screen.findByRole("button", { name: /Pagar sinal/ })).toBeVisible();
+    expect(screen.queryByRole("heading", { name: CUSTOMER_BOOKINGS_PAUSED })).toBeNull();
+  });
+
   it("GET 200 com status replaced pede o link novo da loja", async () => {
     const fetchImpl = vi.fn(async () => json(200, openBody("replaced")));
     render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" fetchImpl={fetchImpl} now={() => new Date("2030-10-01T12:00:00.000Z")} />);
@@ -461,6 +546,25 @@ describe("página da cliente", () => {
 });
 
 describe("estados e rodapé", () => {
+  it("pausa sem WhatsApp pede para tentar de novo e não abre link vazio", () => {
+    const { container, rerender } = render(<SlotLinkNotice screen={{ kind: "paused", whatsapp: null, publicPath: "/salao" }} />);
+    for (const whatsapp of [null, "", "123", "   "]) {
+      rerender(<SlotLinkNotice screen={{ kind: "paused", whatsapp, publicPath: "/salao" }} />);
+      expect(screen.getByRole("heading", { name: CUSTOMER_BOOKINGS_PAUSED })).toBeVisible();
+      expect(screen.getByText(CUSTOMER_PAUSED_LATER)).toBeVisible();
+      expect(screen.getByText(CUSTOMER_PAUSED_RECEIPT)).toBeVisible();
+      expect(screen.queryByRole("link", { name: "Falar com a loja" })).toBeNull();
+      expect(container.querySelector('a[href=""], a[href="#"]')).toBeNull();
+      expect(container.querySelector("a")).toBeNull();
+    }
+    rerender(<SlotLinkNotice screen={{ kind: "paused", whatsapp: "+5511988887777", publicPath: "/salao" }} />);
+    const talk = screen.getByRole("link", { name: "Falar com a loja" });
+    expect(talk).toHaveAttribute("href", "https://wa.me/5511988887777");
+    expect(talk.className).toMatch(/bg-pix-deep/);
+    expect(screen.getByText(CUSTOMER_PAUSED_RECEIPT)).toBeVisible();
+    expect(screen.queryByText(CUSTOMER_PAUSED_LATER)).toBeNull();
+  });
+
   it("cada estado tem título e o caminho da agenda sem o token", () => {
     const { rerender } = render(<SlotLinkNotice screen={{ kind: "taken", publicPath: "/salao" }} />);
     expect(screen.getByRole("heading", { name: "Esse horário acabou de ser reservado." })).toBeVisible();

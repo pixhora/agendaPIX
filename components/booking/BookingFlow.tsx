@@ -47,9 +47,20 @@ interface BookingFlowProps {
   previewBusiness?: PublicBusinessData;
   /** Espelha `LEGAL_PAGES_PUBLISHED`. Desligado: sem link de privacidade. */
   legalPagesPublished?: boolean;
+  /** Link wa.me do suporte. A página pública calcula no servidor. Null esconde o link. */
+  supportWhatsappHref?: string | null;
 }
 
-export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBusiness, legalPagesPublished = false }: BookingFlowProps) {
+const footerLinkClass = "inline-flex min-h-11 items-center text-sm text-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+
+export function BookingFlow({
+  slug,
+  initialBookingId,
+  initialBusiness,
+  previewBusiness,
+  legalPagesPublished = false,
+  supportWhatsappHref = null,
+}: BookingFlowProps) {
   // Estado do Negócio
   const [business, setBusiness] = useState<PublicBusinessData | null>(previewBusiness ?? initialBusiness ?? null);
   const [isLoadingBusiness, setIsLoadingBusiness] = useState(!(previewBusiness || initialBusiness));
@@ -471,18 +482,36 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
   );
 
   const pageFooter = (
-    <footer className="mx-auto flex max-w-5xl flex-col items-center gap-3 px-4 pb-10 pt-4 text-center text-xs text-muted sm:flex-row sm:justify-between sm:px-6 sm:text-left">
+    <footer className="mx-auto flex w-full max-w-5xl flex-col items-center gap-3 px-4 pb-10 pt-4 text-center text-xs text-muted sm:px-6">
       {noBookingFlow ? null : (
         <p className="inline-flex items-center gap-1.5">
           <Icon icon={PIX_ICONS.lock} />
           O sinal garante o horário. Seus dados são usados só para este agendamento.
         </p>
       )}
-      <div className="flex items-center gap-3">
-        <ThemeToggle className="sm:hidden" />
-        <Link href="/" className="inline-flex min-h-11 items-center gap-2 font-semibold text-ink">
-          <BrandMark className="size-6 rounded-[7.5px]" /> Feito com AgendaPix
-        </Link>
+      <div className="flex w-full flex-col items-center gap-2 sm:flex-row sm:items-center sm:justify-between sm:text-left">
+        {legalPagesPublished || supportWhatsappHref ? (
+          <nav aria-label="AgendaPix" className="flex flex-wrap items-center justify-center gap-x-4 sm:justify-start">
+            {legalPagesPublished ? (
+              <>
+                <Link href="/termos" className={footerLinkClass}>Termos de uso</Link>
+                <Link href="/privacidade" className={footerLinkClass}>Política de privacidade</Link>
+              </>
+            ) : null}
+            {supportWhatsappHref ? (
+              <a href={supportWhatsappHref} target="_blank" rel="noopener noreferrer" className={footerLinkClass}>
+                Suporte no WhatsApp
+                <span className="sr-only"> (abre em nova aba)</span>
+              </a>
+            ) : null}
+          </nav>
+        ) : null}
+        <div className="flex items-center gap-3">
+          <ThemeToggle className="sm:hidden" />
+          <Link href="/" className="inline-flex min-h-11 items-center gap-2 font-semibold text-ink">
+            <BrandMark className="size-6 rounded-[7.5px]" /> Feito com AgendaPix
+          </Link>
+        </div>
       </div>
     </footer>
   );
@@ -632,29 +661,6 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
         </main>
         {pageFooter}
         <AgendaPixFooter campaign="reserva_confirmada" />
-      </div>
-    );
-  }
-
-  if (business.bookingsPaused && !bookingResponse) {
-    const whatsapp = business.contactWhatsapp?.replace(/^\+/, "");
-    return (
-      <div className="min-h-dvh bg-paper">
-        {pageHeader}
-        <main id="content" className="mx-auto max-w-md px-4 py-16">
-          <div className="space-y-4 rounded-card border border-line bg-surface p-6 text-center shadow-[var(--shadow-card)]">
-            <h1 className="font-display text-xl font-bold text-ink">Agendamento online pausado</h1>
-            <p className="text-sm text-muted">
-              {whatsapp ? `Fale com ${business.name} pelo WhatsApp para marcar um horário.` : `Fale com ${business.name} para marcar um horário.`}
-            </p>
-            {whatsapp && (
-              <Button asChild className="w-full">
-                <a href={`https://wa.me/${whatsapp}`} target="_blank" rel="noopener noreferrer">Falar no WhatsApp</a>
-              </Button>
-            )}
-          </div>
-        </main>
-        <AgendaPixFooter campaign="pagina_publica" />
       </div>
     );
   }

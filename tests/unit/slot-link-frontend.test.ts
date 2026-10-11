@@ -86,6 +86,12 @@ describe("estados da cliente", () => {
     });
     expect(failure.kind).toBe("expired");
     expect(screenFromFailure("link_expired", { publicPath: "/salao", now }).kind).toBe("expired");
+    expect(screenFromStatus({ ...openBase, status: "pending" as const, bookingsPaused: true }, now)).toMatchObject({
+      kind: "paused",
+      whatsapp: "+5511999999999",
+      publicPath: "/salao",
+    });
+    expect(screenFromStatus({ ...openBase, status: "paid" as const, bookingsPaused: true }, now).kind).toBe("used");
   });
 
   it("horário futuro ocupado não vira expirado, e link pago continua confirmado", () => {
@@ -135,6 +141,13 @@ describe("estados da cliente", () => {
     const retry = screenFromFailure("rate_limited", { publicPath: "/salao", whatsapp: "+5511999999999", now });
     expect(retry).toMatchObject({ kind: "retry", rateLimited: true, whatsapp: "+5511999999999" });
     expect(screenFromFailure("server", { publicPath: "/salao", now })).toMatchObject({ kind: "retry", rateLimited: false });
+    expect(failureCode(403, { error: { code: "bookings_paused", message: "Este estabelecimento não está aceitando novos agendamentos no momento." } })).toBe("bookings_paused");
+    expect(screenFromFailure("bookings_paused", { publicPath: "/salao", whatsapp: "+5511999999999", now })).toEqual({
+      kind: "paused",
+      whatsapp: "+5511999999999",
+      publicPath: "/salao",
+    });
+    expect(failureCode(403, { error: { code: "unauthorized", message: "interno" } })).toBe("unknown");
     expect(failureCode(429, { error: { code: "rate_limited", message: "interno" } })).toBe("rate_limited");
     expect(failureCode(503, { error: { code: "internal_error", message: "interno" } })).toBe("server");
   });
