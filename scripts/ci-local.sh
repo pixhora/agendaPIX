@@ -3,6 +3,7 @@
 #
 # Uso:
 #   scripts/ci-local.sh                 # tudo (exige docker/podman com Postgres 17)
+#   scripts/ci-local.sh pr              # regras de PR contra origin/master (rápido, sem Docker)
 #   scripts/ci-local.sh static          # lint, typecheck, test, build, bundles, audit
 #   scripts/ci-local.sh db              # test:db contra Postgres descartável
 #   scripts/ci-local.sh e2e             # Playwright (+ páginas legais)
@@ -27,6 +28,13 @@ say() { printf '\n\033[1m== %s\033[0m\n' "$*"; }
 die() { printf '\n\033[31mFALHOU: %s\033[0m\n' "$*" >&2; exit 1; }
 restore_tsconfig() { git checkout -- tsconfig.json 2>/dev/null || true; }
 trap restore_tsconfig EXIT
+
+stage_pr() {
+  # Falha se a branch estiver atrás da master, com conflito, com migration fora de ordem, com segredo,
+  # com console.log/.only esquecido, TODO sem dono ou package.json sem lockfile. Ver scripts/check-pr.mjs.
+  say "origin/master atualizado"; git fetch --quiet origin master || die "não consegui buscar origin/master"
+  say "regras de PR (contra origin/master)"; node scripts/check-pr.mjs HEAD origin/master || die "check de PR"
+}
 
 stage_static() {
   say "lint"; pnpm lint || die "lint"
@@ -164,6 +172,7 @@ stage_motion_webkit() {
 stage="${1:-all}"
 shift || true
 case "$stage" in
+  pr) stage_pr ;;
   static) stage_static ;;
   db) stage_db ;;
   e2e) stage_e2e ;;
@@ -171,6 +180,7 @@ case "$stage" in
   motion-webkit) stage_motion_webkit ;;
   visual) stage_visual "$stage" "${1:-}" ;;
   all)
+    stage_pr
     stage_static
     stage_db
     stage_e2e
