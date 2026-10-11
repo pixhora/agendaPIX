@@ -78,4 +78,17 @@ Tópico `payment`. Manifesto `id:{data.id};request-id:{x-request-id};ts:{ts};` e
 
 ## Segredos
 
-`BOOKING_ACCESS_SECRET` assina o link da reserva. `RATE_LIMIT_SECRET` assina o balde antiabuso. `MERCADOPAGO_ACCESS_TOKEN` e `MERCADOPAGO_WEBHOOK_SECRET` continuam separados. Segredo de booking vazio cai em `BETTER_AUTH_SECRET`.
+`BOOKING_ACCESS_SECRET` assina o link da reserva e o HMAC da chave de pagamento do link. `RATE_LIMIT_SECRET` assina o balde antiabuso. `MERCADOPAGO_ACCESS_TOKEN` e `MERCADOPAGO_WEBHOOK_SECRET` continuam separados. Fora de produção, `BOOKING_ACCESS_SECRET` vazio ainda cai em `BETTER_AUTH_SECRET`. Em produção (`NODE_ENV=production` no boot e `VERCEL_ENV=production` no `next build`) esse fallback não existe: vazio, com menos de 32 caracteres ou igual a `BETTER_AUTH_SECRET` impede o processo de subir. A mensagem cita o nome e o motivo, nunca o valor.
+
+Token novo sai só com o segredo atual. A verificação aceita o atual ou `BOOKING_ACCESS_SECRET_PREVIOUS`, em tempo constante. Sem `PREVIOUS`, o `BETTER_AUTH_SECRET` antigo não é aceito: quem quiser manter os links já emitidos grava o valor antigo nessa variável.
+
+## Rollout da 0021
+
+Antes do merge e do deploy:
+
+1. No Neon, crie o branch `backup-pre-0021` a partir de `production`.
+2. Na Vercel Production, crie `BOOKING_ACCESS_SECRET` com `openssl rand -base64 32` **antes** de publicar. Se o segredo estava vazio, defina também `BOOKING_ACCESS_SECRET_PREVIOUS` com o `BETTER_AUTH_SECRET` atual, para o link de acompanhamento das reservas ativas continuar válido. Remova `PREVIOUS` depois que essas reservas passarem. `PREVIOUS` pode repetir `BETTER_AUTH_SECRET`; o segredo atual não pode.
+3. Rode a migration na URL direta (sem `-pooler`) com `.env.migrate` ou com o prompt oculto do `pnpm db:migrate`. O script não imprime a URL, lista o que está pendente e pede confirmação no terminal. Apague `.env.migrate` em seguida. CI e Docker, com `DATABASE_URL` no ambiente, não perguntam e não esperam input.
+4. Aí sim, merge e deploy.
+
+O passo a passo também está em `docs/CONTRATOS.md`, na seção do link de um horário.

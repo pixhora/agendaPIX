@@ -152,6 +152,7 @@ jobs:
             -e DATABASE_URL=postgresql://agenda@localhost:5432/agenda \
             -e BETTER_AUTH_URL=http://localhost:3000 \
             -e BETTER_AUTH_SECRET="$(openssl rand -base64 32)" \
+            -e BOOKING_ACCESS_SECRET="$(openssl rand -base64 32)" \
             -e SMTP_HOST=localhost -e SMTP_PORT=1025 -e SMTP_SECURE=false \
             -e "SMTP_FROM=AgendaPix <ci@agendapix.dev.br>" \
             agendapix:ci
@@ -195,6 +196,7 @@ jobs:
           # Worker em loop, como no compose: precisa continuar de pé.
           docker run -d --name agendapix-worker --network host \
             -e DATABASE_URL=postgresql://agenda@localhost:5432/agenda \
+            -e BOOKING_ACCESS_SECRET="$(openssl rand -base64 32)" \
             -e RECONCILE_INTERVAL_SECONDS=5 \
             agendapix:ci node reconcile.mjs
           sleep 12

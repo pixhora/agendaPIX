@@ -1,10 +1,11 @@
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { createHash } from "node:crypto";
 import { and, eq, gt, inArray, lt, or, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { getDb } from "../../db";
 import * as schema from "../../db/schema";
 import { bookingAccessSecret } from "../env";
+import { bookingAccessTokenMatches, signBookingAccessToken } from "./access-mac";
 import { HttpError } from "../http";
 import { paymentsConfig } from "../payments/config";
 import { assertMpConnectedForDeposit } from "../mercadopago-oauth/bookability";
@@ -69,9 +70,9 @@ export function chargeIdempotencyKey(businessId: string, requestKey: string) {
   return `${value.slice(0, 8)}-${value.slice(8, 12)}-${value.slice(12, 16)}-${value.slice(16, 20)}-${value.slice(20)}`;
 }
 function accessToken(businessId: string, bookingId: string) {
-  const secret = bookingAccessSecret();
-  if (!secret) throw new HttpError(503, "booking_unavailable", "Agendamento indisponível. Tente novamente mais tarde.");
-  return createHmac("sha256", secret).update(`booking-access:v1:${businessId}:${bookingId}`).digest("base64url");
+  const token = signBookingAccessToken(businessId, bookingId);
+  if (!token) throw new HttpError(503, "booking_unavailable", "Agendamento indisponível. Tente novamente mais tarde.");
+  return token;
 }
 export async function lockBusiness(database: Database, businessId: string) {
   await database.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${businessId}, 0))`);
@@ -372,9 +373,10 @@ function bearerToken(authorization: string | null) {
   return PAYMENT_BEARER.exec(authorization ?? "")?.[1] ?? null;
 }
 
-function tokenMatches(token: string, accessTokenHash: string | null) {
-  return Boolean(accessTokenHash && /^[a-f0-9]{64}$/.test(accessTokenHash)
-    && timingSafeEqual(Buffer.from(hash(token), "hex"), Buffer.from(accessTokenHash, "hex")));
+function tokenMatches(token: string, accessTokenHash: string | null, businessId: string, bookingId: string) {
+  if (!accessTokenHash || !/^[a-f0-9]{64}$/.test(accessTokenHash)) return false;
+  if (!bookingAccessSecret()) throw new HttpError(503, "booking_unavailable", "Agendamento indisponível. Tente novamente mais tarde.");
+  return bookingAccessTokenMatches(token, businessId, bookingId);
 }
 
 export type PaymentGatewayPoll = {
@@ -408,7 +410,7 @@ export async function getBookingPayment(
     database.select().from(schema.bookings).where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.id, bookingId))).limit(1),
   ]);
   const booking = bookingRows[0];
-  if (!booking || !tokenMatches(token, booking.accessTokenHash)) {
+  if (!booking || !tokenMatches(token, booking.accessTokenHash, booking.businessId, booking.id)) {
     throw new HttpError(404, "booking_not_found", "Agendamento não encontrado.");
   }
   const now = new Date();

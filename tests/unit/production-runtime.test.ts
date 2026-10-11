@@ -8,6 +8,12 @@ import { mpFixturesAllowed, readMpFixture } from "../../lib/mercadopago/dev-fixt
 
 const capturePath = "/tmp/secret-magic-link-capture.txt";
 const from = "AgendaPix <ci-secreta@example.com>";
+const bookingAccess = "booking-access-secret-32-chars-dddd";
+const authSecret = "better-auth-secret-32-chars-ok-bbbb";
+const dedicatedBookingSecret = {
+  BOOKING_ACCESS_SECRET: bookingAccess,
+  BETTER_AUTH_SECRET: authSecret,
+};
 
 describe("boot de produção", () => {
   it("recusa captura, fixture e remetente example.com sem repetir o valor", () => {
@@ -52,6 +58,7 @@ describe("boot de produção", () => {
       MAGIC_LINK_CAPTURE_FILE: "  ",
       MP_CAPTURE: "",
       SMTP_FROM: "AgendaPix <ci@agendapix.dev.br>",
+      ...dedicatedBookingSecret,
     })).not.toThrow();
   });
 
@@ -74,13 +81,14 @@ describe("boot de produção", () => {
       expect(message).not.toContain("ci@agendapix");
     }
     expect(assertMpOAuthPkce({ MP_OAUTH_PKCE: " on " })).toBe(true);
-    expect(() => assertProductionSafeEnv({ ...env, MP_OAUTH_PKCE: " on " })).not.toThrow();
+    expect(() => assertProductionSafeEnv({ ...env, MP_OAUTH_PKCE: " on ", ...dedicatedBookingSecret })).not.toThrow();
     expect(assertMpOAuthPkce({ MP_OAUTH_PKCE: " off " })).toBe(false);
     expect(() => assertProductionSafeEnv({
       NODE_ENV: "production",
       MERCADOPAGO_ENV: "sandbox",
       MP_OAUTH_PKCE: "off",
       SMTP_FROM: "AgendaPix <ci@agendapix.dev.br>",
+      ...dedicatedBookingSecret,
     })).not.toThrow();
     expect(() => assertProductionSafeEnv({
       NODE_ENV: "production",
@@ -130,7 +138,11 @@ describe("build de produção na Vercel", () => {
       const message = error instanceof Error ? error.message : String(error);
       expect(message).not.toContain(secretValue);
     }
-    expect(() => assertVercelProductionBuild({ VERCEL_ENV: "production", MP_OAUTH_PKCE: " on " })).not.toThrow();
+    expect(() => assertVercelProductionBuild({
+      VERCEL_ENV: "production",
+      MP_OAUTH_PKCE: " on ",
+      ...dedicatedBookingSecret,
+    })).not.toThrow();
 
     const hold = "27";
     expect(() => assertVercelProductionBuild({
@@ -170,6 +182,92 @@ describe("build de produção na Vercel", () => {
   it("o next.config chama a checagem que derruba o build", () => {
     const source = readFileSync("next.config.ts", "utf8");
     expect(source).toContain("assertVercelProductionBuild()");
+  });
+});
+
+describe("BOOKING_ACCESS_SECRET em produção", () => {
+  const boot = {
+    NODE_ENV: "production",
+    SMTP_FROM: "AgendaPix <ci@agendapix.dev.br>",
+    ...dedicatedBookingSecret,
+  };
+  const build = {
+    VERCEL_ENV: "production",
+    MP_OAUTH_PKCE: "on",
+    ...dedicatedBookingSecret,
+  };
+
+  it("recusa vazio, curto e igual a BETTER_AUTH_SECRET sem repetir o valor", () => {
+    const leaked = "segredo-que-nao-pode-vazar-32charsxx";
+    const short = "curto-demais";
+    for (const env of [
+      { ...boot, BOOKING_ACCESS_SECRET: "" },
+      { ...boot, BOOKING_ACCESS_SECRET: undefined },
+      { ...boot, BOOKING_ACCESS_SECRET: "   " },
+    ]) {
+      expect(() => assertProductionSafeEnv(env)).toThrow("BOOKING_ACCESS_SECRET é obrigatório em produção.");
+    }
+    expect(() => assertProductionSafeEnv({ ...boot, BOOKING_ACCESS_SECRET: short })).toThrow("BOOKING_ACCESS_SECRET precisa ter pelo menos 32 caracteres.");
+    expect(() => assertProductionSafeEnv({
+      ...boot,
+      BOOKING_ACCESS_SECRET: leaked,
+      BETTER_AUTH_SECRET: leaked,
+    })).toThrow("BOOKING_ACCESS_SECRET não pode ser igual a BETTER_AUTH_SECRET.");
+    try {
+      assertProductionSafeEnv({ ...boot, BOOKING_ACCESS_SECRET: short });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      expect(message).toContain("BOOKING_ACCESS_SECRET");
+      expect(message).not.toContain(short);
+    }
+    try {
+      assertProductionSafeEnv({ ...boot, BOOKING_ACCESS_SECRET: leaked, BETTER_AUTH_SECRET: leaked });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      expect(message).not.toContain(leaked);
+    }
+
+    expect(() => assertVercelProductionBuild({ ...build, BOOKING_ACCESS_SECRET: "" })).toThrow("BOOKING_ACCESS_SECRET é obrigatório em produção.");
+    expect(() => assertVercelProductionBuild({ ...build, BOOKING_ACCESS_SECRET: short })).toThrow("BOOKING_ACCESS_SECRET precisa ter pelo menos 32 caracteres.");
+    expect(() => assertVercelProductionBuild({
+      ...build,
+      BOOKING_ACCESS_SECRET: leaked,
+      BETTER_AUTH_SECRET: leaked,
+    })).toThrow("BOOKING_ACCESS_SECRET não pode ser igual a BETTER_AUTH_SECRET.");
+    try {
+      assertVercelProductionBuild({ ...build, BOOKING_ACCESS_SECRET: leaked, BETTER_AUTH_SECRET: leaked });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      expect(message).not.toContain(leaked);
+    }
+  });
+
+  it("aceita segredo válido e não cobra a regra fora de produção", () => {
+    expect(() => assertProductionSafeEnv(boot)).not.toThrow();
+    expect(() => assertVercelProductionBuild(build)).not.toThrow();
+    expect(() => assertProductionSafeEnv({ BOOKING_ACCESS_SECRET: "", NODE_ENV: "development" })).not.toThrow();
+    expect(() => assertProductionSafeEnv({ BOOKING_ACCESS_SECRET: "curto", NODE_ENV: "test" })).not.toThrow();
+    expect(() => assertProductionSafeEnv({
+      NODE_ENV: "production",
+      NEXT_PHASE: "phase-production-build",
+      BOOKING_ACCESS_SECRET: "",
+    })).not.toThrow();
+    expect(() => assertVercelProductionBuild({ VERCEL_ENV: "preview", BOOKING_ACCESS_SECRET: "" })).not.toThrow();
+    expect(() => assertVercelProductionBuild({ VERCEL_ENV: "development", BOOKING_ACCESS_SECRET: "curto" })).not.toThrow();
+  });
+
+  it("deixa PREVIOUS igual a BETTER_AUTH_SECRET e avisa uma vez no boot, sem o valor", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(() => assertProductionSafeEnv({ ...boot, BOOKING_ACCESS_SECRET_PREVIOUS: authSecret })).not.toThrow();
+    expect(() => assertVercelProductionBuild({ ...build, BOOKING_ACCESS_SECRET_PREVIOUS: authSecret })).not.toThrow();
+    expect(() => assertProductionSafeEnv({ ...boot, BOOKING_ACCESS_SECRET_PREVIOUS: "   " })).not.toThrow();
+    expect(warn).toHaveBeenCalledTimes(1);
+    const text = warn.mock.calls.map((call) => call.map(String).join(" ")).join("\n");
+    expect(text).toContain("BOOKING_ACCESS_SECRET_PREVIOUS");
+    expect(text).toContain("Remova depois que as reservas ativas passarem");
+    expect(text).not.toContain(authSecret);
+    expect(text).not.toContain(bookingAccess);
+    warn.mockRestore();
   });
 });
 

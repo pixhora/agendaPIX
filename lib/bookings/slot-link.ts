@@ -1,4 +1,3 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
 import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, or, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { z } from "zod";
@@ -20,7 +19,7 @@ import {
 import { consumeAbuseBucket } from "../abuse-rate-limit";
 import { loadBookingAccess } from "../billing/load";
 import { findOwnedBusiness } from "../tenancy";
-import { bookingAccessSecret } from "../env";
+import { bookingAccessMac, bookingAccessMacMatches } from "./access-mac";
 import { HttpError } from "../http";
 import { payerCpfRequired } from "../marketing/facts";
 import { assertMpConnectedForDeposit } from "../mercadopago-oauth/bookability";
@@ -88,11 +87,15 @@ function invalidLink() {
   return new HttpError(404, "link_invalid", LINK_INVALID_MESSAGE);
 }
 
-/** HMAC do Idempotency-Key com o segredo de acesso. A chave crua não fica no banco. */
+export function slotLinkPayMessage(linkId: string, idempotencyKey: string) {
+  return `slot-link-pay:v1:${linkId}:${idempotencyKey}`;
+}
+
+/** HMAC do Idempotency-Key com o segredo atual. A chave crua não fica no banco. */
 export function slotLinkPayIdempotencyHash(linkId: string, idempotencyKey: string) {
-  const secret = bookingAccessSecret();
-  if (!secret) throw new HttpError(503, "booking_unavailable", "Agendamento indisponível. Tente novamente mais tarde.");
-  return createHmac("sha256", secret).update(`slot-link-pay:v1:${linkId}:${idempotencyKey}`).digest("hex");
+  const digest = bookingAccessMac(slotLinkPayMessage(linkId, idempotencyKey), "hex");
+  if (!digest) throw new HttpError(503, "booking_unavailable", "Agendamento indisponível. Tente novamente mais tarde.");
+  return digest;
 }
 
 /** requestKey da reserva, derivado do HMAC. Não é sha256 do id do link. */
@@ -104,9 +107,9 @@ export function slotLinkRequestKey(payIdempotencyHash: string) {
   return `${value.slice(0, 8)}-${value.slice(8, 12)}-${value.slice(12, 16)}-${value.slice(16, 20)}-${value.slice(20)}`;
 }
 
-function sameSecretHash(stored: string | null, next: string) {
-  if (!stored || stored.length !== next.length) return false;
-  return timingSafeEqual(Buffer.from(stored), Buffer.from(next));
+/** O HMAC gravado vale se foi feito com o segredo atual ou com o anterior. */
+function storedPayHashMatches(stored: string | null, message: string) {
+  return Boolean(stored && bookingAccessMacMatches(stored, message, "hex"));
 }
 
 function claimIsFresh(payStartedAt: Date | null, now: Date, holdMinutes: number) {
@@ -634,7 +637,7 @@ function bookingIsPaid(booking: typeof schema.bookings.$inferSelect | null, paym
  * PUT /v1/payments/{id} com status cancelled) e, se o Pix entrar depois,
  * `resolveLatePayment`.
  */
-async function claimForPay(database: Database, link: LinkRow, hash: string, holdMinutes: number) {
+async function claimForPay(database: Database, link: LinkRow, currentHash: string, message: string, holdMinutes: number) {
   return database.transaction(async (tx) => {
     const [clock] = (await tx.execute(sql`SELECT now() AS now`)).rows as { now: Date | string }[];
     const now = new Date(clock?.now ?? Date.now());
@@ -672,7 +675,10 @@ async function claimForPay(database: Database, link: LinkRow, hash: string, hold
     const holdActive = Boolean(booking && booking.status === "pending_payment" && booking.expiresAt && booking.expiresAt > now);
     const claimActive = holdActive || claimIsFresh(locked.payStartedAt, now, holdMinutes);
     // A mesma chave retoma o Pix mesmo com o prazo do link vencido, se o hold da reserva ainda vale.
-    if (claimActive && sameSecretHash(locked.payIdempotencyHash, hash)) return { mode: "resume" as const, now };
+    // O hash gravado pode ser o do segredo anterior: a requestKey da reserva nasceu dele.
+    if (claimActive && storedPayHashMatches(locked.payIdempotencyHash, message)) {
+      return { mode: "resume" as const, now, hash: locked.payIdempotencyHash as string };
+    }
     if (locked.expiresAt <= now) {
       await tx.update(schema.slotLinks).set({ status: "expired", updatedAt: now }).where(and(
         eq(schema.slotLinks.id, locked.id),
@@ -694,7 +700,7 @@ async function claimForPay(database: Database, link: LinkRow, hash: string, hold
     const [claimed] = await tx.update(schema.slotLinks).set({
       status: "pending",
       payStartedAt: now,
-      payIdempotencyHash: hash,
+      payIdempotencyHash: currentHash,
       updatedAt: now,
     }).where(and(
       eq(schema.slotLinks.businessId, locked.businessId),
@@ -708,7 +714,7 @@ async function claimForPay(database: Database, link: LinkRow, hash: string, hold
       gt(schema.slotLinks.expiresAt, now),
     )).returning({ id: schema.slotLinks.id });
     if (!claimed) throw new HttpError(409, "link_in_progress", LINK_IN_PROGRESS_MESSAGE);
-    return { mode: "create" as const, now };
+    return { mode: "create" as const, now, hash: currentHash };
   });
 }
 
@@ -768,9 +774,11 @@ export async function paySlotLink(
   const service = await serviceForBusiness(database, business.id, link.serviceId, true);
   if (service.depositCents <= 0) throw new HttpError(409, "slot_unavailable", SLOT_TAKEN_MESSAGE);
   await requireMercadoPago(business.id, database, MP_PUBLIC_MESSAGE);
-  const hash = slotLinkPayIdempotencyHash(link.id, key);
+  const message = slotLinkPayMessage(link.id, key);
+  const currentHash = slotLinkPayIdempotencyHash(link.id, key);
+  const claimed = await claimForPay(database, link, currentHash, message, config.BOOKING_HOLD_MINUTES);
+  const hash = claimed.hash;
   const requestKey = slotLinkRequestKey(hash);
-  const claimed = await claimForPay(database, link, hash, config.BOOKING_HOLD_MINUTES);
   try {
     if (claimed.mode === "create") {
       const date = localDate(link.startsAt, business.timezone);
