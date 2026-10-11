@@ -108,7 +108,8 @@ describe("generateMetadata da prévia", () => {
     const meta = await slotLinkShareMeta(slug, blocked, now, options(identity));
     expect(selects.length).toBe(before);
     expect(findToken).toHaveBeenCalledTimes(limit);
-    expect(meta.image).toBe(logo);
+    expect(meta.title).toBe("AgendaPix · Agende pelo AgendaPix");
+    expect(meta.image).toBeNull();
     expect(meta.title).not.toContain("Corte");
     expect(shareMetaCacheRecord(slug, blocked)).toBeNull();
   });
@@ -175,37 +176,32 @@ describe("generateMetadata da prévia", () => {
     expect(shareMetaCacheRecord(slug, second)?.negative).toBe(false);
   });
 
-  it("com o bucket estourado a loja é lida no máximo uma vez por slug na janela", async () => {
+  it("com o bucket estourado e slugs aleatórios não consulta businesses", async () => {
     const { counts, options, findToken, storeCard } = ports();
     const now = 1_700_000_000_000;
     counts.set("peer:flood", limit);
-    for (let index = 0; index < 8; index += 1) {
-      const meta = await slotLinkShareMeta(slug, createSlotLinkToken(), now, options("peer:flood"));
-      expect(meta.title).toBe("Negócio de teste · Agende pelo AgendaPix");
-      expect(meta.image).toBe(logo);
+    const names = [slug, ...Array.from({ length: 12 }, (_, index) => `loja-${index}`)];
+    for (const name of names) {
+      for (let index = 0; index < 3; index += 1) {
+        const meta = await slotLinkShareMeta(name, createSlotLinkToken(), now + index, options("peer:flood"));
+        expect(meta.title).toBe("AgendaPix · Agende pelo AgendaPix");
+        expect(meta.image).toBeNull();
+      }
     }
-    expect(storeCard).toHaveBeenCalledTimes(1);
-    expect(storeCard).toHaveBeenCalledWith(slug);
+    expect(storeCard).not.toHaveBeenCalled();
     expect(findToken).not.toHaveBeenCalled();
-    await slotLinkShareMeta("outra-loja", createSlotLinkToken(), now, options("peer:flood"));
-    expect(storeCard).toHaveBeenCalledTimes(2);
-    await slotLinkShareMeta(slug, createSlotLinkToken(), now + STORE_CARD_TTL_MS - 1, options("peer:flood"));
-    expect(storeCard).toHaveBeenCalledTimes(2);
-    await slotLinkShareMeta(slug, createSlotLinkToken(), now + STORE_CARD_TTL_MS, options("peer:flood"));
-    expect(storeCard).toHaveBeenCalledTimes(3);
   });
 
   it("slugs aleatórios não repetem o SELECT e o mesmo slug consulta uma vez na janela", async () => {
-    const { counts, options } = ports();
+    const { options } = ports();
     const now = 1_700_000_000_000;
-    counts.set("peer:flood", limit);
     let selects = 0;
     const storeCard = vi.fn(async (name: string) => {
       selects += 1;
       if (name === slug) return { businessName: "Negócio de teste", logoUrl: logo, missing: false };
       return { businessName: "AgendaPix", logoUrl: null, missing: true };
     });
-    const call = (name: string, at: number) => slotLinkShareMeta(name, createSlotLinkToken(), at, { ...options("peer:flood"), storeCard });
+    const call = (name: string, at: number) => slotLinkShareMeta(name, createSlotLinkToken(), at, { ...options("peer:card"), storeCard, limit: 100 });
     const randomSlugs = Array.from({ length: 12 }, (_, index) => `loja-${index}`);
     for (const name of randomSlugs) {
       await call(name, now);

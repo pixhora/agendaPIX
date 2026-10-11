@@ -56,6 +56,14 @@ function genericMeta(card: StoreCard): SlotLinkShareMeta {
   return { ...copy, image: card.logoUrl };
 }
 
+/** Balde estourado: nome e logo fixos. Não consulta `businesses`. */
+function fixedOgFallback(): SlotLinkShareMeta {
+  return genericMeta({
+    businessName: GENERIC_OG_FALLBACK.businessName,
+    logoUrl: GENERIC_OG_FALLBACK.logoUrl,
+  });
+}
+
 async function defaultStoreCard(database: NonNullable<SlotLinkShareMetaOptions["database"]>, slug: string): Promise<StoreCard> {
   const missing = { businessName: GENERIC_OG_FALLBACK.businessName, logoUrl: GENERIC_OG_FALLBACK.logoUrl, missing: true };
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return missing;
@@ -109,7 +117,7 @@ export async function slotLinkShareMeta(slug: string, token: string, now = Date.
     console.warn("slot-link: não deu para ler o limite da prévia");
     return fallback();
   }
-  if (exhausted) return fallback();
+  if (exhausted) return fixedOgFallback();
 
   let row: { previewId: string } | null = null;
   try {
