@@ -22,6 +22,61 @@ export function logoRejection(file: { type: string; size: number; name?: string 
   return null;
 }
 
+/** Lado maior de referência: o servidor já reduz para 512 px, então 1024 px deixa a imagem nítida na tela. */
+export const LOGO_SHRINK_MAX_EDGE_PX = 1024;
+
+/** Tamanho final da imagem reduzida, mantendo a proporção e sem ampliar. */
+export function logoShrinkSize(width: number, height: number, maxEdge = LOGO_SHRINK_MAX_EDGE_PX): { width: number; height: number } {
+  const longest = Math.max(width, height);
+  if (longest <= maxEdge) return { width, height };
+  const scale = maxEdge / longest;
+  return { width: Math.round(width * scale), height: Math.round(height * scale) };
+}
+
+const SERVER_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+
+/**
+ * Qualquer imagem que o navegador consiga decodificar (HEIC no Safari, GIF, BMP…) vira WebP de até 1024 px aqui,
+ * porque o servidor só aceita PNG, JPEG e WebP. Formato que o navegador não lê volta igual e cai na validação.
+ * Quando a imagem já é aceita e cabe no limite, nada muda.
+ */
+/** A foto escolhida não pôde ser lida (o Android às vezes perde o acesso à foto do Google Fotos). */
+export class LogoUnreadableError extends Error {
+  constructor() {
+    super("logo_unreadable");
+  }
+}
+
+export async function prepareLogoFile(picked: File): Promise<File> {
+  // Lê os bytes logo na escolha: a prévia e o envio passam a usar a cópia em memória, não a referência do seletor.
+  let bytes: ArrayBuffer;
+  try {
+    bytes = await picked.arrayBuffer();
+  } catch {
+    throw new LogoUnreadableError();
+  }
+  const file = new File([bytes], picked.name, { type: picked.type });
+  const accepted = SERVER_TYPES.has(file.type.toLowerCase());
+  if (accepted && file.size <= LOGO_MAX_BYTES) return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const size = logoShrinkSize(bitmap.width, bitmap.height);
+    const canvas = document.createElement("canvas");
+    canvas.width = size.width;
+    canvas.height = size.height;
+    const context = canvas.getContext("2d");
+    if (!context) return file;
+    context.drawImage(bitmap, 0, 0, size.width, size.height);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", 0.85));
+    // Safari nem sempre codifica WebP: o navegador devolve PNG. Só usamos o resultado quando veio mesmo como WebP.
+    if (!blob || blob.type !== "image/webp" || blob.size === 0) return file;
+    return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".webp", { type: "image/webp" });
+  } catch {
+    return file;
+  }
+}
+
 export type LogoUploadResult = { ok: true; url: string } | { ok: false; message: string; cancelled?: boolean };
 
 export function uploadLogoFile(
@@ -74,6 +129,9 @@ export function uploadLogoFile(
       finish({ ok: false, message: profileErrorCopy("internal_error") });
     };
     xhr.onerror = () => finish({ ok: false, message: "Não deu para enviar a imagem. Tente de novo." });
+    // Conexão travada não pode deixar o envio preso até recarregar a página.
+    xhr.timeout = 60_000;
+    xhr.ontimeout = () => finish({ ok: false, message: "A conexão demorou demais. Tente de novo." });
     xhr.onabort = () => finish({ ok: false, message: "", cancelled: true });
     if (options.signal.aborted) {
       finish({ ok: false, message: "", cancelled: true });

@@ -26,6 +26,7 @@ import type { BookingPolicyView } from "@/components/booking/types";
 import { PolicySheet } from "@/components/policy/PolicySheet";
 import type { PreviewScene } from "@/components/preview/scene";
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BusinessAvatar } from "@/components/ui/business-avatar";
 import { PREVIEW_PIX_COPY_PASTE, PREVIEW_PIX_QR } from "@/lib/preview/sample-pix-qr";
@@ -351,6 +352,9 @@ export function PreviewBookingFlow({
 
               {step === 4 && bookingResponse && (
                 <div className="space-y-4">
+                  <Button type="button" variant="ghost" onClick={() => setStep(3)} className="sm:-ml-3">
+                    <ArrowLeft aria-hidden="true" /> Voltar
+                  </Button>
                   <StepPayment
                     slug="studio-bella"
                     booking={bookingResponse}

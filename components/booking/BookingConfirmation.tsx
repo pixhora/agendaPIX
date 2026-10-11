@@ -183,16 +183,20 @@ export function BookingConfirmation({
         ) : null}
       </article>
 
-      <p className="rounded-card border border-line bg-surface p-4 text-sm text-muted">
-        <strong className="font-semibold text-ink">Vai se atrasar ou precisa remarcar?</strong> Avise o estabelecimento pelo WhatsApp o quanto antes.
-      </p>
+      {whatsappNumber ? (
+        <p className="rounded-card border border-line bg-surface p-4 text-sm text-muted">
+          <strong className="font-semibold text-ink">Vai se atrasar ou precisa remarcar?</strong> Avise o estabelecimento pelo WhatsApp o quanto antes.
+        </p>
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <Button asChild size="lg">
-          <a href={`https://wa.me/${whatsappNumber}?text=${whatsappMessage}`} target="_blank" rel="noopener noreferrer">
-            <Icon icon={CONFIRMATION_ICONS.whatsapp} size="md" /> Enviar no WhatsApp
-          </a>
-        </Button>
+        {whatsappNumber ? (
+          <Button asChild size="lg">
+            <a href={`https://wa.me/${whatsappNumber}?text=${whatsappMessage}`} target="_blank" rel="noopener noreferrer">
+              <Icon icon={CONFIRMATION_ICONS.whatsapp} size="md" /> Enviar no WhatsApp
+            </a>
+          </Button>
+        ) : null}
         <Button asChild variant="outline" size="lg">
           <a href={icsHref} download={`${service.name.replace(/\s+/g, "-").toLowerCase()}.ics`}>
             <Icon icon={CONFIRMATION_ICONS.addToCalendar} size="md" /> Adicionar ao calendário

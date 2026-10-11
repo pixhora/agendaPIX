@@ -23,6 +23,7 @@ import {
   type PresetChoice,
 } from "@/lib/dashboard/policy-form";
 import { PolicyEditor } from "@/components/policy/policy-editor";
+import { ServiceImageUpload } from "@/components/dashboard/service-image-upload";
 import { cn } from "@/lib/utils";
 
 export const weekdays = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
@@ -50,9 +51,10 @@ function PendingLine({ children }: { children: string }) {
   return <p role="status" aria-busy="true" className="flex items-center gap-2 text-sm text-muted"><Loader2 aria-hidden="true" className="size-4 animate-spin motion-reduce:animate-none" />{children}</p>;
 }
 
-function FormCta({ pending, idle }: { pending: boolean; idle: string }) {
+function FormCta({ pending, idle, offline = false }: { pending: boolean; idle: string; offline?: boolean }) {
+  // Sem internet o botão fica parado, sem dizer "Salvando…": o aviso de "Sem internet" aparece ao lado.
   return (
-    <Button type="submit" disabled={pending} aria-busy={pending} className="dash-disabled w-full md:w-auto">
+    <Button type="submit" disabled={pending || offline} aria-busy={pending} className="dash-disabled w-full md:w-auto">
       {pending ? <><Loader2 aria-hidden="true" className="animate-spin motion-reduce:animate-none" />Salvando…</> : idle}
     </Button>
   );
@@ -87,7 +89,7 @@ function TextInput({ invalid, className, ...props }: React.ComponentProps<"input
   return <FieldShell invalid={invalid}><Input shellClassName={bareShell} aria-invalid={invalid || undefined} className={cn(bareInput, "dash-disabled", className)} {...props} /></FieldShell>;
 }
 
-type Service = { id: string; name: string; durationMinutes: number; priceCents: number; depositCents: number; active: boolean; depositPolicy?: DepositPolicy };
+type Service = { id: string; name: string; durationMinutes: number; priceCents: number; depositCents: number; active: boolean; depositPolicy?: DepositPolicy; imageUrl?: string | null };
 const initialValues = (service?: Service) => ({ name: service?.name ?? "", duration: String(service?.durationMinutes ?? 30), price: service ? formatMoneyInput(service.priceCents) : "", deposit: service ? formatMoneyInput(service.depositCents) : "0,00", active: service?.active ?? true });
 
 function centsFromInput(value: string) {
@@ -113,6 +115,7 @@ export function ServiceForm({ businessId, businessName, contactWhatsapp = null, 
   const [attempt, setAttempt] = useState(0);
   const prefix = service?.id ?? "new";
   const [values, setValues] = useState(() => initialValues(service));
+  const [imageUrl, setImageUrl] = useState<string | null>(service?.imageUrl ?? null);
   const [policyState, setPolicyState] = useState<PolicyFormState>(() => initialPolicyForm(service));
   const requestKey = service && futureBookingsCount === undefined ? `${service.id}:${attempt}` : "";
   const [trackedKey, setTrackedKey] = useState(requestKey);
@@ -239,6 +242,9 @@ export function ServiceForm({ businessId, businessName, contactWhatsapp = null, 
     </div>
     {depositInvalid && <p id={`${prefix}-deposit-error`} role="alert" className="text-sm font-medium text-danger">O sinal não pode ser maior que o preço.</p>}
     {!depositInvalid && <p className="text-sm text-muted">O sinal deve ser menor ou igual ao preço. Sinal zero confirma o horário sem cobrança.</p>}
+    {service
+      ? <ServiceImageUpload businessId={businessId} serviceId={service.id} url={imageUrl} onChangeUrl={setImageUrl} />
+      : <p className="text-sm text-muted">Salve o serviço para adicionar uma foto.</p>}
     {policyState.chargeDeposit && depositCents > 0 ? <PolicyEditor
       idPrefix={prefix}
       businessName={businessName}
@@ -258,7 +264,7 @@ export function ServiceForm({ businessId, businessName, contactWhatsapp = null, 
     {!online && <p role="alert" className="text-sm font-medium text-danger">Sem internet. Suas mudanças não foram salvas.</p>}
     {clientError && <p role="alert" className="text-sm font-medium text-danger">{clientError}</p>}
     <div aria-live="polite" className="empty:hidden">{pending ? <PendingLine>Salvando…</PendingLine> : <Feedback state={state} showSuccess={showSuccess} />}</div>
-    <FormCta pending={pending || !online} idle={service ? "Salvar serviço" : "Cadastrar serviço"} />
+    <FormCta pending={pending} offline={!online} idle={service ? "Salvar serviço" : "Cadastrar serviço"} />
     <dialog ref={dialogRef} aria-labelledby={`${prefix}-future-title`} className="m-auto w-[min(calc(100%-2rem),28rem)] rounded-card border border-line bg-surface p-5 text-ink backdrop:bg-ink/50">
       <h2 id={`${prefix}-future-title`} className="font-display text-lg font-bold">Reservas já feitas</h2>
       <p className="mt-2 text-sm leading-relaxed">{futureWarning}</p>

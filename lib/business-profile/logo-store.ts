@@ -27,7 +27,7 @@ export type LogoBlobStore = {
 };
 
 type Env = Readonly<Record<string, string | undefined>>;
-type Database = ReturnType<typeof getDb>;
+export type Database = ReturnType<typeof getDb>;
 
 export function isOwnLogoUrl(url: string, businessId: string): boolean {
   if (logoUrlRejection(url) !== null) return false;
@@ -86,7 +86,7 @@ export function resolveBlobStore(env: Env = process.env): LogoBlobStore {
   return createFakeBlobStore();
 }
 
-async function ownedBusiness(businessId: string, ownerId: string, database: Pick<Database, "select">) {
+export async function ownedBusiness(businessId: string, ownerId: string, database: Pick<Database, "select">) {
   const id = z.uuid().safeParse(businessId);
   if (!id.success) throw new HttpError(404, "business_unavailable", "Este negócio não está disponível para sua conta.");
   const business = await findOwnedBusiness(id.data, ownerId, database);
@@ -94,7 +94,7 @@ async function ownedBusiness(businessId: string, ownerId: string, database: Pick
   return business;
 }
 
-async function readLogoFile(request: Request) {
+export async function readLogoFile(request: Request) {
   const declared = request.headers.get("content-length");
   if (declared !== null) {
     const length = Number(declared);

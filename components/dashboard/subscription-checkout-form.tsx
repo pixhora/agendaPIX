@@ -20,7 +20,12 @@ export function SubscriptionCheckoutForm({ action, children, note }: { action: s
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     const form = event.currentTarget;
     const popup = window.open("", "agendapix-subscription-checkout");
-    if (!popup) return;
+    if (!popup) {
+      // Sem a janela, o envio nativo também seria bloqueado: avisamos na página em vez de falhar em silêncio.
+      event.preventDefault();
+      setNotice("O navegador bloqueou a janela do pagamento. Libere pop-ups para este site e tente de novo.");
+      return;
+    }
     event.preventDefault();
     setNotice(null);
     form.target = popup.name || "agendapix-subscription-checkout";
@@ -28,8 +33,13 @@ export function SubscriptionCheckoutForm({ action, children, note }: { action: s
     if (timerRef.current != null) window.clearInterval(timerRef.current);
     const started = Date.now();
     timerRef.current = window.setInterval(() => {
-      if (popup.closed || Date.now() - started > 8000) {
+      if (popup.closed) {
         if (timerRef.current != null) window.clearInterval(timerRef.current);
+        return;
+      }
+      if (Date.now() - started > 8000) {
+        if (timerRef.current != null) window.clearInterval(timerRef.current);
+        setNotice("Não recebemos resposta do pagamento agora. Tente de novo em instantes.");
         return;
       }
       let text = "";

@@ -82,7 +82,7 @@ Tópico `payment`. Manifesto `id:{data.id};request-id:{x-request-id};ts:{ts};` e
 
 Token novo de acompanhamento sai só com o segredo atual. O banco guarda o sha256 dele. A leitura compara esse hash em tempo constante e não consulta `BOOKING_ACCESS_SECRET_PREVIOUS`, então a rotação não invalida o link que o cliente já tem. O HMAC da chave de pagamento do link de horário é o contrário: a busca aceita o segredo atual ou `BOOKING_ACCESS_SECRET_PREVIOUS`. Sem `PREVIOUS`, o HMAC antigo não é encontrado e a mesma chave não retoma o Pix (com o claim ativo, `409 link_in_progress`).
 
-## Rollout da 0021
+## Rollout da 0022
 
 Antes do merge e do deploy:
 
