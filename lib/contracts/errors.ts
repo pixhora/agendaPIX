@@ -18,6 +18,7 @@ export const apiErrorCodeSchema = z.enum([
   "link_used",
   "link_in_progress",
   "link_cancelled",
+  "link_replaced",
   "link_invalid",
   "slot_unavailable",
   "mp_not_connected",

@@ -562,3 +562,65 @@ test("gerar novo link confirma, substitui o antigo e explica o erro", async ({ p
   await expect(page.getByTestId("sent-links").getByRole("button", { name: "Copiar link" })).toHaveCount(0);
   if (testInfo.project.name === "desktop") await shootMatrix(page, "dono-reemitir-lista");
 });
+
+test("link substituído pede o novo para a loja e o cancelado comum não muda", async ({ page }, testInfo) => {
+  test.setTimeout(180_000);
+  await page.goto(`/dashboard/settings?businessId=${meta.businessAId}`);
+  await page.getByLabel("WhatsApp do negócio").fill("+5511988887777");
+  await page.getByRole("button", { name: "Salvar WhatsApp" }).click();
+  await expect(page.getByText("WhatsApp salvo.")).toBeVisible();
+  const listed = await page.request.get(`/api/public/${meta.businessASlug}/services`);
+  const store = await listed.json() as { name: string; contactWhatsapp: string | null };
+  expect(store.contactWhatsapp).toBe("+5511988887777");
+
+  const token = "b".repeat(43);
+  let mode: "replaced-code" | "replaced-reason" | "cancelled" = "replaced-code";
+  await page.route(`**/api/public/${meta.businessASlug}/slot-links/**`, (route) => {
+    if (mode === "replaced-code") {
+      return route.fulfill({
+        status: 409,
+        contentType: "application/json",
+        body: JSON.stringify({ error: { code: "link_replaced", message: "interno" } }),
+      });
+    }
+    if (mode === "replaced-reason") {
+      return route.fulfill({
+        status: 409,
+        contentType: "application/json",
+        body: JSON.stringify({ error: { code: "link_cancelled", message: "interno", reason: "replaced" } }),
+      });
+    }
+    return route.fulfill({
+      status: 409,
+      contentType: "application/json",
+      body: JSON.stringify({ error: { code: "link_cancelled", message: "interno" } }),
+    });
+  });
+
+  const updated = `Este link foi atualizado. Peça o link novo para ${store.name}.`;
+  try {
+    await page.goto(`/${meta.businessASlug}/h/${token}`);
+    await expect(page.getByRole("heading", { name: updated })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Falar com a loja" })).toHaveAttribute("href", "https://wa.me/5511988887777");
+    await expect(page.getByRole("link", { name: "Ver horários disponíveis" })).toHaveAttribute("href", `/${meta.businessASlug}`);
+    await expect(page.getByText("interno")).toHaveCount(0);
+
+    mode = "cancelled";
+    await page.goto(`/${meta.businessASlug}/h/${"c".repeat(43)}`);
+    await expect(page.getByRole("heading", { name: "Este link não está mais disponível." })).toBeVisible();
+    await expect(page.getByText(/foi atualizado/)).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Falar com a loja" })).toHaveCount(0);
+
+    mode = "replaced-reason";
+    await page.goto(`/${meta.businessASlug}/h/${token}`);
+    await expect(page.getByRole("heading", { name: updated })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Falar com a loja" })).toBeVisible();
+    if (testInfo.project.name === "desktop") await shootMatrix(page, "cliente-link-atualizado");
+  } finally {
+    await page.unroute(`**/api/public/${meta.businessASlug}/slot-links/**`).catch(() => undefined);
+    await page.goto(`/dashboard/settings?businessId=${meta.businessAId}`);
+    await page.getByLabel("WhatsApp do negócio").fill("");
+    await page.getByRole("button", { name: "Salvar WhatsApp" }).click();
+    await expect(page.getByText("WhatsApp salvo.")).toBeVisible();
+  }
+});

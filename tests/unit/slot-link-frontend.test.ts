@@ -3,7 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { createSlotLinkToken } from "../../lib/bookings/slot-link-token";
 import { SLOT_LINK_IDEMPOTENCY_KEY_PATTERN } from "../../lib/contracts/slot-link";
-import { failureCode, screenFromFailure, screenFromStatus, shouldClearPayKey, slotStartsInPast } from "../../lib/slot-link/customer-state";
+import { failureCode, isReplacedLinkError, screenFromFailure, screenFromStatus, shouldClearPayKey, slotStartsInPast } from "../../lib/slot-link/customer-state";
 import { clearPayKey, createIdempotencyKey, lockPayPayload, memorySlotLinkStores, payRequestBody, purgeExpiredSlotLinkStorage, readOrCreatePayKey, readPayResume, savePayAccess, SLOT_LINK_CLAIM_PREFIX, slotLinkSessionKey, slotLinkStorageKey } from "../../lib/slot-link/idempotency";
 import { parseOwnerList } from "../../lib/slot-link/owner-link";
 import { isSlotLinkPagePath } from "../../lib/slot-link/paths";
@@ -11,7 +11,7 @@ import { slotLinkPageHeaderRule, slotLinkPageHeaders } from "../../lib/slot-link
 import { PIX_RESUME_STORAGE_PREFIX, purgeExpiredBookingSessions } from "../../components/booking/pix-resume";
 import { GENERIC_OG_FALLBACK, parseSlotLinkPreview, slotLinkOgCopy, slotLinkOgLines } from "../../lib/slot-link/preview";
 import { sendOnWhatsApp } from "../../lib/slot-link/share";
-import { ownerSummary, reissueFailureMessage, slotLinkMessage, validityLine, REISSUE_IN_PROGRESS, REISSUE_TAKEN, OWNER_NETWORK } from "../../lib/slot-link/copy";
+import { ownerSummary, reissueFailureMessage, slotLinkMessage, updatedLinkMessage, validityLine, REISSUE_IN_PROGRESS, REISSUE_TAKEN, OWNER_NETWORK } from "../../lib/slot-link/copy";
 
 const service = { id: "6b0b4a2e-1c3d-4e5f-8a9b-0c1d2e3f4a5b", name: "Corte", durationMinutes: 30, priceCents: 8000, depositCents: 4000 };
 const openBase = {
@@ -90,7 +90,12 @@ describe("estados da cliente", () => {
   it("horário futuro ocupado não vira expirado, e link pago continua confirmado", () => {
     expect(screenFromStatus({ ...openBase, status: "taken" }, now).kind).toBe("taken");
     expect(screenFromStatus({ ...openBase, status: "paid" }, now).kind).toBe("used");
-    expect(screenFromStatus({ ...openBase, status: "replaced" }, now).kind).toBe("unavailable");
+    expect(screenFromStatus({ ...openBase, status: "replaced" }, now)).toMatchObject({
+      kind: "updated",
+      businessName: "Salao",
+      whatsapp: "+5511999999999",
+    });
+    expect(screenFromStatus({ ...openBase, status: "cancelled" }, now).kind).toBe("unavailable");
     expect(screenFromFailure("link_used", { publicPath: "/salao", now }).kind).toBe("used");
     expect(screenFromStatus({ ...openBase, status: "paid" }, now).kind).toBe("used");
     expect(screenFromFailure("link_in_progress", { publicPath: "/salao", now }).kind).toBe("in_progress");
@@ -99,6 +104,24 @@ describe("estados da cliente", () => {
     expect(shouldClearPayKey({ kind: "conflict", publicPath: "/salao" })).toBe(false);
     expect(screenFromFailure("invalid_input", { publicPath: "/salao", now }).kind).toBe("error");
     expect(screenFromFailure("link_invalid", { publicPath: "/salao", now }).kind).toBe("unavailable");
+    expect(screenFromFailure("link_cancelled", { publicPath: "/salao", now }).kind).toBe("unavailable");
+    const updated = screenFromFailure("link_replaced", {
+      publicPath: "/salao",
+      businessName: "Salao",
+      whatsapp: "+5511999999999",
+      now,
+    });
+    expect(updated).toMatchObject({ kind: "updated", businessName: "Salao", whatsapp: "+5511999999999" });
+    expect(updatedLinkMessage("Salao")).toBe("Este link foi atualizado. Peça o link novo para Salao.");
+    expect(updatedLinkMessage("  ")).toBe("Este link foi atualizado. Peça o link novo para a loja.");
+    expect(isReplacedLinkError({ error: { code: "link_replaced", message: "interno" } })).toBe(true);
+    expect(isReplacedLinkError({ error: { code: "link_cancelled", message: "interno", reason: "replaced" } })).toBe(true);
+    expect(isReplacedLinkError({ error: { code: "link_cancelled", message: "interno", details: { reason: "replaced" } } })).toBe(true);
+    expect(isReplacedLinkError({ error: { code: "link_cancelled", message: "interno" } })).toBe(false);
+    expect(failureCode(409, { error: { code: "link_replaced", message: "interno" } })).toBe("link_replaced");
+    expect(failureCode(409, { error: { code: "link_cancelled", message: "interno", reason: "replaced" } })).toBe("link_replaced");
+    expect(failureCode(409, { error: { code: "link_cancelled", message: "interno", details: { reason: "replaced" } } })).toBe("link_replaced");
+    expect(failureCode(409, { error: { code: "link_cancelled", message: "interno" } })).toBe("link_cancelled");
   });
 
   it("chave salva não bloqueia pelo expiresAt; sem chave, o prazo vencido expira", () => {

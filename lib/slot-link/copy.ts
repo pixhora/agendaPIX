@@ -46,6 +46,12 @@ export const CUSTOMER_USED_TITLE = "Este horário já foi confirmado.";
 export const CUSTOMER_USED_HINT = "Se foi você, confira a mensagem de confirmação.";
 export const CUSTOMER_GENERIC = "Não deu para continuar agora. Tente de novo.";
 export const CUSTOMER_UNAVAILABLE_TITLE = "Este link não está mais disponível.";
+
+/** Link que o dono trocou. `{loja}` é o nome do negócio, ou "a loja" se ele não veio. */
+export function updatedLinkMessage(businessName: string | null) {
+  const store = businessName?.trim() || "a loja";
+  return `Este link foi atualizado. Peça o link novo para ${store}.`;
+}
 export const CUSTOMER_OFFLINE = "Sem conexão. Verifique sua internet e tente de novo.";
 export const CUSTOMER_MP = "Esta loja não está recebendo sinal agora. Fale com a loja.";
 export const CUSTOMER_IN_PROGRESS = "Alguém está pagando este horário agora. Se o pagamento não for concluído, ele volta a ficar disponível em alguns minutos.";

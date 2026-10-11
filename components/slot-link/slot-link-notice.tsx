@@ -21,6 +21,7 @@ import {
   TALK_TO_STORE,
   TRY_AGAIN,
   expiredBody,
+  updatedLinkMessage,
 } from "@/lib/slot-link/copy";
 import type { CustomerScreen } from "@/lib/slot-link/customer-state";
 import { whatsAppStoreHref } from "@/lib/slot-link/share";
@@ -139,6 +140,26 @@ export function SlotLinkNotice({
         <div className="grid gap-2">
           {onRetry ? <Button type="button" variant="pix" size="lg" className="w-full" onClick={onRetry}>{TRY_AGAIN}</Button> : null}
           {slots}
+        </div>
+      </NoticeFrame>
+    );
+  }
+
+  if (screen.kind === "updated") {
+    const whatsapp = whatsAppStoreHref(screen.whatsapp);
+    return (
+      <NoticeFrame titleRef={titleRef} title={updatedLinkMessage(screen.businessName)} icon={<Link2Off aria-hidden="true" className="size-8" />}>
+        <div className="grid gap-2">
+          {whatsapp ? (
+            <Button asChild variant="pix" size="lg" className="w-full">
+              <a href={whatsapp} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">{TALK_TO_STORE}</a>
+            </Button>
+          ) : null}
+          {whatsapp ? (
+            <Button asChild variant="outline" size="lg" className="w-full">
+              <a href={publicPath} referrerPolicy="no-referrer">{SEE_SLOTS}</a>
+            </Button>
+          ) : slots}
         </div>
       </NoticeFrame>
     );

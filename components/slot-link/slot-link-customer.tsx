@@ -42,6 +42,8 @@ export function SlotLinkCustomer({
   slug,
   token,
   timezone,
+  businessName = null,
+  contactWhatsapp = null,
   stores,
   fetchImpl,
   now = () => new Date(),
@@ -49,6 +51,9 @@ export function SlotLinkCustomer({
   slug: string;
   token: string;
   timezone: string;
+  /** Nome e WhatsApp da página pública, para o link trocado responder sem o corpo do horário. */
+  businessName?: string | null;
+  contactWhatsapp?: string | null;
   stores?: SlotLinkPayStores;
   fetchImpl?: typeof fetch;
   now?: () => Date;
@@ -74,7 +79,7 @@ export function SlotLinkCustomer({
     startsAt: link.startsAt,
   }), [publicPath]);
 
-  const [known, setKnown] = useState<StoreContext>({ publicPath, businessName: null, whatsapp: null, startsAt: null });
+  const [known, setKnown] = useState<StoreContext>({ publicPath, businessName, whatsapp: contactWhatsapp, startsAt: null });
   const knownRef = React.useRef(known);
   const nowRef = React.useRef(now);
   useEffect(() => {

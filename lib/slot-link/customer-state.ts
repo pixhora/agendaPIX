@@ -12,6 +12,7 @@ export type SlotLinkFailureCode =
   | "link_expired"
   | "link_used"
   | "link_cancelled"
+  | "link_replaced"
   | "link_invalid"
   | "slot_unavailable"
   | "mp_not_connected"
@@ -27,6 +28,7 @@ export type CustomerScreen =
   | { kind: "taken"; publicPath: string }
   | { kind: "used"; publicPath: string }
   | { kind: "unavailable"; publicPath: string }
+  | { kind: "updated"; businessName: string | null; whatsapp: string | null; publicPath: string }
   | { kind: "offline"; publicPath: string }
   | { kind: "mp"; whatsapp: string | null; publicPath: string }
   | { kind: "in_progress"; publicPath: string }
@@ -76,7 +78,8 @@ export function screenFromStatus(
 ): CustomerScreen {
   const store = storeOf(link);
   if (link.status === "paid") return { kind: "used", publicPath: store.publicPath };
-  if (link.status === "cancelled" || link.status === "replaced") return { kind: "unavailable", publicPath: store.publicPath };
+  if (link.status === "replaced") return { kind: "updated", ...store };
+  if (link.status === "cancelled") return { kind: "unavailable", publicPath: store.publicPath };
   if (slotStartsInPast(link.startsAt, now)) return { kind: "expired", ...store };
   if (link.status === "taken") return { kind: "taken", publicPath: store.publicPath };
   if (!options?.resumePay && (link.status === "expired" || linkTtlPassed(link.expiresAt, now))) {
@@ -91,6 +94,14 @@ export function screenFromFailure(
 ): CustomerScreen {
   const past = context.startsAt ? slotStartsInPast(context.startsAt, context.now) : false;
   if (code === "link_used") return { kind: "used", publicPath: context.publicPath };
+  if (code === "link_replaced") {
+    return {
+      kind: "updated",
+      businessName: context.businessName ?? null,
+      whatsapp: context.whatsapp ?? null,
+      publicPath: context.publicPath,
+    };
+  }
   if (code === "link_cancelled" || code === "link_invalid") return { kind: "unavailable", publicPath: context.publicPath };
   if (code === "mp_not_connected") {
     return { kind: "mp", whatsapp: context.whatsapp ?? null, publicPath: context.publicPath };
@@ -115,10 +126,31 @@ export function parseOpenLink(body: unknown) {
   return slotLinkOpenResponseSchema.parse(body);
 }
 
+function errorFields(body: unknown) {
+  if (!body || typeof body !== "object" || !("error" in body)) return { code: null, reason: null };
+  const error = (body as { error?: unknown }).error;
+  if (!error || typeof error !== "object") return { code: null, reason: null };
+  const record = error as { code?: unknown; reason?: unknown; details?: unknown };
+  const code = typeof record.code === "string" ? record.code : null;
+  const direct = typeof record.reason === "string" ? record.reason : null;
+  const details = record.details;
+  const nested = details && typeof details === "object" && "reason" in details && typeof details.reason === "string"
+    ? details.reason
+    : null;
+  return { code, reason: direct ?? nested };
+}
+
+/** O link antigo da cliente: código `link_replaced` ou `link_cancelled` com motivo `replaced`. */
+export function isReplacedLinkError(body: unknown) {
+  const { code, reason } = errorFields(body);
+  return code === "link_replaced" || (code === "link_cancelled" && reason === "replaced");
+}
+
 export function failureCode(status: number, body: unknown): SlotLinkFailureCode {
+  if (isReplacedLinkError(body)) return "link_replaced";
   const code = readSlotLinkErrorCode(body);
   if (code === "link_expired" || status === 410) return "link_expired";
-  if (code === "link_used" || code === "link_cancelled" || code === "link_invalid" || code === "slot_unavailable" || code === "mp_not_connected" || code === "link_in_progress" || code === "idempotency_conflict" || code === "invalid_input") {
+  if (code === "link_used" || code === "link_cancelled" || code === "link_replaced" || code === "link_invalid" || code === "slot_unavailable" || code === "mp_not_connected" || code === "link_in_progress" || code === "idempotency_conflict" || code === "invalid_input") {
     return code;
   }
   if (status === 404) return "link_invalid";

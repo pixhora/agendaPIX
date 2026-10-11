@@ -52,6 +52,7 @@ export const SLOT_LINK_ERROR_CODES = [
   "link_used",
   "link_in_progress",
   "link_cancelled",
+  "link_replaced",
   "link_invalid",
   "slot_unavailable",
   "mp_not_connected",
@@ -71,6 +72,8 @@ export const slotLinkErrorBodySchema = z.object({
   error: z.object({
     code: slotLinkErrorCodeSchema,
     message: z.string().min(1),
+    /** `link_cancelled` com `replaced` é o link que o dono trocou por outro. */
+    reason: z.string().optional(),
     details: apiErrorDetailsSchema.optional(),
   }).strict(),
 }).strict();

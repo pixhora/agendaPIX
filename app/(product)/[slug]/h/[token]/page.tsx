@@ -7,12 +7,16 @@ import { slotLinkShareMeta } from "@/lib/slot-link/share-meta";
 
 export const dynamic = "force-dynamic";
 
-async function timezoneFor(slug: string) {
+async function storeFor(slug: string) {
   try {
     const business = await listPublicServices(slug);
-    return business.timezone || "America/Sao_Paulo";
+    return {
+      timezone: business.timezone || "America/Sao_Paulo",
+      businessName: business.name,
+      contactWhatsapp: business.contactWhatsapp,
+    };
   } catch {
-    return "America/Sao_Paulo";
+    return { timezone: "America/Sao_Paulo", businessName: null, contactWhatsapp: null };
   }
 }
 
@@ -51,6 +55,14 @@ export default async function SlotLinkPage({
 }) {
   await connection();
   const { slug, token } = await params;
-  const timezone = await timezoneFor(slug);
-  return <SlotLinkCustomer slug={slug} token={token} timezone={timezone} />;
+  const store = await storeFor(slug);
+  return (
+    <SlotLinkCustomer
+      slug={slug}
+      token={token}
+      timezone={store.timezone}
+      businessName={store.businessName}
+      contactWhatsapp={store.contactWhatsapp}
+    />
+  );
 }

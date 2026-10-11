@@ -291,6 +291,75 @@ describe("página da cliente", () => {
     expect(stores.session.snapshot[await slotLinkSessionKey(token)]).toBeUndefined();
   });
 
+  it.each([
+    ["código link_replaced", { error: { code: "link_replaced", message: "interno" } }],
+    ["motivo replaced", { error: { code: "link_cancelled", message: "interno", reason: "replaced" } }],
+    ["motivo em details", { error: { code: "link_cancelled", message: "interno", details: { reason: "replaced" } } }],
+  ])("link antigo atualizado (%s) pede o link novo", async (_label, body) => {
+    const fetchImpl = vi.fn(async () => json(409, body));
+    render(
+      <SlotLinkCustomer
+        slug="salao"
+        token={token}
+        timezone="America/Sao_Paulo"
+        businessName="Salao da Ana"
+        contactWhatsapp="+5511988887777"
+        fetchImpl={fetchImpl}
+        now={() => new Date("2030-10-01T12:00:00.000Z")}
+      />,
+    );
+    expect(await screen.findByRole("heading", { name: "Este link foi atualizado. Peça o link novo para Salao da Ana." })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Falar com a loja" })).toHaveAttribute("href", "https://wa.me/5511988887777");
+    expect(screen.getByRole("link", { name: "Falar com a loja" })).toHaveAttribute("target", "_blank");
+    expect(screen.getByRole("link", { name: "Ver horários disponíveis" })).toHaveAttribute("href", "/salao");
+    expect(screen.queryByRole("heading", { name: "Este link não está mais disponível." })).toBeNull();
+    expect(screen.queryByText("interno")).toBeNull();
+  });
+
+  it("link atualizado sem WhatsApp só oferece a agenda", async () => {
+    const fetchImpl = vi.fn(async () => json(409, { error: { code: "link_replaced", message: "interno" } }));
+    render(
+      <SlotLinkCustomer
+        slug="salao"
+        token={token}
+        timezone="America/Sao_Paulo"
+        businessName="Salao da Ana"
+        contactWhatsapp={null}
+        fetchImpl={fetchImpl}
+        now={() => new Date("2030-10-01T12:00:00.000Z")}
+      />,
+    );
+    expect(await screen.findByRole("heading", { name: "Este link foi atualizado. Peça o link novo para Salao da Ana." })).toBeVisible();
+    expect(screen.queryByRole("link", { name: "Falar com a loja" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Ver horários disponíveis" })).toHaveAttribute("href", "/salao");
+  });
+
+  it("link_cancelled sem motivo mantém a tela de cancelado", async () => {
+    const fetchImpl = vi.fn(async () => json(409, { error: { code: "link_cancelled", message: "interno" } }));
+    render(
+      <SlotLinkCustomer
+        slug="salao"
+        token={token}
+        timezone="America/Sao_Paulo"
+        businessName="Salao da Ana"
+        contactWhatsapp="+5511988887777"
+        fetchImpl={fetchImpl}
+        now={() => new Date("2030-10-01T12:00:00.000Z")}
+      />,
+    );
+    expect(await screen.findByRole("heading", { name: "Este link não está mais disponível." })).toBeVisible();
+    expect(screen.queryByText(/foi atualizado/)).toBeNull();
+    expect(screen.queryByRole("link", { name: "Falar com a loja" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Ver horários disponíveis" })).toBeVisible();
+  });
+
+  it("GET 200 com status replaced pede o link novo da loja", async () => {
+    const fetchImpl = vi.fn(async () => json(200, openBody("replaced")));
+    render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" fetchImpl={fetchImpl} now={() => new Date("2030-10-01T12:00:00.000Z")} />);
+    expect(await screen.findByRole("heading", { name: "Este link foi atualizado. Peça o link novo para Salao da Ana." })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Falar com a loja" })).toHaveAttribute("href", "https://wa.me/5511988887777");
+  });
+
   it("sem chave salva, expiresAt vencido não chama o pay", async () => {
     const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
       if (String(input).endsWith("/pay")) throw new Error("não deveria pagar");

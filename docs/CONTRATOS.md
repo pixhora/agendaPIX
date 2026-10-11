@@ -439,7 +439,7 @@ Contratos Zod em `lib/contracts` (`business-profile.ts`, `errors.ts`, reexportad
 | `businessProfileResponseSchema` | `{ id, name, slug, logoUrl, publicPath, publicUrl }`. `logoUrl` e `publicUrl` podem ser `null`. |
 | `logoUploadResponseSchema` | `{ logoUrl }`. |
 | `slugAvailabilityResponseSchema` | `{ input, normalized, valid, available, reason, suggestions }`. `reason`: `taken`, `reserved`, `invalid` ou `too_short` (este último a tela de cadastro já usa). `suggestions` tem no máximo 3 e vem vazio quando o link está livre, inválido ou curto. |
-| `apiErrorCodeSchema` | `invalid_input`, `unauthorized`, `business_unavailable`, `slug_taken`, `rate_limited`, `logo_invalid`, `logo_too_large`, `blob_unavailable`, `internal_error`, e os do link de horário: `link_expired`, `link_used`, `link_cancelled`, `link_invalid`, `slot_unavailable`, `mp_not_connected`. |
+| `apiErrorCodeSchema` | `invalid_input`, `unauthorized`, `business_unavailable`, `slug_taken`, `rate_limited`, `logo_invalid`, `logo_too_large`, `blob_unavailable`, `internal_error`, e os do link de horário: `link_expired`, `link_used`, `link_cancelled`, `link_replaced`, `link_invalid`, `slot_unavailable`, `mp_not_connected`. |
 
 O corpo de erro continua `{ error: { code, message, details? } }`. `handleHttp` espalha `error.details` no objeto `error`.
 
@@ -459,7 +459,7 @@ Migration `db/migrations/0018_business_profile.sql` tem de rodar antes do deploy
 
 ## Link de um horário
 
-Contratos em `lib/contracts/slot-link.ts`, reexportados por `lib/contracts/index.ts`. O corpo de erro é `{ error: { code, message, details? } }` via `handleHttp`. `slotLinkErrorCodeSchema` junta `link_expired`, `link_used`, `link_in_progress`, `link_cancelled`, `link_invalid`, `slot_unavailable`, `mp_not_connected` com `invalid_input`, `rate_limited`, `unauthorized`, `business_unavailable`, `origin_not_allowed` e `body_too_large`.
+Contratos em `lib/contracts/slot-link.ts`, reexportados por `lib/contracts/index.ts`. O corpo de erro é `{ error: { code, message, details? } }` via `handleHttp`. `slotLinkErrorCodeSchema` junta `link_expired`, `link_used`, `link_in_progress`, `link_cancelled`, `link_replaced`, `link_invalid`, `slot_unavailable`, `mp_not_connected` com `invalid_input`, `rate_limited`, `unauthorized`, `business_unavailable`, `origin_not_allowed` e `body_too_large`.
 
 Gerar o link não cria reserva nem cobrança. O hold e o Pix nascem só no POST de pagamento, pelo mesmo fluxo da reserva pública (`createBooking`). Um `23P01` da exclusão de horário vira `409 slot_unavailable`.
 
@@ -488,6 +488,8 @@ O POST de pagamento exige `Idempotency-Key`. Ausente ou fora do formato: `400 in
 `slotLinkOwnerSchema` inclui `cancellable`. É verdadeiro quando não há reserva ligada e o claim está livre ou vencido. O dono cancela nesse caso. Claim fresco ou reserva ligada: `409 link_used`.
 
 `POST .../reissue` devolve o mesmo `201` da criação (token só nessa resposta). O link anterior passa a `replaced` (“Substituído”) e o novo fica `pending`. A lista não recebe o token, então não há “Copiar link” nela. `409 link_in_progress` e `409 slot_unavailable` não trocam o link. `429 rate_limited` usa o mesmo texto de falha ao gerar.
+
+Para a cliente, o link antigo responde `409 link_cancelled` com `reason: "replaced"` (no `error` ou em `error.details`) ou o código `link_replaced`. Os dois abrem “Este link foi atualizado. Peça o link novo para {loja}.”, com o WhatsApp da loja quando houver e “Ver horários disponíveis”. `link_cancelled` sem esse motivo continua “Este link não está mais disponível.”
 
 Códigos depois que o hash confere: `410 link_expired`, `409 link_used`, `409 link_in_progress`, `409 link_cancelled`, `409 slot_unavailable`, `409 mp_not_connected`, `409 idempotency_conflict`. A mesma chave com outro corpo (nome, WhatsApp ou política) cai nesse último: a tela guarda o primeiro payload e reenvia esse. A resposta não traz dado de outra cliente. No navegador, `agendapix.slot-link.pay.` + sha256 do token fica no localStorage com a Idempotency-Key, nome, WhatsApp, hash da política e `expiresAt`. O `accessToken` fica só no sessionStorage, em `agendapix.slot-link.session.` + o mesmo hash, junto com o id da reserva, o serviço e `expiresAt`. Ao abrir o app, registro vencido ou sem prazo é apagado. Antes disso, qualquer token que não casa é `404 link_invalid`.
 

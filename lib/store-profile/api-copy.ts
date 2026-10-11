@@ -15,6 +15,7 @@ export const PROFILE_ERROR_COPY: Record<ApiErrorCode, string> = {
   link_used: "Este horário já foi confirmado.",
   link_in_progress: "Este horário já está em pagamento.",
   link_cancelled: "Este link não está mais disponível.",
+  link_replaced: "Este link foi atualizado.",
   link_invalid: "Este link não está mais disponível.",
   slot_unavailable: "Esse horário acabou de ser reservado.",
   mp_not_connected: "Conecte o Mercado Pago para cobrar sinal.",
