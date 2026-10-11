@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { isAutoRefundAck, MP_CONNECT_CONSENT_TEXT, MP_CONNECT_CONSENT_VERSION } from "../mercadopago/consent";
+import { connectSqlState, MpConnectFailure, MpConnectFailureCode } from "../mercadopago/connect-failure";
 import { invalidatePublicCatalogForBusiness } from "../bookings/public-cache";
 import { normalizeClientAddress } from "../bookings/rate-limit";
 import { findOwnedBusiness } from "../tenancy";
@@ -198,8 +199,15 @@ export async function submitMercadoPagoConnect(input: {
   }
   const fields = await readConnectFields(input.request);
   const returnTo = sanitizeMpReturnTo(fields.returnTo);
-  const store = input.store ?? createDrizzleMpStore();
-  const existing = await store.findByBusinessId(input.businessId);
+  let store: MpConnectionStore;
+  let existing: Awaited<ReturnType<MpConnectionStore["findByBusinessId"]>>;
+  try {
+    store = input.store ?? createDrizzleMpStore();
+    existing = await store.findByBusinessId(input.businessId);
+  } catch (error) {
+    if (error instanceof MpConnectFailure || error instanceof HttpError) throw error;
+    throw new MpConnectFailure(MpConnectFailureCode.Database, error);
+  }
   const textSha256 = createHash("sha256").update(MP_CONNECT_CONSENT_TEXT).digest("hex");
   // Reconexão reaproveita só o aceite vigente. Versão diferente não autoriza cobrança nova.
   const reused = existing?.consentVersion === MP_CONNECT_CONSENT_VERSION && existing.autoRefundAckAt && existing.consentUserId
@@ -213,17 +221,24 @@ export async function submitMercadoPagoConnect(input: {
   const consent = reused ?? { version: MP_CONNECT_CONSENT_VERSION, ackAt: now, userId: input.ownerId, textSha256 };
   const started = beginMercadoPagoConnect({ businessId: input.businessId, returnTo, now, env: input.env });
   const state = new URL(started.authorizationUrl).searchParams.get("state");
-  if (!state) throw new Error("state ausente");
-  await store.saveOAuthState({
-    state,
-    businessId: input.businessId,
-    returnTo: started.returnTo,
-    consentVersion: consent.version,
-    consentTextSha256: consent.textSha256,
-    autoRefundAckAt: consent.ackAt,
-    consentUserId: consent.userId,
-    expiresAt: new Date(now.getTime() + MP_OAUTH_COOKIE_MAX_AGE_SECONDS * 1000),
-  });
+  if (!state) throw new MpConnectFailure(MpConnectFailureCode.State);
+  try {
+    await store.saveOAuthState({
+      state,
+      businessId: input.businessId,
+      returnTo: started.returnTo,
+      consentVersion: consent.version,
+      consentTextSha256: consent.textSha256,
+      autoRefundAckAt: consent.ackAt,
+      consentUserId: consent.userId,
+      expiresAt: new Date(now.getTime() + MP_OAUTH_COOKIE_MAX_AGE_SECONDS * 1000),
+    });
+  } catch (error) {
+    if (error instanceof MpConnectFailure) throw error;
+    // SQLSTATE é erro de banco, mesmo no insert do state. Sem ele, a falha continua MP-STATE.
+    if (connectSqlState(error)) throw new MpConnectFailure(MpConnectFailureCode.Database, error);
+    throw new MpConnectFailure(MpConnectFailureCode.State, error);
+  }
   return { kind: "redirect", location: started.authorizationUrl, cookie: started.cookie };
 }
 
