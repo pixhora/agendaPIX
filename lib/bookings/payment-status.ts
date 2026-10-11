@@ -17,6 +17,11 @@ function millis(value: Date | string) {
   return value instanceof Date ? value.getTime() : new Date(value).getTime();
 }
 
+/** Recusa definitiva: pagamento `failed` sem id no gateway. Não é hold vencido nem cobrança cancelada. */
+export function chargeFailedForPayment(payment: { status: string; externalId: string | null } | null | undefined) {
+  return Boolean(payment && payment.status === "failed" && !payment.externalId);
+}
+
 /** Mesma fronteira de `expirePending` (`expires_at <= now`) e do QR utilizável (`expires_at > now`). */
 export function isDue(expiresAt: Instant, now: Date) {
   return expiresAt != null && millis(expiresAt) <= now.getTime();

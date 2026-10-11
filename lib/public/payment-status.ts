@@ -41,13 +41,18 @@ const pixPaymentSchema = z.object({
   copyPaste: z.string().nullable(),
 });
 
-/** Corpo 200 de GET /api/public/[slug]/bookings/[id]/payment. */
+/**
+ * Corpo 200 de GET /api/public/[slug]/bookings/[id]/payment.
+ * `chargeFailed` é true só quando o Pix não chegou a ser criado (`payment.status = failed` e `externalId` nulo).
+ * Hold vencido e cobrança cancelada ficam false. Sem coluna nova.
+ */
 export const paymentStatusResponseSchema = z.object({
   bookingId: z.string(),
   status: bookingStatusSchema,
   startsAt: z.string(),
   endsAt: z.string(),
   expiresAt: z.string().nullable(),
+  chargeFailed: z.boolean().optional(),
   payment: pixPaymentSchema.nullable(),
   policy: paymentStatusPolicySchema.nullable(),
 });

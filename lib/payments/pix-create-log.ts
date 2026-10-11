@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { redactOAuthReturnLog } from "../onboarding/oauth-return";
 import {
@@ -129,11 +129,51 @@ export function logPixCreateFailure(input: PixCreateLogInput) {
   console.warn(formatPixCreateLog(input));
 }
 
-/** Sai de `creating` só enquanto ninguém anexou o Pix. `failed` não entra na fila da reconciliação. */
+/**
+ * Sai de `creating` só enquanto ninguém anexou o Pix. `failed` não entra na fila da reconciliação.
+ * Na mesma transação, a reserva `pending_payment` vai para `expired` (o mesmo status do hold vencido)
+ * e o link de horário solta o claim, como no vencimento. Idempotente. Não mexe em Pix já anexado ou pago.
+ */
 export async function markCreatingPaymentFailed(database: Database, payment: { businessId: string; id: string }) {
-  await database.update(schema.payments).set({ status: "failed" }).where(and(
-    eq(schema.payments.businessId, payment.businessId),
-    eq(schema.payments.id, payment.id),
-    eq(schema.payments.status, "creating"),
-  ));
+  await database.transaction(async (tx) => {
+    const [locked] = await tx.select().from(schema.payments).where(and(
+      eq(schema.payments.businessId, payment.businessId),
+      eq(schema.payments.id, payment.id),
+    )).for("update").limit(1);
+    if (!locked || locked.externalId) return;
+    if (locked.status !== "creating" && locked.status !== "failed") return;
+    if (locked.status === "creating") {
+      const [marked] = await tx.update(schema.payments).set({ status: "failed" }).where(and(
+        eq(schema.payments.businessId, locked.businessId),
+        eq(schema.payments.id, locked.id),
+        eq(schema.payments.status, "creating"),
+        isNull(schema.payments.externalId),
+      )).returning({ id: schema.payments.id });
+      if (!marked) return;
+    }
+    const now = new Date();
+    const [booking] = await tx.select({ status: schema.bookings.status }).from(schema.bookings).where(and(
+      eq(schema.bookings.businessId, locked.businessId),
+      eq(schema.bookings.id, locked.bookingId),
+    )).for("update").limit(1);
+    if (!booking || (booking.status !== "pending_payment" && booking.status !== "expired")) return;
+    if (booking.status === "pending_payment") {
+      const [released] = await tx.update(schema.bookings).set({ status: "expired", updatedAt: now }).where(and(
+        eq(schema.bookings.businessId, locked.businessId),
+        eq(schema.bookings.id, locked.bookingId),
+        eq(schema.bookings.status, "pending_payment"),
+      )).returning({ id: schema.bookings.id });
+      if (!released) return;
+    }
+    await tx.update(schema.slotLinks).set({
+      bookingId: null,
+      payStartedAt: null,
+      payIdempotencyHash: null,
+      updatedAt: now,
+    }).where(and(
+      eq(schema.slotLinks.businessId, locked.businessId),
+      eq(schema.slotLinks.bookingId, locked.bookingId),
+      sql`${schema.slotLinks.status} NOT IN ('paid', 'cancelled', 'replaced')`,
+    ));
+  });
 }

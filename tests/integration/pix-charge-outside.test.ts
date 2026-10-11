@@ -4,7 +4,9 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as schema from "../../db/schema";
-import { createBooking, lockBusiness } from "../../lib/bookings/service";
+import { createBooking, getBookingPayment, lockBusiness } from "../../lib/bookings/service";
+import { signBookingAccessToken } from "../../lib/bookings/access-mac";
+import { createSlotLinkPreviewId, createSlotLinkToken, slotLinkTokenHash } from "../../lib/bookings/slot-link-token";
 import { disconnectMercadoPago } from "../../lib/mercadopago-oauth/credentials";
 import { createDrizzleMpStore } from "../../lib/mercadopago-oauth/repository";
 import { databaseEnvSchema } from "../../lib/env";
@@ -14,7 +16,7 @@ import { applyPaidEvent } from "../../lib/payments/apply-paid";
 import { drizzleRefundPorts, settleAutomaticLateRefund } from "../../lib/payments/refund-flow";
 import { polledPaidEvent, type ChargeInput, type PaymentProvider } from "../../lib/payments/provider";
 import { bookingPaymentUnavailableErrorSchema } from "../../lib/contracts/booking-payment-error";
-import { PixCreateRefusedError } from "../../lib/payments/pix-create-log";
+import { markCreatingPaymentFailed, PixCreateRefusedError } from "../../lib/payments/pix-create-log";
 import { withAppCors } from "../../lib/origins";
 import { PIX_APPROVAL_TOLERANCE_MS } from "../../lib/payments/rules";
 import { hash } from "../../lib/bookings/service";
@@ -65,6 +67,8 @@ afterEach(async () => {
   }
   await database.delete(schema.paymentRefunds).where(eq(schema.paymentRefunds.businessId, businessId));
   await database.delete(schema.ownerNotices).where(eq(schema.ownerNotices.businessId, businessId));
+  await database.delete(schema.slotLinkBookings).where(eq(schema.slotLinkBookings.businessId, businessId));
+  await database.delete(schema.slotLinks).where(eq(schema.slotLinks.businessId, businessId));
   await database.delete(schema.payments).where(eq(schema.payments.businessId, businessId));
   await database.delete(schema.bookings).where(eq(schema.bookings.businessId, businessId));
   await database.delete(schema.customers).where(eq(schema.customers.businessId, businessId));
@@ -118,6 +122,8 @@ describe("cobrança fora da transação", () => {
     const [payment] = await database.select().from(schema.payments).where(eq(schema.payments.businessId, businessId));
     expect(payment.status).toBe("creating");
     expect(payment.externalId).toBeNull();
+    const [held] = await database.select().from(schema.bookings).where(eq(schema.bookings.id, payment.bookingId));
+    expect(held.status).toBe("pending_payment");
     // Gateway pode ter criado a cobrança antes do timeout local: idempotência evita duplicar.
     provider.latencyMs = 0;
     vi.stubEnv("PAYMENT_PROVIDER_TIMEOUT_MS", "8000");
@@ -214,18 +220,85 @@ describe("cobrança fora da transação", () => {
     expect(payment.status).toBe("failed");
     expect(payment.externalId).toBeNull();
     const [booking] = await database.select().from(schema.bookings).where(eq(schema.bookings.id, payment.bookingId));
-    expect(booking.status).toBe("pending_payment");
-    const replay = await createBooking(slug, input(0), key, database, refused);
-    expect(replay.replayed).toBe(true);
-    expect(replay.data.payment?.status).toBe("failed");
-    expect(replay.data).not.toHaveProperty("reason");
+    expect(booking.status).toBe("expired");
+    let replayCaught: unknown;
+    try {
+      await createBooking(slug, input(0), key, database, refused);
+    } catch (error) {
+      replayCaught = error;
+    }
+    const replay = await publicPaymentUnavailable(replayCaught);
+    expect(replay.status).toBe(503);
+    expect(replay.body.error.details).toEqual({ retry_same_key: false });
+    expect(replay.raw).not.toContain("bookingId");
     expect(calls).toBe(1);
+    const taken = await createBooking(slug, input(0, "+5511999999902"), randomUUID(), database, provider);
+    expect(taken.data.payment?.status).toBe("pending");
+    expect(taken.data.bookingId).not.toBe(booking.id);
+    const viewed = await getBookingPayment(slug, booking.id, `Bearer ${signBookingAccessToken(businessId, booking.id)}`, database);
+    expect(viewed.status).toBe("expired");
+    expect(viewed.payment?.status).toBe("failed");
+    expect(viewed.chargeFailed).toBe(true);
+    expect(viewed.payment?.externalId).toBeNull();
     const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const report = await reconcileOnce(database, provider, { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50, RECONCILE_BUDGET_MS: 50_000 });
     expect(report.stuckRetried).toBe(0);
     expect(logged.mock.calls.flat().join(" ")).not.toContain("reconcile_failed");
     expect(logged.mock.calls.flat().join(" ")).not.toContain(payment.id);
     logged.mockRestore();
+  });
+
+  it("recusa definitiva solta o link e duas liberações concorrentes não reabrem o hold", async () => {
+    const refused: PaymentProvider = {
+      name: provider.name,
+      createPixCharge: async () => { throw new PixCreateRefusedError(422); },
+      getCharge: provider.getCharge.bind(provider),
+      findChargeByReference: provider.findChargeByReference.bind(provider),
+      cancelCharge: provider.cancelCharge.bind(provider),
+      verifyWebhook: provider.verifyWebhook.bind(provider),
+      refundCharge: provider.refundCharge.bind(provider),
+    };
+    const key = randomUUID();
+    const token = createSlotLinkToken();
+    await expect(createBooking(slug, input(2), key, database, refused, null, async (tx, bookingId) => {
+      const [row] = await tx.select({ startsAt: schema.bookings.startsAt, createdAt: schema.bookings.createdAt }).from(schema.bookings).where(eq(schema.bookings.id, bookingId)).limit(1);
+      await tx.insert(schema.slotLinks).values({
+        businessId,
+        serviceId,
+        startsAt: row.startsAt,
+        endsAt: new Date(row.startsAt.getTime() + 30 * 60_000),
+        expiresAt: row.startsAt,
+        status: "pending",
+        tokenHash: slotLinkTokenHash(token),
+        previewId: createSlotLinkPreviewId(),
+        bookingId,
+        payStartedAt: row.createdAt,
+        payIdempotencyHash: "ab".repeat(32),
+        createdAt: new Date(row.createdAt.getTime() - 1000),
+      });
+    })).rejects.toMatchObject({ status: 503, code: "payment_unavailable" });
+    const [payment] = await database.select().from(schema.payments).where(eq(schema.payments.businessId, businessId));
+    await Promise.all([
+      markCreatingPaymentFailed(database, payment),
+      markCreatingPaymentFailed(database, payment),
+    ]);
+    const [booking] = await database.select().from(schema.bookings).where(eq(schema.bookings.id, payment.bookingId));
+    expect(booking.status).toBe("expired");
+    const [link] = await database.select().from(schema.slotLinks).where(eq(schema.slotLinks.businessId, businessId));
+    expect(link.bookingId).toBeNull();
+    expect(link.payStartedAt).toBeNull();
+    expect(link.payIdempotencyHash).toBeNull();
+    expect(link.status).toBe("pending");
+    const [replay, next] = await Promise.allSettled([
+      createBooking(slug, input(2), key, database, refused),
+      createBooking(slug, input(2, "+5511999999903"), randomUUID(), database, provider),
+    ]);
+    expect(replay.status).toBe("rejected");
+    if (replay.status !== "rejected") return;
+    expect(replay.reason).toMatchObject({ status: 503, code: "payment_unavailable" });
+    expect((replay.reason as { details?: { details?: { retry_same_key?: boolean } } }).details?.details?.retry_same_key).toBe(false);
+    expect(next.status).toBe("fulfilled");
+    if (next.status === "fulfilled") expect(next.value.data.payment?.status).toBe("pending");
   });
 });
 
@@ -260,6 +333,8 @@ describe("reconciliação", () => {
     const [payment] = await database.select().from(schema.payments).where(eq(schema.payments.businessId, businessId));
     expect(payment.status).toBe("failed");
     expect(payment.externalId).toBeNull();
+    const [released] = await database.select().from(schema.bookings).where(eq(schema.bookings.id, payment.bookingId));
+    expect(released.status).toBe("expired");
     expect(report.stuckRetried).toBe(0);
     logged.mockClear();
     const again = await reconcileOnce(database, refused, config);
