@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import { bookingPaymentUnavailableErrorSchema } from "../../lib/contracts/booking-payment-error";
 
-const message = "Não foi possível criar a cobrança. Tente novamente com a mesma chave.";
+const message = "Não conseguimos gerar o Pix agora. Tente de novo em instantes ou fale com a loja.";
 
 it("aceita só retry_same_key no 503 de cobrança", () => {
   for (const retrySameKey of [true, false]) {

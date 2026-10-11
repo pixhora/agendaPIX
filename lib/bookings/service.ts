@@ -196,7 +196,7 @@ export async function attachCreatedCharge(database: Database, payment: typeof sc
   return updated;
 }
 
-const PIX_CHARGE_UNAVAILABLE = "Não foi possível criar a cobrança. Tente novamente com a mesma chave.";
+const PIX_CHARGE_UNAVAILABLE = "Não conseguimos gerar o Pix agora. Tente de novo em instantes ou fale com a loja.";
 
 function paymentUnavailable(retrySameKey: boolean) {
   const details = bookingPaymentUnavailableDetailsSchema.parse({ retry_same_key: retrySameKey });

@@ -33,7 +33,7 @@ let provider: FakePaymentProvider;
 
 const slot = (index: number) => new Date(Date.UTC(2030, 0, 1, 12, 0) + index * 1800000).toISOString();
 const input = (index = 0, phone = "+5511999999900") => ({ serviceId, startsAt: slot(index), customer: { name: "Cliente", phone, cpfCnpj: "52998224725" }, policyHash: padraoPolicyHash("Negócio") });
-const PIX_UNAVAILABLE = "Não foi possível criar a cobrança. Tente novamente com a mesma chave.";
+const PIX_UNAVAILABLE = "Não conseguimos gerar o Pix agora. Tente de novo em instantes ou fale com a loja.";
 
 async function publicPaymentUnavailable(error: unknown) {
   const response = await withAppCors(
