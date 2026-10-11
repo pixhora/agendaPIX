@@ -14,6 +14,7 @@ import { createDrizzleMpStore } from "../mercadopago-oauth/repository";
 import { purgeDisconnectedMercadoPagoTokens } from "../mercadopago-oauth/refresh";
 import { MpAccountNotConnectedError } from "./seller-account";
 import { callProvider, ProviderTimeoutError } from "./timeout";
+import { markCreatingPaymentFailed, PixCreateRefusedError } from "./pix-create-log";
 
 type Database = NodePgDatabase<typeof schema>;
 type PoolDatabase = Database & { $client: Pool };
@@ -264,6 +265,14 @@ async function retryStuckCreating(
       if (payment.expiresAt <= now) await settleExpiredCreating(database, provider, config, payment, now, report);
       else report.stuckRetried += await retryOpenCreating(database, provider, config, payment, now, report);
     } catch (error) {
+      if (error instanceof PixCreateRefusedError) {
+        try {
+          await markCreatingPaymentFailed(database, payment);
+        } catch (markError) {
+          noteFailure(report, "stuck", payment.id, markError);
+        }
+        continue;
+      }
       noteFailure(report, "stuck", payment.id, error);
       try {
         await database.update(schema.payments).set({ updatedAt: now }).where(and(samePayment(payment), eq(schema.payments.status, "creating")));
