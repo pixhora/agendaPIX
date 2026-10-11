@@ -147,6 +147,20 @@ export function MpConnectForm({
     const timer = window.setTimeout(() => revealAck(ackRef.current), 0);
     return () => window.clearTimeout(timer);
   }, [ackInvalid, requireAck]);
+  useEffect(() => {
+    // O envio nativo marca a trava antes de sair. No voltar pelo bfcache a página
+    // continua montada com a trava ligada; um erro no meio do caminho também.
+    function releaseSubmitLock(event: Event) {
+      const persisted = "persisted" in event && (event as PageTransitionEvent).persisted === true;
+      if ((event.type === "pageshow" && persisted) || event.type === "error") submittedRef.current = false;
+    }
+    window.addEventListener("pageshow", releaseSubmitLock);
+    window.addEventListener("error", releaseSubmitLock);
+    return () => {
+      window.removeEventListener("pageshow", releaseSubmitLock);
+      window.removeEventListener("error", releaseSubmitLock);
+    };
+  }, []);
 
   const ack = requireAck ? (
     <div className={pinActions ? "mt-4" : undefined}>
