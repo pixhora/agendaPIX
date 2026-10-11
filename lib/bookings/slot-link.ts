@@ -828,9 +828,14 @@ export async function readSlotLinkPreview(
   identity: string | null,
   database: Database = getDb(),
   config: BookingConfig = bookingConfig(),
+  options?: { probe?: boolean },
 ) {
   if (!isSlotLinkPreviewId(previewId)) throw invalidLink();
-  await probeLimit(database, "slot-link-preview", identity, config.SLOT_LINK_OPEN_PER_CLIENT);
+  // A prévia da página (`generateMetadata`) só chama isto depois de achar o token
+  // e não pode gastar o balde nesse caminho. A rota pública continua consumindo.
+  if (options?.probe !== false) {
+    await probeLimit(database, "slot-link-preview", identity, config.SLOT_LINK_OPEN_PER_CLIENT);
+  }
   const [link] = await database.select().from(schema.slotLinks).where(eq(schema.slotLinks.previewId, previewId)).limit(1);
   if (!link) throw invalidLink();
   const [business] = await database.select().from(schema.businesses).where(eq(schema.businesses.id, link.businessId)).limit(1);

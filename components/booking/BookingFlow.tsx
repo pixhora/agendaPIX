@@ -30,8 +30,11 @@ import { BrandMark } from "@/components/ui/brand";
 import { BookingSummary } from "./BookingSummary";
 import { GENERIC_SUBMIT_MESSAGE, OFFLINE_MESSAGE, POLICY_CHANGED_MESSAGE, businessLoadCopy, isOfflineError, publicBookingErrorView, whatsappHref } from "./booking-error";
 import { migratedPixResumePayload, pixResumePayload, pixResumeStorageKey, readPixResume, shouldClearExpiredResume, shouldResumePix, type PixResumeSession } from "./pix-resume";
+import { keptAccessToken } from "@/lib/slot-link/idempotency";
+import { TrackingUnavailable } from "./tracking-unavailable";
 import { buildPublicBookingBody } from "./booking-payload";
 import { PausedState } from "./PausedState";
+import { AgendaPixFooter } from "@/components/slot-link/agenda-pix-footer";
 const PolicySheet = React.lazy(() => import("@/components/policy/PolicySheet").then((mod) => ({ default: mod.PolicySheet })));
 
 interface BookingFlowProps {
@@ -72,6 +75,7 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
     trigger: null,
   });
   const [bookingResponse, setBookingResponse] = useState<BookingResponse | null>(null);
+  const [trackingMiss, setTrackingMiss] = useState(false);
 
   useEffect(() => {
     if (step < 2 && !selectedService) return;
@@ -141,7 +145,7 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
 
   // Recarregar ou voltar neste separador retoma o Pix. Fechar a aba apaga o sessionStorage.
   useEffect(() => {
-    if (!business || step !== 1 || isCompleted || bookingResponse) return;
+    if (!business || step !== 1 || isCompleted || bookingResponse || trackingMiss) return;
     if (typeof window === "undefined") return;
 
     const storageKey = pixResumeStorageKey(slug);
@@ -181,11 +185,15 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
       },
     })
       .then(async (res) => {
+        if (res.status === 404) {
+          if (!isCancelled) setTrackingMiss(true);
+          return null;
+        }
         if (!res.ok) throw new Error("Reserva não encontrada ou expirada");
         return parsePaymentStatusResponse(await res.json());
       })
       .then((paymentData) => {
-        if (isCancelled) return;
+        if (isCancelled || !paymentData) return;
 
         // Invariante: expirado/cancelado permanece terminal
         if (
@@ -261,7 +269,7 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
     return () => {
       isCancelled = true;
     };
-  }, [business, slug, initialBookingId, step, isCompleted, bookingResponse]);
+  }, [business, slug, initialBookingId, step, isCompleted, bookingResponse, trackingMiss]);
 
   // Cria a reserva chamando POST /api/public/[slug]/bookings
   const handleCreateBooking = async () => {
@@ -348,11 +356,13 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
         // Recarregar esta aba retoma o Pix. Fechar a aba apaga a sessão. Sem nome, telefone ou CPF.
         if (typeof window !== "undefined") {
           try {
+            const storageKey = pixResumeStorageKey(slug);
+            const stored = readPixResume(sessionStorage.getItem(storageKey));
             sessionStorage.setItem(
-              pixResumeStorageKey(slug),
+              storageKey,
               pixResumePayload({
                 bookingId: booking.bookingId,
-                accessToken: booking.accessToken,
+                accessToken: keptAccessToken(stored, booking),
                 serviceId: selectedService.id,
                 expiresAt: booking.expiresAt,
               }),
@@ -499,6 +509,17 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
     );
   }
 
+  if (trackingMiss) {
+    return (
+      <div className="min-h-dvh bg-paper">
+        {pageHeader}
+        <main id="content" className="mx-auto w-full max-w-xl px-4 py-8">
+          <TrackingUnavailable slug={slug} whatsapp={business.contactWhatsapp ?? null} />
+        </main>
+      </div>
+    );
+  }
+
   if (business.bookingsPaused && !isCompleted && !(step === 4 && bookingResponse)) {
     return (
       <div className="min-h-dvh bg-paper">
@@ -507,6 +528,7 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
           <PausedState businessName={business.name} contactWhatsapp={business.contactWhatsapp} services={business.services} autoFocus />
         </main>
         {pageFooter}
+        <AgendaPixFooter campaign="pagina_publica" />
       </div>
     );
   }
@@ -533,6 +555,7 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
           </React.Suspense>
         </main>
         {pageFooter}
+        <AgendaPixFooter campaign="reserva_confirmada" />
       </div>
     );
   }
@@ -555,6 +578,7 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
             )}
           </div>
         </main>
+        <AgendaPixFooter campaign="pagina_publica" />
       </div>
     );
   }
@@ -670,6 +694,7 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
         </aside>}
       </main>
       {pageFooter}
+      {step === 4 && bookingResponse ? null : <AgendaPixFooter campaign="pagina_publica" />}
       {selectedService ? (
         <React.Suspense fallback={null}>
         <PolicySheet

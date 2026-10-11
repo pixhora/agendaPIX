@@ -6,8 +6,24 @@ export type PixResumeSession = {
   serviceId: string;
 };
 
+export const PIX_RESUME_STORAGE_PREFIX = "booking_session_";
+
 export function pixResumeStorageKey(slug: string): string {
-  return `booking_session_${slug}`;
+  return `${PIX_RESUME_STORAGE_PREFIX}${slug}`;
+}
+
+/** Apaga retomadas de Pix vencidas. expiresAt nulo fica: a agenda pública ainda retoma. */
+export function purgeExpiredBookingSessions(
+  store: { keys(): string[]; get(key: string): string | null; remove(key: string): void },
+  now = Date.now(),
+) {
+  for (const key of store.keys()) {
+    if (!key.startsWith(PIX_RESUME_STORAGE_PREFIX)) continue;
+    const session = readPixResume(store.get(key));
+    if (!session || (session.expiresAt !== null && new Date(session.expiresAt).getTime() <= now)) {
+      store.remove(key);
+    }
+  }
 }
 
 export function readPixResume(raw: string | null): PixResumeSession | null {

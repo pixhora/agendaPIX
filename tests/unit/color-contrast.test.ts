@@ -46,6 +46,26 @@ const themes = {
 
 const surfaces = ["--paper", "--surface", "--subtle"] as const;
 
+describe("botão pixDeep", () => {
+  it("claro mantém #064a43 e o texto branco passa de 4,5:1", () => {
+    const background = token(themes.light, "--pix-deep");
+    const foreground = token(themes.light, "--slab-foreground");
+    expect(background).toBe("#064a43");
+    expect(contrast(foreground, background)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("escuro usa #0e6b60 e o texto branco passa de 4,5:1", () => {
+    const background = token(themes.dark, "--pix-deep");
+    const foreground = token(themes.dark, "--slab-foreground");
+    const muted = token(themes.dark, "--pix-deep-muted");
+    expect(background).toBe("#0e6b60");
+    expect(contrast(foreground, background)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(muted, background)).toBeGreaterThanOrEqual(4.5);
+    const systemDark = block(css, ":root:not(.light):not(.dark)");
+    expect(token(systemDark, "--pix-deep")).toBe(background);
+  });
+});
+
 describe("contraste dos tokens de texto", () => {
   for (const [theme, cssBlock] of Object.entries(themes)) {
     it(`${theme}: tinta e texto secundário passam de 4,5:1 em papel, cartão e superfície sutil`, () => {

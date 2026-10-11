@@ -11,13 +11,16 @@ import { StatusChip, ValueSlab } from "@/components/ui/value-slab";
 import { buttonVariants } from "@/components/ui/button";
 import { getBusinessBilling } from "@/lib/billing/status";
 import { getDb } from "@/db";
-import { dashboardBookings } from "@/lib/dashboard/data";
+import { dashboardBookings, dashboardServices } from "@/lib/dashboard/data";
 import { dashboardAgendaKpis, dashboardAgendaSummary, formatBrlCents } from "@/lib/dashboard/summary";
 import { OwnerBillingNotice } from "@/components/dashboard/owner-billing-notice";
 import { ownerContext } from "@/lib/dashboard/session";
 import { dateSchema, shiftDate, weekDates } from "@/lib/dashboard/validation";
 import { localDate } from "@/lib/bookings/availability";
 import { cn } from "@/lib/utils";
+import { SlotLinkPanel } from "@/components/slot-link/slot-link-panel";
+import { getServiceBlockedReason, readMpDepositGate } from "@/lib/mercadopago-oauth/bookability";
+import { createDrizzleMpStore } from "@/lib/mercadopago-oauth/repository";
 
 const utcDay = (day: string) => new Date(`${day}T12:00:00Z`);
 const format = (options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC", ...options });
@@ -43,12 +46,24 @@ export default async function AgendaPage({ searchParams }: { searchParams: Promi
   const date = parsedDate.success ? parsedDate.data : today;
   const weekly = query.view === "week";
   const dates = weekly ? weekDates(date) : [date];
-  const [bookings, billing] = business
+  const [bookings, billing, listedServices, mpGate] = business
     ? await Promise.all([
       dashboardBookings(owner.id, business.id, dates, getDb(), business),
       getBusinessBilling(business.id, owner.id),
+      dashboardServices(owner.id, business.id, getDb(), business),
+      readMpDepositGate(business.id, { store: createDrizzleMpStore(getDb()) }),
     ])
-    : [[] as Awaited<ReturnType<typeof dashboardBookings>>, null];
+    : [[] as Awaited<ReturnType<typeof dashboardBookings>>, null, [], null];
+  const depositServices = listedServices
+    .filter((service) => service.active && service.depositCents > 0)
+    .map((service) => ({
+      id: service.id,
+      name: service.name,
+      durationMinutes: service.durationMinutes,
+      priceCents: service.priceCents,
+      depositCents: service.depositCents,
+    }));
+  const mpReady = mpGate ? getServiceBlockedReason({ depositCents: 1 }, mpGate) === null : false;
   const summary = business ? dashboardAgendaSummary(bookings, date, timezone, now) : null;
   const kpis = dashboardAgendaKpis(bookings, now);
 
@@ -124,6 +139,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Promi
         <StatusBadge status={nextBooking.status} />
       </section>}
 
+      <SlotLinkPanel businessId={business.id} slug={business.slug} timezone={timezone} date={date} today={today} services={depositServices} mpReady={mpReady} />
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="font-display text-lg font-bold">{weekly ? "Semana" : "Atendimentos"}</h2>
         <p aria-live="polite" className="text-sm text-muted">{bookings.length} {bookings.length === 1 ? "agendamento" : "agendamentos"}</p>

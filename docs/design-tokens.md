@@ -26,8 +26,8 @@
 | `--pix-soft` | `#E8F6F3` | `#10302C` | Fundo de destaque Pix (aviso, próximo atendimento) |
 | `--pix-bright` | `#3FD0BE` | `#3FD0BE` | Faixa do horário reservado, botão sobre a placa, detalhe de marca. Nunca é cor de texto sobre `--paper` |
 | `--pix-bright-foreground` | `#0B0B0C` | `#0B0B0C` | Texto sobre `--pix-bright`. Fixo nos dois modos (`text-ink` no escuro fica claro e falha) |
-| `--pix-deep` | `#064A43` | `#0B2F2B` | Bloco do CTA final e selo "Exemplo". Uma vez por página |
-| `--pix-deep-muted` | `#B9E4DD` | `#9FD9D0` | Texto secundário sobre `--pix-deep` |
+| `--pix-deep` | `#064A43` | `#0E6B60` | Bloco do CTA final, selo "Exemplo" e botão `pixDeep`. Texto branco (`--slab-foreground`) nos dois temas |
+| `--pix-deep-muted` | `#B9E4DD` | `#B4E4DB` | Texto secundário sobre `--pix-deep` |
 | `--brand-tile` / `--brand-tile-foreground` | `#0B0B0C` / `#F6F5F2` | `#0B0B0C` / `#F6F5F2` | Azulejo da marca. Escuro nos dois temas, igual ao favicon |
 | `--brand-tile-edge` | transparente | `rgb(255 255 255 / 0.14)` | Borda interna do azulejo no escuro, para não sumir no `#0F0F10` |
 | `--success` / `--success-soft` | `#156B3A` / `#E6F4EA` | `#6FD49A` / `#133222` | Confirmado, salvo |
@@ -45,6 +45,8 @@ Aliases shadcn: `background`, `foreground`, `primary`, `primary-foreground`, `mu
 | `muted` sobre `paper` / `surface` / `subtle` | 6,2 / 6,8 / 5,8:1 | 7,6 / 7,0 / 6,3:1 |
 | `pix` sobre `paper` / `surface` / `pix-soft` | 5,6 / 6,1 / 5,5:1 | 10,0 / 9,2 / 7,4:1 |
 | `pix-foreground` sobre `pix` (botão Pix) | 6,1:1 | 10,3:1 |
+| `slab-foreground` sobre `pix-deep` (botão pixDeep) | 10,2:1 | 6,4:1 |
+| `pix-deep-muted` sobre `pix-deep` | 7,4:1 | 4,6:1 |
 | `success` / `warning` / `danger` sobre o `-soft` | 5,8 / 5,7 / 5,6:1 | 7,7 / 8,0 / 7,0:1 |
 | `slab-muted` sobre `slab` | 11,9:1 | — |
 | `line-strong` sobre `surface` (borda de campo, 1.4.11) | 3,4:1 | 3,3:1 |
