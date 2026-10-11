@@ -12,7 +12,7 @@ test.describe("cadastro da loja vazio", () => {
     await expect(page.getByRole("heading", { name: "Sua loja" })).toBeVisible();
     await expect(page.getByLabel("Nome da loja")).toHaveValue("");
     await expect(page.getByLabel("Seu link")).toHaveValue("");
-    await expect(page.getByLabel("Duração")).toHaveValue("");
+    await expect(page.getByLabel("Duração")).toContainText("Escolha a duração");
     await expect(page.getByLabel("Nome do serviço")).toHaveValue("");
     await expect(page.getByRole("button", { name: "Continuar" })).toBeDisabled();
     await expect(page.getByText("Salvo neste aparelho")).toHaveCount(0);

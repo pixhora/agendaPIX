@@ -235,6 +235,8 @@ h1, h2, h3, h4, h5, h6, .font-display {
   textarea:focus-visible,
   select:focus,
   select:focus-visible,
+  [data-slot="select-trigger"]:focus,
+  [data-slot="select-trigger"]:focus-visible,
   [tabindex="-1"]:focus,
   [tabindex="-1"]:focus-visible {
     outline: none;
@@ -390,6 +392,54 @@ h1, h2, h3, h4, h5, h6, .font-display {
   color-scheme: light;
   background-color: #ffffff;
   color: #0b0b0c;
+}
+
+/*
+ * Menu do select (Radix). Abre com fade e escala 96% → 100% a partir do campo.
+ * 150ms para abrir, 100ms para fechar. Sem deslize e sem quique.
+ * A escala é propriedade à parte para não brigar com o translate do popper.
+ */
+@keyframes select-menu-in {
+  from { opacity: 0; scale: 0.96; }
+  to { opacity: 1; scale: 1; }
+}
+
+@keyframes select-menu-out {
+  from { opacity: 1; scale: 1; }
+  to { opacity: 0; scale: 0.96; }
+}
+
+[data-slot="select-content"] {
+  transform-origin: var(--radix-select-content-transform-origin, top center);
+}
+
+[data-slot="select-content"][data-state="open"] {
+  animation: select-menu-in 150ms ease-out both;
+}
+
+[data-slot="select-content"][data-state="closed"] {
+  animation: select-menu-out 100ms ease-out both;
+}
+
+[data-slot="select-trigger"] [data-slot="select-icon"] {
+  transition: transform 150ms ease-out;
+}
+
+[data-slot="select-trigger"][data-state="open"] [data-slot="select-icon"] {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-slot="select-content"],
+  [data-slot="select-content"][data-state="open"],
+  [data-slot="select-content"][data-state="closed"] {
+    animation: none !important;
+    scale: 1 !important;
+  }
+
+  [data-slot="select-trigger"] [data-slot="select-icon"] {
+    transition: none !important;
+  }
 }
 
 /* Hero: composição em camadas (components/landing/HeroMotion.tsx).

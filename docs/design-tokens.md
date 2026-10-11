@@ -83,4 +83,4 @@ Classes utilitárias: `.transition-feedback`, `.transition-opening`, `.transitio
 
 ## 6. Componentes base (`components/ui`)
 
-`Button` (default, pix, outline, ghost, danger; tamanhos default/lg/sm/icon; `buttonVariants` com tailwind-merge), `Input`, `Select`, `Label`, `FieldHint`, `FieldError`, `Card`, `Skeleton` (sobre `--subtle`), `StatusBadge`, `ValueSlab` e `StatusChip`, `BrandMark`/`BrandLink`, `Calendar` (react-day-picker 9, pt-BR), `Popover` (Radix), `Switch` (checkbox nativo), `Toaster` (Sonner). Ícones: lucide-react, sempre `aria-hidden` quando decorativos.
+`Button` (default, pix, outline, ghost, danger; tamanhos default/lg/sm/icon; `buttonVariants` com tailwind-merge), `Input`, `Select` (Radix: seta `ChevronDown` de 16px a 12px da borda, menu com fade e escala de 96% a 100% em 150ms), `Label`, `FieldHint`, `FieldError`, `Card`, `Skeleton` (sobre `--subtle`), `StatusBadge`, `ValueSlab` e `StatusChip`, `BrandMark`/`BrandLink`, `Calendar` (react-day-picker 9, pt-BR), `Popover` (Radix), `Switch` (checkbox nativo), `Toaster` (Sonner). Ícones: lucide-react, sempre `aria-hidden` quando decorativos.

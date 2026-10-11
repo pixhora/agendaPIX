@@ -21,16 +21,4 @@ function Input({ className, shellClassName, type = "text", ...props }: React.Com
   );
 }
 
-function Select({ className, ...props }: React.ComponentProps<"select">) {
-  return (
-    <div className={fieldShell}>
-      <select
-        data-slot="select"
-        className={cn(fieldControl, "px-3", className)}
-        {...props}
-      />
-    </div>
-  );
-}
-
-export { Input, Select };
+export { Input };

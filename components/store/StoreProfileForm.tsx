@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Input, Select } from "@/components/ui/input";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { MoneyInput } from "@/components/ui/money-input";
 import { Switch } from "@/components/ui/switch";
@@ -174,17 +175,25 @@ export function StoreProfileForm({
         <div className="grid gap-1.5">
           <Label htmlFor="store-duration">Duração</Label>
           <Select
-            id="store-duration"
             value={data.durationMinutes > 0 ? String(data.durationMinutes) : ""}
-            aria-invalid={show("duration") ? true : undefined}
-            aria-describedby={show("duration") ? "store-duration-error" : undefined}
-            onBlur={() => setBlurred((current) => ({ ...current, duration: true }))}
-            onChange={(event) => onChange({ durationMinutes: Number(event.target.value) || 0 })}
+            onValueChange={(next) => onChange({ durationMinutes: Number(next) || 0 })}
+            onOpenChange={(open) => {
+              if (!open) setBlurred((current) => ({ ...current, duration: true }));
+            }}
           >
-            <option value="">Escolha a duração</option>
-            {STORE_DURATION_MINUTES.map((minutes) => (
-              <option key={minutes} value={minutes}>{minutes} min</option>
-            ))}
+            <SelectTrigger
+              id="store-duration"
+              aria-invalid={show("duration") ? true : undefined}
+              aria-describedby={show("duration") ? "store-duration-error" : undefined}
+              onBlur={() => setBlurred((current) => ({ ...current, duration: true }))}
+            >
+              <SelectValue placeholder="Escolha a duração" />
+            </SelectTrigger>
+            <SelectContent>
+              {STORE_DURATION_MINUTES.map((minutes) => (
+                <SelectItem key={minutes} value={String(minutes)}>{minutes} min</SelectItem>
+              ))}
+            </SelectContent>
           </Select>
           <FieldError id="store-duration-error">{show("duration") ? errors.duration : null}</FieldError>
         </div>

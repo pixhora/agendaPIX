@@ -87,26 +87,29 @@ test.describe("campo de dinheiro: prefixo e valor na mesma figura", () => {
   }
 });
 
-test.describe("select de duração: texto escuro sobre o menu branco", () => {
+test.describe("select de duração: texto legível no tema escuro", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test("opções escuras continuam legíveis no controle fechado", async ({ page }) => {
+  test("opção e controle fechado passam de 4,5:1", async ({ page }) => {
     await page.addInitScript((value) => localStorage.setItem("agenda-theme", value), "dark");
     await page.goto("/onboarding");
-    const select = page.locator("select#store-duration");
-    const option = await select.locator("option").first().evaluate((element) => {
-      const computed = getComputedStyle(element);
-      return { color: computed.color, background: computed.backgroundColor };
-    });
-    expect(contrastRatio(option.color, "rgb(255, 255, 255)")).toBeGreaterThanOrEqual(4.5);
-    await select.selectOption("30");
-    const closed = await select.evaluate((element) => {
-      const shell = element.parentElement;
+    const select = page.getByRole("combobox", { name: "Duração" });
+    await select.click();
+    const option = page.getByRole("option", { name: "30 min" });
+    const open = await option.evaluate((element) => {
+      const menu = element.closest("[data-slot=select-content]");
       return {
         color: getComputedStyle(element).color,
-        surface: shell ? getComputedStyle(shell).backgroundColor : "rgb(0, 0, 0)",
+        surface: menu ? getComputedStyle(menu).backgroundColor : getComputedStyle(element).backgroundColor,
       };
     });
+    expect(open.surface).not.toBe("rgba(0, 0, 0, 0)");
+    expect(contrastRatio(open.color, open.surface)).toBeGreaterThanOrEqual(4.5);
+    await option.click();
+    const closed = await select.evaluate((element) => ({
+      color: getComputedStyle(element).color,
+      surface: getComputedStyle(element).backgroundColor,
+    }));
     expect(closed.surface).not.toBe("rgba(0, 0, 0, 0)");
     expect(contrastRatio(closed.color, closed.surface)).toBeGreaterThanOrEqual(4.5);
   });
