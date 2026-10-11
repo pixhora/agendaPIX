@@ -52,6 +52,20 @@ describe("segredos separados", () => {
       VERCEL_ENV: "production",
       BETTER_AUTH_SECRET: auth,
     })).toBeNull();
+    expect(bookingAccessSecret({
+      VERCEL_ENV: "preview",
+      BETTER_AUTH_SECRET: auth,
+    })).toBeNull();
+    expect(bookingAccessSecret({
+      VERCEL_ENV: "preview",
+      BETTER_AUTH_SECRET: auth,
+      BOOKING_ACCESS_SECRET: "replace-this-booking-access-secret-32",
+    })).toBeNull();
+    expect(bookingAccessSecret({
+      VERCEL_ENV: "preview",
+      BETTER_AUTH_SECRET: auth,
+      BOOKING_ACCESS_SECRET: access,
+    })).toBe(access);
     expect(bookingAccessSecret({ NODE_ENV: "test", BETTER_AUTH_SECRET: auth, BOOKING_ACCESS_SECRET: "" })).toBe(auth);
   });
 

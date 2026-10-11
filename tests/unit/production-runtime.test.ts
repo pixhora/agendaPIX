@@ -167,6 +167,7 @@ describe("build de produção na Vercel", () => {
       VERCEL_ENV: "preview",
       MP_OAUTH_PKCE: "off",
       BOOKING_HOLD_MINUTES: hold,
+      ...dedicatedBookingSecret,
     })).not.toThrow();
     expect(() => assertVercelProductionBuild({
       NODE_ENV: "development",
@@ -205,7 +206,7 @@ describe("BOOKING_ACCESS_SECRET em produção", () => {
       { ...boot, BOOKING_ACCESS_SECRET: undefined },
       { ...boot, BOOKING_ACCESS_SECRET: "   " },
     ]) {
-      expect(() => assertProductionSafeEnv(env)).toThrow("BOOKING_ACCESS_SECRET é obrigatório em produção.");
+      expect(() => assertProductionSafeEnv(env)).toThrow("BOOKING_ACCESS_SECRET é obrigatório em produção e no preview.");
     }
     expect(() => assertProductionSafeEnv({ ...boot, BOOKING_ACCESS_SECRET: short })).toThrow("BOOKING_ACCESS_SECRET precisa ter pelo menos 32 caracteres.");
     expect(() => assertProductionSafeEnv({
@@ -227,7 +228,7 @@ describe("BOOKING_ACCESS_SECRET em produção", () => {
       expect(message).not.toContain(leaked);
     }
 
-    expect(() => assertVercelProductionBuild({ ...build, BOOKING_ACCESS_SECRET: "" })).toThrow("BOOKING_ACCESS_SECRET é obrigatório em produção.");
+    expect(() => assertVercelProductionBuild({ ...build, BOOKING_ACCESS_SECRET: "" })).toThrow("BOOKING_ACCESS_SECRET é obrigatório em produção e no preview.");
     expect(() => assertVercelProductionBuild({ ...build, BOOKING_ACCESS_SECRET: short })).toThrow("BOOKING_ACCESS_SECRET precisa ter pelo menos 32 caracteres.");
     expect(() => assertVercelProductionBuild({
       ...build,
@@ -242,7 +243,7 @@ describe("BOOKING_ACCESS_SECRET em produção", () => {
     }
   });
 
-  it("aceita segredo válido e não cobra a regra fora de produção", () => {
+  it("aceita segredo válido e não cobra a regra fora da Vercel de produção e preview", () => {
     expect(() => assertProductionSafeEnv(boot)).not.toThrow();
     expect(() => assertVercelProductionBuild(build)).not.toThrow();
     expect(() => assertProductionSafeEnv({ BOOKING_ACCESS_SECRET: "", NODE_ENV: "development" })).not.toThrow();
@@ -252,8 +253,33 @@ describe("BOOKING_ACCESS_SECRET em produção", () => {
       NEXT_PHASE: "phase-production-build",
       BOOKING_ACCESS_SECRET: "",
     })).not.toThrow();
-    expect(() => assertVercelProductionBuild({ VERCEL_ENV: "preview", BOOKING_ACCESS_SECRET: "" })).not.toThrow();
+    expect(() => assertVercelProductionBuild({ VERCEL_ENV: "preview", BOOKING_ACCESS_SECRET: "" })).toThrow("BOOKING_ACCESS_SECRET é obrigatório em produção e no preview.");
     expect(() => assertVercelProductionBuild({ VERCEL_ENV: "development", BOOKING_ACCESS_SECRET: "curto" })).not.toThrow();
+  });
+
+  it("recusa o prefixo de exemplo e cobra as mesmas regras no preview", () => {
+    const placeholder = "replace-this-with-a-real-booking-secret-32";
+    const message = "BOOKING_ACCESS_SECRET ainda é o valor de exemplo. Troque o segredo.";
+    expect(() => assertProductionSafeEnv({ ...boot, BOOKING_ACCESS_SECRET: placeholder })).toThrow(message);
+    expect(() => assertVercelProductionBuild({ ...build, BOOKING_ACCESS_SECRET: placeholder })).toThrow(message);
+    const preview = { VERCEL_ENV: "preview", BETTER_AUTH_SECRET: authSecret };
+    expect(() => assertVercelProductionBuild({ ...preview, BOOKING_ACCESS_SECRET: placeholder })).toThrow(message);
+    try {
+      assertVercelProductionBuild({ ...preview, BOOKING_ACCESS_SECRET: placeholder });
+    } catch (error) {
+      const text = error instanceof Error ? error.message : String(error);
+      expect(text).not.toContain(placeholder);
+      expect(text).not.toContain("with-a-real-booking-secret");
+    }
+    expect(() => assertVercelProductionBuild(preview)).toThrow("BOOKING_ACCESS_SECRET é obrigatório em produção e no preview.");
+    expect(() => assertVercelProductionBuild({ ...preview, BOOKING_ACCESS_SECRET: "curto" })).toThrow("BOOKING_ACCESS_SECRET precisa ter pelo menos 32 caracteres.");
+    expect(() => assertVercelProductionBuild({ ...preview, BOOKING_ACCESS_SECRET: authSecret })).toThrow("BOOKING_ACCESS_SECRET não pode ser igual a BETTER_AUTH_SECRET.");
+    expect(() => assertVercelProductionBuild({
+      ...preview,
+      BOOKING_ACCESS_SECRET: bookingAccess,
+      MP_OAUTH_PKCE: "off",
+      BOOKING_HOLD_MINUTES: "27",
+    })).not.toThrow();
   });
 
   it("deixa PREVIOUS igual a BETTER_AUTH_SECRET e avisa uma vez no boot, sem o valor", () => {

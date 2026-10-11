@@ -1,11 +1,10 @@
-import { createHash } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { and, eq, gt, inArray, lt, or, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { getDb } from "../../db";
 import * as schema from "../../db/schema";
-import { bookingAccessSecret } from "../env";
-import { bookingAccessTokenMatches, signBookingAccessToken } from "./access-mac";
+import { signBookingAccessToken } from "./access-mac";
 import { HttpError } from "../http";
 import { paymentsConfig } from "../payments/config";
 import { assertMpConnectedForDeposit } from "../mercadopago-oauth/bookability";
@@ -373,10 +372,10 @@ function bearerToken(authorization: string | null) {
   return PAYMENT_BEARER.exec(authorization ?? "")?.[1] ?? null;
 }
 
-function tokenMatches(token: string, accessTokenHash: string | null, businessId: string, bookingId: string) {
+/** Compara o sha256 do token que o cliente apresenta com o hash gravado. Não recalcula o HMAC, então a rotação do segredo não invalida o link já emitido. */
+function tokenMatches(token: string, accessTokenHash: string | null) {
   if (!accessTokenHash || !/^[a-f0-9]{64}$/.test(accessTokenHash)) return false;
-  if (!bookingAccessSecret()) throw new HttpError(503, "booking_unavailable", "Agendamento indisponível. Tente novamente mais tarde.");
-  return bookingAccessTokenMatches(token, businessId, bookingId);
+  return timingSafeEqual(Buffer.from(hash(token), "hex"), Buffer.from(accessTokenHash, "hex"));
 }
 
 export type PaymentGatewayPoll = {
@@ -410,7 +409,7 @@ export async function getBookingPayment(
     database.select().from(schema.bookings).where(and(eq(schema.bookings.businessId, business.id), eq(schema.bookings.id, bookingId))).limit(1),
   ]);
   const booking = bookingRows[0];
-  if (!booking || !tokenMatches(token, booking.accessTokenHash, booking.businessId, booking.id)) {
+  if (!booking || !tokenMatches(token, booking.accessTokenHash)) {
     throw new HttpError(404, "booking_not_found", "Agendamento não encontrado.");
   }
   const now = new Date();

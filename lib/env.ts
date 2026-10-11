@@ -28,9 +28,10 @@ export const bookingSecretsSchema = z.object({
 });
 
 const bookingAccessSecretProductionMessage = {
-  empty: "BOOKING_ACCESS_SECRET é obrigatório em produção.",
+  empty: "BOOKING_ACCESS_SECRET é obrigatório em produção e no preview.",
   short: "BOOKING_ACCESS_SECRET precisa ter pelo menos 32 caracteres.",
   same: "BOOKING_ACCESS_SECRET não pode ser igual a BETTER_AUTH_SECRET.",
+  placeholder: "BOOKING_ACCESS_SECRET ainda é o valor de exemplo. Troque o segredo.",
 } as const;
 
 function normalizedSecret(raw: string | undefined): string | undefined {
@@ -39,15 +40,16 @@ function normalizedSecret(raw: string | undefined): string | undefined {
   return value.length === 0 ? undefined : value;
 }
 
-/** Boot (`NODE_ENV=production`, fora do `next build`) ou build da Vercel de produção. */
+/** Boot (`NODE_ENV=production`, fora do `next build`) ou build da Vercel de produção e de preview. */
 export function requiresDedicatedBookingAccessSecret(env: Readonly<Record<string, string | undefined>> = process.env) {
-  if (env.VERCEL_ENV === "production") return true;
+  if (env.VERCEL_ENV === "production" || env.VERCEL_ENV === "preview") return true;
   return env.NODE_ENV === "production" && env.NEXT_PHASE !== "phase-production-build";
 }
 
 /**
- * Segredo atual dos links de reserva. Em produção não cai em `BETTER_AUTH_SECRET`:
- * vazio, curto ou igual ao segredo de sessão devolve null. Fora disso, vazio ainda cai.
+ * Segredo atual dos links de reserva. Em produção e no preview da Vercel não cai em
+ * `BETTER_AUTH_SECRET`: vazio, curto, prefixo de exemplo ou igual ao segredo de sessão
+ * devolve null. Fora disso, vazio ainda cai.
  */
 export function bookingAccessSecret(env: Readonly<Record<string, string | undefined>> = process.env) {
   if (requiresDedicatedBookingAccessSecret(env)) {
@@ -70,10 +72,11 @@ export function bookingAccessSecretPrevious(env: Readonly<Record<string, string 
   return normalizedSecret(env.BOOKING_ACCESS_SECRET_PREVIOUS) ?? null;
 }
 
-/** Boot e `next build` de produção. A mensagem cita o nome e o motivo, nunca o valor. Não olha `BOOKING_ACCESS_SECRET_PREVIOUS`. */
+/** Boot e `next build` de produção e de preview. A mensagem cita o nome e o motivo, nunca o valor. Não olha `BOOKING_ACCESS_SECRET_PREVIOUS`. */
 export function assertBookingAccessSecret(env: Readonly<Record<string, string | undefined>> = process.env) {
   const value = normalizedSecret(env.BOOKING_ACCESS_SECRET);
   if (!value) throw new Error(bookingAccessSecretProductionMessage.empty);
+  if (value.startsWith("replace-this-")) throw new Error(bookingAccessSecretProductionMessage.placeholder);
   if (value.length < 32) throw new Error(bookingAccessSecretProductionMessage.short);
   const auth = normalizedSecret(env.BETTER_AUTH_SECRET);
   if (auth && value === auth) throw new Error(bookingAccessSecretProductionMessage.same);
@@ -155,14 +158,19 @@ const vercelProductionPkceMessage = "MP_OAUTH_PKCE deve ser on quando VERCEL_ENV
 /**
  * O `register()` do instrumentation só roda quando a instância sobe. Na Vercel isso é
  * depois do deploy, e um throw vira 500 em toda rota, inclusive `/api/health`.
- * `next.config.ts` chama isto ao carregar: o `next build` de produção falha e a Vercel
- * recusa o deploy. Preview (`VERCEL_ENV=preview`) e dev não entram.
+ * `next.config.ts` chama isto ao carregar. `VERCEL_ENV=production` exige `MP_OAUTH_PKCE=on`,
+ * `bookingConfig` e `BOOKING_ACCESS_SECRET`. `VERCEL_ENV=preview` exige o mesmo
+ * `BOOKING_ACCESS_SECRET`, para o preview não cair em `BETTER_AUTH_SECRET`.
+ * PKCE e `bookingConfig` continuam só no build de produção. Dev não entra.
  * ` on ` vale `on`. A mensagem não repete o valor.
  */
 export function assertVercelProductionBuild(env: Readonly<Record<string, string | undefined>> = process.env) {
-  if (env.VERCEL_ENV !== "production") return;
-  if (readMpOAuthPkce(env.MP_OAUTH_PKCE) !== "on") throw new Error(vercelProductionPkceMessage);
-  bookingConfig(env);
+  const vercelEnv = env.VERCEL_ENV;
+  if (vercelEnv !== "production" && vercelEnv !== "preview") return;
+  if (vercelEnv === "production") {
+    if (readMpOAuthPkce(env.MP_OAUTH_PKCE) !== "on") throw new Error(vercelProductionPkceMessage);
+    bookingConfig(env);
+  }
   assertBookingAccessSecret(env);
 }
 

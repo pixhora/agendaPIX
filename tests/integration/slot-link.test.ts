@@ -1,13 +1,14 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, createHmac, randomUUID } from "node:crypto";
 import { eq, inArray, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as schema from "../../db/schema";
 import { bookingConfig } from "../../lib/bookings/config";
-import { createBooking, hash } from "../../lib/bookings/service";
+import { signBookingAccessToken } from "../../lib/bookings/access-mac";
+import { createBooking, getBookingPayment, hash } from "../../lib/bookings/service";
 import * as bookingService from "../../lib/bookings/service";
-import { cancelSlotLink, createSlotLink, deleteSlotLinksForBusiness, listSlotLinks, openSlotLink, paySlotLink, purgeExpiredSlotLinkLabels, readSlotLinkPreview, reissueSlotLink, slotLinkPayIdempotencyHash } from "../../lib/bookings/slot-link";
+import { cancelSlotLink, createSlotLink, deleteSlotLinksForBusiness, listSlotLinks, openSlotLink, paySlotLink, purgeExpiredSlotLinkLabels, readSlotLinkPreview, reissueSlotLink, slotLinkPayIdempotencyHash, slotLinkPayMessage } from "../../lib/bookings/slot-link";
 import { databaseEnvSchema } from "../../lib/env";
 import { applyPaidEvent } from "../../lib/payments/apply-paid";
 import { FakePaymentProvider } from "../../lib/payments/fake";
@@ -667,5 +668,66 @@ describe("link de um horário", () => {
     expect(String((definition.rows[0] as { def: string }).def)).toContain("ON DELETE CASCADE");
     expect(await deleteSlotLinksForBusiness(shop.businessId, database)).toBe(2);
     expect(await database.select().from(schema.slotLinks).where(eq(schema.slotLinks.businessId, shop.businessId))).toHaveLength(0);
+  });
+
+  it("retoma o Pix começado antes da rotação quando PREVIOUS está definido", async () => {
+    const oldSecret = "old-booking-access-secret-32chars-aaa";
+    const nextSecret = "new-booking-access-secret-32chars-bbb";
+    vi.stubEnv("NODE_ENV", "test");
+    vi.stubEnv("BETTER_AUTH_SECRET", "auth-secret-32-characters-long-ccccc");
+    vi.stubEnv("BOOKING_ACCESS_SECRET", oldSecret);
+    vi.stubEnv("BOOKING_ACCESS_SECRET_PREVIOUS", "");
+    const created = await makeLink(2);
+    const key = payKey(70);
+    const first = await pay(created.token, 70, "peer:192.0.2.70", key);
+    const oldHash = createHmac("sha256", oldSecret).update(slotLinkPayMessage(created.id, key)).digest("hex");
+    const [before] = await database.select().from(schema.slotLinks).where(eq(schema.slotLinks.id, created.id));
+    expect(before.payIdempotencyHash).toBe(oldHash);
+
+    vi.stubEnv("BOOKING_ACCESS_SECRET", nextSecret);
+    vi.stubEnv("BOOKING_ACCESS_SECRET_PREVIOUS", oldSecret);
+    const again = await pay(created.token, 70, "peer:192.0.2.71", key);
+    expect(again.bookingId).toBe(first.bookingId);
+    expect(again.payment?.id).toBe(first.payment?.id);
+    const [after] = await database.select().from(schema.slotLinks).where(eq(schema.slotLinks.id, created.id));
+    const nextHash = createHmac("sha256", nextSecret).update(slotLinkPayMessage(created.id, key)).digest("hex");
+    expect(after.payIdempotencyHash).toBe(oldHash);
+    expect(after.payIdempotencyHash).not.toBe(nextHash);
+  });
+
+  it("sem PREVIOUS a mesma chave não acha o Pix começado com o segredo antigo", async () => {
+    const oldSecret = "old-booking-access-secret-32chars-aaa";
+    const nextSecret = "new-booking-access-secret-32chars-bbb";
+    vi.stubEnv("NODE_ENV", "test");
+    vi.stubEnv("BETTER_AUTH_SECRET", "auth-secret-32-characters-long-ccccc");
+    vi.stubEnv("BOOKING_ACCESS_SECRET", oldSecret);
+    vi.stubEnv("BOOKING_ACCESS_SECRET_PREVIOUS", "");
+    const created = await makeLink(3);
+    const key = payKey(71);
+    await pay(created.token, 71, "peer:192.0.2.72", key);
+    vi.stubEnv("BOOKING_ACCESS_SECRET", nextSecret);
+    vi.stubEnv("BOOKING_ACCESS_SECRET_PREVIOUS", "");
+    await expect(pay(created.token, 71, "peer:192.0.2.73", key)).rejects.toMatchObject({ status: 409, code: "link_in_progress" });
+    expect(await database.select().from(schema.payments).where(eq(schema.payments.businessId, shop.businessId))).toHaveLength(1);
+  });
+
+  it("o link de acompanhamento segue válido depois da rotação sem PREVIOUS", async () => {
+    const oldSecret = "old-booking-access-secret-32chars-aaa";
+    const nextSecret = "new-booking-access-secret-32chars-bbb";
+    vi.stubEnv("NODE_ENV", "test");
+    vi.stubEnv("BETTER_AUTH_SECRET", "auth-secret-32-characters-long-ccccc");
+    vi.stubEnv("BOOKING_ACCESS_SECRET", oldSecret);
+    vi.stubEnv("BOOKING_ACCESS_SECRET_PREVIOUS", "");
+    const created = await makeLink(4);
+    const paid = await pay(created.token, 74, "peer:192.0.2.74", payKey(74));
+    vi.stubEnv("BOOKING_ACCESS_SECRET", nextSecret);
+    const viewed = await getBookingPayment(shop.slug, paid.bookingId, `Bearer ${paid.accessToken}`, database);
+    expect(viewed.bookingId).toBe(paid.bookingId);
+    const resigned = signBookingAccessToken(shop.businessId, paid.bookingId);
+    expect(resigned).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    await expect(getBookingPayment(shop.slug, paid.bookingId, `Bearer ${resigned}`, database)).rejects.toMatchObject({
+      status: 404,
+      code: "booking_not_found",
+    });
   });
 });

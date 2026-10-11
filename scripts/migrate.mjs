@@ -6,13 +6,14 @@
 // Compatível com o journal do Drizzle (drizzle.__drizzle_migrations: hash sha256 do arquivo + created_at = `when`),
 // então é no-op num banco já migrado por `drizzle-kit migrate` ou pelo migrador antigo.
 //
-// URL, sem imprimir o valor:
+// URL, sem imprimir o valor. O script escreve só a origem (`env`, `.env.migrate`, `.env` ou `prompt`):
 //   1. DATABASE_URL já no ambiente (CI, Docker, `DATABASE_URL=... pnpm db:migrate`)
 //   2. senão `.env.migrate` (gitignore; veja `.env.migrate.example`)
 //   3. senão o `.env` que este script já carregava
 //   4. senão, se o stdin for TTY, pergunta com entrada oculta
-// Confirmação só com stdin TTY, salvo `--yes`. Sem TTY, segue se `--yes` ou se a URL veio do ambiente / `.env`.
-// Sem isso, sai com erro em vez de esperar input.
+// Com stdin TTY, a confirmação das pendências aparece também quando a URL veio do ambiente, salvo `--yes`.
+// Sem TTY, `env` e `.env` seguem; `.env.migrate` só segue com `--yes`. Sem isso, sai com erro em vez de esperar input.
+// Colar a URL e o Enter no mesmo bloco do prompt conta como um Enter.
 //
 // Uso: `pnpm db:migrate` e `node migrate.cjs` na imagem Docker (este arquivo empacotado por `pnpm build:bundles`).
 // MIGRATIONS_DIR troca a pasta (padrão: db/migrations relativo ao diretório atual).
@@ -21,6 +22,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { config as loadDotenv, parse as parseDotenv } from "dotenv";
 import pg from "pg";
+import { consumeHiddenChunk, databaseUrlSourceLabel, redactDatabaseMessage } from "./migrate-input.mjs";
 
 const MIGRATION_LOCK_KEY = 726_154_093;
 
@@ -42,19 +44,6 @@ function parseDatabaseUrl(value) {
   return value;
 }
 
-function redact(message, url) {
-  let text = message;
-  if (url) text = text.split(url).join("[DATABASE_URL]");
-  try {
-    const parsed = new URL(url);
-    if (parsed.password) text = text.split(decodeURIComponent(parsed.password)).join("[redacted]");
-    if (parsed.username) text = text.split(decodeURIComponent(parsed.username)).join("[redacted]");
-  } catch {
-    // A URL já foi rejeitada ou não está na mensagem.
-  }
-  return text;
-}
-
 function promptHidden(label) {
   return new Promise((resolve) => {
     process.stdout.write(label);
@@ -70,23 +59,17 @@ function promptHidden(label) {
       stdin.removeListener("data", onData);
     };
     const onData = (chunk) => {
-      const text = String(chunk);
-      if (text === "\u0003") {
+      const next = consumeHiddenChunk(value, chunk);
+      value = next.value;
+      if (next.abort) {
         cleanup();
         process.stdout.write("\n");
         process.exit(130);
       }
-      if (text === "\r" || text === "\n") {
-        process.stdout.write("\n");
-        cleanup();
-        resolve(value);
-        return;
-      }
-      if (text === "\u007f" || text === "\b") {
-        value = value.slice(0, -1);
-        return;
-      }
-      value += text;
+      if (!next.done) return;
+      process.stdout.write("\n");
+      cleanup();
+      resolve(value);
     };
     stdin.on("data", onData);
   });
@@ -128,18 +111,18 @@ async function resolveDatabaseUrl(isTty) {
   const fromEnvironment = process.env.DATABASE_URL?.trim() ?? "";
   loadDotenv({ quiet: true });
   const fromDotenv = process.env.DATABASE_URL?.trim() ?? "";
-  if (fromEnvironment) return { url: parseDatabaseUrl(fromEnvironment), source: "env" };
+  if (fromEnvironment) return { url: fromEnvironment, source: "env" };
   if (existsSync(".env.migrate")) {
     const parsed = parseDotenv(readFileSync(".env.migrate"));
     const value = parsed.DATABASE_URL?.trim() ?? "";
     if (!value) fail(".env.migrate existe, mas não define DATABASE_URL. Nada foi aplicado.");
-    return { url: parseDatabaseUrl(value), source: "file" };
+    return { url: value, source: "file" };
   }
-  if (fromDotenv) return { url: parseDatabaseUrl(fromDotenv), source: "dotenv" };
+  if (fromDotenv) return { url: fromDotenv, source: "dotenv" };
   if (isTty) {
     const value = (await promptHidden("DATABASE_URL (a digitação não aparece): ")).trim();
     if (!value) fail("DATABASE_URL vazia. Nada foi aplicado.");
-    return { url: parseDatabaseUrl(value), source: "prompt" };
+    return { url: value, source: "prompt" };
   }
   fail("Sem DATABASE_URL, sem .env.migrate e sem terminal interativo. Defina DATABASE_URL ou crie .env.migrate. Nada foi aplicado.");
 }
@@ -154,8 +137,13 @@ async function main() {
   const yes = process.argv.includes("--yes");
   const isTty = Boolean(process.stdin.isTTY);
   const resolved = await resolveDatabaseUrl(isTty);
-  const { url, source } = resolved;
+  const { source } = resolved;
+  process.stdout.write(`Origem da URL: ${databaseUrlSourceLabel[source]}\n`);
+  const url = parseDatabaseUrl(resolved.url);
   databaseUrl = url;
+  if (!isTty && !yes && !existingEnvPath(source)) {
+    fail("Sem terminal interativo. Passe --yes para aplicar, ou defina DATABASE_URL no ambiente. Nada foi aplicado.");
+  }
   const folder = resolve(process.env.MIGRATIONS_DIR ?? "db/migrations");
   const journal = JSON.parse(readFileSync(join(folder, "meta/_journal.json"), "utf8"));
   const client = new pg.Client({ connectionString: url, connectionTimeoutMillis: 10_000 });
@@ -189,14 +177,13 @@ async function main() {
     }
     process.stdout.write("Migrations pendentes:\n");
     for (const item of pending) process.stdout.write(`- ${item.file}\n`);
+    // TTY pede confirmação também quando a URL veio de env, .env.migrate ou .env. --yes pula.
     if (isTty && !yes) {
       const answer = await promptLine("Aplicar estas migrations? [s/N] ");
       if (!confirmed(answer)) {
         process.stdout.write("Migrations não aplicadas.\n");
         return;
       }
-    } else if (!isTty && !yes && !existingEnvPath(source)) {
-      throw new Error("Sem terminal interativo. Passe --yes para aplicar, ou defina DATABASE_URL no ambiente. Nada foi aplicado.");
     }
     let count = 0;
     for (const item of pending) {
@@ -220,6 +207,6 @@ async function main() {
 
 main().catch((error) => {
   const message = error instanceof Error ? error.message : String(error);
-  process.stderr.write(`Falha ao aplicar migrations: ${redact(message, databaseUrl)}\n`);
+  process.stderr.write(`Falha ao aplicar migrations: ${redactDatabaseMessage(message, databaseUrl)}\n`);
   process.exit(1);
 });
