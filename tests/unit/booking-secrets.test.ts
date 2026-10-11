@@ -1,9 +1,9 @@
-import { createHmac } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { bookingAccessMacMatches, bookingAccessTokenMatches, signBookingAccessToken } from "../../lib/bookings/access-mac";
+import { accessTokenForStoredHash, bookingAccessMacMatches, bookingAccessTokenMatches, signBookingAccessToken } from "../../lib/bookings/access-mac";
 import { slotLinkPayIdempotencyHash, slotLinkPayMessage } from "../../lib/bookings/slot-link";
 import { tenantScopedHash } from "../../lib/bookings/rate-limit";
-import { bookingAccessSecret, rateLimitSecret } from "../../lib/env";
+import { bookingAccessSecret, bookingAccessSecretPrevious, rateLimitSecret } from "../../lib/env";
 
 const auth = "main-secret-32-characters-long-aaaaaaa";
 
@@ -113,5 +113,13 @@ describe("segredos separados", () => {
     expect(bookingAccessMacMatches(previousPay, payMessage, "hex")).toBe(true);
     expect(bookingAccessMacMatches(currentPay, payMessage, "hex")).toBe(true);
     expect(bookingAccessMacMatches(otherPay, payMessage, "hex")).toBe(false);
+    expect(bookingAccessSecretPrevious({ BOOKING_ACCESS_SECRET_PREVIOUS: "curto" })).toBeNull();
+    expect(bookingAccessSecretPrevious({ BOOKING_ACCESS_SECRET_PREVIOUS: previous })).toBe(previous);
+    expect(bookingAccessMacMatches(previousPay, payMessage, "hex", { ...env, BOOKING_ACCESS_SECRET_PREVIOUS: "curto" })).toBe(false);
+
+    const stored = createHash("sha256").update(signedPrevious).digest("hex");
+    expect(accessTokenForStoredHash(businessId, bookingId, stored, env)).toBe(signedPrevious);
+    const unknown = createHash("sha256").update("outro-token").digest("hex");
+    expect(accessTokenForStoredHash(businessId, bookingId, unknown, env)).toBe(signedCurrent);
   });
 });

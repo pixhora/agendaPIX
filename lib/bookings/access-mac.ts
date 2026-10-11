@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { bookingAccessSecret, bookingAccessSecretPrevious } from "../env";
 
 type MacEncoding = "hex" | "base64url";
@@ -67,4 +67,38 @@ export function bookingAccessTokenMatches(
   env: Readonly<Record<string, string | undefined>> = process.env,
 ) {
   return bookingAccessMacMatches(token, bookingAccessTokenMessage(businessId, bookingId), "base64url", env);
+}
+
+function storedTokenHashMatches(token: string, accessTokenHash: string | null) {
+  const presented = createHash("sha256").update(token).digest("hex");
+  if (!accessTokenHash || !/^[a-f0-9]{64}$/.test(accessTokenHash)) {
+    timingSafeStringEqual(presented, presented);
+    return false;
+  }
+  return timingSafeStringEqual(presented, accessTokenHash);
+}
+
+/**
+ * Token da reserva já gravada. Compara o sha256 do token do segredo atual e, se houver,
+ * do anterior, com `accessTokenHash`. Devolve o que bate. Se nenhum bate, devolve o atual
+ * e não o anterior.
+ */
+export function accessTokenForStoredHash(
+  businessId: string,
+  bookingId: string,
+  accessTokenHash: string | null,
+  env: Readonly<Record<string, string | undefined>> = process.env,
+) {
+  const current = signBookingAccessToken(businessId, bookingId, env);
+  if (!current) return null;
+  const previousSecret = bookingAccessSecretPrevious(env);
+  const previous = previousSecret ? mac(previousSecret, bookingAccessTokenMessage(businessId, bookingId), "base64url") : null;
+  const compared = previous ?? current;
+  const currentOk = storedTokenHashMatches(current, accessTokenHash);
+  const previousOk = storedTokenHashMatches(compared, accessTokenHash);
+  const currentKnown = bookingAccessTokenMatches(current, businessId, bookingId, env);
+  const previousKnown = bookingAccessTokenMatches(compared, businessId, bookingId, env);
+  if (currentOk && currentKnown) return current;
+  if (previous && previousOk && previousKnown) return previous;
+  return current;
 }

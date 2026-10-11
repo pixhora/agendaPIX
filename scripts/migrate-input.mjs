@@ -13,7 +13,7 @@ export function consumeHiddenChunk(value, chunk) {
   return { value: next, done: false, abort: false };
 }
 
-/** Tira a URL, a senha e o usuário da mensagem. O texto que sobra não serve para reconectar. */
+/** Tira a URL inteira e a senha. O usuário do banco fica, para o nome da tabela continuar legível. */
 export function redactDatabaseMessage(message, url) {
   let text = String(message);
   if (!url) return text;
@@ -24,17 +24,20 @@ export function redactDatabaseMessage(message, url) {
   } catch {
     return text;
   }
-  for (const secret of [parsed.password, parsed.username]) {
-    if (!secret) continue;
-    text = text.split(secret).join("[redacted]");
-    try {
-      const decoded = decodeURIComponent(secret);
-      if (decoded !== secret) text = text.split(decoded).join("[redacted]");
-    } catch {
-      // Senha com % solto não decodifica.
-    }
+  if (!parsed.password) return text;
+  text = text.split(parsed.password).join("[redacted]");
+  try {
+    const decoded = decodeURIComponent(parsed.password);
+    if (decoded !== parsed.password) text = text.split(decoded).join("[redacted]");
+  } catch {
+    // Senha com % solto não decodifica.
   }
   return text;
+}
+
+export function formatDatabaseClientError(error, url) {
+  const message = error instanceof Error ? error.message : String(error);
+  return `Falha ao aplicar migrations: ${redactDatabaseMessage(message, url)}\n`;
 }
 
 export const databaseUrlSourceLabel = {

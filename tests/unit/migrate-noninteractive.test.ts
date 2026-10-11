@@ -3,10 +3,10 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { consumeHiddenChunk, redactDatabaseMessage } from "../../scripts/migrate-input.mjs";
+import { consumeHiddenChunk, formatDatabaseClientError, redactDatabaseMessage } from "../../scripts/migrate-input.mjs";
 
 const script = join(process.cwd(), "scripts/migrate.mjs");
-const secretUrl = "postgresql://agenda:super-secret-password@127.0.0.1:1/agenda";
+const secretUrl = "postgresql://id:super-secret-password@127.0.0.1:1/agenda";
 
 function runMigrate(args: string[] = [], options: { files?: Record<string, string>; env?: Record<string, string>; timeoutMs?: number } = {}) {
   const cwd = mkdtempSync(join(tmpdir(), "migrate-notty-"));
@@ -14,7 +14,7 @@ function runMigrate(args: string[] = [], options: { files?: Record<string, strin
     writeFileSync(join(cwd, name), contents);
   }
   const env = { ...process.env, ...options.env };
-  delete env.DATABASE_URL;
+  if (!options.env?.DATABASE_URL) delete env.DATABASE_URL;
   const child = spawn(process.execPath, [script, ...args], {
     cwd,
     env,
@@ -74,6 +74,47 @@ describe("migrate sem TTY", () => {
     expect(output).not.toContain(secretUrl);
   });
 
+  it(".env sem TTY e sem --yes sai com erro", async () => {
+    const result = await runMigrate([], {
+      files: { ".env": `DATABASE_URL=${secretUrl}\n` },
+    });
+    expect(result.elapsed).toBeLessThan(2000);
+    expect(result.code).not.toBe(0);
+    const output = `${result.stdout}\n${result.stderr}`;
+    expect(output).toContain("Origem da URL: .env");
+    expect(output).toMatch(/Passe --yes/);
+    expect(output).not.toContain("super-secret-password");
+    expect(output).not.toContain(secretUrl);
+  });
+
+  it("--yes com .env segue", async () => {
+    const result = await runMigrate(["--yes"], {
+      files: { ".env": `DATABASE_URL=${secretUrl}\n` },
+      env: { MIGRATIONS_DIR: join(process.cwd(), "db/migrations") },
+      timeoutMs: 8000,
+    });
+    expect(result.code).not.toBe(0);
+    const output = `${result.stdout}\n${result.stderr}`;
+    expect(output).toContain("Origem da URL: .env");
+    expect(output).not.toMatch(/Passe --yes/);
+    expect(output).toMatch(/Falha ao aplicar migrations/);
+    expect(output).not.toContain("super-secret-password");
+  });
+
+  it("DATABASE_URL no ambiente segue sem --yes", async () => {
+    const result = await runMigrate([], {
+      env: { DATABASE_URL: secretUrl, MIGRATIONS_DIR: join(process.cwd(), "db/migrations") },
+      timeoutMs: 8000,
+    });
+    expect(result.code).not.toBe(0);
+    const output = `${result.stdout}\n${result.stderr}`;
+    expect(output).toContain("Origem da URL: env");
+    expect(output).not.toMatch(/Passe --yes/);
+    expect(output).toMatch(/Falha ao aplicar migrations/);
+    expect(output).not.toContain("super-secret-password");
+    expect(output).not.toContain(secretUrl);
+  });
+
   it("--yes com .env.migrate segue e a senha não aparece no erro", async () => {
     const result = await runMigrate(["--yes"], {
       files: { ".env.migrate": `DATABASE_URL=${secretUrl}\n` },
@@ -99,13 +140,22 @@ describe("entrada oculta e redação da URL", () => {
     expect(result.value).toBe(secretUrl);
   });
 
-  it("redige senha e URL numa mensagem de erro", () => {
-    const message = `connect failed ${secretUrl} password super-secret-password user agenda`;
+  it("redige senha e URL e deixa o nome da tabela legível", () => {
+    const message = `connect failed ${secretUrl} password super-secret-password relation "slot_links" is invalid`;
     const out = redactDatabaseMessage(message, secretUrl);
     expect(out).not.toContain("super-secret-password");
     expect(out).not.toContain(secretUrl);
-    expect(out).not.toContain("agenda");
+    expect(out).toContain('relation "slot_links" is invalid');
     expect(out).toContain("[DATABASE_URL]");
     expect(out).toContain("[redacted]");
+  });
+
+  it("redige a senha no erro do cliente", () => {
+    const error = new Error(`connect failed ${secretUrl} password super-secret-password relation "slot_links" is invalid`);
+    const out = formatDatabaseClientError(error, secretUrl);
+    expect(out).toMatch(/^Falha ao aplicar migrations: /);
+    expect(out).not.toContain("super-secret-password");
+    expect(out).not.toContain(secretUrl);
+    expect(out).toContain('relation "slot_links" is invalid');
   });
 });

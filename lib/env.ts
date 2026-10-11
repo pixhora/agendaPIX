@@ -64,12 +64,16 @@ export function bookingAccessSecret(env: Readonly<Record<string, string | undefi
 }
 
 /**
- * Segredo anterior, só para verificar token já emitido. Vazio conta como ausente.
+ * Segredo anterior, só para achar o HMAC de um Pix de link de horário já começado.
+ * Vazio ou com menos de 32 caracteres conta como ausente.
  * Não herda `BETTER_AUTH_SECRET`: quem rotaciona grava o valor antigo aqui.
  * Pode ser igual a `BETTER_AUTH_SECRET`. Essa igualdade não derruba o boot.
+ * Igual ao segredo atual também não derruba: o boot só avisa, sem o valor.
  */
 export function bookingAccessSecretPrevious(env: Readonly<Record<string, string | undefined>> = process.env) {
-  return normalizedSecret(env.BOOKING_ACCESS_SECRET_PREVIOUS) ?? null;
+  const value = normalizedSecret(env.BOOKING_ACCESS_SECRET_PREVIOUS);
+  if (!value || value.length < 32) return null;
+  return value;
 }
 
 /** Boot e `next build` de produção e de preview. A mensagem cita o nome e o motivo, nunca o valor. Não olha `BOOKING_ACCESS_SECRET_PREVIOUS`. */
@@ -86,9 +90,24 @@ let warnedBookingAccessSecretPrevious = false;
 
 /** Um aviso por processo, sem o valor, enquanto a rotação ainda aceita o segredo anterior. */
 export function warnBookingAccessSecretPrevious(env: Readonly<Record<string, string | undefined>> = process.env) {
-  if (warnedBookingAccessSecretPrevious || !bookingAccessSecretPrevious(env)) return;
+  if (warnedBookingAccessSecretPrevious) return;
+  const raw = normalizedSecret(env.BOOKING_ACCESS_SECRET_PREVIOUS);
+  if (!raw) return;
   warnedBookingAccessSecretPrevious = true;
-  console.warn("BOOKING_ACCESS_SECRET_PREVIOUS está definido. Remova depois que as reservas ativas passarem.");
+  if (raw.length < 32) {
+    console.warn("BOOKING_ACCESS_SECRET_PREVIOUS precisa ter pelo menos 32 caracteres.");
+    return;
+  }
+  console.warn("BOOKING_ACCESS_SECRET_PREVIOUS está definido. Ele só vale para Pix de link de horário já começado antes da rotação. Remova depois que esses pagamentos passarem.");
+  const current = normalizedSecret(env.BOOKING_ACCESS_SECRET);
+  if (current && raw === current) {
+    console.warn("BOOKING_ACCESS_SECRET_PREVIOUS é igual a BOOKING_ACCESS_SECRET.");
+  }
+}
+
+/** Só para teste. O processo real avisa uma vez. */
+export function resetBookingAccessSecretPreviousWarning() {
+  warnedBookingAccessSecretPrevious = false;
 }
 
 export function rateLimitSecret(env: Readonly<Record<string, string | undefined>> = process.env) {

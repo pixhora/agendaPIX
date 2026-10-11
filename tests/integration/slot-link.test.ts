@@ -693,6 +693,9 @@ describe("link de um horário", () => {
     const nextHash = createHmac("sha256", nextSecret).update(slotLinkPayMessage(created.id, key)).digest("hex");
     expect(after.payIdempotencyHash).toBe(oldHash);
     expect(after.payIdempotencyHash).not.toBe(nextHash);
+    expect(again.accessToken).toBe(first.accessToken);
+    const viewed = await getBookingPayment(shop.slug, again.bookingId, `Bearer ${again.accessToken}`, database);
+    expect(viewed.bookingId).toBe(first.bookingId);
   });
 
   it("sem PREVIOUS a mesma chave não acha o Pix começado com o segredo antigo", async () => {

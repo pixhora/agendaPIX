@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { isDevExampleOpen } from "../../components/preview/preview-badge-gate";
-import { assertProductionSafeEnv, assertVercelProductionBuild, smtpFromUsesExampleDomain } from "../../lib/env";
+import { assertProductionSafeEnv, assertVercelProductionBuild, resetBookingAccessSecretPreviousWarning, smtpFromUsesExampleDomain } from "../../lib/env";
 import { assertMpOAuthPkce } from "../../lib/mercadopago-oauth/config";
 import { magicLinkCapturePath } from "../../lib/email";
 import { mpFixturesAllowed, readMpFixture } from "../../lib/mercadopago/dev-fixtures";
@@ -283,6 +283,7 @@ describe("BOOKING_ACCESS_SECRET em produção", () => {
   });
 
   it("deixa PREVIOUS igual a BETTER_AUTH_SECRET e avisa uma vez no boot, sem o valor", () => {
+    resetBookingAccessSecretPreviousWarning();
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     expect(() => assertProductionSafeEnv({ ...boot, BOOKING_ACCESS_SECRET_PREVIOUS: authSecret })).not.toThrow();
     expect(() => assertVercelProductionBuild({ ...build, BOOKING_ACCESS_SECRET_PREVIOUS: authSecret })).not.toThrow();
@@ -290,10 +291,33 @@ describe("BOOKING_ACCESS_SECRET em produção", () => {
     expect(warn).toHaveBeenCalledTimes(1);
     const text = warn.mock.calls.map((call) => call.map(String).join(" ")).join("\n");
     expect(text).toContain("BOOKING_ACCESS_SECRET_PREVIOUS");
-    expect(text).toContain("Remova depois que as reservas ativas passarem");
+    expect(text).toContain("Pix de link de horário já começado antes da rotação");
+    expect(text).not.toContain("reservas ativas");
     expect(text).not.toContain(authSecret);
     expect(text).not.toContain(bookingAccess);
     warn.mockRestore();
+  });
+
+  it("avisa sem o valor quando PREVIOUS repete o segredo atual e ignora um PREVIOUS curto", () => {
+    resetBookingAccessSecretPreviousWarning();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const short = "curto-demais";
+    expect(() => assertProductionSafeEnv({ ...boot, BOOKING_ACCESS_SECRET_PREVIOUS: bookingAccess })).not.toThrow();
+    const equalText = warn.mock.calls.map((call) => call.map(String).join(" ")).join("\n");
+    expect(equalText).toContain("BOOKING_ACCESS_SECRET_PREVIOUS é igual a BOOKING_ACCESS_SECRET.");
+    expect(equalText).toContain("Pix de link de horário já começado antes da rotação");
+    expect(equalText).not.toContain(bookingAccess);
+    expect(equalText).not.toContain(authSecret);
+    warn.mockRestore();
+
+    resetBookingAccessSecretPreviousWarning();
+    const shortWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(() => assertProductionSafeEnv({ ...boot, BOOKING_ACCESS_SECRET_PREVIOUS: short })).not.toThrow();
+    const shortText = shortWarn.mock.calls.map((call) => call.map(String).join(" ")).join("\n");
+    expect(shortText).toContain("BOOKING_ACCESS_SECRET_PREVIOUS precisa ter pelo menos 32 caracteres.");
+    expect(shortText).not.toContain(short);
+    expect(shortText).not.toContain("Pix de link de horário");
+    shortWarn.mockRestore();
   });
 });
 

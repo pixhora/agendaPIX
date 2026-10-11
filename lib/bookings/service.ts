@@ -4,7 +4,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { getDb } from "../../db";
 import * as schema from "../../db/schema";
-import { signBookingAccessToken } from "./access-mac";
+import { accessTokenForStoredHash, signBookingAccessToken } from "./access-mac";
 import { HttpError } from "../http";
 import { paymentsConfig } from "../payments/config";
 import { assertMpConnectedForDeposit } from "../mercadopago-oauth/bookability";
@@ -70,6 +70,12 @@ export function chargeIdempotencyKey(businessId: string, requestKey: string) {
 }
 function accessToken(businessId: string, bookingId: string) {
   const token = signBookingAccessToken(businessId, bookingId);
+  if (!token) throw new HttpError(503, "booking_unavailable", "Agendamento indisponível. Tente novamente mais tarde.");
+  return token;
+}
+
+function accessTokenForExisting(businessId: string, bookingId: string, accessTokenHash: string | null) {
+  const token = accessTokenForStoredHash(businessId, bookingId, accessTokenHash);
   if (!token) throw new HttpError(503, "booking_unavailable", "Agendamento indisponível. Tente novamente mais tarde.");
   return token;
 }
@@ -298,7 +304,7 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
       if (!bookingRequestMatches(existing.requestHash, input)) throw new HttpError(409, "idempotency_conflict", "Essa chave já foi usada em outro agendamento.");
       const [payment] = await transaction.select().from(schema.payments).where(and(eq(schema.payments.businessId, business.id), eq(schema.payments.bookingId, existing.id))).limit(1);
       if (onReserved) await onReserved(transaction, existing.id);
-      return { kind: "existing" as const, booking: existing, payment, token: accessToken(business.id, existing.id), now };
+      return { kind: "existing" as const, booking: existing, payment, token: accessTokenForExisting(business.id, existing.id, existing.accessTokenHash), now };
     }
     const access = await loadBookingAccess(business, transaction);
     if (access.bookingsPaused) throw new HttpError(403, "bookings_paused", BOOKINGS_PAUSED_MESSAGE);

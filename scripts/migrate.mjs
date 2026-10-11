@@ -12,7 +12,8 @@
 //   3. senão o `.env` que este script já carregava
 //   4. senão, se o stdin for TTY, pergunta com entrada oculta
 // Com stdin TTY, a confirmação das pendências aparece também quando a URL veio do ambiente, salvo `--yes`.
-// Sem TTY, `env` e `.env` seguem; `.env.migrate` só segue com `--yes`. Sem isso, sai com erro em vez de esperar input.
+// Sem TTY, só `env` (DATABASE_URL já no processo, CI/Docker) segue sem `--yes`.
+// `.env` e `.env.migrate` exigem `--yes`. Sem isso, sai com erro em vez de esperar input.
 // Colar a URL e o Enter no mesmo bloco do prompt conta como um Enter.
 //
 // Uso: `pnpm db:migrate` e `node migrate.cjs` na imagem Docker (este arquivo empacotado por `pnpm build:bundles`).
@@ -22,7 +23,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { config as loadDotenv, parse as parseDotenv } from "dotenv";
 import pg from "pg";
-import { consumeHiddenChunk, databaseUrlSourceLabel, redactDatabaseMessage } from "./migrate-input.mjs";
+import { consumeHiddenChunk, databaseUrlSourceLabel, formatDatabaseClientError } from "./migrate-input.mjs";
 
 const MIGRATION_LOCK_KEY = 726_154_093;
 
@@ -127,8 +128,8 @@ async function resolveDatabaseUrl(isTty) {
   fail("Sem DATABASE_URL, sem .env.migrate e sem terminal interativo. Defina DATABASE_URL ou crie .env.migrate. Nada foi aplicado.");
 }
 
-function existingEnvPath(source) {
-  return source === "env" || source === "dotenv";
+function explicitEnvPath(source) {
+  return source === "env";
 }
 
 let databaseUrl = "";
@@ -141,12 +142,15 @@ async function main() {
   process.stdout.write(`Origem da URL: ${databaseUrlSourceLabel[source]}\n`);
   const url = parseDatabaseUrl(resolved.url);
   databaseUrl = url;
-  if (!isTty && !yes && !existingEnvPath(source)) {
+  if (!isTty && !yes && !explicitEnvPath(source)) {
     fail("Sem terminal interativo. Passe --yes para aplicar, ou defina DATABASE_URL no ambiente. Nada foi aplicado.");
   }
   const folder = resolve(process.env.MIGRATIONS_DIR ?? "db/migrations");
   const journal = JSON.parse(readFileSync(join(folder, "meta/_journal.json"), "utf8"));
   const client = new pg.Client({ connectionString: url, connectionTimeoutMillis: 10_000 });
+  client.on("error", (error) => {
+    process.stderr.write(formatDatabaseClientError(error, databaseUrl));
+  });
   await client.connect();
   try {
     await client.query("SELECT pg_advisory_lock($1)", [MIGRATION_LOCK_KEY]);
@@ -206,7 +210,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  const message = error instanceof Error ? error.message : String(error);
-  process.stderr.write(`Falha ao aplicar migrations: ${redactDatabaseMessage(message, databaseUrl)}\n`);
+  process.stderr.write(formatDatabaseClientError(error, databaseUrl));
   process.exit(1);
 });
