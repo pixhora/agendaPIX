@@ -9,8 +9,10 @@ export function SlotLinkStorageSweep() {
   useEffect(() => {
     const stores = browserSlotLinkStores();
     purgeExpiredSlotLinkStorage(stores);
-    // O BookingFlow grava `booking_session_*` no sessionStorage, não no localStorage.
+    // O fluxo grava `booking_session_*` no sessionStorage. A varredura também
+    // apaga a cópia que tenha sobrado no localStorage.
     purgeExpiredBookingSessions(stores.session);
+    purgeExpiredBookingSessions(stores.claim);
   }, []);
   return null;
 }

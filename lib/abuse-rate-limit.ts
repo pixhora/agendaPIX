@@ -58,6 +58,24 @@ export async function consumeAbuseBucket(
   throw new HttpError(429, "rate_limited", "Muitas tentativas. Espere um pouco e tente de novo.", retryAfter, { retryAfter });
 }
 
+/** Lê o mesmo balde de `consumeAbuseBucket` sem incrementar. Janela no relógio do banco. */
+export async function abuseBucketExhausted(
+  scope: string,
+  identity: string,
+  limit: number,
+  window: WindowName,
+  database: AbuseDb = getDb(),
+) {
+  const hash = clientHash(scope, identity);
+  const interval = windowInterval(window);
+  const found = await database.execute(sql`SELECT 1 AS blocked FROM abuse_rate_limits
+    WHERE scope = ${scope} AND client_hash = ${hash}
+      AND attempts >= ${limit}
+      AND window_started_at > now() - ${interval}
+    LIMIT 1`);
+  return found.rows.length > 0;
+}
+
 /** 10 rascunhos por IP por hora. Sem IP confiável, não há balde compartilhado. */
 export async function consumeDraftCreateLimit(request: Request, database?: ReturnType<typeof getDb>) {
   const identity = bookingClientIdentity(request);

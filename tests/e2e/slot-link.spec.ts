@@ -182,11 +182,20 @@ async function shootMatrix(page: Page, name: string) {
       await page.setViewportSize({ width: frame.width, height: frame.height });
       await page.emulateMedia({ colorScheme: scheme });
       await page.evaluate((theme) => {
+        let style = document.getElementById("shot-freeze");
+        if (!style) {
+          style = document.createElement("style");
+          style.id = "shot-freeze";
+          style.textContent = "*,*::before,*::after{transition:none!important;animation:none!important}";
+          document.head.appendChild(style);
+        }
         const dark = theme === "dark";
         document.documentElement.classList.toggle("dark", dark);
         document.documentElement.classList.toggle("light", !dark);
         document.documentElement.style.colorScheme = theme;
+        try { localStorage.setItem("agenda-theme", theme); } catch { /* print segue com a classe */ }
       }, scheme);
+      await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => resolve(undefined))));
       const label = scheme === "dark" ? "escuro" : "claro";
       await page.screenshot({ path: path.join(shots, `${name}-${frame.name}-${label}.png`), fullPage: true });
     }
@@ -378,10 +387,12 @@ test("mesma chave com outros dados oferece continuar o pagamento", async ({ page
   await expect(page.getByText("Para corrigir nome ou WhatsApp, fale com a loja depois de pagar.")).toBeVisible();
   const resume = page.getByRole("button", { name: "Continuar pagamento" });
   await expect(resume).toBeEnabled();
-  await expect(resume).toHaveClass(/bg-pix/);
+  await expect(resume).toHaveClass(/bg-\[#0a6e63\]/);
+  await expect(resume).toHaveClass(/text-white/);
   const otherSlots = page.getByRole("link", { name: "Ver horários disponíveis" });
   await expect(otherSlots).toHaveAttribute("href", `/${meta.businessASlug}`);
   await expect(otherSlots).toHaveClass(/border/);
+  await expect(otherSlots).toHaveClass(/text-\[#0b0b0c\]/);
   await expect(page.getByText("+5511900000000")).toHaveCount(0);
   await expect(page.getByText(/já foi usada/)).toHaveCount(0);
   await expect(page.getByLabel("Nome")).toHaveCount(0);

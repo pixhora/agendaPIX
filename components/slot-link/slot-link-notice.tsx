@@ -126,9 +126,9 @@ export function SlotLinkNotice({
         <p className="text-sm text-muted">{CUSTOMER_CONFLICT_BODY}</p>
         <div className="grid gap-2">
           {onContinue ? (
-            <Button type="button" variant="pix" size="lg" className="w-full" onClick={onContinue}>{CONTINUE_PAYMENT}</Button>
+            <Button type="button" variant="pix" size="lg" className="w-full !bg-[#0a6e63] !text-white" onClick={onContinue}>{CONTINUE_PAYMENT}</Button>
           ) : null}
-          <Button asChild variant="outline" size="lg" className="w-full">
+          <Button asChild variant="outline" size="lg" className="w-full !border-[#0b0b0c] !bg-white !text-[#0b0b0c]">
             <a href={publicPath} referrerPolicy="no-referrer">{SEE_SLOTS}</a>
           </Button>
         </div>
