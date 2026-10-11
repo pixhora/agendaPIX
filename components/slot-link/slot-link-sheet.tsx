@@ -61,7 +61,7 @@ export function SlotLinkSheet({
   services: DepositService[];
   mpReady: boolean;
   seed: SlotSeed | null;
-  onCreated: () => void;
+  onCreated: (created: { id: string; url: string }) => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [serviceId, setServiceId] = useState(seed?.serviceId ?? "");
@@ -164,7 +164,7 @@ export function SlotLinkSheet({
         url,
       });
       setReady({ url, message, expiresAt: created.expiresAt, statusLabel: SLOT_LINK_STATUS_LABEL[created.status] });
-      onCreated();
+      onCreated({ id: created.id, url });
     } catch (caught) {
       setError(isOfflineError(caught) ? OWNER_NETWORK : OWNER_NETWORK);
     } finally {

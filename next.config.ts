@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 import { assertVercelProductionBuild } from "./lib/env";
 import { staticAssetHeaderRules } from "./lib/security/headers";
+import { slotLinkPageHeaderRule } from "./lib/slot-link/privacy";
 
 assertVercelProductionBuild();
 
@@ -18,7 +19,10 @@ const nextConfig: NextConfig = {
   // Sharp no runtime Node da Vercel. A rota da logo não usa Edge.
   serverExternalPackages: ["sharp"],
   async headers() {
-    return staticAssetHeaderRules(process.env.NODE_ENV === "development");
+    return [
+      ...staticAssetHeaderRules(process.env.NODE_ENV === "development"),
+      slotLinkPageHeaderRule(),
+    ];
   },
 };
 

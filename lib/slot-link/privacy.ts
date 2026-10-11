@@ -8,3 +8,14 @@ export function slotLinkPageHeaders(): SecurityHeader[] {
     { key: "X-Robots-Tag", value: "noindex, nofollow" },
   ];
 }
+
+/**
+ * O matcher do proxy ignora prefetch. Esta regra cobre `/:slug/h/:token`
+ * mesmo quando o documento é pré-carregado.
+ */
+export function slotLinkPageHeaderRule() {
+  return {
+    source: "/:slug/h/:token",
+    headers: slotLinkPageHeaders(),
+  };
+}

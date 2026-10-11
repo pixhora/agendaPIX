@@ -23,7 +23,7 @@ import {
   shouldClearPayKey,
   type CustomerScreen,
 } from "@/lib/slot-link/customer-state";
-import { browserPayKeyStore, clearPayKey, lockPayPayload, payRequestBody, readPayResume, savePayResume, type PayKeyStore, type SlotLinkPayPayload } from "@/lib/slot-link/idempotency";
+import { browserSlotLinkStores, clearPayKey, lockPayPayload, payRequestBody, readPayResume, savePayAccess, type SlotLinkPayDraft, type SlotLinkPayPayload, type SlotLinkPayStores } from "@/lib/slot-link/idempotency";
 import { paySlotLinkUrl, publicSlotLinkUrl } from "@/lib/slot-link/paths";
 import { isOfflineError } from "@/components/booking/booking-error";
 import { AgendaPixFooter } from "./agenda-pix-footer";
@@ -42,19 +42,19 @@ export function SlotLinkCustomer({
   slug,
   token,
   timezone,
-  store,
+  stores,
   fetchImpl,
   now = () => new Date(),
 }: {
   slug: string;
   token: string;
   timezone: string;
-  store?: PayKeyStore;
+  stores?: SlotLinkPayStores;
   fetchImpl?: typeof fetch;
   now?: () => Date;
 }) {
-  const [fallbackStore] = useState<PayKeyStore>(() => browserPayKeyStore());
-  const payStore = store ?? fallbackStore;
+  const [fallbackStores] = useState<SlotLinkPayStores>(() => browserSlotLinkStores());
+  const payStores = stores ?? fallbackStores;
   const request = fetchImpl ?? fetch;
   const [phase, setPhase] = useState<Phase>({ kind: "loading" });
   const [name, setName] = useState("");
@@ -84,8 +84,8 @@ export function SlotLinkCustomer({
 
   const applyScreen = useCallback(async (screen: CustomerScreen) => {
     if (shouldClearPayKey(screen)) {
-      const saved = await readPayResume(token, payStore);
-      await clearPayKey(token, payStore);
+      const saved = await readPayResume(token, payStores, nowRef.current().getTime());
+      await clearPayKey(token, payStores);
       setSavedPayload(null);
       if (screen.kind === "used" && saved?.accessToken && saved.bookingId && saved.serviceId) {
         try {
@@ -104,7 +104,7 @@ export function SlotLinkCustomer({
       }
     }
     setPhase(screen);
-  }, [payStore, slug, token]);
+  }, [payStores, slug, token]);
 
   const load = useCallback(async () => {
     const context = knownRef.current;
@@ -123,7 +123,7 @@ export function SlotLinkCustomer({
       const next = rememberStore(opened);
       knownRef.current = next;
       setKnown(next);
-      const saved = await readPayResume(token, payStore);
+      const saved = await readPayResume(token, payStores, clock().getTime());
       setSavedPayload(saved?.payload ?? null);
       const screen = screenFromStatus(opened, clock(), { resumePay: Boolean(saved?.idempotencyKey) });
       await applyScreen(screen);
@@ -135,7 +135,7 @@ export function SlotLinkCustomer({
       await applyScreen(screen);
       return screen;
     }
-  }, [applyScreen, payStore, rememberStore, request, slug, token]);
+  }, [applyScreen, payStores, rememberStore, request, slug, token]);
 
   useEffect(() => {
     let cancelled = false;
@@ -153,7 +153,7 @@ export function SlotLinkCustomer({
     try {
       const fresh = await load();
       if (fresh.kind !== "form") return;
-      const draft: SlotLinkPayPayload = {
+      const draft: SlotLinkPayDraft = {
         customer: {
           name: name.trim(),
           phone: normalizePhoneToE164(phone),
@@ -161,9 +161,19 @@ export function SlotLinkCustomer({
         },
         policyHash: link.policy.hash,
       };
-      const { record, payload } = await lockPayPayload(token, payStore, draft);
-      setSavedPayload(payload);
-      const opened = await postPay(record.idempotencyKey, payload);
+      const locked = await lockPayPayload(token, payStores, draft, link.expiresAt, undefined, now().getTime());
+      if (!locked) {
+        await applyScreen(screenFromFailure("link_expired", {
+          publicPath: link.business.publicPath,
+          businessName: link.business.name,
+          whatsapp: link.business.contactWhatsapp,
+          startsAt: link.startsAt,
+          now: now(),
+        }));
+        return;
+      }
+      setSavedPayload(locked.payload);
+      const opened = await postPay(locked.record.idempotencyKey, locked.fresh ? draft : locked.payload);
       if (opened) setPhase({ kind: "pix", link, booking: opened });
     } catch (error) {
       if (isOfflineError(error)) setPhase({ kind: "offline", publicPath: link.business.publicPath });
@@ -173,7 +183,7 @@ export function SlotLinkCustomer({
     }
   }
 
-  async function postPay(idempotencyKey: string, payload: SlotLinkPayPayload) {
+  async function postPay(idempotencyKey: string, payload: SlotLinkPayDraft) {
     const response = await request(paySlotLinkUrl(slug, token), {
       method: "POST",
       cache: "no-store",
@@ -187,12 +197,12 @@ export function SlotLinkCustomer({
     if (response.status === 201) {
       const booking = parsePayResult(body);
       const current = linkRef.current;
-      await savePayResume(token, payStore, {
+      await savePayAccess(token, payStores, {
         bookingId: booking.bookingId,
         accessToken: booking.accessToken,
         expiresAt: booking.expiresAt,
         serviceId: current?.service.id ?? "",
-      });
+      }, now().getTime());
       return booking;
     }
     const current = linkRef.current;
@@ -215,7 +225,7 @@ export function SlotLinkCustomer({
 
   async function continueSavedPay() {
     if (submitting) return;
-    const saved = await readPayResume(token, payStore);
+    const saved = await readPayResume(token, payStores, now().getTime());
     const current = linkRef.current;
     if (!saved?.payload || !current) return;
     setSubmitting(true);
@@ -350,7 +360,7 @@ export function SlotLinkCustomer({
               businessName={phase.link.business.name}
               contactWhatsapp={phase.link.business.contactWhatsapp}
               onPaymentConfirmed={() => {
-                void clearPayKey(token, payStore);
+                void clearPayKey(token, payStores);
                 setSavedPayload(null);
                 setPhase({ kind: "confirmed", link: phase.link, booking: phase.booking, customerName: payerName, customerPhone: payerPhone });
               }}

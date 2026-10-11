@@ -1,11 +1,14 @@
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { createSlotLinkToken } from "../../lib/bookings/slot-link-token";
 import { SLOT_LINK_IDEMPOTENCY_KEY_PATTERN } from "../../lib/contracts/slot-link";
 import { failureCode, screenFromFailure, screenFromStatus, shouldClearPayKey, slotStartsInPast } from "../../lib/slot-link/customer-state";
-import { clearPayKey, createIdempotencyKey, lockPayPayload, memoryPayKeyStore, payRequestBody, readOrCreatePayKey, readPayResume, slotLinkStorageKey } from "../../lib/slot-link/idempotency";
+import { clearPayKey, createIdempotencyKey, lockPayPayload, memorySlotLinkStores, payRequestBody, purgeExpiredSlotLinkStorage, readOrCreatePayKey, readPayResume, savePayAccess, SLOT_LINK_CLAIM_PREFIX, slotLinkSessionKey, slotLinkStorageKey } from "../../lib/slot-link/idempotency";
 import { parseOwnerList } from "../../lib/slot-link/owner-link";
 import { isSlotLinkPagePath } from "../../lib/slot-link/paths";
-import { slotLinkPageHeaders } from "../../lib/slot-link/privacy";
+import { slotLinkPageHeaderRule, slotLinkPageHeaders } from "../../lib/slot-link/privacy";
+import { PIX_RESUME_STORAGE_PREFIX, purgeExpiredBookingSessions } from "../../components/booking/pix-resume";
 import { GENERIC_OG_FALLBACK, parseSlotLinkPreview, slotLinkOgCopy, slotLinkOgLines } from "../../lib/slot-link/preview";
 import { sendOnWhatsApp } from "../../lib/slot-link/share";
 import { ownerSummary, slotLinkMessage, validityLine } from "../../lib/slot-link/copy";
@@ -117,55 +120,161 @@ describe("estados da cliente", () => {
 });
 
 describe("idempotência do pagamento", () => {
+  const expiresAt = "2030-01-01T15:00:00.000Z";
+  const now = Date.parse("2030-01-01T12:00:00.000Z");
+
   it("a mesma chave é reaproveitada e uma loja vazia gera outra", async () => {
     const token = createSlotLinkToken();
-    const store = memoryPayKeyStore();
+    const stores = memorySlotLinkStores();
     const keyA = "11111111-1111-4111-8111-111111111111";
     const keyB = "22222222-2222-4222-8222-222222222222";
     expect(SLOT_LINK_IDEMPOTENCY_KEY_PATTERN.test(createIdempotencyKey())).toBe(true);
-    const first = await readOrCreatePayKey(token, store, () => keyA);
-    const second = await readOrCreatePayKey(token, store, () => keyB);
-    expect(second.record.idempotencyKey).toBe(keyA);
-    expect(first.storageKey).toBe(second.storageKey);
-    expect(first.storageKey.includes(token)).toBe(false);
-    const other = await readOrCreatePayKey(token, memoryPayKeyStore(), () => keyB);
-    expect(other.record.idempotencyKey).toBe(keyB);
-    expect(other.record.idempotencyKey).not.toBe(first.record.idempotencyKey);
+    const first = await readOrCreatePayKey(token, stores, expiresAt, () => keyA, now);
+    const second = await readOrCreatePayKey(token, stores, expiresAt, () => keyB, now);
+    expect(first?.record.idempotencyKey).toBe(keyA);
+    expect(second?.record.idempotencyKey).toBe(keyA);
+    expect(first?.storageKey).toBe(second?.storageKey);
+    expect(first?.storageKey.includes(token)).toBe(false);
+    expect(first?.record.expiresAt).toBe(expiresAt);
+    const other = await readOrCreatePayKey(token, memorySlotLinkStores(), expiresAt, () => keyB, now);
+    expect(other?.record.idempotencyKey).toBe(keyB);
+    expect(other?.record.idempotencyKey).not.toBe(first?.record.idempotencyKey);
   });
 
   it("apaga a chave depois do pagamento", async () => {
     const token = createSlotLinkToken();
-    const store = memoryPayKeyStore();
-    await readOrCreatePayKey(token, store, () => "11111111-1111-4111-8111-111111111111");
-    await clearPayKey(token, store);
-    const again = await readOrCreatePayKey(token, store, () => "33333333-3333-4333-8333-333333333333");
-    expect(again.record.idempotencyKey).toBe("33333333-3333-4333-8333-333333333333");
-    expect(again.record.payload).toBeUndefined();
+    const stores = memorySlotLinkStores();
+    await readOrCreatePayKey(token, stores, expiresAt, () => "11111111-1111-4111-8111-111111111111", now);
+    await clearPayKey(token, stores);
+    const again = await readOrCreatePayKey(token, stores, expiresAt, () => "33333333-3333-4333-8333-333333333333", now);
+    expect(again?.record.idempotencyKey).toBe("33333333-3333-4333-8333-333333333333");
+    expect(again?.record.payload).toBeUndefined();
     const key = await slotLinkStorageKey(token);
-    expect(JSON.stringify(store.snapshot).includes(token)).toBe(false);
-    expect(key.startsWith("agendapix.slot-link.pay.")).toBe(true);
+    expect(JSON.stringify(stores.claim.snapshot).includes(token)).toBe(false);
+    expect(key.startsWith(SLOT_LINK_CLAIM_PREFIX)).toBe(true);
   });
 
   it("o primeiro payload fica travado e a retomada reenvia esse corpo", async () => {
     const token = createSlotLinkToken();
-    const store = memoryPayKeyStore();
+    const stores = memorySlotLinkStores();
     const key = "11111111-1111-4111-8111-111111111111";
     const first = {
       customer: { name: "Ana Souza", phone: "+5511987654321" },
       policyHash: "ab".repeat(32),
     };
-    const locked = await lockPayPayload(token, store, first, () => key);
-    const again = await lockPayPayload(token, store, {
+    const locked = await lockPayPayload(token, stores, first, expiresAt, () => key, now);
+    const again = await lockPayPayload(token, stores, {
       customer: { name: "Outra Pessoa", phone: "+5511987654000", cpfCnpj: "52998224725" },
       policyHash: "cd".repeat(32),
-    }, () => "22222222-2222-4222-8222-222222222222");
-    expect(again.record.idempotencyKey).toBe(key);
-    expect(again.payload).toEqual(first);
-    expect(payRequestBody(again.payload)).toEqual(first);
-    expect(JSON.stringify(store.snapshot).includes(token)).toBe(false);
-    await clearPayKey(token, store);
-    expect(await readPayResume(token, store)).toBeNull();
-    expect(locked.payload.customer.name).toBe("Ana Souza");
+    }, expiresAt, () => "22222222-2222-4222-8222-222222222222", now);
+    expect(again?.record.idempotencyKey).toBe(key);
+    expect(again?.payload).toEqual(first);
+    expect(again?.fresh).toBe(false);
+    expect(payRequestBody(again!.payload)).toEqual(first);
+    const saved = JSON.stringify(stores.claim.snapshot);
+    expect(saved.includes(token)).toBe(false);
+    expect(saved.includes("52998224725")).toBe(false);
+    expect(saved.includes("accessToken")).toBe(false);
+    const kept = await lockPayPayload(token, stores, {
+      customer: { name: "", phone: "" },
+      policyHash: "ab".repeat(32),
+    }, "2020-01-01T00:00:00.000Z", () => "99999999-9999-4999-8999-999999999999", now);
+    expect(kept?.payload).toEqual(first);
+    expect(kept?.record.idempotencyKey).toBe(key);
+    await clearPayKey(token, stores);
+    expect(await readPayResume(token, stores, now)).toBeNull();
+    expect(locked?.payload.customer.name).toBe("Ana Souza");
+  });
+
+  it("accessToken fica só na sessão e o claim local guarda a chave com prazo", async () => {
+    const token = createSlotLinkToken();
+    const stores = memorySlotLinkStores();
+    const key = "11111111-1111-4111-8111-111111111111";
+    await lockPayPayload(token, stores, {
+      customer: { name: "Ana Souza", phone: "+5511987654321", cpfCnpj: "52998224725" },
+      policyHash: "ab".repeat(32),
+    }, expiresAt, () => key, now);
+    const hold = "2030-01-01T16:00:00.000Z";
+    await savePayAccess(token, stores, {
+      bookingId: "7c1c5b3f-2d4e-5f60-9b0c-1d2e3f4a5b6c",
+      accessToken: "token-secreto",
+      expiresAt: hold,
+      serviceId: "6b0b4a2e-1c3d-4e5f-8a9b-0c1d2e3f4a5b",
+    }, now);
+    const claim = stores.claim.snapshot[await slotLinkStorageKey(token)] ?? "";
+    const session = stores.session.snapshot[await slotLinkSessionKey(token)] ?? "";
+    expect(claim).not.toContain("token-secreto");
+    expect(claim).not.toContain("accessToken");
+    expect(claim).not.toContain("52998224725");
+    expect(JSON.parse(claim).expiresAt).toBe(hold);
+    expect(session).toContain("token-secreto");
+    expect(stores.claim.snapshot[await slotLinkSessionKey(token)]).toBeUndefined();
+    const resume = await readPayResume(token, stores, now);
+    expect(resume?.accessToken).toBe("token-secreto");
+    expect(resume?.idempotencyKey).toBe(key);
+  });
+
+  it("ao carregar, apaga chave, payload e token vencidos ou sem prazo", async () => {
+    const token = createSlotLinkToken();
+    const live = createSlotLinkToken();
+    const stores = memorySlotLinkStores();
+    const claimKey = await slotLinkStorageKey(token);
+    const sessionKey = await slotLinkSessionKey(token);
+    const legacy = {
+      idempotencyKey: "11111111-1111-4111-8111-111111111111",
+      payload: { customer: { name: "Ana Souza", phone: "+5511987654321", cpfCnpj: "52998224725" }, policyHash: "ab".repeat(32) },
+      bookingId: "7c1c5b3f-2d4e-5f60-9b0c-1d2e3f4a5b6c",
+      accessToken: "token-secreto",
+      serviceId: "6b0b4a2e-1c3d-4e5f-8a9b-0c1d2e3f4a5b",
+      expiresAt,
+    };
+    stores.claim.set(claimKey, JSON.stringify(legacy));
+    stores.session.set(claimKey, JSON.stringify(legacy));
+    const staleKey = await slotLinkStorageKey(`${token}stale`);
+    stores.claim.set(staleKey, JSON.stringify({ ...legacy, expiresAt: "2020-01-01T00:00:00.000Z" }));
+    stores.session.set(await slotLinkSessionKey(`${token}stale`), JSON.stringify({
+      bookingId: legacy.bookingId,
+      accessToken: "token-velho",
+      serviceId: legacy.serviceId,
+      expiresAt: "2020-01-01T00:00:00.000Z",
+    }));
+    const missingKey = await slotLinkStorageKey(`${token}missing`);
+    stores.claim.set(missingKey, JSON.stringify({ idempotencyKey: legacy.idempotencyKey, payload: legacy.payload }));
+    await lockPayPayload(live, stores, {
+      customer: { name: "Bia", phone: "+5511987654000" },
+      policyHash: "cd".repeat(32),
+    }, expiresAt, () => "22222222-2222-4222-8222-222222222222", now);
+
+    purgeExpiredSlotLinkStorage(stores, now);
+
+    const claim = stores.claim.snapshot[claimKey] ?? "";
+    expect(claim).not.toContain("token-secreto");
+    expect(claim).not.toContain("52998224725");
+    expect(claim).not.toContain(token);
+    expect(JSON.parse(claim).payload.customer).toEqual({ name: "Ana Souza", phone: "+5511987654321" });
+    expect(stores.session.snapshot[claimKey]).toBeUndefined();
+    expect(stores.session.snapshot[sessionKey]).toContain("token-secreto");
+    expect(stores.claim.snapshot[staleKey]).toBeUndefined();
+    expect(stores.session.snapshot[await slotLinkSessionKey(`${token}stale`)]).toBeUndefined();
+    expect(stores.claim.snapshot[missingKey]).toBeUndefined();
+    expect(stores.claim.snapshot[await slotLinkStorageKey(live)]).toContain("Bia");
+
+    const sessions = memorySlotLinkStores().session;
+    sessions.set(`${PIX_RESUME_STORAGE_PREFIX}salao`, JSON.stringify({
+      bookingId: legacy.bookingId,
+      accessToken: "token-pix",
+      expiresAt: "2020-01-01T00:00:00.000Z",
+      serviceId: legacy.serviceId,
+    }));
+    sessions.set(`${PIX_RESUME_STORAGE_PREFIX}outro`, JSON.stringify({
+      bookingId: legacy.bookingId,
+      accessToken: "token-vivo",
+      expiresAt: null,
+      serviceId: legacy.serviceId,
+    }));
+    purgeExpiredBookingSessions(sessions, now);
+    expect(sessions.snapshot[`${PIX_RESUME_STORAGE_PREFIX}salao`]).toBeUndefined();
+    expect(sessions.snapshot[`${PIX_RESUME_STORAGE_PREFIX}outro`]).toContain("token-vivo");
   });
 });
 
@@ -207,6 +316,12 @@ describe("textos e privacidade da página", () => {
     expect(headers["X-Robots-Tag"]).toBe("noindex, nofollow");
     expect(headers["Cache-Control"]).toBe("no-store");
     expect(headers["Referrer-Policy"]).toBe("no-referrer");
+    expect(slotLinkPageHeaderRule()).toEqual({
+      source: "/:slug/h/:token",
+      headers: slotLinkPageHeaders(),
+    });
+    const config = readFileSync(path.join(__dirname, "../../next.config.ts"), "utf8");
+    expect(config).toContain("slotLinkPageHeaderRule()");
     const shared: { text: string }[] = [];
     const opened: string[] = [];
     await expect(sendOnWhatsApp("Oi", {
@@ -218,5 +333,28 @@ describe("textos e privacidade da página", () => {
     expect(opened).toEqual([]);
     await sendOnWhatsApp("Oi", { mobile: false, share: async () => { throw new Error("não"); }, open: (url) => opened.push(url) });
     expect(opened[0]).toBe(`https://wa.me/?text=${encodeURIComponent("Oi")}`);
+  });
+
+  it("nenhum Link aponta para a página do token", () => {
+    const offenders: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(dir)) {
+        if (entry === "node_modules" || entry === ".next") continue;
+        const full = path.join(dir, entry);
+        if (statSync(full).isDirectory()) {
+          walk(full);
+          continue;
+        }
+        if (!entry.endsWith(".tsx")) continue;
+        const source = readFileSync(full, "utf8");
+        const tags = source.match(/<Link\b[\s\S]*?>/g) ?? [];
+        for (const tag of tags) {
+          if (tag.includes("slotLinkPagePath") || tag.includes("/h/")) offenders.push(full);
+        }
+      }
+    };
+    walk(path.join(__dirname, "../../components"));
+    walk(path.join(__dirname, "../../app"));
+    expect(offenders).toEqual([]);
   });
 });

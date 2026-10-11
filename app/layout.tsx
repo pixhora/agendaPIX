@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { Toaster } from "@/components/ui/toaster";
 import { siteDescription, siteName, siteOpenGraph, siteOrigin, siteTitle } from "@/lib/site";
 import { MercadoPagoCallback } from "@/components/payments/mp-callback";
+import { SlotLinkStorageSweep } from "@/components/slot-link/storage-sweep";
 import { themeInitScript } from "@/lib/theme";
 import "./globals.css";
 import Script from "next/script";
@@ -55,6 +56,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
       </head>
       <body className="min-h-dvh bg-paper font-sans text-ink antialiased">
         {children}
+        <SlotLinkStorageSweep />
         <Suspense fallback={null}>
           <MercadoPagoCallback />
         </Suspense>

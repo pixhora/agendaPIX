@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { SLOT_LINK_STATUS_LABEL, clockInZone } from "@/lib/slot-link/copy";
+import { LINK_COPIED, SLOT_LINK_STATUS_LABEL, clockInZone, formatDayMonth, isoDateInZone, weekdayShort } from "@/lib/slot-link/copy";
 import { parseOwnerLink, parseOwnerList, type OwnerLink } from "@/lib/slot-link/owner-link";
 import { cancelSlotLinkUrl, ownerSlotLinksUrl } from "@/lib/slot-link/paths";
 import { isOfflineError } from "@/components/booking/booking-error";
@@ -13,11 +14,14 @@ export function SentLinks({
   date,
   timezone,
   reloadToken = 0,
+  copyUrls = {},
 }: {
   businessId: string;
   date: string;
   timezone: string;
   reloadToken?: number;
+  /** URL só na memória desta visita. A lista não recebe o token da API. */
+  copyUrls?: Record<string, string>;
 }) {
   const [links, setLinks] = useState<OwnerLink[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -50,6 +54,15 @@ export function SentLinks({
       cancelled = true;
     };
   }, [load, reloadToken]);
+
+  async function copyLink(url: string) {
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success(LINK_COPIED);
+    } catch {
+      toast.error("Não foi possível copiar. Tente de novo.");
+    }
+  }
 
   async function cancel(link: OwnerLink) {
     setBusyId(link.id);
@@ -90,28 +103,38 @@ export function SentLinks({
       ) : null}
       {status === "ready" && links.length > 0 ? (
         <ol className="grid gap-2">
-          {links.map((link) => (
-            <li key={link.id} className="grid gap-2 rounded-card border border-line bg-surface p-4">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <p className="font-semibold text-ink">{link.customerLabel ?? link.service.name}</p>
-                <p className="text-sm font-semibold text-ink">{SLOT_LINK_STATUS_LABEL[link.status]}</p>
-              </div>
-              <p className="text-sm text-muted">{link.service.name} · {clockInZone(link.startsAt, timezone)}</p>
-              {link.cancellable ? (
-                confirmId === link.id ? (
-                  <div className="grid gap-2 rounded-field bg-subtle p-3">
-                    <p className="text-sm text-ink">Cancelar este link? A cliente deixa de conseguir pagar.</p>
-                    <div className="flex flex-wrap gap-2">
-                      <Button type="button" variant="danger" disabled={busyId === link.id} onClick={() => void cancel(link)}>Cancelar link</Button>
-                      <Button type="button" variant="outline" onClick={() => setConfirmId(null)}>Manter link</Button>
+          {links.map((link) => {
+            const pending = link.status === "pending";
+            const day = isoDateInZone(link.startsAt, timezone);
+            const copyUrl = pending ? copyUrls[link.id] : undefined;
+            return (
+              <li key={link.id} className="grid gap-2 rounded-card border border-line bg-surface p-4">
+                {pending && link.customerLabel ? <p className="font-semibold text-ink">{link.customerLabel}</p> : null}
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <p className="font-semibold text-ink">{link.service.name}</p>
+                  <p className="text-sm font-semibold text-ink">{SLOT_LINK_STATUS_LABEL[link.status]}</p>
+                </div>
+                <p className="text-sm text-muted">{weekdayShort(day)}, {formatDayMonth(day)}</p>
+                <p className="text-sm font-semibold tabular-nums text-ink">{clockInZone(link.startsAt, timezone)}</p>
+                {copyUrl ? (
+                  <Button type="button" variant="outline" className="justify-self-start" onClick={() => void copyLink(copyUrl)}>Copiar link</Button>
+                ) : null}
+                {pending && link.cancellable ? (
+                  confirmId === link.id ? (
+                    <div className="grid gap-2 rounded-field bg-subtle p-3">
+                      <p className="text-sm text-ink">Cancelar este link? A cliente deixa de conseguir pagar.</p>
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="button" variant="danger" disabled={busyId === link.id} onClick={() => void cancel(link)}>Cancelar link</Button>
+                        <Button type="button" variant="outline" onClick={() => setConfirmId(null)}>Manter link</Button>
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <Button type="button" variant="ghost" className="justify-self-start px-0" onClick={() => setConfirmId(link.id)}>Cancelar link</Button>
-                )
-              ) : null}
-            </li>
-          ))}
+                  ) : (
+                    <Button type="button" variant="ghost" className="justify-self-start px-0" onClick={() => setConfirmId(link.id)}>Cancelar link</Button>
+                  )
+                ) : null}
+              </li>
+            );
+          })}
         </ol>
       ) : null}
       {cursor ? (

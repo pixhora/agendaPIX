@@ -5,9 +5,13 @@ import userEvent from "@testing-library/user-event";
 import { SlotLinkCustomer } from "@/components/slot-link/slot-link-customer";
 import { AgendaPixFooter } from "@/components/slot-link/agenda-pix-footer";
 import { SlotLinkNotice } from "@/components/slot-link/slot-link-notice";
-import { memoryPayKeyStore, readOrCreatePayKey, slotLinkStorageKey } from "@/lib/slot-link/idempotency";
+import { memorySlotLinkStores, readOrCreatePayKey, slotLinkSessionKey, slotLinkStorageKey } from "@/lib/slot-link/idempotency";
+import { SlotLinkStorageSweep } from "@/components/slot-link/storage-sweep";
+import { SentLinks } from "@/components/slot-link/sent-links";
 import { createSlotLinkToken } from "../../lib/bookings/slot-link-token";
-import { CUSTOMER_CONFLICT_BODY, CUSTOMER_CONFLICT_TITLE, CUSTOMER_IN_PROGRESS, CUSTOMER_USED_TITLE } from "@/lib/slot-link/copy";
+import { CUSTOMER_CONFLICT_BODY, CUSTOMER_CONFLICT_TITLE, CUSTOMER_IN_PROGRESS, CUSTOMER_USED_TITLE, formatDayMonth, isoDateInZone, weekdayShort } from "@/lib/slot-link/copy";
+
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 vi.mock("@/components/booking/StepPayment", () => ({
   StepPayment: ({ onPaymentConfirmed, booking }: { onPaymentConfirmed: () => void; booking: { payment: { copyPaste: string | null } | null } }) => (
@@ -97,7 +101,7 @@ async function fillAndPay(user: ReturnType<typeof userEvent.setup>) {
 describe("página da cliente", () => {
   it("começa vazia, reaproveita a mesma chave e o 201 só abre o Pix", async () => {
     const user = userEvent.setup();
-    const store = memoryPayKeyStore();
+    const stores = memorySlotLinkStores();
     const keys: string[] = [];
     const bodies: string[] = [];
     let posts = 0;
@@ -113,7 +117,7 @@ describe("página da cliente", () => {
       }
       return json(200, openBody());
     });
-    render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" store={store} fetchImpl={fetchImpl} now={() => new Date("2030-10-01T12:00:00.000Z")} />);
+    render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" stores={stores} fetchImpl={fetchImpl} now={() => new Date("2030-10-01T12:00:00.000Z")} />);
     expect(await screen.findByLabelText("Nome")).toHaveValue("");
     expect(screen.getByLabelText("WhatsApp")).toHaveValue("");
     expect(screen.queryByLabelText("CPF")).toBeNull();
@@ -130,14 +134,19 @@ describe("página da cliente", () => {
     expect(keys).toEqual([keys[0], keys[0]]);
     expect(bodies).toEqual([bodies[0], bodies[0]]);
     expect(keys[0]?.length).toBeGreaterThan(8);
-    const saved = store.snapshot[await slotLinkStorageKey(token)] ?? "";
+    const saved = stores.claim.snapshot[await slotLinkStorageKey(token)] ?? "";
+    const session = stores.session.snapshot[await slotLinkSessionKey(token)] ?? "";
     expect(saved.includes(token)).toBe(false);
+    expect(saved.includes("access-token-teste")).toBe(false);
+    expect(saved.includes("accessToken")).toBe(false);
+    expect(session.includes("access-token-teste")).toBe(true);
+    expect(JSON.parse(saved).expiresAt).toBe("2030-10-18T14:45:00.000Z");
   });
 
   it("chave diferente com marcação ativa mostra link_in_progress, sem contador e sem dado da outra cliente", async () => {
     const user = userEvent.setup();
-    const store = memoryPayKeyStore();
-    await readOrCreatePayKey(token, memoryPayKeyStore(), () => "chave-do-outro-aparelho");
+    const stores = memorySlotLinkStores();
+    await readOrCreatePayKey(token, memorySlotLinkStores(), "2030-10-18T18:00:00.000Z", () => "chave-do-outro-aparelho", Date.parse("2030-10-01T12:00:00.000Z"));
     const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/pay")) {
@@ -149,7 +158,7 @@ describe("página da cliente", () => {
       }
       return json(200, openBody());
     });
-    render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" store={store} fetchImpl={fetchImpl} now={() => new Date("2030-10-01T12:00:00.000Z")} />);
+    render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" stores={stores} fetchImpl={fetchImpl} now={() => new Date("2030-10-01T12:00:00.000Z")} />);
     await fillAndPay(user);
     expect(await screen.findByRole("heading", { name: CUSTOMER_IN_PROGRESS })).toBeVisible();
     expect(screen.getByRole("button", { name: "Tentar de novo" })).toBeVisible();
@@ -160,37 +169,39 @@ describe("página da cliente", () => {
 
   it("apaga a chave quando o pagamento confirma e quando o link expira", async () => {
     const user = userEvent.setup();
-    const store = memoryPayKeyStore();
+    const stores = memorySlotLinkStores();
     const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
       if (String(input).endsWith("/pay")) return json(201, payBody());
       return json(200, openBody());
     });
-    const view = render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" store={store} fetchImpl={fetchImpl} now={() => new Date("2030-10-01T12:00:00.000Z")} />);
+    const view = render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" stores={stores} fetchImpl={fetchImpl} now={() => new Date("2030-10-01T12:00:00.000Z")} />);
     await fillAndPay(user);
     expect(await screen.findByText(/Pix 000201/)).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Simular pagamento confirmado" }));
     expect(await screen.findByText("Horário confirmado!")).toBeVisible();
-    expect(store.snapshot[await slotLinkStorageKey(token)]).toBeUndefined();
+    expect(stores.claim.snapshot[await slotLinkStorageKey(token)]).toBeUndefined();
+    expect(stores.session.snapshot[await slotLinkSessionKey(token)]).toBeUndefined();
 
-    const expiredStore = memoryPayKeyStore();
-    await readOrCreatePayKey(token, expiredStore, () => "chave-velha");
+    const expiredStores = memorySlotLinkStores();
+    await readOrCreatePayKey(token, expiredStores, "2030-10-18T18:00:00.000Z", () => "44444444-4444-4444-8444-444444444444", Date.parse("2030-10-01T12:00:00.000Z"));
     view.rerender(
       <SlotLinkCustomer
         slug="salao"
         token={token}
         timezone="America/Sao_Paulo"
-        store={expiredStore}
+        stores={expiredStores}
         fetchImpl={vi.fn(async () => json(410, { error: { code: "link_expired", message: "Este link expirou." } }))}
         now={() => new Date("2030-10-01T12:00:00.000Z")}
       />,
     );
     expect(await screen.findByRole("heading", { name: "Este link expirou." })).toBeVisible();
-    expect(expiredStore.snapshot[await slotLinkStorageKey(token)]).toBeUndefined();
+    expect(expiredStores.claim.snapshot[await slotLinkStorageKey(token)]).toBeUndefined();
+    expect(expiredStores.session.snapshot[await slotLinkSessionKey(token)]).toBeUndefined();
   });
 
   it("409 idempotency_conflict reenvia o payload salvo e volta ao mesmo Pix", async () => {
     const user = userEvent.setup();
-    const store = memoryPayKeyStore();
+    const stores = memorySlotLinkStores();
     const bodies: string[] = [];
     let posts = 0;
     const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -207,7 +218,7 @@ describe("página da cliente", () => {
       }
       return json(200, openBody());
     });
-    render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" store={store} fetchImpl={fetchImpl} now={() => new Date("2030-10-01T12:00:00.000Z")} />);
+    render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" stores={stores} fetchImpl={fetchImpl} now={() => new Date("2030-10-01T12:00:00.000Z")} />);
     await fillAndPay(user);
     expect(await screen.findByRole("heading", { name: CUSTOMER_CONFLICT_TITLE })).toBeVisible();
     expect(screen.getByText(CUSTOMER_CONFLICT_BODY)).toBeVisible();
@@ -220,8 +231,10 @@ describe("página da cliente", () => {
     expect(screen.getByTestId("slot-link-payer")).toHaveTextContent("Ana Souza");
     expect(screen.queryByLabelText("WhatsApp")).toBeNull();
     expect(bodies).toEqual([bodies[0], bodies[0]]);
-    const saved = JSON.parse(store.snapshot[await slotLinkStorageKey(token)] ?? "{}") as { payload?: { customer?: { name?: string } } };
+    const saved = JSON.parse(stores.claim.snapshot[await slotLinkStorageKey(token)] ?? "{}") as { payload?: { customer?: { name?: string } }; accessToken?: string };
     expect(saved.payload?.customer?.name).toBe("Ana Souza");
+    expect(saved.accessToken).toBeUndefined();
+    expect(stores.session.snapshot[await slotLinkSessionKey(token)]).toContain("access-token-teste");
   });
 
   it("GET 200 com status paid mostra o horário confirmado, sem botão de pagar", async () => {
@@ -237,9 +250,9 @@ describe("página da cliente", () => {
 
   it("chave salva retoma o Pix mesmo com expiresAt vencido e não avisa", async () => {
     const user = userEvent.setup();
-    const store = memoryPayKeyStore();
+    const stores = memorySlotLinkStores();
     const key = "11111111-1111-4111-8111-111111111111";
-    await readOrCreatePayKey(token, store, () => key);
+    await readOrCreatePayKey(token, stores, "2030-10-18T18:00:00.000Z", () => key, Date.parse("2030-10-01T12:00:00.000Z"));
     const sent: string[] = [];
     const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -249,7 +262,7 @@ describe("página da cliente", () => {
       }
       return json(200, { ...openBody("expired"), expiresAt: "2020-01-01T00:00:00.000Z" });
     });
-    render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" store={store} fetchImpl={fetchImpl} now={() => new Date("2030-10-01T12:00:00.000Z")} />);
+    render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" stores={stores} fetchImpl={fetchImpl} now={() => new Date("2030-10-01T12:00:00.000Z")} />);
     expect(await screen.findByRole("button", { name: /Pagar sinal de/ })).toBeVisible();
     expect(screen.queryByRole("heading", { name: "Este link expirou." })).toBeNull();
     await fillAndPay(user);
@@ -260,9 +273,9 @@ describe("página da cliente", () => {
 
   it("com chave salva, link_expired do backend mostra expirado e apaga a chave", async () => {
     const user = userEvent.setup();
-    const store = memoryPayKeyStore();
+    const stores = memorySlotLinkStores();
     const key = "22222222-2222-4222-8222-222222222222";
-    await readOrCreatePayKey(token, store, () => key);
+    await readOrCreatePayKey(token, stores, "2030-10-18T18:00:00.000Z", () => key, Date.parse("2030-10-01T12:00:00.000Z"));
     const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/pay")) {
@@ -271,10 +284,11 @@ describe("página da cliente", () => {
       }
       return json(200, { ...openBody("pending"), expiresAt: "2020-01-01T00:00:00.000Z" });
     });
-    render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" store={store} fetchImpl={fetchImpl} now={() => new Date("2030-10-01T12:00:00.000Z")} />);
+    render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" stores={stores} fetchImpl={fetchImpl} now={() => new Date("2030-10-01T12:00:00.000Z")} />);
     await fillAndPay(user);
     expect(await screen.findByRole("heading", { name: "Este link expirou." })).toBeVisible();
-    expect(store.snapshot[await slotLinkStorageKey(token)]).toBeUndefined();
+    expect(stores.claim.snapshot[await slotLinkStorageKey(token)]).toBeUndefined();
+    expect(stores.session.snapshot[await slotLinkSessionKey(token)]).toBeUndefined();
   });
 
   it("sem chave salva, expiresAt vencido não chama o pay", async () => {
@@ -309,5 +323,91 @@ describe("estados e rodapé", () => {
     expect(screen.getByText(/Agenda com sinal no Pix feita no AgendaPix/)).toBeVisible();
     rerender(<AgendaPixFooter campaign="reserva_confirmada" />);
     expect(screen.getByRole("link", { name: "Crie a sua grátis" })).toHaveAttribute("href", "/?utm_source=agendapix&utm_medium=rodape&utm_campaign=reserva_confirmada");
+  });
+});
+
+describe("links enviados", () => {
+  it("copia o link só enquanto está pendente e não mostra o token", async () => {
+    const user = userEvent.setup();
+    const secret = `https://exemplo.test/salao/h/${token}`;
+    const pending = {
+      id: "7c1c5b3f-2d4e-5f60-9b0c-1d2e3f4a5b6c",
+      service,
+      startsAt: "2030-10-18T14:30:00.000Z",
+      expiresAt: "2030-10-18T14:00:00.000Z",
+      status: "pending",
+      createdAt: "2026-10-10T12:00:00.000Z",
+      previewId: "aaaaaaaaaaaaaaaaaaaaaa",
+      customerLabel: "Ana da lista",
+      cancellable: true,
+    };
+    const paid = {
+      ...pending,
+      id: "8d2d6c40-3e5f-4061-8c1d-2e3f4a5b6c7d",
+      status: "paid",
+      customerLabel: "Segredo",
+      cancellable: true,
+    };
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    vi.stubGlobal("fetch", vi.fn(async () => json(200, { links: [pending, paid], nextCursor: null })));
+    const view = render(
+      <SentLinks
+        businessId="6b0b4a2e-1c3d-4e5f-8a9b-0c1d2e3f4a5b"
+        date="2030-10-18"
+        timezone="America/Sao_Paulo"
+        copyUrls={{ [pending.id]: secret }}
+      />,
+    );
+    expect(await screen.findByText("Ana da lista")).toBeVisible();
+    expect(screen.getByText("Aguardando pagamento")).toBeVisible();
+    expect(screen.getByText("Pago, horário confirmado")).toBeVisible();
+    expect(screen.queryByText("Segredo")).toBeNull();
+    expect(screen.getAllByRole("button", { name: "Copiar link" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Cancelar link" })).toHaveLength(1);
+    const day = isoDateInZone(pending.startsAt, "America/Sao_Paulo");
+    expect(screen.getAllByText(`${weekdayShort(day)}, ${formatDayMonth(day)}`).length).toBeGreaterThan(0);
+    expect(view.container.textContent).not.toContain(token);
+    expect(view.container.innerHTML).not.toContain("/h/");
+    await user.click(screen.getByRole("button", { name: "Copiar link" }));
+    expect(writeText).toHaveBeenCalledWith(secret);
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("limpeza ao abrir", () => {
+  it("apaga no localStorage a chave vencida e tira o accessToken de lá", async () => {
+    const claimKey = await slotLinkStorageKey(token);
+    const sessionKey = await slotLinkSessionKey(token);
+    window.localStorage.setItem(claimKey, JSON.stringify({
+      idempotencyKey: "11111111-1111-4111-8111-111111111111",
+      payload: { customer: { name: "Ana Souza", phone: "+5511987654321", cpfCnpj: "52998224725" }, policyHash: "ab".repeat(32) },
+      accessToken: "token-secreto",
+      bookingId: "7c1c5b3f-2d4e-5f60-9b0c-1d2e3f4a5b6c",
+      serviceId: service.id,
+      expiresAt: "2099-01-01T00:00:00.000Z",
+    }));
+    window.localStorage.setItem(`${claimKey}vencido`, JSON.stringify({
+      idempotencyKey: "22222222-2222-4222-8222-222222222222",
+      expiresAt: "2020-01-01T00:00:00.000Z",
+    }));
+    window.sessionStorage.setItem("booking_session_salao", JSON.stringify({
+      bookingId: "7c1c5b3f-2d4e-5f60-9b0c-1d2e3f4a5b6c",
+      accessToken: "token-pix",
+      expiresAt: "2020-01-01T00:00:00.000Z",
+      serviceId: service.id,
+    }));
+    render(<SlotLinkStorageSweep />);
+    await vi.waitFor(() => {
+      expect(window.localStorage.getItem(`${claimKey}vencido`)).toBeNull();
+    });
+    const claim = window.localStorage.getItem(claimKey) ?? "";
+    expect(claim).not.toContain("token-secreto");
+    expect(claim).not.toContain("52998224725");
+    expect(claim).toContain("Ana Souza");
+    expect(window.sessionStorage.getItem(sessionKey)).toContain("token-secreto");
+    expect(window.sessionStorage.getItem("booking_session_salao")).toBeNull();
+    window.localStorage.removeItem(claimKey);
+    window.sessionStorage.removeItem(sessionKey);
   });
 });

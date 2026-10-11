@@ -32,6 +32,7 @@ export function SlotLinkPanel({
   const [sheet, setSheet] = useState<{ seed: SlotSeed | null; id: number } | null>(null);
   const [sheetSeq, setSheetSeq] = useState(0);
   const [reloadToken, setReloadToken] = useState(0);
+  const [copyUrls, setCopyUrls] = useState<Record<string, string>>({});
   const [free, setFree] = useState<FreeSlot[]>([]);
   const requestKey = `${date}:${services.map((service) => service.id).join(",")}:${reloadToken}`;
 
@@ -116,7 +117,7 @@ export function SlotLinkPanel({
           )}
         </section>
       )}
-      <SentLinks businessId={businessId} date={date} timezone={timezone} reloadToken={reloadToken} />
+      <SentLinks businessId={businessId} date={date} timezone={timezone} reloadToken={reloadToken} copyUrls={copyUrls} />
       {sheet ? (
         <SlotLinkSheet
           key={sheet.id}
@@ -128,7 +129,10 @@ export function SlotLinkPanel({
           services={services}
           mpReady={mpReady}
           seed={sheet.seed}
-          onCreated={() => setReloadToken((current) => current + 1)}
+          onCreated={(created) => {
+            setCopyUrls((current) => ({ ...current, [created.id]: created.url }));
+            setReloadToken((current) => current + 1);
+          }}
         />
       ) : null}
     </div>
