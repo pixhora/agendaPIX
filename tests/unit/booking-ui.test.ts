@@ -96,7 +96,9 @@ describe("Pix UI status helpers (contrato PixCharge)", () => {
     expect(pixUiPhase({ status: "expired", payment: { status: "expired" } as never })).toBe("expired");
     expect(pixUiPhase({ status: "pending_payment", payment: { status: "expired" } as never })).toBe("expired");
     expect(pixUiPhase({ status: "cancelled", payment: { status: "cancelled" } as never })).toBe("cancelled");
-    expect(pixUiPhase({ status: "pending_payment", payment: { status: "failed" } as never })).toBe("cancelled");
+    expect(pixUiPhase({ status: "pending_payment", payment: { status: "failed" } as never })).toBe("charge_failed");
+    expect(pixUiPhase({ status: "cancelled", payment: { status: "failed" } as never })).toBe("cancelled");
+    expect(pixUiPhase({ status: "expired", payment: { status: "failed" } as never })).toBe("expired");
   });
 
   it("accepts only PNG data URLs with copyPaste while pending", () => {

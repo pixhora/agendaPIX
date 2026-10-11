@@ -42,6 +42,7 @@ import {
   refundedCopy,
 } from "./pix-deadline-copy";
 import { WHATSAPP_CONTACT_LABEL } from "./customer-copy";
+import { PixChargeFailedScreen } from "./pix-charge-failed";
 import { createStatusPoller, isTerminalPixPhase, persistedRateLimitUntil, rateLimitHint, retryAfterFrom429 } from "./payment-poll";
 import { parsePaymentStatusResponse, type PaymentStatusResponse } from "@/lib/public/payment-status";
 
@@ -60,6 +61,9 @@ interface StepPaymentProps {
   /** WhatsApp do negócio. Sem número, o botão de contato não aparece. */
   contactWhatsapp?: string | null;
   onOpenPolicy?: (trigger: HTMLElement) => void;
+  /** Recusa (`failed`): gera de novo com outra chave. */
+  onRetryFailedCharge?: () => void;
+  chargeRetrying?: boolean;
 }
 
 export function StepPayment({
@@ -73,6 +77,8 @@ export function StepPayment({
   businessName,
   contactWhatsapp,
   onOpenPolicy,
+  onRetryFailedCharge,
+  chargeRetrying = false,
 }: StepPaymentProps) {
   const payment = booking.payment;
   const timezone = summary?.timezone ?? "America/Sao_Paulo";
@@ -109,8 +115,8 @@ export function StepPayment({
   const announcedRef = useRef<Set<PixDeadlineMilestone>>(new Set());
   const lastMinuteRef = useRef<number | null>(null);
   const showDevSimulate = canShowDevSimulatePix(payment?.provider);
-  const haltClock = phase === "paid" || phase === "expired" || phase === "cancelled" || phase === "refund_pending" || phase === "refunded";
-  const stopPolling = phase === "paid" || phase === "cancelled" || phase === "refund_pending" || phase === "refunded" || (phase === "expired" && !lateWatching);
+  const haltClock = phase === "paid" || phase === "expired" || phase === "cancelled" || phase === "charge_failed" || phase === "refund_pending" || phase === "refunded";
+  const stopPolling = phase === "paid" || phase === "cancelled" || phase === "charge_failed" || phase === "refund_pending" || phase === "refunded" || (phase === "expired" && !lateWatching);
   const whatsappContact = whatsappHref(contactWhatsapp);
   const whatsappLabel = whatsappContact
     ? (businessName?.trim() ? businessWhatsappLabel(businessName.trim()) : WHATSAPP_CONTACT_LABEL)
@@ -145,7 +151,7 @@ export function StepPayment({
         return;
       }
 
-      if (next === "confirming" || next === "expired" || next === "cancelled" || next === "refund_pending" || next === "refunded") {
+      if (next === "confirming" || next === "expired" || next === "cancelled" || next === "charge_failed" || next === "refund_pending" || next === "refunded") {
         setCheckError(null);
         return;
       }
@@ -394,6 +400,16 @@ export function StepPayment({
         </div>
         {followUpActions}
       </div>
+    );
+  }
+
+  if (phase === "charge_failed") {
+    return (
+      <PixChargeFailedScreen
+        storeHref={whatsappContact}
+        retrying={chargeRetrying}
+        onRetry={() => onRetryFailedCharge?.()}
+      />
     );
   }
 

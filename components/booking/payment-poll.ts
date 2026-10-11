@@ -281,7 +281,7 @@ export function createStatusPoller<T>(options: {
   };
 }
 
-const TERMINAL_PHASES = new Set<PixUiPhase>(["paid", "expired", "cancelled", "refund_pending", "refunded"]);
+const TERMINAL_PHASES = new Set<PixUiPhase>(["paid", "expired", "cancelled", "charge_failed", "refund_pending", "refunded"]);
 
 /** Resultado que encerra a verificação: não vale gastar outro pedido em seguida. */
 export function isTerminalPixPhase(phase: PixUiPhase): boolean {

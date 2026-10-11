@@ -16,6 +16,7 @@ import { PolicySummaryLine } from "@/components/policy/PolicySummaryLine";
 import { POLICY_MISSING_MESSAGE } from "./booking-error";
 import { policyLineTone, servicePolicyState } from "./policy-gate";
 import { privacyPolicyLink } from "@/lib/marketing/flags";
+import { PIX_GENERATING_LABEL } from "./customer-copy";
 import { PixCreateStoreLine } from "./pix-create-error";
 
 interface StepCustomerProps {
@@ -229,7 +230,7 @@ export function StepCustomer({
         <Button type="submit" size="lg" variant={service.depositCents > 0 ? "pix" : "default"} disabled={isSubmitting || policyBlocked} aria-busy={isSubmitting || undefined} className="w-full sm:w-auto">
           {isSubmitting ? <Loader2 aria-hidden="true" className="animate-spin motion-reduce:animate-none" /> : service.depositCents > 0 ? <Lock aria-hidden="true" /> : null}
           {isSubmitting
-            ? "Gerando Pix…"
+            ? PIX_GENERATING_LABEL
             : service.depositCents > 0
               ? `Gerar Pix de ${formatCurrency(service.depositCents)}`
               : "Confirmar agendamento"}

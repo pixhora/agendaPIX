@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useSyncExternalStore } from "react";
+import React, { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import type {
   PublicBusinessData,
@@ -29,6 +29,7 @@ import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { BrandMark } from "@/components/ui/brand";
 import { BookingSummary } from "./BookingSummary";
 import { GENERIC_SUBMIT_MESSAGE, OFFLINE_MESSAGE, POLICY_CHANGED_MESSAGE, businessLoadCopy, isOfflineError, publicBookingErrorView, shouldRotatePixIdempotencyKey, whatsappHref } from "./booking-error";
+import { isFailedPixCharge } from "./pix-status";
 import { PIX_CREATE_FAILED_COPY } from "./customer-copy";
 import { pixRetryPaymentRequest } from "./pix-retry";
 import { PIX_RESUME_UNKNOWN, getPixResumeServerSnapshot, migratedPixResumePayload, pixResumePayload, pixResumeStorageKey, readPixResume, readPixResumeRaw, replacePixResume, subscribePixResume, shouldClearExpiredResume, shouldResumePix, type PixResumeSession } from "./pix-resume";
@@ -80,6 +81,7 @@ export function BookingFlow({
 
   // Submissão da Reserva
   const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
+  const createInFlight = useRef(false);
   const [bookingError, setBookingError] = useState<{
     message: string;
     contactHref: string | null;
@@ -306,8 +308,10 @@ export function BookingFlow({
 
   // Cria a reserva chamando POST /api/public/[slug]/bookings
   const handleCreateBooking = async () => {
+    if (createInFlight.current) return;
     if (!selectedService || !selectedSlot) return;
 
+    createInFlight.current = true;
     setIsSubmittingBooking(true);
     setBookingError(null);
 
@@ -394,6 +398,7 @@ export function BookingFlow({
       }
 
       const booking = data as BookingResponse;
+      if (isFailedPixCharge(booking.payment)) replaceIdempotencyKey();
       setBookingResponse(booking);
 
       // Se não há sinal ou já foi confirmado diretamente:
@@ -428,6 +433,7 @@ export function BookingFlow({
       const msg = isOfflineError(err) ? OFFLINE_MESSAGE : GENERIC_SUBMIT_MESSAGE;
       setBookingError({ message: msg, contactHref: null, tone: "danger" });
     } finally {
+      createInFlight.current = false;
       setIsSubmittingBooking(false);
     }
   };
@@ -791,6 +797,8 @@ export function BookingFlow({
                   setIsCompleted(true);
                 }}
                 onRestart={handleRestart}
+                onRetryFailedCharge={() => { void handleCreateBooking(); }}
+                chargeRetrying={isSubmittingBooking}
               />
               </React.Suspense>
             )}
