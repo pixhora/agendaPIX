@@ -1,3 +1,4 @@
+import { activeBusinessCookie } from "@/lib/dashboard/active-business";
 import { localDraftEnvelope } from "@/lib/onboarding/local-draft";
 import type { OnboardingData, OnboardingStep } from "./types";
 
@@ -134,5 +135,13 @@ export function writeCommitResult(result: CommitResult) {
     sessionStorage.setItem(COMMIT_RESULT_KEY, JSON.stringify(result));
   } catch {
     // sessionStorage indisponível: a conclusão ainda pode seguir pela navegação.
+  }
+  // A loja recém-criada passa a ser a aberta no painel, mesmo que outra tenha sido a última usada.
+  if (result.businessId) {
+    try {
+      document.cookie = activeBusinessCookie(result.businessId);
+    } catch {
+      // Sem cookie, o painel abre pela ordem (mais nova primeiro).
+    }
   }
 }

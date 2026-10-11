@@ -4,6 +4,7 @@ import { useEffect, useRef, type ReactNode, type RefObject } from "react";
 import { ExternalLink, Loader2 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { MpInstallHelp } from "@/components/payments/mp-install-help";
 import { MP_CONNECT_CONSENT_TEXT, MP_CONNECT_CONSENT_VERSION } from "@/lib/mercadopago/consent";
 import { MP_AUTO_REFUND_ACK_HINT } from "@/lib/mercadopago/connect-copy";
 import { AUTO_REFUND_ACK_ERROR, gateConnectSubmit, mpConnectAction, type MpReturnTo } from "@/lib/mercadopago/contract";
@@ -108,6 +109,7 @@ export function MpConnectForm({
   ackInvalid,
   pending,
   submitLabel,
+  installHelp = false,
   onBlocked,
   buttonVariant = "pix",
   beside,
@@ -124,6 +126,8 @@ export function MpConnectForm({
   ackInvalid: boolean;
   pending?: boolean;
   submitLabel: string;
+  /** Mostra o tutorial de instalação abaixo do botão. Fica fora do formulário de consentimento. */
+  installHelp?: boolean;
   onBlocked: () => void;
   buttonVariant?: "pix" | "default" | "outline" | "link";
   beside?: ReactNode;
@@ -135,6 +139,7 @@ export function MpConnectForm({
   footer?: ReactNode;
 }) {
   const ackRef = useRef<HTMLInputElement>(null);
+  const submittedRef = useRef(false);
   useEffect(() => {
     if (!ackInvalid || !requireAck) return;
     const timer = window.setTimeout(() => revealAck(ackRef.current), 0);
@@ -157,11 +162,13 @@ export function MpConnectForm({
   ) : null;
 
   return (
+    <>
     <form
       method="post"
       action={mpConnectAction(businessId)}
       onSubmit={(event) => {
-        if (pending) {
+        // Um clique duplo antes da navegação criaria dois pedidos de conexão, com states OAuth diferentes.
+        if (pending || submittedRef.current) {
           event.preventDefault();
           return;
         }
@@ -169,7 +176,9 @@ export function MpConnectForm({
           event.preventDefault();
           onBlocked();
           revealAck(ackRef.current);
+          return;
         }
+        submittedRef.current = true;
       }}
       className={pinActions ? "flex min-h-0 flex-1 flex-col md:block" : undefined}
     >
@@ -213,5 +222,7 @@ export function MpConnectForm({
         {footer}
       </div>
     </form>
+    {installHelp ? <MpInstallHelp /> : null}
+    </>
   );
 }

@@ -389,9 +389,7 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
     setDepositBlocked(false);
     setSelectedService(null);
     setSelectedSlot(null);
-    setCustomerName("");
-    setCustomerPhone("");
-    setCustomerCpf("");
+    // Os dados da cliente ficam: ela não precisa digitar tudo de novo para outro horário.
     setBookingResponse(null);
     setIsCompleted(false);
     setStep(1);
