@@ -566,7 +566,7 @@ test("gerar novo link confirma, substitui o antigo e explica o erro", async ({ p
 test("link substituído pede o novo para a loja e o cancelado comum não muda", async ({ page }, testInfo) => {
   test.setTimeout(180_000);
   await page.goto(`/dashboard/settings?businessId=${meta.businessAId}`);
-  await page.getByLabel("WhatsApp do negócio").fill("+5511988887777");
+  await page.getByRole("textbox", { name: "WhatsApp do negócio" }).fill("+5511988887777");
   await page.getByRole("button", { name: "Salvar WhatsApp" }).click();
   await expect(page.getByText("WhatsApp salvo.")).toBeVisible();
   const listed = await page.request.get(`/api/public/${meta.businessASlug}/services`);
@@ -619,7 +619,7 @@ test("link substituído pede o novo para a loja e o cancelado comum não muda", 
   } finally {
     await page.unroute(`**/api/public/${meta.businessASlug}/slot-links/**`).catch(() => undefined);
     await page.goto(`/dashboard/settings?businessId=${meta.businessAId}`);
-    await page.getByLabel("WhatsApp do negócio").fill("");
+    await page.getByRole("textbox", { name: "WhatsApp do negócio" }).fill("");
     await page.getByRole("button", { name: "Salvar WhatsApp" }).click();
     await expect(page.getByText("WhatsApp salvo.")).toBeVisible();
   }
