@@ -556,10 +556,23 @@ describe("OAuth Mercado Pago por negócio", () => {
       store,
     });
     expect(foreign).toEqual({ kind: "json", status: 403, body: { error: { code: "forbidden_origin" } } });
-    const referer = await submitMercadoPagoConnect({
+    const refererOnly = await submitMercadoPagoConnect({
       request: new Request("https://app.example.com/api/businesses/x/mercadopago/connect", {
         method: "POST",
         headers: { referer: "https://app.example.com/dashboard/settings", "content-type": "application/json" },
+        body: JSON.stringify({ returnTo: "https://evil.example", autoRefundAck: true, consentVersion: MP_CONNECT_CONSENT_VERSION }),
+      }),
+      businessId,
+      ownerId: "owner",
+      now,
+      env,
+      store,
+    });
+    expect(refererOnly).toEqual({ kind: "json", status: 403, body: { error: { code: "forbidden_origin" } } });
+    const referer = await submitMercadoPagoConnect({
+      request: new Request("https://app.example.com/api/businesses/x/mercadopago/connect", {
+        method: "POST",
+        headers: { origin: "https://app.example.com", referer: "https://app.example.com/dashboard/settings", "content-type": "application/json" },
         body: JSON.stringify({ returnTo: "https://evil.example", autoRefundAck: true, consentVersion: MP_CONNECT_CONSENT_VERSION }),
       }),
       businessId,

@@ -6,6 +6,7 @@ import { normalizeClientAddress } from "../bookings/rate-limit";
 import { findOwnedBusiness } from "../tenancy";
 import { authEnvSchema } from "../env";
 import { HttpError, readBody } from "../http";
+import { isAllowedAppOrigin } from "../origins";
 import { syncAccountProfile } from "./account-profile";
 import { mpOAuthConfig, type MpOAuthConfig } from "./config";
 import { encryptMpToken } from "./crypto";
@@ -148,15 +149,6 @@ export function requestClientIp(request: Request) {
   return normalizeClientAddress(forwarded.split(",").at(-1)?.trim());
 }
 
-function sameOrigin(request: Request, appOrigin: string) {
-  const origin = request.headers.get("origin");
-  if (origin !== null) return origin === appOrigin;
-  const referer = request.headers.get("referer");
-  if (!referer) return false;
-  try { return new URL(referer).origin === appOrigin; }
-  catch { return false; }
-}
-
 function wantsJson(request: Request) {
   return (request.headers.get("accept") ?? "").toLowerCase().includes("application/json");
 }
@@ -194,7 +186,7 @@ export async function submitMercadoPagoConnect(input: {
 }): Promise<MpConnectSubmit> {
   const config = mpOAuthConfig(input.env);
   const now = input.now ?? new Date();
-  if (!sameOrigin(input.request, config.origin)) {
+  if (!isAllowedAppOrigin(input.request, input.env)) {
     return { kind: "json", status: 403, body: { error: { code: "forbidden_origin" } } };
   }
   const fields = await readConnectFields(input.request);
@@ -261,7 +253,7 @@ export async function acceptMercadoPagoConsent(input: {
   const auth = authEnvSchema.safeParse(input.env ?? process.env);
   if (!auth.success) throw new HttpError(503, "mp_oauth_unconfigured", "A conexão com o Mercado Pago ainda não está configurada.");
   const now = input.now ?? new Date();
-  if (!sameOrigin(input.request, new URL(auth.data.BETTER_AUTH_URL).origin)) {
+  if (!isAllowedAppOrigin(input.request, input.env)) {
     return { kind: "error", status: 403, body: { error: { code: "forbidden_origin", message: "Essa origem não pode registrar o aceite." } } };
   }
   const fields = await readConnectFields(input.request);

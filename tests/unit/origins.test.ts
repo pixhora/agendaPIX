@@ -21,7 +21,7 @@ it("allows credentialed preflight for exact localhost:3000", async () => {
   expect(response.headers.get("vary")).toContain("Origin");
 });
 
-it.each(["http://untrusted.example", "http://localhost:3000.evil.example", "http://127.0.0.1:3000", "null", "http://localhost:3000/path", "http://localhost:3001", "http://localhost:3005", "http://localhost:3343"])("rejects origin %s before running the handler", async (origin) => {
+it.each(["http://untrusted.example", "http://localhost:3000.evil.example", "http://127.0.0.1:3000", "null", "http://localhost:3000/path", "http://localhost:3000/", "http://LOCALHOST:3000", "http://localhost:3001", "http://localhost:3005", "http://localhost:3343"])("rejects origin %s before running the handler", async (origin) => {
   const run = vi.fn();
   const response = await withAppCors(new Request("http://localhost:3000/api/auth", { headers: { origin } }), run);
   expect(response.status).toBe(403);
@@ -52,10 +52,10 @@ it.each([
   expect((await appPreflight(request, ["GET", "PUT", "DELETE"])).status).toBe(403);
 });
 
-it("uses only the canonical app origin in production and rejects other origins before writes", async () => {
+it("uses the canonical app origin and its www pair in production and rejects other origins before writes", async () => {
   vi.stubEnv("NODE_ENV", "production");
   vi.stubEnv("BETTER_AUTH_URL", "https://agenda.example/auth");
-  expect(trustedAppOrigins()).toEqual(["https://agenda.example"]);
+  expect(trustedAppOrigins()).toEqual(["https://agenda.example", "https://www.agenda.example"]);
   const run = vi.fn(async () => Response.json({ ok: true }));
   for (const origin of ["http://localhost:3000", "http://localhost:3001", "http://localhost:3005", "http://localhost:3343", "https://other.example", "https://agenda.example.evil.example"]) {
     const response = await withAppCors(new Request("https://agenda.example/api/onboarding", { method: "POST", headers: { origin } }), run);
