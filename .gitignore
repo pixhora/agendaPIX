@@ -10,6 +10,9 @@ next-env.d.ts
 # Configuração privada (somente o exemplo é versionado)
 .env*
 !.env.example
+# URL pontual do pnpm db:migrate. O exemplo pode ser versionado; o arquivo real, não.
+.env.migrate
+!.env.migrate.example
 
 # Segredos e chaves
 *.pem

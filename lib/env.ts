@@ -16,8 +16,10 @@ export const authEnvSchema = z.object({
 });
 
 /**
- * Segredos separados do de sessão. Vazios caem no `BETTER_AUTH_SECRET` para não invalidar
- * links e baldes já emitidos. Rotacionar um não mexe no outro.
+ * Segredos separados do de sessão. Fora de produção, vazio cai no `BETTER_AUTH_SECRET`
+ * para não invalidar links e baldes já emitidos. Em produção o de acesso é obrigatório
+ * e não acompanha o de sessão. Rotacionar um não mexe no outro.
+ * `BOOKING_ACCESS_SECRET_PREVIOUS` só entra na verificação, nunca na assinatura nova.
  */
 export const bookingSecretsSchema = z.object({
   BETTER_AUTH_SECRET: secretValue,
@@ -25,9 +27,87 @@ export const bookingSecretsSchema = z.object({
   RATE_LIMIT_SECRET: optionalSecret,
 });
 
+const bookingAccessSecretProductionMessage = {
+  empty: "BOOKING_ACCESS_SECRET é obrigatório em produção e no preview.",
+  short: "BOOKING_ACCESS_SECRET precisa ter pelo menos 32 caracteres.",
+  same: "BOOKING_ACCESS_SECRET não pode ser igual a BETTER_AUTH_SECRET.",
+  placeholder: "BOOKING_ACCESS_SECRET ainda é o valor de exemplo. Troque o segredo.",
+} as const;
+
+function normalizedSecret(raw: string | undefined): string | undefined {
+  if (raw === undefined) return undefined;
+  const value = raw.trim();
+  return value.length === 0 ? undefined : value;
+}
+
+/** Boot (`NODE_ENV=production`, fora do `next build`) ou build da Vercel de produção e de preview. */
+export function requiresDedicatedBookingAccessSecret(env: Readonly<Record<string, string | undefined>> = process.env) {
+  if (env.VERCEL_ENV === "production" || env.VERCEL_ENV === "preview") return true;
+  return env.NODE_ENV === "production" && env.NEXT_PHASE !== "phase-production-build";
+}
+
+/**
+ * Segredo atual dos links de reserva. Em produção e no preview da Vercel não cai em
+ * `BETTER_AUTH_SECRET`: vazio, curto, prefixo de exemplo ou igual ao segredo de sessão
+ * devolve null. Fora disso, vazio ainda cai.
+ */
 export function bookingAccessSecret(env: Readonly<Record<string, string | undefined>> = process.env) {
+  if (requiresDedicatedBookingAccessSecret(env)) {
+    const value = normalizedSecret(env.BOOKING_ACCESS_SECRET);
+    const auth = normalizedSecret(env.BETTER_AUTH_SECRET);
+    if (!value || value.length < 32 || value.startsWith("replace-this-")) return null;
+    if (auth && value === auth) return null;
+    return value;
+  }
   const parsed = bookingSecretsSchema.safeParse(env);
   return parsed.success ? parsed.data.BOOKING_ACCESS_SECRET ?? parsed.data.BETTER_AUTH_SECRET : null;
+}
+
+/**
+ * Segredo anterior, só para achar o HMAC de um Pix de link de horário já começado.
+ * Vazio ou com menos de 32 caracteres conta como ausente.
+ * Não herda `BETTER_AUTH_SECRET`: quem rotaciona grava o valor antigo aqui.
+ * Pode ser igual a `BETTER_AUTH_SECRET`. Essa igualdade não derruba o boot.
+ * Igual ao segredo atual também não derruba: o boot só avisa, sem o valor.
+ */
+export function bookingAccessSecretPrevious(env: Readonly<Record<string, string | undefined>> = process.env) {
+  const value = normalizedSecret(env.BOOKING_ACCESS_SECRET_PREVIOUS);
+  if (!value || value.length < 32) return null;
+  return value;
+}
+
+/** Boot e `next build` de produção e de preview. A mensagem cita o nome e o motivo, nunca o valor. Não olha `BOOKING_ACCESS_SECRET_PREVIOUS`. */
+export function assertBookingAccessSecret(env: Readonly<Record<string, string | undefined>> = process.env) {
+  const value = normalizedSecret(env.BOOKING_ACCESS_SECRET);
+  if (!value) throw new Error(bookingAccessSecretProductionMessage.empty);
+  if (value.startsWith("replace-this-")) throw new Error(bookingAccessSecretProductionMessage.placeholder);
+  if (value.length < 32) throw new Error(bookingAccessSecretProductionMessage.short);
+  const auth = normalizedSecret(env.BETTER_AUTH_SECRET);
+  if (auth && value === auth) throw new Error(bookingAccessSecretProductionMessage.same);
+}
+
+let warnedBookingAccessSecretPrevious = false;
+
+/** Um aviso por processo, sem o valor, enquanto a rotação ainda aceita o segredo anterior. */
+export function warnBookingAccessSecretPrevious(env: Readonly<Record<string, string | undefined>> = process.env) {
+  if (warnedBookingAccessSecretPrevious) return;
+  const raw = normalizedSecret(env.BOOKING_ACCESS_SECRET_PREVIOUS);
+  if (!raw) return;
+  warnedBookingAccessSecretPrevious = true;
+  if (raw.length < 32) {
+    console.warn("BOOKING_ACCESS_SECRET_PREVIOUS precisa ter pelo menos 32 caracteres.");
+    return;
+  }
+  console.warn("BOOKING_ACCESS_SECRET_PREVIOUS está definido. Ele só vale para Pix de link de horário já começado antes da rotação. Remova depois que esses pagamentos passarem.");
+  const current = normalizedSecret(env.BOOKING_ACCESS_SECRET);
+  if (current && raw === current) {
+    console.warn("BOOKING_ACCESS_SECRET_PREVIOUS é igual a BOOKING_ACCESS_SECRET.");
+  }
+}
+
+/** Só para teste. O processo real avisa uma vez. */
+export function resetBookingAccessSecretPreviousWarning() {
+  warnedBookingAccessSecretPrevious = false;
 }
 
 export function rateLimitSecret(env: Readonly<Record<string, string | undefined>> = process.env) {
@@ -97,14 +177,20 @@ const vercelProductionPkceMessage = "MP_OAUTH_PKCE deve ser on quando VERCEL_ENV
 /**
  * O `register()` do instrumentation só roda quando a instância sobe. Na Vercel isso é
  * depois do deploy, e um throw vira 500 em toda rota, inclusive `/api/health`.
- * `next.config.ts` chama isto ao carregar: o `next build` de produção falha e a Vercel
- * recusa o deploy. Preview (`VERCEL_ENV=preview`) e dev não entram.
+ * `next.config.ts` chama isto ao carregar. `VERCEL_ENV=production` exige `MP_OAUTH_PKCE=on`,
+ * `bookingConfig` e `BOOKING_ACCESS_SECRET`. `VERCEL_ENV=preview` exige o mesmo
+ * `BOOKING_ACCESS_SECRET`, para o preview não cair em `BETTER_AUTH_SECRET`.
+ * PKCE e `bookingConfig` continuam só no build de produção. Dev não entra.
  * ` on ` vale `on`. A mensagem não repete o valor.
  */
 export function assertVercelProductionBuild(env: Readonly<Record<string, string | undefined>> = process.env) {
-  if (env.VERCEL_ENV !== "production") return;
-  if (readMpOAuthPkce(env.MP_OAUTH_PKCE) !== "on") throw new Error(vercelProductionPkceMessage);
-  bookingConfig(env);
+  const vercelEnv = env.VERCEL_ENV;
+  if (vercelEnv !== "production" && vercelEnv !== "preview") return;
+  if (vercelEnv === "production") {
+    if (readMpOAuthPkce(env.MP_OAUTH_PKCE) !== "on") throw new Error(vercelProductionPkceMessage);
+    bookingConfig(env);
+  }
+  assertBookingAccessSecret(env);
 }
 
 /**
@@ -131,6 +217,8 @@ export function assertProductionSafeEnv(env: Readonly<Record<string, string | un
     throw new Error(productionPkceMessage);
   }
   bookingConfig(env);
+  assertBookingAccessSecret(env);
+  warnBookingAccessSecretPrevious(env);
 }
 
 const staticRedirectUri = z.url().refine((value) => {
