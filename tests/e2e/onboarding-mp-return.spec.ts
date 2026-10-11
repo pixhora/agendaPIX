@@ -57,3 +57,18 @@ test("o error boundary do retorno do Mercado Pago oferece tentar de novo", async
   }));
   expect(draft).toEqual({ draft: null, step: null, id: null, callback: null });
 });
+
+test("o error boundary do cadastro mantém o rascunho e oferece tentar de novo", async ({ page }) => {
+  await page.goto("/onboarding/confirmar?erro=cadastro");
+  await expect(page.getByRole("heading", { name: "Algo deu errado no cadastro" })).toBeVisible();
+  await expect(page.getByText("Seu cadastro está salvo. Toque em \"Tentar de novo\" para continuar.")).toBeVisible();
+  await expect(page.getByRole("main")).not.toContainText("onboarding_generic_probe");
+  await expect(page.getByRole("link", { name: "Suporte no WhatsApp" })).toHaveAttribute("href", "https://wa.me/5514997504655");
+  await page.evaluate(() => {
+    localStorage.setItem("agenda_onboarding_draft", JSON.stringify({ businessName: "Rascunho antigo" }));
+  });
+  await page.getByRole("button", { name: "Tentar de novo" }).click();
+  await expect(page.getByRole("heading", { name: "Algo deu errado no cadastro" })).toBeVisible();
+  const draft = await page.evaluate(() => localStorage.getItem("agenda_onboarding_draft"));
+  expect(draft).toContain("Rascunho antigo");
+});

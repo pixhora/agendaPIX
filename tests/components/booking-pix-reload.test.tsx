@@ -86,6 +86,7 @@ it("mantém a reserva quando o Pix não carrega e tenta de novo", async () => {
   );
 
   expect(await screen.findByRole("heading", { name: "Não conseguimos carregar seu Pix" })).toBeVisible();
+  expect(screen.getByText("Sua reserva continua guardada. Verifique sua internet e tente de novo.")).toBeVisible();
   expect(screen.queryByRole("radiogroup", { name: /Serviços/ })).toBeNull();
   expect(sessionStorage.getItem(storageKey)).toContain(bookingId);
   expect(window.location.search).toContain(`bookingId=${bookingId}`);

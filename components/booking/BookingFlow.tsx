@@ -525,6 +525,7 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
         <main id="content" className="mx-auto w-full max-w-xl px-4 py-8">
           <section role="alert" className="rounded-frame bg-surface px-6 py-8 text-center shadow-[var(--shadow-card)]">
             <h1 className="mx-auto max-w-[28ch] font-display text-xl font-extrabold tracking-tight text-ink sm:text-2xl">Não conseguimos carregar seu Pix</h1>
+            <p className="mx-auto mt-3 max-w-[36ch] text-sm leading-relaxed text-muted">Sua reserva continua guardada. Verifique sua internet e tente de novo.</p>
             <Button
               type="button"
               variant="pixDeep"

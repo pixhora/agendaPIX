@@ -36,7 +36,8 @@ test.describe("retorno do Mercado Pago sem sessão", () => {
 
   test("pede o e-mail para continuar, mesmo com id na URL", async ({ page }) => {
     await page.goto(`/onboarding/recebimento?businessId=${meta.businessAId}&slug=${meta.businessASlug}`);
-    await expect(page.getByRole("heading", { name: "Seu cadastro está salvo. Entre com seu e-mail para continuar de onde parou." })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Seu cadastro está salvo." })).toBeVisible();
+    await expect(page.getByText("Entre com seu e-mail para continuar de onde parou.")).toBeVisible();
     await expect(page.getByRole("link", { name: "Entrar" })).toHaveAttribute("href", "/login?next=%2Fonboarding%2Frecebimento");
     await expect(page.getByRole("heading", { name: /Conecte sua conta Mercado Pago/ })).toHaveCount(0);
     expect(page.url()).not.toContain(meta.businessAId);
