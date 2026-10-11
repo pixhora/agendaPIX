@@ -192,6 +192,19 @@ describe("generateMetadata da prévia", () => {
     expect(findToken).not.toHaveBeenCalled();
   });
 
+  it("token inválido e slugs aleatórios não consultam businesses", async () => {
+    const { options, findToken, storeCard } = ports();
+    const now = 1_700_000_000_000;
+    const names = [slug, ...Array.from({ length: 12 }, (_, index) => `loja-${index}`)];
+    for (const name of names) {
+      const meta = await slotLinkShareMeta(name, "token-invalido", now, options("peer:malformed"));
+      expect(meta.title).toBe("AgendaPix · Agende pelo AgendaPix");
+      expect(meta.image).toBeNull();
+    }
+    expect(storeCard).not.toHaveBeenCalled();
+    expect(findToken).not.toHaveBeenCalled();
+  });
+
   it("slugs aleatórios não repetem o SELECT e o mesmo slug consulta uma vez na janela", async () => {
     const { options } = ports();
     const now = 1_700_000_000_000;

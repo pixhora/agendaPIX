@@ -106,7 +106,7 @@ export async function slotLinkShareMeta(slug: string, token: string, now = Date.
   const loadStoreCard = options.storeCard ?? ((storeSlug: string) => defaultStoreCard(database, storeSlug));
   const fallback = async () => genericMeta(await rememberedStoreCard(slug, now, loadStoreCard));
 
-  if (!tokenOk) return fallback();
+  if (!tokenOk) return fixedOgFallback();
   const tokenHash = slotLinkTokenHash(token);
   const cacheKey = shareMetaCacheKey(slug, tokenHash);
 
