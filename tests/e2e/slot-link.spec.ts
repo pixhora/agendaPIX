@@ -568,7 +568,7 @@ test("link substituído pede o novo para a loja e o cancelado comum não muda", 
   await page.goto(`/dashboard/settings?businessId=${meta.businessAId}`);
   await page.getByRole("textbox", { name: "WhatsApp do negócio" }).fill("+5511988887777");
   await page.getByRole("button", { name: "Salvar WhatsApp" }).click();
-  await expect(page.getByText("WhatsApp salvo.")).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: "WhatsApp salvo." })).toBeVisible();
   const listed = await page.request.get(`/api/public/${meta.businessASlug}/services`);
   const store = await listed.json() as { name: string; contactWhatsapp: string | null };
   expect(store.contactWhatsapp).toBe("+5511988887777");
@@ -621,6 +621,6 @@ test("link substituído pede o novo para a loja e o cancelado comum não muda", 
     await page.goto(`/dashboard/settings?businessId=${meta.businessAId}`);
     await page.getByRole("textbox", { name: "WhatsApp do negócio" }).fill("");
     await page.getByRole("button", { name: "Salvar WhatsApp" }).click();
-    await expect(page.getByText("WhatsApp salvo.")).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: "WhatsApp salvo." })).toBeVisible();
   }
 });
