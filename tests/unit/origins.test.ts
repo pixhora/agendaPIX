@@ -21,20 +21,12 @@ it("allows credentialed preflight for exact localhost:3000", async () => {
   expect(response.headers.get("vary")).toContain("Origin");
 });
 
-it.each(["http://untrusted.example", "http://localhost:3000.evil.example", "http://127.0.0.1:3000", "null", "http://localhost:3001", "http://localhost:3005", "http://localhost:3343"])("rejects origin %s before running the handler", async (origin) => {
+it.each(["http://untrusted.example", "http://localhost:3000.evil.example", "http://127.0.0.1:3000", "null", "http://localhost:3000/path", "http://localhost:3000/", "http://LOCALHOST:3000", "http://localhost:3001", "http://localhost:3005", "http://localhost:3343"])("rejects origin %s before running the handler", async (origin) => {
   const run = vi.fn();
   const response = await withAppCors(new Request("http://localhost:3000/api/auth", { headers: { origin } }), run);
   expect(response.status).toBe(403);
   expect(response.headers.has("access-control-allow-origin")).toBe(false);
   expect(run).not.toHaveBeenCalled();
-});
-
-it("normalizes a path on the trusted origin before the exact comparison", async () => {
-  const run = vi.fn(async () => Response.json({ ok: true }));
-  const response = await withAppCors(new Request("http://localhost:3000/api/auth", { headers: { origin: "http://localhost:3000/path" } }), run);
-  expect(response.status).toBe(200);
-  expect(response.headers.get("access-control-allow-origin")).toBe("http://localhost:3000");
-  expect(run).toHaveBeenCalledOnce();
 });
 
 it("keeps cookies/status and CORS on error responses; accepts server-side GET without Origin", async () => {

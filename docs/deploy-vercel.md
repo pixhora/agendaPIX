@@ -60,7 +60,7 @@ O lembrete da véspera da devolução manual não espera 09:00. Sai na primeira 
 
 ## Origens aceitas no navegador
 
-A lista efetiva é a origem de `BETTER_AUTH_URL`, o par automático www/apex (`https://www.agendapix.dev.br` e `https://agendapix.dev.br`) e cada item de `APP_ALLOWED_ORIGINS`. Cada item vira `new URL(item).origin`. A comparação com o header `Origin` é a string exata dessa origem. `Origin` ausente, vazio ou `null` responde 403. `Referer` não substitui `Origin`.
+A lista efetiva é a origem de `BETTER_AUTH_URL`, o par automático www/apex (`https://www.agendapix.dev.br` e `https://agendapix.dev.br`) e cada item de `APP_ALLOWED_ORIGINS`. Cada item da lista vira `new URL(item).origin`. O header `Origin` recebido não é reparseado: a comparação é a string crua, então path, barra final ou maiúscula não batem. `Origin` ausente, vazio ou `null` responde 403. `Referer` não substitui `Origin`. Recusa com `Origin` presente gera no máximo um `console.warn` por origem distinta a cada 60s, com `origin_received` (200 caracteres), `allowed_origins` e a contagem suprimida. `Origin` ausente não entra no log.
 
 Em Production (`VERCEL_ENV=production`), `*.vercel.app` não entra: qualquer item cujo host termina em `.vercel.app`, e qualquer item que não seja https, derruba o boot e o `next build`. A mensagem cita qual item (a origem normalizada, sem usuário nem senha). Item que nem é URL é ignorado, com aviso no boot e sem imprimir o valor. Preview pode usar o host da Vercel; Production, não.
 

@@ -3,6 +3,7 @@ import { assertProductionSafeEnv, assertVercelProductionBuild } from "../../lib/
 import { MP_CONNECT_CONSENT_VERSION } from "../../lib/mercadopago/consent";
 import { createMemoryMpStore } from "../../lib/mercadopago-oauth/memory-store";
 import { submitMercadoPagoConnect } from "../../lib/mercadopago-oauth/flow";
+import { logRejectedAppOrigin, resetRejectedOriginLog } from "../../lib/app-origins";
 import { requireAppOrigin, trustedAppOrigins } from "../../lib/origins";
 
 const businessId = "11111111-1111-4111-8111-111111111111";
@@ -149,17 +150,88 @@ describe("allowlist de origem do app", () => {
       cookie,
       authorization: "Bearer super-secret-token",
     })).toEqual(forbidden);
-    const payload = warn.mock.calls.map((call) => call[0]).find((value) => {
-      return typeof value === "object" && value !== null && "origin_received" in value;
-    }) as { origin_received: string; allowed_origins: string[]; event: string };
+    const payload = originLogs(warn)[0];
     expect(payload.event).toBe("forbidden_origin");
     expect(payload.origin_received).toHaveLength(200);
     expect(payload.origin_received).toBe(raw.slice(0, 200));
     expect(payload.origin_received).not.toContain(marker);
     expect(payload.allowed_origins).toEqual([canonical, apex]);
+    expect(payload.suppressed).toBe(0);
     const serialized = JSON.stringify(warn.mock.calls);
     expect(serialized).not.toContain(cookie);
     expect(serialized).not.toContain("super-secret-token");
     expect(serialized).not.toContain(marker);
   });
+
+  it("não loga Origin ausente e amostra 1 warn por origem a cada 60s", async () => {
+    resetRejectedOriginLog();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-11T12:00:00.000Z"));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      expect(await connect({})).toEqual(forbidden);
+      expect(originLogs(warn)).toEqual([]);
+
+      expect(await connect({ origin: "https://evil.example" })).toEqual(forbidden);
+      expect(await connect({ origin: "https://evil.example" })).toEqual(forbidden);
+      expect(await connect({ origin: "https://evil.example" })).toEqual(forbidden);
+      vi.setSystemTime(new Date("2026-10-11T12:00:59.000Z"));
+      expect(await connect({ origin: "https://evil.example" })).toEqual(forbidden);
+      expect(originLogs(warn)).toEqual([{
+        event: "forbidden_origin",
+        origin_received: "https://evil.example",
+        allowed_origins: [canonical, apex],
+        suppressed: 0,
+      }]);
+
+      vi.setSystemTime(new Date("2026-10-11T12:01:00.000Z"));
+      expect(await connect({ origin: "https://evil.example" })).toEqual(forbidden);
+      expect(originLogs(warn)[1]).toEqual({
+        event: "forbidden_origin",
+        origin_received: "https://evil.example",
+        allowed_origins: [canonical, apex],
+        suppressed: 3,
+      });
+
+      expect(await connect({ origin: "https://outro.example" })).toEqual(forbidden);
+      expect(originLogs(warn)[2]).toMatchObject({
+        origin_received: "https://outro.example",
+        allowed_origins: [canonical, apex],
+        suppressed: 0,
+      });
+    } finally {
+      vi.useRealTimers();
+      resetRejectedOriginLog();
+    }
+  });
+
+  it("guarda no máximo 100 origens e ainda avisa uma origem nova", () => {
+    resetRejectedOriginLog();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const allowed = ["https://www.agendapix.dev.br"];
+    try {
+      for (let index = 0; index < 100; index += 1) logRejectedAppOrigin(`https://evil-${index}.example`, allowed, 0);
+      expect(originLogs(warn)).toHaveLength(100);
+      logRejectedAppOrigin("https://evil-0.example", allowed, 1_000);
+      expect(originLogs(warn)).toHaveLength(100);
+      logRejectedAppOrigin("https://nova.example", allowed, 1_000);
+      expect(originLogs(warn)).toHaveLength(101);
+      expect(originLogs(warn).at(-1)).toMatchObject({
+        origin_received: "https://nova.example",
+        allowed_origins: allowed,
+        suppressed: 0,
+      });
+    } finally {
+      resetRejectedOriginLog();
+    }
+  });
 });
+
+function originLogs(warn: { mock: { calls: unknown[][] } }) {
+  return warn.mock.calls.map((call) => call[0]).filter((value): value is {
+    event: string;
+    origin_received: string;
+    allowed_origins: string[];
+    suppressed: number;
+  } => typeof value === "object" && value !== null && "origin_received" in value);
+}

@@ -22,33 +22,21 @@ export function trustedAppOrigins(env: Readonly<Record<string, string | undefine
   return allowed;
 }
 
-/** Origin ausente, vazio, `null` ou fora da allowlist. Não consulta Referer. */
+/** Header cru, comparado à allowlist já normalizada. Ausente, vazio, `null` ou diferente: recusa. Não consulta Referer. */
 export function isAllowedAppOrigin(request: Request, env: Readonly<Record<string, string | undefined>> = process.env) {
   const allowed = trustedAppOrigins(env);
   const raw = request.headers.get("origin");
-  if (raw === null || raw.length === 0 || raw === "null") {
-    logRejectedAppOrigin(raw ?? "", allowed);
-    return false;
-  }
-  let normalized: string;
-  try {
-    normalized = new URL(raw).origin;
-  } catch {
-    logRejectedAppOrigin(raw, allowed);
-    return false;
-  }
-  if (!originEqualsAllowed(normalized, allowed)) {
-    logRejectedAppOrigin(raw, allowed);
-    return false;
-  }
-  return true;
+  if (raw === null) return false;
+  if (originEqualsAllowed(raw, allowed)) return true;
+  logRejectedAppOrigin(raw, allowed);
+  return false;
 }
 
 export function requireAppOrigin(request: Request) {
   if (!isAllowedAppOrigin(request)) {
     throw new HttpError(403, "origin_not_allowed", "Origem da solicitação não permitida.");
   }
-  return new URL(request.headers.get("origin") ?? "").origin;
+  return request.headers.get("origin") ?? "";
 }
 
 export async function withAppCors(request: Request, run: () => Promise<Response>) {

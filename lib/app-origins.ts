@@ -96,10 +96,43 @@ export function originEqualsAllowed(origin: string, allowed: readonly string[]):
   return false;
 }
 
-export function logRejectedAppOrigin(originReceived: string, allowedOrigins: readonly string[]) {
+const REJECTED_ORIGIN_WINDOW_MS = 60_000;
+const REJECTED_ORIGIN_MAP_LIMIT = 100;
+
+type RejectedOriginSample = { loggedAt: number; suppressed: number };
+
+const rejectedOriginSamples = new Map<string, RejectedOriginSample>();
+
+/** Só para teste. O processo real guarda a amostra até o limite do mapa. */
+export function resetRejectedOriginLog() {
+  rejectedOriginSamples.clear();
+}
+
+/**
+ * No máximo um warn por origem distinta a cada 60s. A chave é o Origin truncado.
+ * `suppressed` conta as recusas da mesma origem que não viraram log desde o aviso anterior.
+ */
+export function logRejectedAppOrigin(originReceived: string, allowedOrigins: readonly string[], now = Date.now()) {
+  const key = originReceived.slice(0, ORIGIN_RECEIVED_LOG_LIMIT);
+  const current = rejectedOriginSamples.get(key);
+  if (current && now - current.loggedAt < REJECTED_ORIGIN_WINDOW_MS) {
+    current.suppressed += 1;
+    rejectedOriginSamples.delete(key);
+    rejectedOriginSamples.set(key, current);
+    return;
+  }
+  const suppressed = current?.suppressed ?? 0;
+  if (current) rejectedOriginSamples.delete(key);
+  while (rejectedOriginSamples.size >= REJECTED_ORIGIN_MAP_LIMIT) {
+    const oldest = rejectedOriginSamples.keys().next().value;
+    if (oldest === undefined) break;
+    rejectedOriginSamples.delete(oldest);
+  }
+  rejectedOriginSamples.set(key, { loggedAt: now, suppressed: 0 });
   console.warn({
     event: "forbidden_origin",
-    origin_received: originReceived.slice(0, ORIGIN_RECEIVED_LOG_LIMIT),
+    origin_received: key,
     allowed_origins: [...allowedOrigins],
+    suppressed,
   });
 }
