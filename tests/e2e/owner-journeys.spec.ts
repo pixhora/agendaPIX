@@ -83,7 +83,8 @@ test("cadastro concluído → \"Ir para o painel\" abre /dashboard com o negóci
   await page.getByLabel("Seu link").fill(slug);
   await expect(page.getByText("Disponível", { exact: true })).toBeVisible();
   await page.getByLabel("Nome do serviço").fill("Corte novo");
-  await page.getByLabel("Duração").selectOption("45");
+  await page.getByLabel("Duração").click();
+  await page.getByRole("option", { name: "45 min" }).click();
   const price = page.getByLabel("Preço");
   await price.click();
   await price.pressSequentially("5000");

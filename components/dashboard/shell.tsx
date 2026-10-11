@@ -4,6 +4,7 @@ import { Icon } from "@/components/ui/icon";
 import { ACTION_ICONS } from "@/lib/icons/registry";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { BusinessSwitcher } from "./business-switcher";
 import { RememberBusiness } from "./remember-business";
 
 export function DashboardShell({ title, description, path, businesses, businessId, actions, notice, children }: {
@@ -24,14 +25,7 @@ export function DashboardShell({ title, description, path, businesses, businessI
         <p className="mt-1.5 max-w-[65ch] text-sm leading-relaxed text-muted sm:text-base">{description}</p>
       </div>
       {(actions || businesses.length > 1) && <div className="flex w-full flex-wrap items-end gap-2 sm:w-auto">
-        {businesses.length > 1 && <form action={path} className="flex min-w-0 flex-1 items-end gap-2 sm:flex-none">
-          <label className="grid min-w-0 flex-1 gap-1.5 text-xs font-semibold text-muted" htmlFor="business">Negócio
-            <select key={businessId} id="business" name="businessId" defaultValue={businessId} className="min-h-11 w-full min-w-0 rounded-field border border-line-strong/60 bg-surface px-3 text-base font-medium text-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring sm:min-w-48">
-              {businesses.map((business) => <option value={business.id} key={business.id}>{business.name}</option>)}
-            </select>
-          </label>
-          <button className={buttonVariants({ variant: "outline" })} type="submit">Abrir</button>
-        </form>}
+        {businesses.length > 1 && <BusinessSwitcher path={path} businesses={businesses} businessId={businessId} />}
         {actions}
       </div>}
     </header>
