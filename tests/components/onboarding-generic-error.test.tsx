@@ -24,10 +24,10 @@ describe("error boundary geral do cadastro", () => {
       { digest: "digest-ok" },
     );
     const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    const retry = vi.fn();
+    const reset = vi.fn();
     localStorage.setItem(DRAFT_KEY, JSON.stringify({ businessName: "Rascunho antigo" }));
 
-    render(<OnboardingError error={error} retry={retry} />);
+    render(<OnboardingError error={error} reset={reset} />);
 
     expect(screen.getByRole("heading", { name: "Algo deu errado no cadastro" })).toBeInTheDocument();
     expect(screen.getByText('Seu cadastro está salvo. Toque em "Tentar de novo" para continuar.')).toBeInTheDocument();
@@ -54,7 +54,7 @@ describe("error boundary geral do cadastro", () => {
     expect(expected).toContain("state=[omitido]");
 
     await userEvent.click(screen.getByRole("button", { name: "Tentar de novo" }));
-    expect(retry).toHaveBeenCalledTimes(1);
+    expect(reset).toHaveBeenCalledTimes(1);
     expect(localStorage.getItem(DRAFT_KEY)).toContain("Rascunho antigo");
   });
 });

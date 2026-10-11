@@ -6,10 +6,10 @@ import { onboardingBoundaryLog } from "@/lib/onboarding/mp-return-error";
 
 export default function OnboardingError({
   error,
-  retry,
+  reset,
 }: {
   error: Error & { digest?: string };
-  retry: () => void;
+  reset: () => void;
 }) {
   useEffect(() => {
     console.error(onboardingBoundaryLog(error));
@@ -20,7 +20,7 @@ export default function OnboardingError({
       <section className="w-full max-w-[480px] rounded-frame border border-line bg-surface p-6 shadow-[var(--shadow-card)] sm:p-8">
         <h1 className="font-display text-[28px] font-extrabold leading-[1.12] tracking-tight">Algo deu errado no cadastro</h1>
         <p className="mt-3 max-w-[36ch] text-[15px] leading-relaxed text-ink">Seu cadastro está salvo. Toque em &quot;Tentar de novo&quot; para continuar.</p>
-        <Button className="mt-6 w-full" variant="pixDeep" size="lg" type="button" onClick={() => retry()}>
+        <Button className="mt-6 w-full" variant="pixDeep" size="lg" type="button" onClick={() => reset()}>
           Tentar de novo
         </Button>
         <a

@@ -8,7 +8,7 @@ export default function OnboardingRecebimentoError({
   error,
 }: {
   error: Error & { digest?: string };
-  retry: () => void;
+  reset: () => void;
 }) {
   useEffect(() => {
     console.error(onboardingBoundaryLog(error));
