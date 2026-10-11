@@ -187,9 +187,12 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
           if (!isCancelled) setTrackingMiss(true);
           return null;
         }
-        // Token vencido ou horário já liberado: a tela é final. 500 e rede tentam de novo.
+        // Token vencido ou horário já liberado: apaga a sessão (com o accessToken) e a tela é final.
         if (res.status === 401 || res.status === 403 || res.status === 410) {
-          if (!isCancelled) setPixResumeFailure("gone");
+          if (!isCancelled) {
+            replacePixResume(slug, null);
+            setPixResumeFailure("gone");
+          }
           return null;
         }
         if (!res.ok) throw new Error("pix_resume_unavailable");

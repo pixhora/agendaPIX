@@ -194,15 +194,25 @@ function renderPixResume() {
   render(<BookingFlow slug={slug} initialBookingId={bookingId} previewBusiness={previewBusiness} />);
 }
 
+function storedPixDump(): string {
+  return Array.from({ length: sessionStorage.length }, (_, index) => {
+    const key = sessionStorage.key(index) ?? "";
+    return `${key}=${sessionStorage.getItem(key) ?? ""}`;
+  }).join("\n");
+}
+
 it.each([401, 403, 410])("status %s encerra o pagamento e volta aos horários", async (status) => {
   seedPixResume();
   vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status, headers: { "content-type": "application/json" } })));
   renderPixResume();
 
   expect(await screen.findByRole("heading", { name: "Este pagamento não está mais disponível." })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Ver horários" })).toBeVisible();
   expect(screen.getByText("O horário pode ter sido liberado. Escolha um horário de novo para continuar.")).toBeVisible();
   expect(screen.queryByRole("button", { name: "Tentar de novo" })).toBeNull();
-  expect(sessionStorage.getItem(storageKey)).toContain(bookingId);
+  expect(sessionStorage.getItem(storageKey)).toBeNull();
+  expect(storedPixDump()).not.toContain("token-pix");
+  expect(storedPixDump()).not.toContain(bookingId);
 
   await userEvent.setup().click(screen.getByRole("button", { name: "Ver horários" }));
   expect(await screen.findByRole("radiogroup", { name: /Serviços/ })).toBeVisible();
@@ -222,7 +232,9 @@ it("status 500 mantém a reserva e oferece tentar de novo", async () => {
   expect(screen.getByRole("button", { name: "Tentar de novo" })).toBeVisible();
   expect(screen.queryByRole("button", { name: "Ver horários" })).toBeNull();
   expect(screen.queryByRole("heading", { name: "Este pagamento não está mais disponível." })).toBeNull();
-  expect(sessionStorage.getItem(storageKey)).toContain(bookingId);
+  const kept = sessionStorage.getItem(storageKey);
+  expect(kept).toContain(bookingId);
+  expect(kept).toContain("token-pix");
   expect(window.location.search).toContain(`bookingId=${bookingId}`);
 });
 
@@ -236,6 +248,8 @@ it("erro de rede mantém a reserva e oferece tentar de novo", async () => {
   expect(await screen.findByRole("heading", { name: "Não conseguimos carregar seu Pix" })).toBeVisible();
   expect(screen.getByRole("button", { name: "Tentar de novo" })).toBeVisible();
   expect(screen.queryByRole("button", { name: "Ver horários" })).toBeNull();
-  expect(sessionStorage.getItem(storageKey)).toContain(bookingId);
+  const kept = sessionStorage.getItem(storageKey);
+  expect(kept).toContain(bookingId);
+  expect(kept).toContain("token-pix");
   expect(window.location.search).toContain(`bookingId=${bookingId}`);
 });
