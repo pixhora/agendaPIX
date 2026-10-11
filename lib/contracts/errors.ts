@@ -14,6 +14,14 @@ export const apiErrorCodeSchema = z.enum([
   "logo_too_large",
   "blob_unavailable",
   "internal_error",
+  "link_expired",
+  "link_used",
+  "link_in_progress",
+  "link_cancelled",
+  "link_replaced",
+  "link_invalid",
+  "slot_unavailable",
+  "mp_not_connected",
 ]);
 
 export type ApiErrorCode = z.infer<typeof apiErrorCodeSchema>;

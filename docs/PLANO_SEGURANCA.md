@@ -31,9 +31,14 @@ Data: 2026-10-03. Revisão inicial; não equivale a aprovação de produção.
 6. **P1 — T1: endurecer produção.** HTTPS obrigatório, segredos fora do Git, logs sem links/tokens/email/chaves, SMTP com transporte seguro, backup e restauração comprovados. Dependência: infraestrutura real. Pronto: configuração validada e prova de restauração sem divulgar credenciais.
 7. **Gate — T3 + Tech Lead:** executar testes de origem/callback, expiração/reuso, sessão/logout, tenant cruzado, rate limit, SMTP indisponível e webhook duplicado; executar lint/typecheck/test e build em sequência apropriada. Pronto: evidências reais anexadas e revisão sem BLOQUEIA. Nenhuma aprovação de produção baseada apenas nesta documentação.
 
+## Link de horário nos logs da Vercel
+
+Decisão **pendente com o Matiss** (não é risco aceito). O token do link de um horário fica no path e portanto nos logs de request da Vercel. Mitigações já no produto: prazo curto com teto em `SLOT_LINK_TTL_MINUTES`, token inválido depois do pagamento, e acesso aos logs da Vercel restrito ao dono. Detalhe em `docs/deploy-vercel.md` e `docs/CONTRATOS.md`.
+
 ## Pendências
 
 - Diagnóstico completo do pedido válido e da conexão SMTP.
+- Matiss: retenção e acesso dos logs de request da Vercel que contêm o token do link de horário.
 - Relatório independente do Tech Lead e consolidação dos achados.
 - Configuração de entrega externa e topologia de produção; não inventar credenciais ou fornecedor.
 - Nesta execução não houve correção de código, mudança de configuração, envio real, deploy ou execução da suíte completa.

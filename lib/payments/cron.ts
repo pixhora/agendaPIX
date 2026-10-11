@@ -44,8 +44,10 @@ export function reconcileDatabaseUrl(env: Readonly<Record<string, string | undef
 export async function runCronTick(input: {
   deleteExpiredDrafts: () => Promise<number>;
   reconcile: () => Promise<ReconcileReport>;
+  purgeSlotLinkLabels?: () => Promise<number>;
   now?: Date;
   onDraftCleanupError?: (code: string) => void;
+  onSlotLinkLabelError?: (code: string) => void;
 }) {
   let expiredDraftsDeleted = 0;
   let draftCleanupFailed = false;
@@ -55,8 +57,25 @@ export async function runCronTick(input: {
     draftCleanupFailed = true;
     input.onDraftCleanupError?.(reconcileFailureCode(error));
   }
+  let slotLinkLabelsPurged = 0;
+  let slotLinkLabelPurgeFailed = false;
+  if (input.purgeSlotLinkLabels) {
+    try {
+      slotLinkLabelsPurged = await input.purgeSlotLinkLabels();
+    } catch (error) {
+      slotLinkLabelPurgeFailed = true;
+      input.onSlotLinkLabelError?.(reconcileFailureCode(error));
+    }
+  }
   const report = await input.reconcile();
-  return { at: (input.now ?? new Date()).toISOString(), expiredDraftsDeleted, draftCleanupFailed, ...report };
+  return {
+    at: (input.now ?? new Date()).toISOString(),
+    expiredDraftsDeleted,
+    draftCleanupFailed,
+    slotLinkLabelsPurged,
+    slotLinkLabelPurgeFailed,
+    ...report,
+  };
 }
 
 /** Uma passagem com pool dedicado de uma conexão, encerrado ao final (nada fica aberto entre execuções). */

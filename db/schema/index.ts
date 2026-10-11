@@ -166,6 +166,83 @@ export const bookings = pgTable("bookings", {
   check("bookings_policy_snapshot_pair", sql`(${table.policySnapshot} IS NULL) = (${table.policyText} IS NULL) AND (${table.policySnapshot} IS NULL) = (${table.policyHash} IS NULL)`),
 ]);
 
+export const slotLinkStatus = pgEnum("slot_link_status", ["pending", "paid", "expired", "taken", "cancelled", "replaced"]);
+
+/**
+ * Link de um horário. Não reserva: o hold nasce só no pagamento.
+ * `token_hash` é o sha256 do token opaco. `preview_id` é outro aleatório e não deriva o token.
+ * `expires_at` nunca passa de `starts_at`.
+ */
+export const slotLinks = pgTable("slot_links", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "cascade" }),
+  serviceId: uuid("service_id").notNull(),
+  startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+  endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  status: slotLinkStatus("status").default("pending").notNull(),
+  tokenHash: text("token_hash").notNull(),
+  previewId: text("preview_id").notNull(),
+  bookingId: uuid("booking_id"),
+  payStartedAt: timestamp("pay_started_at", { withTimezone: true }),
+  /** HMAC do `Idempotency-Key` com segredo do servidor. Não é o segredo nem a chave crua. */
+  payIdempotencyHash: text("pay_idempotency_hash"),
+  /** Lembrete do dono. Não preenche o cadastro da cliente. */
+  customerLabel: text("customer_label"),
+  /** Link novo emitido no lugar deste. Só preenchido quando `status` é `replaced`. */
+  replacedByLinkId: uuid("replaced_by_link_id"),
+  ...timestamps(),
+}, (table) => [
+  unique("slot_links_business_id_unique").on(table.businessId, table.id),
+  unique("slot_links_token_hash_unique").on(table.tokenHash),
+  unique("slot_links_preview_id_unique").on(table.previewId),
+  uniqueIndex("slot_links_booking_id_unique").on(table.bookingId).where(sql`${table.bookingId} IS NOT NULL`),
+  index("slot_links_business_start_idx").on(table.businessId, table.startsAt),
+  index("slot_links_business_created_idx").on(table.businessId, table.createdAt),
+  foreignKey({ name: "slot_links_service_tenant_fk", columns: [table.businessId, table.serviceId], foreignColumns: [services.businessId, services.id] }),
+  foreignKey({ name: "slot_links_booking_tenant_fk", columns: [table.businessId, table.bookingId], foreignColumns: [bookings.businessId, bookings.id] }),
+  check("slot_links_interval_valid", sql`${table.startsAt} < ${table.endsAt}`),
+  check("slot_links_expires_before_start", sql`${table.expiresAt} <= ${table.startsAt}`),
+  check("slot_links_expires_after_create", sql`${table.expiresAt} > ${table.createdAt}`),
+  check("slot_links_token_hash_format", sql`${table.tokenHash} ~ '^[a-f0-9]{64}$'`),
+  check("slot_links_preview_id_format", sql`${table.previewId} ~ '^[A-Za-z0-9_-]{22}$'`),
+  check("slot_links_customer_label_length", sql`${table.customerLabel} IS NULL OR (length(trim(${table.customerLabel})) > 0 AND char_length(${table.customerLabel}) <= 80)`),
+  check("slot_links_paid_has_booking", sql`${table.status} <> 'paid' OR ${table.bookingId} IS NOT NULL`),
+  check("slot_links_pay_claim_pair", sql`(${table.payStartedAt} IS NULL) = (${table.payIdempotencyHash} IS NULL)`),
+  check("slot_links_pay_idempotency_hash_format", sql`${table.payIdempotencyHash} IS NULL OR ${table.payIdempotencyHash} ~ '^[a-f0-9]{64}$'`),
+  check("slot_links_replaced_pair", sql`(${table.status} = 'replaced') = (${table.replacedByLinkId} IS NOT NULL)`),
+  uniqueIndex("slot_links_replaced_by_unique").on(table.replacedByLinkId).where(sql`${table.replacedByLinkId} IS NOT NULL`),
+  foreignKey({
+    name: "slot_links_replaced_by_fk",
+    columns: [table.businessId, table.replacedByLinkId],
+    foreignColumns: [table.businessId, table.id],
+  }),
+]);
+
+/**
+ * Reserva que nasceu deste link. A retomada troca `slot_links.booking_id`,
+ * mas um Pix atrasado da reserva antiga ainda acha o link.
+ */
+export const slotLinkBookings = pgTable("slot_link_bookings", {
+  businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "cascade" }),
+  slotLinkId: uuid("slot_link_id").notNull(),
+  bookingId: uuid("booking_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.bookingId] }),
+  index("slot_link_bookings_link_idx").on(table.businessId, table.slotLinkId),
+  foreignKey({
+    name: "slot_link_bookings_link_fk",
+    columns: [table.businessId, table.slotLinkId],
+    foreignColumns: [slotLinks.businessId, slotLinks.id],
+  }).onDelete("cascade"),
+  foreignKey({
+    name: "slot_link_bookings_booking_fk",
+    columns: [table.businessId, table.bookingId],
+    foreignColumns: [bookings.businessId, bookings.id],
+  }).onDelete("cascade"),
+]);
+
 export const payments = pgTable("payments", {
   id: uuid("id").defaultRandom().primaryKey(),
   businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "restrict" }),

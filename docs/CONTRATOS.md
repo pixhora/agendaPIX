@@ -439,7 +439,7 @@ Contratos Zod em `lib/contracts` (`business-profile.ts`, `errors.ts`, reexportad
 | `businessProfileResponseSchema` | `{ id, name, slug, logoUrl, publicPath, publicUrl }`. `logoUrl` e `publicUrl` podem ser `null`. |
 | `logoUploadResponseSchema` | `{ logoUrl }`. |
 | `slugAvailabilityResponseSchema` | `{ input, normalized, valid, available, reason, suggestions }`. `reason`: `taken`, `reserved`, `invalid` ou `too_short` (este último a tela de cadastro já usa). `suggestions` tem no máximo 3 e vem vazio quando o link está livre, inválido ou curto. |
-| `apiErrorCodeSchema` | `invalid_input`, `unauthorized`, `business_unavailable`, `slug_taken`, `rate_limited`, `logo_invalid`, `logo_too_large`, `blob_unavailable`, `internal_error`. |
+| `apiErrorCodeSchema` | `invalid_input`, `unauthorized`, `business_unavailable`, `slug_taken`, `rate_limited`, `logo_invalid`, `logo_too_large`, `blob_unavailable`, `internal_error`, e os do link de horário: `link_expired`, `link_used`, `link_in_progress`, `link_cancelled`, `link_replaced`, `link_invalid`, `slot_unavailable`, `mp_not_connected`. |
 
 O corpo de erro continua `{ error: { code, message, details? } }`. `handleHttp` espalha `error.details` no objeto `error`.
 
@@ -456,3 +456,49 @@ Não há prazo que simplesmente libere um link antigo para qualquer um. Enquanto
 O cadastro cria a página sem URL de logo. `logoUrl` no corpo do rascunho, do commit ou de `POST /api/onboarding` é `400 invalid_input` e não grava a coluna. O arquivo fica no navegador até existir `businessId`; em seguida o POST da logo grava a coluna.
 
 Migration `db/migrations/0018_business_profile.sql` tem de rodar antes do deploy deste código. Sem ela, o SELECT de `businesses.logo_url` responde 500. A migration cria a coluna `logo_url`, a tabela `business_slug_history` com `released_at` e o gatilho que recusa slug atual contra alias ativo ou solto há menos de 90 dias (`23505`). CSP `img-src` inclui `https://*.public.blob.vercel-storage.com`. `https://blob.fake.local` só entra com `NODE_ENV=development`. `serverExternalPackages` inclui `sharp`.
+
+## Link de um horário
+
+Contratos em `lib/contracts/slot-link.ts`, reexportados por `lib/contracts/index.ts`. O corpo de erro é `{ error: { code, message, details? } }` via `handleHttp`. `slotLinkErrorCodeSchema` junta `link_expired`, `link_used`, `link_in_progress`, `link_cancelled`, `link_replaced`, `link_invalid`, `slot_unavailable`, `mp_not_connected` com `invalid_input`, `rate_limited`, `unauthorized`, `business_unavailable`, `origin_not_allowed` e `body_too_large`.
+
+Gerar o link não cria reserva nem cobrança. O hold e o Pix nascem só no POST de pagamento, pelo mesmo fluxo da reserva pública (`createBooking`). Um `23P01` da exclusão de horário vira `409 slot_unavailable`.
+
+Prazo: `SLOT_LINK_TTL_MINUTES`, padrão **1440** (24 horas), faixa **15–10080**. Valor inválido cai no mesmo `bookingConfig` / `assertProductionSafeEnv` das outras envs de reserva (`503 booking_unavailable` na primeira uso; em produção o boot recusa). O `expiresAt` gravado é `min(agora + prazo, startsAt)`: o link nunca vence depois do início do horário. O check no banco é `expires_at <= starts_at`.
+
+Token: 32 bytes de `crypto.randomBytes`, base64url (43 caracteres), no **path**, nunca no fragmento. A coluna guarda só o sha256. Formato inválido responde `404 link_invalid` sem consultar o banco. Token desconhecido, malformado ou de outro negócio devolve o mesmo `404 link_invalid` e a mesma mensagem, sem dizer se o token existiu. `previewId` é outro aleatório de 16 bytes (22 caracteres). Não deriva o token e não autoriza pagamento.
+
+Nome e WhatsApp da cliente só entram na reserva, com a mesma retenção de `customers` / `bookings`. O `customerLabel` opcional é lembrete do dono: não volta no link público e não preenche o cadastro. Ele fica só até o horário começar (`starts_at` < agora): o cron diário (`GET`/`POST /api/cron/reconcile`) grava `NULL`. A linha do link continua. Não há fluxo de exclusão de conta. O FK `slot_links.business_id` é `ON DELETE CASCADE`: apagar o negócio apaga os links e o histórico `slot_link_bookings`.
+
+| Método e rota | Schema do pedido | Schema da resposta |
+| --- | --- | --- |
+| `POST /api/businesses/{businessId}/slot-links` | `slotLinkCreateRequestSchema` `{ serviceId, date, time, customerLabel? }` | `201` `slotLinkCreatedResponseSchema` (inclui `token` e `path` uma vez) |
+| `GET /api/businesses/{businessId}/slot-links?date=YYYY-MM-DD&cursor=&limit=` | `slotLinkListQuerySchema` | `slotLinkListResponseSchema` |
+| `POST /api/businesses/{businessId}/slot-links/{linkId}/cancel` | sem corpo | `slotLinkOwnerSchema` |
+| `POST /api/businesses/{businessId}/slot-links/{linkId}/reissue` | sem corpo | `201` `slotLinkCreatedResponseSchema` (token novo) |
+| `GET /api/public/{slug}/slot-links/{token}` | — | `slotLinkOpenResponseSchema` |
+| `POST /api/public/{slug}/slot-links/{token}/pay` | header `Idempotency-Key` (16–128, base64url ou UUID) + `slotLinkPayRequestSchema` `{ customer: { name, phone, cpfCnpj? }, policyHash }` | `201` `slotLinkPayResponseSchema` |
+| `GET /api/public/slot-link-previews/{previewId}` | — | `slotLinkPreviewResponseSchema` |
+
+O GET público resolve o negócio pelo slug e só então compara o hash do token, para token desconhecido e token de outra loja seguirem o mesmo caminho. Revalida o horário em toda leitura e devolve `status`: `pending`, `paid`, `expired`, `taken` ou `cancelled`. Horário que já começou devolve `expired`, mesmo que o intervalo esteja ocupado. Também devolve negócio, serviço, `startsAt`, `depositCents`, `remainingCents`, política (`text` + `hash`) e `expiresAt`. Não devolve nome, telefone nem o token. As respostas desse path levam `Cache-Control: no-store`, `Referrer-Policy: no-referrer` e `X-Robots-Tag: noindex, nofollow`. O token não entra em log de aplicação; `redactSlotLinkToken` cobre o path se uma mensagem de erro o ecoar. Não há Sentry neste processo. O token no path aparece nos logs de request da Vercel: a decisão de retenção e acesso está pendente com o Matiss (ver `docs/deploy-vercel.md`).
+
+A prévia de um link `pending` é `{ kind: "slot", businessName, logoUrl, serviceName, date, time }`. Qualquer outro status de um `previewId` conhecido responde `200` `{ kind: "generic", businessName, logoUrl }` — sem serviço, data ou hora, e sem `404`. `previewId` desconhecido ou malformado continua `404 link_invalid`. Não traz disponibilidade, sinal nem dado da cliente. Com IP, a rota usa o mesmo teto de abertura (`SLOT_LINK_OPEN_PER_CLIENT`) e os mesmos cabeçalhos de privacidade. Sem IP, vale o teto anônimo descrito abaixo.
+
+O POST de pagamento exige `Idempotency-Key`. Ausente ou fora do formato: `400 invalid_input`. O banco guarda só o HMAC dessa chave com o segredo de acesso (`BOOKING_ACCESS_SECRET`, ou `BETTER_AUTH_SECRET`), amarrado ao link. Não é sha256 do id do link. A `requestKey` da reserva é um UUID derivado desse HMAC. A mesma chave, com o claim ainda dentro do hold e a reserva sem pagamento, chama `createBooking` de novo com a mesma `requestKey`. O `createBooking` acha a reserva e devolve a mesma linha de `payments` (mesmo id, mesmo QR, mesmo copia-e-cola) e o `accessToken` derivado do id da reserva. Isso vale mesmo se o `expiresAt` do link já passou: só um claim novo olha esse prazo. Chave diferente nesse claim: `409 link_in_progress`, sem dado da outra cliente. Se o prazo do link já passou, a chave diferente recebe `410 link_expired`. Claim vencido (`pay_started_at < now() - BOOKING_HOLD_MINUTES`, reserva não paga) e prazo do link ainda válido: qualquer chave assume pelo mesmo `UPDATE ... WHERE booking_id IS NULL AND (pay_started_at IS NULL OR pay_started_at < now() - hold)`. Antes disso, na mesma transação, a reserva pendente passa por `expirePending`. Um Pix antigo que chegar depois cai em `resolveLatePayment` / `late_payment_policy` e não confirma por cima da reserva nova. Cada reserva nascida do link fica em `slot_link_bookings`. Só `late_rebooked` (a reserva antiga confirmada) marca o link como `paid` e aponta `booking_id` para ela. `late_no_slot` não marca. Pago: `409 link_used` para qualquer chave nova; o GET mostra `paid`.
+
+`slotLinkOwnerSchema` inclui `cancellable`. É verdadeiro quando não há reserva ligada e o claim está livre ou vencido. O dono cancela nesse caso. Claim fresco ou reserva ligada: `409 link_used`.
+
+Códigos depois que o hash confere: `410 link_expired`, `409 link_used`, `409 link_in_progress`, `409 link_cancelled`, `409 link_replaced`, `409 slot_unavailable`, `409 mp_not_connected`. Antes disso, qualquer token que não casa é `404 link_invalid`. `link_replaced` não traz o token nem o path do link novo.
+
+`POST .../reissue` usa `findOwnedBusiness`, `requireAppOrigin` e o mesmo teto de criação por dono. Numa transação, trava a linha com `SELECT ... FOR UPDATE`. Só um link `pending` sem claim ativo (`pay_started_at` dentro do hold, ou reserva `pending_payment` com hold vigente) pode ser trocado. Claim ativo: `409 link_in_progress` e o link antigo continua válido. Horário ocupado: `409 slot_unavailable` e o antigo continua `pending`. No sucesso, o antigo fica `replaced` com `replaced_by_link_id` e nasce outro link do mesmo serviço e horário, com `expiresAt` recalculado (`min(agora + prazo, startsAt)`) e token novo. O token antigo responde `409 link_replaced`. A lista do dono mostra `replaced`.
+
+Limites, janela de 1 minuto. O IP vem só de `bookingClientIdentity` (o handler não lê `X-Forwarded-For` na mão). O teto por IP entra primeiro. O teto por token só conta depois que o hash casa, para token aleatório não criar linha em `abuse_rate_limits`. Sem IP, o probe usa um balde global com teto de 10000 por minuto, não o teto por cliente. Esse balde só existe fora da Vercel: em produção `BOOKING_TRUST_PROXY` está ligado e a plataforma manda o IP. O teto por negócio continua valendo depois que o hash casa.
+
+- criar: `SLOT_LINK_CREATE_PER_OWNER` (padrão 30) por dono no negócio
+- abrir e prévia: `SLOT_LINK_OPEN_PER_CLIENT` (padrão 60) e, na abertura, `SLOT_LINK_OPEN_PER_BUSINESS` (padrão 600)
+- pagar: `SLOT_LINK_PAY_PER_CLIENT` (padrão 10), `SLOT_LINK_PAY_PER_BUSINESS` (padrão 120) e `SLOT_LINK_PAY_PER_TOKEN` (padrão 5) no hash do token
+
+POST do dono exige sessão (`401` sem sessão) e `requireAppOrigin`. O negócio passa por `findOwnedBusiness`. Serviço de outro negócio não entra. Dono A não lista nem cancela link do dono B (`404`).
+
+Status: `paid` quando alguma reserva nascida do link confirma, inclusive `late_rebooked` da reserva antiga (o webhook e a reconciliação marcam o link na mesma transação de `applyPaidEvent`). `late_no_slot` não marca pago: a lista segue a reserva atual (`pending` se o hold dela vale, `paid` se ela confirmou) e fica `expired` se esse hold também venceu. `expired` também quando passa `expiresAt` ou `startsAt`; `taken` quando outra reserva ocupa o intervalo e o horário ainda não começou; `cancelled` quando o dono cancela; `pending` no restante. `paid` e `cancelled` não voltam atrás. Hold vencido sem pagamento não trava um claim novo enquanto o prazo do link existir. O cancelamento do dono usa `now()` do banco, o mesmo relógio do claim.
+
+Migration `0022_slot_links` tem de rodar **antes** do deploy. Sem a tabela, estas rotas respondem 500. O número é o próximo livre no master depois de `0021_service_image`. Se outro PR ocupar `0021` antes do merge, renumerar o arquivo, o snapshot e o journal.

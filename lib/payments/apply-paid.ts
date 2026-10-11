@@ -1,6 +1,7 @@
 import { and, eq, or, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "../../db/schema";
+import { ensureSlotLinkBooking } from "../bookings/slot-link";
 import { expirePending, hash, lockBusiness } from "../bookings/service";
 import { HttpError } from "../http";
 import type { LateRefundCause } from "./notices";
@@ -60,6 +61,7 @@ export async function applyPaidEvent(database: Database, providerName: string, e
     if (decision.confirm) {
       await database.update(schema.bookings).set({ status: "confirmed" })
         .where(and(eq(schema.bookings.businessId, found.businessId), eq(schema.bookings.id, booking.id), eq(schema.bookings.status, "pending_payment")));
+      await markSlotLinkPaid(database, found.businessId, booking.id, processingNow);
       await audit(database, {
         businessId: found.businessId, paymentId: payment.id, bookingId: booking.id, action: "payment_confirmed",
         detail: { eventId: event.eventId, statusDetail: event.statusDetail ?? null },
@@ -116,6 +118,7 @@ async function reclaimOnTimeBooking(database: Database, input: {
         businessId: business.id, paymentId: payment.id, bookingId: booking.id, action: "payment_confirmed",
         detail: { eventId: event.eventId, statusDetail: event.statusDetail ?? null, reclaimed: true },
       });
+      await markSlotLinkPaid(database, business.id, booking.id, now);
       return { outcome: "processed", reason: "on_time_reclaimed", ...ids };
     }
   }
@@ -159,6 +162,7 @@ async function resolveLatePayment(database: Database, input: {
     }
     if (rebooked) {
       await audit(database, { businessId: business.id, paymentId: payment.id, bookingId: booking.id, action: "late_payment_rebooked", detail: { eventId: event.eventId, statusDetail: event.statusDetail ?? null } });
+      await markSlotLinkPaid(database, business.id, booking.id, now);
       return { outcome: "processed", reason: "late_rebooked", paymentId: payment.id, businessId: business.id, bookingId: booking.id };
     }
   }
@@ -170,6 +174,27 @@ async function resolveLatePayment(database: Database, input: {
     },
   });
   return { outcome: "ignored", reason: "late_no_slot", paymentId: payment.id, businessId: business.id, bookingId: booking.id };
+}
+
+async function markSlotLinkPaid(database: Database, businessId: string, bookingId: string, now: Date) {
+  await ensureSlotLinkBooking(database, businessId, bookingId);
+  const [origin] = await database.select({ slotLinkId: schema.slotLinkBookings.slotLinkId }).from(schema.slotLinkBookings).where(and(
+    eq(schema.slotLinkBookings.businessId, businessId),
+    eq(schema.slotLinkBookings.bookingId, bookingId),
+  )).limit(1);
+  if (origin) {
+    await database.update(schema.slotLinks).set({ status: "paid", bookingId, updatedAt: now }).where(and(
+      eq(schema.slotLinks.businessId, businessId),
+      eq(schema.slotLinks.id, origin.slotLinkId),
+      sql`${schema.slotLinks.status} NOT IN ('cancelled', 'replaced')`,
+    ));
+    return;
+  }
+  await database.update(schema.slotLinks).set({ status: "paid", updatedAt: now }).where(and(
+    eq(schema.slotLinks.businessId, businessId),
+    eq(schema.slotLinks.bookingId, bookingId),
+    sql`${schema.slotLinks.status} NOT IN ('cancelled', 'replaced')`,
+  ));
 }
 
 function isExclusionViolation(error: unknown): boolean {

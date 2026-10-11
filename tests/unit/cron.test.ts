@@ -47,7 +47,7 @@ describe("limpeza de rascunhos na rota de cron", () => {
       onDraftCleanupError: (code) => { seen.push(code); },
     });
     expect(reconcile).toHaveBeenCalledOnce();
-    expect(result).toMatchObject({ at: "2026-10-09T06:00:00.000Z", expiredDraftsDeleted: 0, draftCleanupFailed: true, polledPaid: 0 });
+    expect(result).toMatchObject({ at: "2026-10-09T06:00:00.000Z", expiredDraftsDeleted: 0, draftCleanupFailed: true, polledPaid: 0, slotLinkLabelsPurged: 0, slotLinkLabelPurgeFailed: false });
     expect(seen).toEqual(["reconcile_failed"]);
     expect(JSON.stringify(result)).not.toContain("dono@salao.com");
     expect(seen.join(" ")).not.toContain("Bearer");
