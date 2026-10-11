@@ -84,6 +84,7 @@ export function updatedLinkMessage(businessName: string | null) {
 }
 export const CUSTOMER_OFFLINE = "Sem conexão. Verifique sua internet e tente de novo.";
 export const CUSTOMER_MP = "Esta loja não está recebendo sinal agora. Fale com a loja.";
+export const CUSTOMER_BOOKINGS_PAUSED = "Esta agenda não está aceitando novos agendamentos agora.";
 export const CUSTOMER_IN_PROGRESS = "Alguém está pagando este horário agora. Se o pagamento não for concluído, ele volta a ficar disponível em alguns minutos.";
 export const CUSTOMER_CONFLICT_TITLE = "Você já começou o pagamento deste horário com outros dados.";
 export const CUSTOMER_CONFLICT_BODY = "Para corrigir nome ou WhatsApp, fale com a loja depois de pagar.";

@@ -63,6 +63,16 @@ describe("serviço com sinal sem conta conectada", () => {
     expect(view.kind === "unavailable" ? view.message : "").not.toMatch(/teste|mercado pago/i);
   });
 
+  it("403 bookings_paused vira pausa e ignora o texto do servidor", () => {
+    const view = publicBookingErrorView(403, {
+      error: {
+        code: "bookings_paused",
+        message: "Este estabelecimento não está aceitando novos agendamentos no momento.",
+      },
+    });
+    expect(view).toEqual({ kind: "paused" });
+  });
+
   it("não trata payout_key_missing como indisponível", () => {
     const view = publicBookingErrorView(409, {
       error: { code: "payout_key_missing", message: "Falta a chave de repasse." },

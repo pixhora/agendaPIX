@@ -1,5 +1,9 @@
 # PEDIDOS ENTRE TERMINAIS
 
+## P11 — Cliente: 403 bookings_paused
+
+Estado: neste branch de textos, sem merge. A página pública e a tela do link de horário tratam o código `bookings_paused` com “Esta agenda não está aceitando novos agendamentos agora.” e o botão “Falar com a loja”. Depende da PR #90 para o GET do link enviar `bookingsPaused` e para o POST soltar o claim ao recusar. No master atual o POST de pagamento já pode devolver o código via `createBooking`. O campo no GET fica opcional até a #90.
+
 ## P10 — Contrato: boot PKCE, cache de alias e dedupe do mp-connect
 
 Estado: implementado neste branch, sem merge e sem deploy. `assertProductionSafeEnv` passa a exigir `MP_OAUTH_PKCE=on` quando `MERCADOPAGO_ENV=production`. `bookingConfig` no boot só roda com `NODE_ENV=production`. O `next build` com `VERCEL_ENV=production` falha se o PKCE não for `on` ou se `bookingConfig` for inválido. Antes do merge, confirmar que `MP_OAUTH_PKCE=on` já está em Production na Vercel. Migration `0020_webhook_events` precisa rodar antes do deploy e não foi aplicada em produção. Limpeza de `webhook_events` com 30 dias está só documentada em `docs/CONTRATOS.md`.

@@ -56,6 +56,7 @@ export const SLOT_LINK_ERROR_CODES = [
   "link_invalid",
   "slot_unavailable",
   "mp_not_connected",
+  "bookings_paused",
   "idempotency_conflict",
   "invalid_input",
   "rate_limited",
@@ -162,6 +163,11 @@ export const slotLinkOpenResponseSchema = z.object({
   expiresAt: z.iso.datetime({ offset: true }),
   status: slotLinkStatusSchema,
   requiresPayerCpf: z.boolean(),
+  /**
+   * Agenda fechada para horário novo. Ausente enquanto o backend não envia.
+   * Pix já começado neste link continua no formulário.
+   */
+  bookingsPaused: z.boolean().optional(),
 }).strict();
 
 export type SlotLinkOpenResponse = z.infer<typeof slotLinkOpenResponseSchema>;

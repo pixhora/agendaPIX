@@ -49,6 +49,8 @@ describe("contrato do link de horário", () => {
     expect(apiErrorBodySchema.parse(body).error.code).toBe("link_invalid");
     expect(SLOT_LINK_TTL_DEFAULT_MINUTES).toBe(1440);
     expect(slotLinkErrorCodeSchema.options).toContain("idempotency_conflict");
+    expect(slotLinkErrorCodeSchema.safeParse("bookings_paused").success).toBe(true);
+    expect(slotLinkErrorBodySchema.parse({ error: { code: "bookings_paused", message: "Agenda pausada." } }).error.code).toBe("bookings_paused");
     expect(slotLinkErrorBodySchema.safeParse({ error: { code: "link_cancelled", message: "Este link não está mais disponível.", reason: "replaced" } }).success).toBe(false);
   });
 
@@ -65,6 +67,8 @@ describe("contrato do link de horário", () => {
       requiresPayerCpf: false,
     });
     expect(opened.status).toBe("taken");
+    expect(opened.bookingsPaused).toBeUndefined();
+    expect(slotLinkOpenResponseSchema.parse({ ...opened, bookingsPaused: true }).bookingsPaused).toBe(true);
     const slot = slotLinkPreviewResponseSchema.parse({
       kind: "slot", businessName: "Salao", logoUrl: null, serviceName: "Corte", date: "2030-01-01", time: "09:00",
     });
