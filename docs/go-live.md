@@ -45,12 +45,12 @@ O código usa a mesma URL de API nos dois modos. Quem define o ambiente é o **a
       Troca: `vercel env rm <VAR> production --yes` e depois `vercel env add <VAR> production --sensitive`.
 - [ ] **Webhook em modo produtivo:** Suas integrações → aplicação → Webhooks → aba **Modo produtivo**:
       - URL `https://www.agendapix.dev.br/api/webhooks/payments/mercadopago`
-      - evento **Order (Mercado Pago)**
+      - eventos **payment** e **mp-connect**
       - salvar
 - [ ] Copie a **assinatura secreta** mostrada no painel (gere/regenere se preciso) para
       `MERCADOPAGO_WEBHOOK_SECRET` na Vercel. Precisa ter ≥ 32 caracteres. Se for regenerada depois, atualize na Vercel também.
 - [ ] `vercel deploy --prod` (ou redeploy do último deploy). Env nova só vale depois de um novo deploy.
-- [ ] No painel, use **Simular notificação** do webhook produtivo. Para o app, uma notificação de order
+- [ ] No painel, use **Simular notificação** do webhook produtivo. Para o app, uma notificação de **payment**
       inexistente é aceitável (404/ignorada). O que importa é **não** responder `401 invalid_signature`.
       Se der 401, o secret está errado.
 
