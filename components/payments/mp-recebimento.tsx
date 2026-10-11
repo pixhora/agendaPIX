@@ -61,6 +61,10 @@ export function MpRecebimento({ legalPagesPublished }: { legalPagesPublished: bo
     return (
       <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 px-5 py-10">
         <h1 className="font-display text-2xl font-extrabold tracking-tight">Não encontramos este cadastro</h1>
+        {/* O retorno do Mercado Pago trouxe uma resposta: mostramos em vez de descartar. */}
+        {callback ? (
+          <p role="status" className="text-sm leading-relaxed">{callback.mp === "connected" ? callback.toast : callback.message}</p>
+        ) : null}
         <p className="text-sm leading-relaxed text-muted">Abra o painel para conectar o Mercado Pago, ou comece o cadastro de novo.</p>
         <Link href="/dashboard/settings#recebimento" className={buttonVariants({ size: "lg" })}>Abrir o painel</Link>
         <Link href="/onboarding" className={buttonVariants({ variant: "outline", size: "lg" })}>Começar de novo</Link>

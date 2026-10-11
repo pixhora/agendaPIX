@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, gte, inArray, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, lt, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "../../db";
 import { businesses, bookings, businessHours, customers, services } from "../../db/schema";
@@ -17,7 +17,7 @@ import { manualRefundFlags } from "../payments/manual-refund-calendar";
 type Database = Omit<ReturnType<typeof getDb>, "$client">;
 type OwnedBusiness = typeof businesses.$inferSelect;
 export async function ownedBusinesses(ownerId: string, database: Database = getDb()) {
-  return database.select().from(businesses).where(eq(businesses.ownerId, z.string().min(1).parse(ownerId))).orderBy(asc(businesses.createdAt), asc(businesses.id));
+  return database.select().from(businesses).where(eq(businesses.ownerId, z.string().min(1).parse(ownerId))).orderBy(desc(businesses.createdAt), desc(businesses.id));
 }
 /** Negócios com ao menos um serviço ativo que cobra sinal. Uma query para a moldura do painel. */
 export async function businessesWithDeposit(businessIds: string[], database: Database = getDb()) {
