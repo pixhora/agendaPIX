@@ -7,6 +7,7 @@ import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool, type PoolClient } from "pg";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as schema from "../../db/schema";
+import type { OwnerMailer } from "../../lib/email";
 import { databaseEnvSchema } from "../../lib/env";
 import { dashboardBookings } from "../../lib/dashboard/data";
 import { acknowledgeDepositReversal } from "../../lib/payments/deposit-reversal-ack";
@@ -236,7 +237,7 @@ describe("sinal devolvido ou contestado", () => {
       businessId: businessA, paymentId: late.payment.id, bookingId: late.booking.id, action: "late_no_slot",
       detail: { cause: "window_expired", reason: "late_no_slot" },
     });
-    const mailer = vi.fn(async () => {});
+    const mailer = vi.fn<OwnerMailer>(async () => {});
     expect(await settleAutomaticLateRefund(drizzleRefundPorts(database), {
       refundCharge: async () => ({ status: "refunded", refundId: "auto-1" }),
     }, late.payment.id, mailer)).toBe("submitted");
