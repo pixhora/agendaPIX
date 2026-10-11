@@ -1,20 +1,54 @@
+import { configuredAppOrigins, logRejectedAppOrigin, originEqualsAllowed, pairedHostOrigin } from "./app-origins";
 import { authEnvSchema } from "./env";
 import { handleHttp, HttpError } from "./http";
 
-export function trustedAppOrigins() {
-  const env = authEnvSchema.safeParse(process.env);
-  if (!env.success) throw new HttpError(503, "auth_unavailable", "O acesso está indisponível. Tente novamente mais tarde.");
-  const origin = new URL(env.data.BETTER_AUTH_URL).origin;
-  const local = process.env.NODE_ENV === "production" ? [] : ["http://localhost:3000"];
-  return [...new Set([origin, ...local])];
+export function trustedAppOrigins(env: Readonly<Record<string, string | undefined>> = process.env) {
+  const parsed = authEnvSchema.safeParse(env);
+  if (!parsed.success) throw new HttpError(503, "auth_unavailable", "O acesso está indisponível. Tente novamente mais tarde.");
+  const canonical = new URL(parsed.data.BETTER_AUTH_URL).origin;
+  const paired = pairedHostOrigin(canonical);
+  const local = env.NODE_ENV === "production" ? [] : ["http://localhost:3000"];
+  const allowed = [canonical];
+  if (paired) {
+    let seen = false;
+    for (const current of allowed) {
+      if (current === paired) seen = true;
+    }
+    if (!seen) allowed.push(paired);
+  }
+  for (const origin of [...configuredAppOrigins(env), ...local]) {
+    if (!originEqualsAllowed(origin, allowed)) allowed.push(origin);
+  }
+  return allowed;
+}
+
+/** Origin ausente, vazio, `null` ou fora da allowlist. Não consulta Referer. */
+export function isAllowedAppOrigin(request: Request, env: Readonly<Record<string, string | undefined>> = process.env) {
+  const allowed = trustedAppOrigins(env);
+  const raw = request.headers.get("origin");
+  if (raw === null || raw.length === 0 || raw === "null") {
+    logRejectedAppOrigin(raw ?? "", allowed);
+    return false;
+  }
+  let normalized: string;
+  try {
+    normalized = new URL(raw).origin;
+  } catch {
+    logRejectedAppOrigin(raw, allowed);
+    return false;
+  }
+  if (!originEqualsAllowed(normalized, allowed)) {
+    logRejectedAppOrigin(raw, allowed);
+    return false;
+  }
+  return true;
 }
 
 export function requireAppOrigin(request: Request) {
-  const origin = request.headers.get("origin");
-  if (!origin || !trustedAppOrigins().includes(origin)) {
+  if (!isAllowedAppOrigin(request)) {
     throw new HttpError(403, "origin_not_allowed", "Origem da solicitação não permitida.");
   }
-  return origin;
+  return new URL(request.headers.get("origin") ?? "").origin;
 }
 
 export async function withAppCors(request: Request, run: () => Promise<Response>) {

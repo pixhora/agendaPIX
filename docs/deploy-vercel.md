@@ -36,7 +36,8 @@ O lembrete da véspera da devolução manual não espera 09:00. Sai na primeira 
 | --- | --- |
 | `DATABASE_URL` | Neon, string **com pooler** (`...-pooler...neon.tech/...?sslmode=require`) |
 | `DATABASE_URL_UNPOOLED` | Neon, string direta (criada pela integração Neon ↔ Vercel) |
-| `BETTER_AUTH_URL` | URL pública estável, ex.: `https://agendapix.vercel.app` (sem barra final) |
+| `BETTER_AUTH_URL` | URL pública estável, ex.: `https://www.agendapix.dev.br` (sem barra final). O apex `https://agendapix.dev.br` entra sozinho, e o contrário também |
+| `APP_ALLOWED_ORIGINS` | Opcional. Origens extras, separadas por vírgula. Detalhe abaixo |
 | `BETTER_AUTH_SECRET` | `openssl rand -base64 32` (novo para produção) |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` | Resend: `smtp.resend.com` / `465` / `true` · Gmail: `smtp.gmail.com` / `465` / `true` |
 | `SMTP_USER` / `SMTP_PASSWORD` | Resend: `resend` / API key · Gmail: endereço / senha de app (exige 2FA) |
@@ -56,6 +57,12 @@ O lembrete da véspera da devolução manual não espera 09:00. Sai na primeira 
 | `BOOKING_TRUST_PROXY` | `true` (a Vercel sobrescreve `X-Real-IP`/`X-Forwarded-For`) |
 | `BOOKING_CLIENT_IP_HEADER` | `x-real-ip` |
 | `ENABLE_EXPERIMENTAL_COREPACK` | `1` (pnpm 12 do `packageManager`) |
+
+## Origens aceitas no navegador
+
+A lista efetiva é a origem de `BETTER_AUTH_URL`, o par automático www/apex (`https://www.agendapix.dev.br` e `https://agendapix.dev.br`) e cada item de `APP_ALLOWED_ORIGINS`. Cada item vira `new URL(item).origin`. A comparação com o header `Origin` é a string exata dessa origem. `Origin` ausente, vazio ou `null` responde 403. `Referer` não substitui `Origin`.
+
+Em Production (`VERCEL_ENV=production`), `*.vercel.app` não entra: qualquer item cujo host termina em `.vercel.app`, e qualquer item que não seja https, derruba o boot e o `next build`. A mensagem cita qual item (a origem normalizada, sem usuário nem senha). Item que nem é URL é ignorado, com aviso no boot e sem imprimir o valor. Preview pode usar o host da Vercel; Production, não.
 
 ## DNS do e-mail
 

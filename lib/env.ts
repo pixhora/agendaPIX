@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { assertConfiguredAppOrigins } from "./app-origins";
 import { readManualCheckoutConfig } from "./billing/config";
 import { bookingConfig } from "./bookings/config";
 import { readSupportWhatsappNumber } from "./support-contact";
@@ -217,7 +218,8 @@ export function assertSubscriptionCheckoutEnv(env: Readonly<Record<string, strin
  * O `register()` do instrumentation só roda quando a instância sobe. Na Vercel isso é
  * depois do deploy, e um throw vira 500 em toda rota, inclusive `/api/health`.
  * `next.config.ts` chama isto ao carregar. `VERCEL_ENV=production` exige `MP_OAUTH_PKCE=on`,
- * `bookingConfig`, `BOOKING_ACCESS_SECRET` e as envs do checkout manual da assinatura.
+ * `bookingConfig`, `BOOKING_ACCESS_SECRET`, as envs do checkout manual da assinatura
+ * e recusa item de `APP_ALLOWED_ORIGINS` em `.vercel.app` ou sem https.
  * `VERCEL_ENV=preview` exige o mesmo `BOOKING_ACCESS_SECRET`, para o preview não cair em
  * `BETTER_AUTH_SECRET`. PKCE, `bookingConfig` e o checkout continuam só no build de produção.
  * Dev não entra. ` on ` vale `on`. A mensagem não repete o valor.
@@ -231,6 +233,7 @@ export function assertVercelProductionBuild(env: Readonly<Record<string, string 
   }
   assertBookingAccessSecret(env);
   if (vercelEnv === "production") assertSubscriptionCheckoutEnv(env);
+  assertConfiguredAppOrigins(env);
 }
 
 /**
@@ -241,6 +244,7 @@ export function assertVercelProductionBuild(env: Readonly<Record<string, string 
  * A mensagem de PKCE não repete o valor configurado.
  */
 export function assertProductionSafeEnv(env: Readonly<Record<string, string | undefined>> = process.env) {
+  assertConfiguredAppOrigins(env);
   const parsed = productionRuntimeEnvSchema.safeParse({
     NODE_ENV: env.NODE_ENV,
     NEXT_PHASE: env.NEXT_PHASE,
