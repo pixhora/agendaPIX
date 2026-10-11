@@ -1,5 +1,7 @@
 import { z } from "zod";
+import { readManualCheckoutConfig } from "./billing/config";
 import { bookingConfig } from "./bookings/config";
+import { readSupportWhatsappNumber } from "./support-contact";
 
 const postgresUrl = z.url().refine((value) => ["postgres:", "postgresql:"].includes(new URL(value).protocol), "Use uma URL PostgreSQL.");
 
@@ -114,11 +116,21 @@ export function rateLimitSecret(env: Readonly<Record<string, string | undefined>
   const parsed = bookingSecretsSchema.safeParse(env);
   return parsed.success ? parsed.data.RATE_LIMIT_SECRET ?? parsed.data.BETTER_AUTH_SECRET : null;
 }
+const optionalReplyTo = z.preprocess(
+  (value) => {
+    if (typeof value !== "string") return undefined;
+    const trimmed = value.trim();
+    return trimmed.length === 0 ? undefined : trimmed;
+  },
+  z.string().min(1).refine((value) => !/[\r\n]/.test(value), "Resposta inválida.").optional(),
+);
+
 export const smtpEnvSchema = z.object({
   SMTP_HOST: z.string().min(1),
   SMTP_PORT: z.coerce.number().int().min(1).max(65535),
   SMTP_SECURE: z.enum(["true", "false"]).transform((value) => value === "true"),
   SMTP_FROM: z.string().min(1).refine((value) => !/[\r\n]/.test(value), "Remetente inválido."),
+  SMTP_REPLY_TO: optionalReplyTo,
   SMTP_USER: z.string().optional(),
   SMTP_PASSWORD: z.string().optional(),
 }).refine((value) => Boolean(value.SMTP_USER) === Boolean(value.SMTP_PASSWORD), "Configure usuário e senha SMTP juntos.");
@@ -137,6 +149,7 @@ const productionBootMessage = {
   capture: "MAGIC_LINK_CAPTURE_FILE não pode estar definido em produção.",
   fixtures: "MP_CAPTURE não pode estar definido em produção.",
   from: "SMTP_FROM não pode usar o domínio example.com em produção.",
+  replyTo: "SMTP_REPLY_TO não pode usar o domínio example.com em produção.",
 } as const;
 
 /**
@@ -150,11 +163,13 @@ export const productionRuntimeEnvSchema = z.object({
   MAGIC_LINK_CAPTURE_FILE: z.string().optional(),
   MP_CAPTURE: z.string().optional(),
   SMTP_FROM: z.string().optional(),
+  SMTP_REPLY_TO: z.string().optional(),
 }).superRefine((value, ctx) => {
   if (value.NODE_ENV !== "production" || value.NEXT_PHASE === "phase-production-build") return;
   if (value.MAGIC_LINK_CAPTURE_FILE?.trim()) ctx.addIssue({ code: "custom", message: productionBootMessage.capture });
   if (value.MP_CAPTURE?.trim()) ctx.addIssue({ code: "custom", message: productionBootMessage.fixtures });
   if (value.SMTP_FROM?.trim() && smtpFromUsesExampleDomain(value.SMTP_FROM)) ctx.addIssue({ code: "custom", message: productionBootMessage.from });
+  if (value.SMTP_REPLY_TO?.trim() && smtpFromUsesExampleDomain(value.SMTP_REPLY_TO)) ctx.addIssue({ code: "custom", message: productionBootMessage.replyTo });
 });
 
 const productionPkceMessage = "MP_OAUTH_PKCE deve ser on quando MERCADOPAGO_ENV=production.";
@@ -174,14 +189,38 @@ function productionBoot(env: Readonly<Record<string, string | undefined>>) {
 
 const vercelProductionPkceMessage = "MP_OAUTH_PKCE deve ser on quando VERCEL_ENV=production.";
 
+const subscriptionCheckoutMessage = {
+  whatsappMissing: "SUPPORT_WHATSAPP_NUMBER é obrigatório em produção para o checkout da assinatura.",
+  whatsappInvalid: "SUPPORT_WHATSAPP_NUMBER inválido.",
+  hoursMissing: "SUBSCRIPTION_MANUAL_ACTIVATION_HOURS é obrigatório em produção para o checkout da assinatura.",
+  hoursInvalid: "SUBSCRIPTION_MANUAL_ACTIVATION_HOURS inválido.",
+} as const;
+
+function blankEnv(raw: string | undefined) {
+  return raw === undefined || raw.trim() === "";
+}
+
+/**
+ * Checkout manual da assinatura. Sem estas envs o painel mostra a assinatura indisponível
+ * e o dono não consegue pagar. A mensagem cita o nome da variável, nunca o valor.
+ * Preview, dev e boot sem `VERCEL_ENV=production` não entram aqui.
+ */
+export function assertSubscriptionCheckoutEnv(env: Readonly<Record<string, string | undefined>> = process.env) {
+  if (blankEnv(env.SUPPORT_WHATSAPP_NUMBER)) throw new Error(subscriptionCheckoutMessage.whatsappMissing);
+  if (blankEnv(env.SUBSCRIPTION_MANUAL_ACTIVATION_HOURS)) throw new Error(subscriptionCheckoutMessage.hoursMissing);
+  if (readManualCheckoutConfig(env).available) return;
+  if (!readSupportWhatsappNumber(env)) throw new Error(subscriptionCheckoutMessage.whatsappInvalid);
+  throw new Error(subscriptionCheckoutMessage.hoursInvalid);
+}
+
 /**
  * O `register()` do instrumentation só roda quando a instância sobe. Na Vercel isso é
  * depois do deploy, e um throw vira 500 em toda rota, inclusive `/api/health`.
  * `next.config.ts` chama isto ao carregar. `VERCEL_ENV=production` exige `MP_OAUTH_PKCE=on`,
- * `bookingConfig` e `BOOKING_ACCESS_SECRET`. `VERCEL_ENV=preview` exige o mesmo
- * `BOOKING_ACCESS_SECRET`, para o preview não cair em `BETTER_AUTH_SECRET`.
- * PKCE e `bookingConfig` continuam só no build de produção. Dev não entra.
- * ` on ` vale `on`. A mensagem não repete o valor.
+ * `bookingConfig`, `BOOKING_ACCESS_SECRET` e as envs do checkout manual da assinatura.
+ * `VERCEL_ENV=preview` exige o mesmo `BOOKING_ACCESS_SECRET`, para o preview não cair em
+ * `BETTER_AUTH_SECRET`. PKCE, `bookingConfig` e o checkout continuam só no build de produção.
+ * Dev não entra. ` on ` vale `on`. A mensagem não repete o valor.
  */
 export function assertVercelProductionBuild(env: Readonly<Record<string, string | undefined>> = process.env) {
   const vercelEnv = env.VERCEL_ENV;
@@ -191,6 +230,7 @@ export function assertVercelProductionBuild(env: Readonly<Record<string, string 
     bookingConfig(env);
   }
   assertBookingAccessSecret(env);
+  if (vercelEnv === "production") assertSubscriptionCheckoutEnv(env);
 }
 
 /**
@@ -207,6 +247,7 @@ export function assertProductionSafeEnv(env: Readonly<Record<string, string | un
     MAGIC_LINK_CAPTURE_FILE: env.MAGIC_LINK_CAPTURE_FILE,
     MP_CAPTURE: env.MP_CAPTURE,
     SMTP_FROM: env.SMTP_FROM,
+    SMTP_REPLY_TO: env.SMTP_REPLY_TO,
   });
   if (!parsed.success) {
     const messages = [...new Set(parsed.error.issues.map((issue) => issue.message))];
@@ -218,6 +259,7 @@ export function assertProductionSafeEnv(env: Readonly<Record<string, string | un
   }
   bookingConfig(env);
   assertBookingAccessSecret(env);
+  if (env.VERCEL_ENV === "production") assertSubscriptionCheckoutEnv(env);
   warnBookingAccessSecretPrevious(env);
 }
 

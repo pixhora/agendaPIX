@@ -516,6 +516,7 @@ export async function openSlotLink(slug: string, token: string, identity: string
   if (status === "replaced" || link.status === "replaced") throw new HttpError(409, "link_replaced", LINK_REPLACED_MESSAGE);
   const service = await serviceForBusiness(database, business.id, link.serviceId, false);
   const policy = policyView(service, business, link.startsAt);
+  const access = await loadBookingAccess(business, database, now);
   return slotLinkOpenResponseSchema.parse({
     business: {
       name: business.name,
@@ -532,6 +533,7 @@ export async function openSlotLink(slug: string, token: string, identity: string
     expiresAt: iso(link.expiresAt),
     status,
     requiresPayerCpf: payerCpfRequired(),
+    bookingsPaused: access.bookingsPaused,
   });
 }
 
@@ -781,6 +783,8 @@ export async function paySlotLink(
   const requestKey = slotLinkRequestKey(hash);
   try {
     if (claimed.mode === "create") {
+      const access = await loadBookingAccess(business, database, claimed.now);
+      if (access.bookingsPaused) throw new HttpError(403, "bookings_paused", BOOKINGS_PAUSED_MESSAGE);
       const date = localDate(link.startsAt, business.timezone);
       const slots = await listBookableSlots(business, service, date, claimed.now, database);
       if (!slots.some((slot) => slot.startsAt.getTime() === link.startsAt.getTime())) {
