@@ -88,7 +88,7 @@ export function BookingFlow({
   });
   const [bookingResponse, setBookingResponse] = useState<BookingResponse | null>(null);
   const [trackingMiss, setTrackingMiss] = useState(false);
-  const [pixLoadError, setPixLoadError] = useState(false);
+  const [pixResumeFailure, setPixResumeFailure] = useState<"retry" | "gone" | null>(null);
   const [pixResumePending, setPixResumePending] = useState(false);
   const [pixResumeAttempt, setPixResumeAttempt] = useState(0);
   const resumeRaw = useSyncExternalStore(subscribePixResume, () => readPixResumeRaw(slug), getPixResumeServerSnapshot);
@@ -198,7 +198,15 @@ export function BookingFlow({
           if (!isCancelled) setTrackingMiss(true);
           return null;
         }
-        if (!res.ok) throw new Error("Reserva não encontrada ou expirada");
+        // Token vencido ou horário já liberado: apaga a sessão (com o accessToken) e a tela é final.
+        if (res.status === 401 || res.status === 403 || res.status === 410) {
+          if (!isCancelled) {
+            replacePixResume(slug, null);
+            setPixResumeFailure("gone");
+          }
+          return null;
+        }
+        if (!res.ok) throw new Error("pix_resume_unavailable");
         return parsePaymentStatusResponse(await res.json());
       })
       .then((paymentData) => {
@@ -262,14 +270,14 @@ export function BookingFlow({
             : null,
         };
 
-        setPixLoadError(false);
+        setPixResumeFailure(null);
         setBookingResponse(fullResponse);
         setStep(4);
       })
       .catch(() => {
         if (isCancelled) return;
-        // A rede falhou: a reserva continua neste separador. Tentar de novo busca o Pix outra vez.
-        setPixLoadError(true);
+        // A rede falhou ou o servidor respondeu 500: a reserva continua neste separador.
+        setPixResumeFailure("retry");
       })
       .finally(() => {
         if (!isCancelled) setPixResumePending(false);
@@ -390,6 +398,21 @@ export function BookingFlow({
       setBookingError({ message: msg, contactHref: null, tone: "danger" });
     } finally {
       setIsSubmittingBooking(false);
+    }
+  };
+
+  const returnToSchedule = () => {
+    replacePixResume(slug, null);
+    setPixResumeFailure(null);
+    setPixResumePending(false);
+    setSelectedService(null);
+    setSelectedSlot(null);
+    setBookingResponse(null);
+    setStep(1);
+    try {
+      window.history.replaceState(null, "", publicBookingPagePath(slug));
+    } catch {
+      // history indisponível
     }
   };
 
@@ -547,13 +570,31 @@ export function BookingFlow({
     );
   }
 
-  if (pixLoadError) {
+  if (pixResumeFailure === "gone") {
+    return (
+      <div className="min-h-dvh bg-paper">
+        {pageHeader}
+        <main id="content" className="mx-auto w-full max-w-xl px-4 py-8">
+          <section role="alert" className="rounded-frame bg-surface px-6 py-8 text-center shadow-[var(--shadow-card)]">
+            <h1 className="mx-auto max-w-[28ch] font-display text-xl font-extrabold tracking-tight text-ink sm:text-2xl">Este pagamento não está mais disponível.</h1>
+            <p className="mx-auto mt-3 max-w-[36ch] text-sm leading-relaxed text-muted">O horário pode ter sido liberado. Escolha um horário de novo para continuar.</p>
+            <Button type="button" variant="pixDeep" size="lg" className="mt-6 w-full" onClick={returnToSchedule}>
+              Ver horários
+            </Button>
+          </section>
+        </main>
+      </div>
+    );
+  }
+
+  if (pixResumeFailure === "retry") {
     return (
       <div className="min-h-dvh bg-paper">
         {pageHeader}
         <main id="content" className="mx-auto w-full max-w-xl px-4 py-8">
           <section role="alert" className="rounded-frame bg-surface px-6 py-8 text-center shadow-[var(--shadow-card)]">
             <h1 className="mx-auto max-w-[28ch] font-display text-xl font-extrabold tracking-tight text-ink sm:text-2xl">Não conseguimos carregar seu Pix</h1>
+            <p className="mx-auto mt-3 max-w-[36ch] text-sm leading-relaxed text-muted">Sua reserva continua guardada. Verifique sua internet e tente de novo.</p>
             <Button
               type="button"
               variant="pixDeep"

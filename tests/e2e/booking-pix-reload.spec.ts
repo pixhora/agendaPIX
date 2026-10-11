@@ -21,6 +21,7 @@ test("recarregar no meio do Pix com erro de rede não apaga a reserva", async ({
   await page.route("**/api/public/**/bookings/**/payment", (route) => route.abort("failed"));
   await page.goto(`/${meta.businessASlug}?bookingId=${bookingId}`);
   await expect(page.getByRole("heading", { name: "Não conseguimos carregar seu Pix" })).toBeVisible();
+  await expect(page.getByText("Sua reserva continua guardada. Verifique sua internet e tente de novo.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Tentar de novo" })).toBeVisible();
   await expect(page.getByRole("radiogroup", { name: /Serviços/ })).toHaveCount(0);
   const stored = await page.evaluate((key) => sessionStorage.getItem(key), pixResumeStorageKey(meta.businessASlug));

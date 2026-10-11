@@ -53,6 +53,7 @@ describe("WhatsApp de apoio", () => {
       "components/booking/BookingFlow.tsx",
       "components/dashboard/app-frame.tsx",
       "app/onboarding/error.tsx",
+      "app/onboarding/recebimento/error.tsx",
     ];
     for (const file of clientSurfaces) {
       const source = readFileSync(join(import.meta.dirname, "../../", file), "utf8");

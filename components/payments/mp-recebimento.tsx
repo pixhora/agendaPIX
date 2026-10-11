@@ -111,7 +111,8 @@ export function MpRecebimento({ legalPagesPublished }: { legalPagesPublished: bo
   if (gate === "signed-out") {
     return (
       <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 px-5 py-10">
-        <h1 className="font-display text-2xl font-extrabold tracking-tight">Seu cadastro está salvo. Entre com seu e-mail para continuar de onde parou.</h1>
+        <h1 className="font-display text-2xl font-extrabold tracking-tight">Seu cadastro está salvo.</h1>
+        <p className="text-base leading-relaxed">Entre com seu e-mail para continuar de onde parou.</p>
         <Link href={loginErrorPath("/onboarding/recebimento")} className={buttonVariants({ variant: "pixDeep", size: "lg" })}>Entrar</Link>
       </main>
     );
