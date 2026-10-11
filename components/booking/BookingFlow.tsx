@@ -636,29 +636,6 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
     );
   }
 
-  if (business.bookingsPaused && !bookingResponse) {
-    const whatsapp = business.contactWhatsapp?.replace(/^\+/, "");
-    return (
-      <div className="min-h-dvh bg-paper">
-        {pageHeader}
-        <main id="content" className="mx-auto max-w-md px-4 py-16">
-          <div className="space-y-4 rounded-card border border-line bg-surface p-6 text-center shadow-[var(--shadow-card)]">
-            <h1 className="font-display text-xl font-bold text-ink">Agendamento online pausado</h1>
-            <p className="text-sm text-muted">
-              {whatsapp ? `Fale com ${business.name} pelo WhatsApp para marcar um horário.` : `Fale com ${business.name} para marcar um horário.`}
-            </p>
-            {whatsapp && (
-              <Button asChild className="w-full">
-                <a href={`https://wa.me/${whatsapp}`} target="_blank" rel="noopener noreferrer">Falar no WhatsApp</a>
-              </Button>
-            )}
-          </div>
-        </main>
-        <AgendaPixFooter campaign="pagina_publica" />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-dvh bg-paper">
       {pageHeader}

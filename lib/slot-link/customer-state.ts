@@ -16,6 +16,7 @@ export type SlotLinkFailureCode =
   | "link_invalid"
   | "slot_unavailable"
   | "mp_not_connected"
+  | "bookings_paused"
   | "link_in_progress"
   | "idempotency_conflict"
   | "invalid_input"
@@ -33,6 +34,7 @@ export type CustomerScreen =
   | { kind: "updated"; businessName: string | null; whatsapp: string | null; publicPath: string }
   | { kind: "offline"; publicPath: string }
   | { kind: "mp"; whatsapp: string | null; publicPath: string }
+  | { kind: "paused"; whatsapp: string | null; publicPath: string }
   | { kind: "in_progress"; publicPath: string }
   | { kind: "conflict"; publicPath: string }
   | { kind: "retry"; rateLimited: boolean; whatsapp: string | null; publicPath: string; issuedAt: number }
@@ -75,6 +77,7 @@ export function screenFromStatus(link: SlotLinkOpenResponse, now: Date): Custome
   if (link.status === "cancelled") return { kind: "unavailable", publicPath: store.publicPath };
   if (slotStartsInPast(link.startsAt, now)) return { kind: "expired", ...store };
   if (link.status === "taken") return { kind: "taken", publicPath: store.publicPath };
+  if (link.bookingsPaused) return { kind: "paused", whatsapp: store.whatsapp, publicPath: store.publicPath };
   return { kind: "form", link };
 }
 
@@ -95,6 +98,9 @@ export function screenFromFailure(
   if (code === "link_cancelled" || code === "link_invalid") return { kind: "unavailable", publicPath: context.publicPath };
   if (code === "mp_not_connected") {
     return { kind: "mp", whatsapp: context.whatsapp ?? null, publicPath: context.publicPath };
+  }
+  if (code === "bookings_paused") {
+    return { kind: "paused", whatsapp: context.whatsapp ?? null, publicPath: context.publicPath };
   }
   if (code === "link_in_progress") return { kind: "in_progress", publicPath: context.publicPath };
   if (code === "idempotency_conflict") return { kind: "conflict", publicPath: context.publicPath };
@@ -137,7 +143,7 @@ export function failureCode(status: number, body: unknown): SlotLinkFailureCode 
   const code = readSlotLinkErrorCode(body);
   if (code === "rate_limited") return "rate_limited";
   if (code === "link_expired" || status === 410) return "link_expired";
-  if (code === "link_used" || code === "link_cancelled" || code === "link_replaced" || code === "link_invalid" || code === "slot_unavailable" || code === "mp_not_connected" || code === "link_in_progress" || code === "idempotency_conflict" || code === "invalid_input") {
+  if (code === "link_used" || code === "link_cancelled" || code === "link_replaced" || code === "link_invalid" || code === "slot_unavailable" || code === "mp_not_connected" || code === "bookings_paused" || code === "link_in_progress" || code === "idempotency_conflict" || code === "invalid_input") {
     return code;
   }
   if (status === 404) return "link_invalid";

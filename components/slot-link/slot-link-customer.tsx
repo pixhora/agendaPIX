@@ -133,7 +133,9 @@ export function SlotLinkCustomer({
       const saved = await readPayResume(token, payStores, clock().getTime());
       setSavedPayload(saved?.payload ?? null);
       if (saved?.bookingId) setHoldStarted(true);
-      const screen = screenFromStatus(opened, clock());
+      const listed = screenFromStatus(opened, clock());
+      // Pix já começado retoma mesmo com a agenda pausada. Horário novo vê a pausa.
+      const screen = listed.kind === "paused" && saved?.payload ? { kind: "form" as const, link: opened } : listed;
       await applyScreen(screen);
       return screen;
     } catch (error) {

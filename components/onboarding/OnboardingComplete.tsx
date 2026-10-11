@@ -6,6 +6,7 @@ import { ArrowRight, Check, ExternalLink, FileQuestion, Loader2, TriangleAlert }
 import { Button, buttonVariants } from "@/components/ui/button";
 import { BrandLink } from "@/components/ui/brand";
 import { cn } from "@/lib/utils";
+import { mpConnectionUrl, parseMpOwnerStatus } from "@/lib/mercadopago/contract";
 import { provisionBusiness, type ProvisioningResult } from "@/lib/provisioning";
 import {
   IDEMPOTENCY_KEY,
@@ -21,7 +22,7 @@ import {
 type State =
   | { kind: "loading" }
   | { kind: "missing" }
-  | { kind: "done"; publicPath: string; slug: string }
+  | { kind: "done"; publicPath: string; slug: string; businessId: string | null }
   | { kind: "error"; result: Extract<ProvisioningResult, { ok: false }> };
 
 /**
@@ -35,7 +36,7 @@ export function OnboardingComplete() {
   const run = useCallback(async () => {
     const committed = readCommitResult();
     if (committed) {
-      setState({ kind: "done", publicPath: committed.publicPath, slug: committed.slug });
+      setState({ kind: "done", publicPath: committed.publicPath, slug: committed.slug, businessId: committed.businessId ?? null });
       return;
     }
     const setup = readCompletedSetup();
@@ -47,7 +48,12 @@ export function OnboardingComplete() {
     const result = await provisionBusiness(setup, { idempotencyKey: ensureOnboardingIdempotencyKey() });
     if (result.ok) {
       clearCompletedSetup();
-      setState({ kind: "done", publicPath: result.publicPath, slug: result.slug });
+      setState({
+        kind: "done",
+        publicPath: result.publicPath,
+        slug: result.slug,
+        businessId: typeof result.businessId === "string" && result.businessId.length > 0 ? result.businessId : null,
+      });
       return;
     }
     if (result.code === "conflict" || result.code === "idempotency_conflict" || result.code === "invalid_payload") {
@@ -100,18 +106,7 @@ export function OnboardingComplete() {
           )}
 
           {state.kind === "done" && (
-            <div className="space-y-6 text-center">
-              <span aria-hidden="true" className="animate-confirm-pop mx-auto flex size-16 items-center justify-center rounded-full bg-pix text-pix-foreground"><Check className="size-8" strokeWidth={3} /></span>
-              <div className="space-y-2">
-                <h1 className="font-display text-3xl font-extrabold tracking-tight">Sua agenda está no ar</h1>
-                <p className="text-muted">Compartilhe o link no WhatsApp e no Instagram. Cada reserva chega com o sinal pago no Pix.</p>
-              </div>
-              <p className="rounded-field border border-line bg-subtle px-4 py-3 font-semibold break-all">/{state.slug}</p>
-              <div className="flex flex-col gap-2">
-                <Link href="/dashboard" className={primary}>Ir para o painel<ArrowRight aria-hidden="true" /></Link>
-                <Link href={state.publicPath} className={secondary}><ExternalLink aria-hidden="true" />Ver minha página</Link>
-              </div>
-            </div>
+            <DoneAgenda slug={state.slug} publicPath={state.publicPath} businessId={state.businessId} primary={primary} secondary={secondary} />
           )}
 
           {state.kind === "error" && (
@@ -134,6 +129,61 @@ export function OnboardingComplete() {
           )}
         </div>
       </main>
+    </div>
+  );
+}
+
+function DoneAgenda({
+  slug,
+  publicPath,
+  businessId,
+  primary,
+  secondary,
+}: {
+  slug: string;
+  publicPath: string;
+  businessId: string | null;
+  primary: string;
+  secondary: string;
+}) {
+  const [connected, setConnected] = useState<boolean | null>(businessId ? null : false);
+
+  useEffect(() => {
+    if (!businessId) return;
+    const controller = new AbortController();
+    void fetch(mpConnectionUrl(businessId), { cache: "no-store", signal: controller.signal })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload) => {
+        setConnected(parseMpOwnerStatus(payload)?.status === "connected");
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setConnected(false);
+      });
+    return () => controller.abort();
+  }, [businessId]);
+
+  return (
+    <div className="space-y-6 text-center">
+      <span aria-hidden="true" className="animate-confirm-pop mx-auto flex size-16 items-center justify-center rounded-full bg-pix text-pix-foreground"><Check className="size-8" strokeWidth={3} /></span>
+      <div className="space-y-2">
+        <h1 className="font-display text-3xl font-extrabold tracking-tight">Sua agenda está no ar</h1>
+        {connected === true ? (
+          <p className="text-muted">Compartilhe o link no WhatsApp e no Instagram. Cada reserva chega com o sinal pago no Pix.</p>
+        ) : connected === false ? (
+          <p className="text-muted">Conecte o Mercado Pago para receber o sinal no Pix.</p>
+        ) : (
+          <p className="text-sm text-muted" role="status">Conferindo o Mercado Pago…</p>
+        )}
+      </div>
+      <p className="rounded-field border border-line bg-subtle px-4 py-3 font-semibold break-all">/{slug}</p>
+      <div className="flex flex-col gap-2">
+        {connected === false ? (
+          <Link href="/onboarding/recebimento" className={primary}>Conectar agora</Link>
+        ) : null}
+        <Link href="/dashboard" className={connected === false ? secondary : primary}>Ir para o painel<ArrowRight aria-hidden="true" /></Link>
+        <Link href={publicPath} className={secondary}><ExternalLink aria-hidden="true" />Ver minha página</Link>
+      </div>
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { bookingConfig } from "../../lib/bookings/config";
 import { demoSteps, faqItems, holdAnswer, moneyLead } from "../../lib/marketing/landing-copy";
+import { subscriptionActivationHours, subscriptionPriceRule } from "../../lib/marketing/plans";
 import { formatMinutes, getPublicBookingFacts, type PublicBookingFacts } from "../../lib/marketing/facts";
 
 const feminineBrand = /(?:^|[^\p{L}])(?:a|da|pela|na)\s+AgendaPix/iu;
@@ -161,6 +162,20 @@ describe("landing copy", () => {
     const files = [...sourceFiles("components/landing"), ...sourceFiles("lib/marketing"), "app/page.tsx"];
     const offenders = files.flatMap((file) => (/10 min/i.test(readFileSync(file, "utf8")) ? [file] : []));
     expect(offenders).toEqual([]);
+  });
+
+  it("says the old link redirects and the plan rule follows the activation hours", () => {
+    const answer = faqItems({ holdMinutes: 30, pixRecipientDisplayName: null, requiresPayerCpf: false }).find((item) => item.id === "change_link");
+    expect(answer?.answer).toBe("Dá pra mudar o link em Configurações. O link antigo passa a levar para o novo.");
+    expect(subscriptionActivationHours({})).toBeNull();
+    expect(subscriptionActivationHours({ SUBSCRIPTION_MANUAL_ACTIVATION_HOURS: "0" })).toBeNull();
+    expect(subscriptionActivationHours({ SUBSCRIPTION_MANUAL_ACTIVATION_HOURS: "02" })).toBeNull();
+    expect(subscriptionPriceRule(null)).toBe("R$ 49/mês, pago pela página de assinatura. Ativação assim que confirmarmos o pagamento.");
+    expect(subscriptionPriceRule(1)).toBe("R$ 49/mês, pago pela página de assinatura. Ativação em até 1 hora depois do pagamento.");
+    expect(subscriptionPriceRule(6)).toBe("R$ 49/mês, pago pela página de assinatura. Ativação em até 6 horas depois do pagamento.");
+    const pricing = readFileSync("components/landing/LandingPricing.tsx", "utf8");
+    expect(pricing.match(/text-\[14px\]/g)).toHaveLength(1);
+    expect(pricing.match(/\{rule\}/g)).toHaveLength(1);
   });
 
   it("does not hardcode a payment deadline in the landing components", () => {

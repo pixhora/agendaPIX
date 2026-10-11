@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Clock, Link2Off, WifiOff } from "lucide-react";
+import { Clock, Link2Off, Pause, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   CONTINUE_PAYMENT,
+  CUSTOMER_BOOKINGS_PAUSED,
+  CUSTOMER_PAUSED_LATER,
+  CUSTOMER_PAUSED_RECEIPT,
   CUSTOMER_CONFLICT_BODY,
   CUSTOMER_CONFLICT_TITLE,
   CUSTOMER_EXPIRED_TITLE,
@@ -92,6 +95,22 @@ export function SlotLinkNotice({
     return (
       <NoticeFrame titleRef={titleRef} title={CUSTOMER_OFFLINE} icon={<WifiOff aria-hidden="true" className="size-8" />}>
         {onRetry ? <Button type="button" variant="pix" size="lg" className="w-full" onClick={onRetry}>{TRY_AGAIN}</Button> : null}
+      </NoticeFrame>
+    );
+  }
+
+  if (screen.kind === "paused") {
+    const whatsapp = whatsAppStoreHref(screen.whatsapp);
+    return (
+      <NoticeFrame titleRef={titleRef} title={CUSTOMER_BOOKINGS_PAUSED} icon={<Pause aria-hidden="true" className="size-8" />}>
+        {whatsapp ? (
+          <Button asChild variant="pixDeep" size="lg" className="w-full">
+            <a href={whatsapp} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">{TALK_TO_STORE}</a>
+          </Button>
+        ) : (
+          <p className="text-sm text-muted">{CUSTOMER_PAUSED_LATER}</p>
+        )}
+        <p className="text-sm text-muted">{CUSTOMER_PAUSED_RECEIPT}</p>
       </NoticeFrame>
     );
   }
