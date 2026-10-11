@@ -550,11 +550,12 @@ test("gerar novo link confirma, substitui o antigo e explica o erro", async ({ p
 
   mode = "ok";
   await dialog.getByRole("button", { name: "Gerar novo link" }).click();
-  await expect(page.getByRole("heading", { name: "Link pronto" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Copiar link" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Enviar no WhatsApp" })).toBeVisible();
+  const ready = page.getByRole("dialog", { name: "Link pronto" });
+  await expect(ready.getByRole("heading", { name: "Link pronto" })).toBeVisible();
+  await expect(ready.getByTestId("slot-link-ready").getByRole("button", { name: "Copiar link", exact: true })).toBeVisible();
+  await expect(ready.getByRole("button", { name: "Enviar no WhatsApp" })).toBeVisible();
   if (testInfo.project.name === "desktop") await shootMatrix(page, "dono-reemitir-pronto");
-  await page.getByRole("button", { name: "Fechar" }).click();
+  await ready.getByRole("button", { name: "Fechar" }).click();
   await expect(page.getByText("Substituído")).toBeVisible();
   await expect(page.getByText("Aguardando pagamento").first()).toBeVisible();
   await expect(page.getByTestId("sent-links")).not.toContainText(nextToken);
