@@ -113,6 +113,26 @@ describe("lembretes da devolução manual", () => {
     expect(sent).toEqual(["dono@example.com"]);
   });
 
+  it("falha de envio solta a trava da véspera e registra o log sem o endereço", async () => {
+    let released = false;
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+    const ports: ReminderPorts = {
+      async load() { return [item()]; },
+      async claimEve() { return true; },
+      async releaseEve() { released = true; },
+      async send(mail) { throw new Error(`smtp down ${mail.to}`); },
+      async recordEve() { throw new Error("não deveria gravar"); },
+      async recordDaily() {},
+    };
+    expect(await runManualRefundReminders(ports, new Date("2026-10-22T06:00:00.000Z"))).toEqual({ emails: 0 });
+    expect(released).toBe(true);
+    const logged = errorLog.mock.calls.map((call) => call.map(String).join(" ")).join("\n");
+    expect(logged).toContain("[mail] scope=refund_deadline_eve code=send_failed");
+    expect(logged).not.toContain("dono@example.com");
+    expect(logged).not.toContain("Ana Souza");
+    errorLog.mockRestore();
+  });
+
   it("dois jobs ao mesmo tempo enviam um e-mail, só para o dono", async () => {
     const claimed = new Set<string>();
     let gate: Promise<void> = Promise.resolve();

@@ -22,6 +22,7 @@ export const apiErrorCodeSchema = z.enum([
   "link_invalid",
   "slot_unavailable",
   "mp_not_connected",
+  "bookings_paused",
 ]);
 
 export type ApiErrorCode = z.infer<typeof apiErrorCodeSchema>;

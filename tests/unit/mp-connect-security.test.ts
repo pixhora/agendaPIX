@@ -184,6 +184,37 @@ describe("mp-connect não desconecta sem confirmação nem dedupe", () => {
     expect(mpConnectRequestId("a".repeat(129))).toBeNull();
     expect(mpConnectRequestId("req\nid")).toBeNull();
   });
+
+  it("trocar o x-request-id invalida a assinatura e não consulta eventos nem o Mercado Pago", async () => {
+    const hook = harness();
+    const events: WebhookEventPort = {
+      seen: async () => { throw new Error("dedupe antes da assinatura"); },
+      record: async () => { throw new Error("dedupe antes da assinatura"); },
+      deauthorize: async () => { throw new Error("dedupe antes da assinatura"); },
+    };
+    const swapped = signed("req-original", deauthorizedBody);
+    swapped.headers.set("x-request-id", "req-trocado");
+    await expect(handleMpConnectWebhook({
+      ...swapped,
+      env,
+      store: hook.store,
+      events,
+      fetchImpl: async () => { throw new Error("nao devia chamar o MP"); },
+    })).rejects.toMatchObject({ status: 401, code: "invalid_signature" });
+    expect((await hook.store.findByBusinessId(businessId))?.status).toBe("connected");
+    expect(hook.calls).toEqual([]);
+    expect(hook.marks()).toBe(0);
+  });
+
+  it("user_id de outro vendedor não desconecta a conexão real", async () => {
+    const hook = harness();
+    const body = JSON.stringify({ action: "application.deauthorized", type: "mp-connect", user_id: "9999" });
+    expect(await hook.run("req-other-user", body)).toEqual({ outcome: "ignored", reason: "no_token" });
+    expect((await hook.store.findByBusinessId(businessId))?.status).toBe("connected");
+    expect((await hook.store.findByBusinessId(businessId))?.accessTokenEnc).not.toBeNull();
+    expect(hook.calls).toEqual([]);
+    expect(hook.marks()).toBe(0);
+  });
 });
 
 describe("webhook_events grava o efeito na mesma transação", () => {

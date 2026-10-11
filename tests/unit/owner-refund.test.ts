@@ -262,6 +262,23 @@ describe("devolução automática só no atraso sem horário", () => {
     expect(ports.audits.some((row) => row.detail.actor === "system" && row.detail.reason === "late_no_slot")).toBe(true);
   });
 
+  it("falha do e-mail não desfaz o estorno e não grava o aviso", async () => {
+    const ports = memory(view());
+    const provider = { refundCharge: async () => ({ status: "refunded" as const, refundId: "auto-1" }) };
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+    const mailer = async (to: string) => {
+      throw new Error(`smtp down ${to}`);
+    };
+    expect(await settleAutomaticLateRefund(ports, provider, "pay-1", mailer, now)).toBe("submitted");
+    expect(ports.audits.some((row) => row.action === "automatic_refund")).toBe(true);
+    expect(ports.audits.some((row) => row.action === "notice_late_refunded")).toBe(false);
+    const logged = errorLog.mock.calls.map((call) => call.map(String).join(" ")).join("\n");
+    expect(logged).toContain("[mail] scope=owner_notice code=send_failed");
+    expect(logged).not.toContain("dono@example.com");
+    expect(logged).not.toContain("Ana");
+    errorLog.mockRestore();
+  });
+
   it("falha do gateway marca failed e pede devolução manual, sem segundo estorno", async () => {
     const ports = memory(view());
     let calls = 0;

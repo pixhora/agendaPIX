@@ -9,6 +9,7 @@ import { signBookingAccessToken } from "../../lib/bookings/access-mac";
 import { createBooking, getBookingPayment, hash } from "../../lib/bookings/service";
 import * as bookingService from "../../lib/bookings/service";
 import { cancelSlotLink, createSlotLink, deleteSlotLinksForBusiness, listSlotLinks, openSlotLink, paySlotLink, purgeExpiredSlotLinkLabels, readSlotLinkPreview, reissueSlotLink, slotLinkPayIdempotencyHash, slotLinkPayMessage } from "../../lib/bookings/slot-link";
+import { dashboardBookings } from "../../lib/dashboard/data";
 import { databaseEnvSchema } from "../../lib/env";
 import { applyPaidEvent } from "../../lib/payments/apply-paid";
 import { FakePaymentProvider } from "../../lib/payments/fake";
@@ -732,5 +733,39 @@ describe("link de um horário", () => {
       status: 404,
       code: "booking_not_found",
     });
+  });
+
+  it("agenda pausada recusa pagamento novo do link e solta o claim; retomada e Pix já pago seguem", async () => {
+    const confirmed = await makeLink(0);
+    const paid = await pay(confirmed.token, 80, "peer:192.0.2.90", payKey(80));
+    const charge = provider.markPaid(paid.payment!.externalId!);
+    await database.transaction(async (tx) => {
+      const result = await applyPaidEvent(tx, "fake", polledPaidEvent(charge, hash), new Date());
+      expect(result.outcome).toBe("processed");
+    });
+    const held = await makeLink(1);
+    const hold = await pay(held.token, 81, "peer:192.0.2.91", payKey(81));
+    const idle = await makeLink(2);
+    await database.update(schema.businesses).set({ trialEndsAt: new Date("2020-01-01T00:00:00.000Z") }).where(eq(schema.businesses.id, shop.businessId));
+
+    const opened = await openSlotLink(shop.slug, idle.token, "peer:192.0.2.92", database);
+    expect(opened.bookingsPaused).toBe(true);
+    expect(opened.status).toBe("pending");
+    await expect(pay(idle.token, 82, "peer:192.0.2.93", payKey(82))).rejects.toMatchObject({ status: 403, code: "bookings_paused" });
+    const [idleRow] = await database.select().from(schema.slotLinks).where(eq(schema.slotLinks.id, idle.id));
+    expect(idleRow.payStartedAt).toBeNull();
+    expect(idleRow.bookingId).toBeNull();
+    expect(idleRow.payIdempotencyHash).toBeNull();
+    await expect(createSlotLink(shop.businessId, shop.ownerId, {
+      serviceId: shop.serviceId, date: DATE, time: clock(3),
+    }, database)).rejects.toMatchObject({ status: 403, code: "bookings_paused" });
+    await expect(reissueSlotLink(shop.businessId, shop.ownerId, idle.id, database)).rejects.toMatchObject({ status: 403, code: "bookings_paused" });
+
+    const resumed = await pay(held.token, 81, "peer:192.0.2.94", payKey(81));
+    expect(resumed.bookingId).toBe(hold.bookingId);
+    const [booking] = await database.select().from(schema.bookings).where(eq(schema.bookings.id, paid.bookingId));
+    expect(booking.status).toBe("confirmed");
+    const listed = await dashboardBookings(shop.ownerId, shop.businessId, [DATE], database);
+    expect(listed.some((row) => row.id === paid.bookingId && row.status === "confirmed")).toBe(true);
   });
 });
