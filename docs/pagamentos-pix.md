@@ -78,4 +78,17 @@ Tópico `payment`. Manifesto `id:{data.id};request-id:{x-request-id};ts:{ts};` e
 
 ## Segredos
 
-`BOOKING_ACCESS_SECRET` assina o link da reserva. `RATE_LIMIT_SECRET` assina o balde antiabuso. `MERCADOPAGO_ACCESS_TOKEN` e `MERCADOPAGO_WEBHOOK_SECRET` continuam separados. Segredo de booking vazio cai em `BETTER_AUTH_SECRET`.
+`BOOKING_ACCESS_SECRET` assina o link da reserva e o HMAC da chave de pagamento do link. `RATE_LIMIT_SECRET` assina o balde antiabuso. `MERCADOPAGO_ACCESS_TOKEN` e `MERCADOPAGO_WEBHOOK_SECRET` continuam separados. Fora de produção e fora do preview da Vercel, `BOOKING_ACCESS_SECRET` vazio ainda cai em `BETTER_AUTH_SECRET`. Em produção (`NODE_ENV=production` no boot) e no `next build` com `VERCEL_ENV=production` ou `VERCEL_ENV=preview` esse fallback não existe: vazio, com menos de 32 caracteres, com prefixo de exemplo ou igual a `BETTER_AUTH_SECRET` impede o processo de subir. Production e Preview usam valores diferentes. A mensagem cita o nome e o motivo, nunca o valor.
+
+Token novo de acompanhamento sai só com o segredo atual. O banco guarda o sha256 dele. A leitura compara esse hash em tempo constante e não consulta `BOOKING_ACCESS_SECRET_PREVIOUS`, então a rotação não invalida o link que o cliente já tem. O HMAC da chave de pagamento do link de horário é o contrário: a busca aceita o segredo atual ou `BOOKING_ACCESS_SECRET_PREVIOUS`. Sem `PREVIOUS`, o HMAC antigo não é encontrado e a mesma chave não retoma o Pix (com o claim ativo, `409 link_in_progress`).
+
+## Rollout da 0021
+
+Antes do merge e do deploy:
+
+1. No Neon, crie o branch `backup-pre-0021` a partir de `production`.
+2. Na Vercel, crie `BOOKING_ACCESS_SECRET` em Production e em Preview, com valores diferentes, **antes** de publicar. O link de acompanhamento que o cliente já tem continua válido sem `BOOKING_ACCESS_SECRET_PREVIOUS`. Defina `PREVIOUS` só para retomar um Pix do link de horário começado com o segredo antigo (se o segredo estava vazio, esse HMAC usava o `BETTER_AUTH_SECRET` da época). Remova `PREVIOUS` só depois que esses pagamentos passarem. Não rotacione uma segunda vez enquanto eles estiverem pendentes. Se a retomada não achar o token nem com o segredo atual nem com `PREVIOUS`, a resposta traz o token atual, o hash gravado não muda, e o processo avisa só o id da reserva. `PREVIOUS` precisa ter pelo menos 32 caracteres. Pode repetir `BETTER_AUTH_SECRET`; o segredo atual não pode. Se repetir o segredo atual, o boot avisa, sem o valor.
+3. Rode a migration na URL direta (sem `-pooler`). A origem da URL, nesta ordem, é `env`, `.env.migrate`, `.env` ou o prompt oculto. O script imprime só essa origem, nunca o valor. Colar a URL e o Enter no prompt vale um Enter. Com terminal, a confirmação das pendentes aparece também quando a URL veio do ambiente, salvo `--yes`. Sem terminal, só `DATABASE_URL` já no ambiente segue sem `--yes`. `.env` e `.env.migrate` exigem `--yes`. Apague `.env.migrate` em seguida. CI e Docker, com `DATABASE_URL` no ambiente e sem TTY, não perguntam e não esperam input.
+4. Aí sim, merge e deploy.
+
+O passo a passo também está em `docs/CONTRATOS.md`, na seção do link de um horário.

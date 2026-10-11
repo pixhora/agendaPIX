@@ -1,10 +1,10 @@
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { and, eq, gt, inArray, lt, or, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { getDb } from "../../db";
 import * as schema from "../../db/schema";
-import { bookingAccessSecret } from "../env";
+import { accessTokenForStoredHash, signBookingAccessToken } from "./access-mac";
 import { HttpError } from "../http";
 import { paymentsConfig } from "../payments/config";
 import { assertMpConnectedForDeposit } from "../mercadopago-oauth/bookability";
@@ -69,9 +69,15 @@ export function chargeIdempotencyKey(businessId: string, requestKey: string) {
   return `${value.slice(0, 8)}-${value.slice(8, 12)}-${value.slice(12, 16)}-${value.slice(16, 20)}-${value.slice(20)}`;
 }
 function accessToken(businessId: string, bookingId: string) {
-  const secret = bookingAccessSecret();
-  if (!secret) throw new HttpError(503, "booking_unavailable", "Agendamento indisponível. Tente novamente mais tarde.");
-  return createHmac("sha256", secret).update(`booking-access:v1:${businessId}:${bookingId}`).digest("base64url");
+  const token = signBookingAccessToken(businessId, bookingId);
+  if (!token) throw new HttpError(503, "booking_unavailable", "Agendamento indisponível. Tente novamente mais tarde.");
+  return token;
+}
+
+function accessTokenForExisting(businessId: string, bookingId: string, accessTokenHash: string | null) {
+  const token = accessTokenForStoredHash(businessId, bookingId, accessTokenHash);
+  if (!token) throw new HttpError(503, "booking_unavailable", "Agendamento indisponível. Tente novamente mais tarde.");
+  return token;
 }
 export async function lockBusiness(database: Database, businessId: string) {
   await database.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${businessId}, 0))`);
@@ -298,7 +304,7 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
       if (!bookingRequestMatches(existing.requestHash, input)) throw new HttpError(409, "idempotency_conflict", "Essa chave já foi usada em outro agendamento.");
       const [payment] = await transaction.select().from(schema.payments).where(and(eq(schema.payments.businessId, business.id), eq(schema.payments.bookingId, existing.id))).limit(1);
       if (onReserved) await onReserved(transaction, existing.id);
-      return { kind: "existing" as const, booking: existing, payment, token: accessToken(business.id, existing.id), now };
+      return { kind: "existing" as const, booking: existing, payment, token: accessTokenForExisting(business.id, existing.id, existing.accessTokenHash), now };
     }
     const access = await loadBookingAccess(business, transaction);
     if (access.bookingsPaused) throw new HttpError(403, "bookings_paused", BOOKINGS_PAUSED_MESSAGE);
@@ -372,9 +378,10 @@ function bearerToken(authorization: string | null) {
   return PAYMENT_BEARER.exec(authorization ?? "")?.[1] ?? null;
 }
 
+/** Compara o sha256 do token que o cliente apresenta com o hash gravado. Não recalcula o HMAC, então a rotação do segredo não invalida o link já emitido. */
 function tokenMatches(token: string, accessTokenHash: string | null) {
-  return Boolean(accessTokenHash && /^[a-f0-9]{64}$/.test(accessTokenHash)
-    && timingSafeEqual(Buffer.from(hash(token), "hex"), Buffer.from(accessTokenHash, "hex")));
+  if (!accessTokenHash || !/^[a-f0-9]{64}$/.test(accessTokenHash)) return false;
+  return timingSafeEqual(Buffer.from(hash(token), "hex"), Buffer.from(accessTokenHash, "hex"));
 }
 
 export type PaymentGatewayPoll = {

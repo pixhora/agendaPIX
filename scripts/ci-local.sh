@@ -101,6 +101,7 @@ stage_docker() {
   "$CONTAINER_BIN" run -d --name agendapix --network host \
     -e PORT=3000 -e DATABASE_URL="$db_url" -e BETTER_AUTH_URL=http://localhost:3000 \
     -e BETTER_AUTH_SECRET="$(openssl rand -base64 32)" \
+    -e BOOKING_ACCESS_SECRET="$(openssl rand -base64 32)" \
     -e SMTP_HOST=localhost -e SMTP_PORT=1025 -e SMTP_SECURE=false \
     -e "SMTP_FROM=AgendaPix <ci@agendapix.dev.br>" "$PW_TAG" >/dev/null
   for _ in $(seq 1 30); do curl -fsS http://localhost:3000/api/health >/dev/null 2>&1 && break; sleep 1; done
@@ -115,7 +116,8 @@ stage_docker() {
   say "reconciliador (uma passagem e loop)"
   "$CONTAINER_BIN" run --rm --network host -e NODE_ENV=development -e DATABASE_URL="$db_url" \
     -e PAYMENT_PROVIDER=fake -e FAKE_WEBHOOK_SECRET="$(openssl rand -hex 32)" "$PW_TAG" node reconcile.mjs --once --json >/dev/null || die "reconcile --once"
-  "$CONTAINER_BIN" run -d --name agendapix-worker --network host -e DATABASE_URL="$db_url" -e RECONCILE_INTERVAL_SECONDS=5 "$PW_TAG" node reconcile.mjs >/dev/null
+  "$CONTAINER_BIN" run -d --name agendapix-worker --network host -e DATABASE_URL="$db_url" \
+    -e BOOKING_ACCESS_SECRET="$(openssl rand -base64 32)" -e RECONCILE_INTERVAL_SECONDS=5 "$PW_TAG" node reconcile.mjs >/dev/null
   sleep 12
   "$CONTAINER_BIN" logs agendapix-worker 2>&1 | grep -q 'reconcile: loop' || die "worker sem loop"
   say "HEALTHCHECK"
