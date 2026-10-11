@@ -28,7 +28,7 @@ import { availabilitySchema, bookingInputSchema, requestKeySchema, slugSchema } 
 import { depositSlotAllowed } from "./hold";
 import { bookingConfig, type BookingConfig } from "./config";
 import { getPublicBookingFacts, payerCpfRequired } from "../marketing/facts";
-import { withDerivedExpiry } from "./payment-status";
+import { chargeFailedForPayment, withDerivedExpiry } from "./payment-status";
 import { consumeBookingRateLimit, consumePaymentPollRateLimit, tenantScopedHash } from "./rate-limit";
 import { refreshPaidFromGateway, shouldPollGateway } from "../payments/status-poll";
 
@@ -331,6 +331,9 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
       if (!bookingRequestMatches(existing.requestHash, input)) throw new HttpError(409, "idempotency_conflict", "Essa chave já foi usada em outro agendamento.");
       const [payment] = await transaction.select().from(schema.payments).where(and(eq(schema.payments.businessId, business.id), eq(schema.payments.bookingId, existing.id))).limit(1);
       if (onReserved) await onReserved(transaction, existing.id);
+      if (payment?.status === "failed" && !payment.externalId) {
+        return { kind: "refused" as const, booking: existing, payment, token: accessTokenForExisting(business.id, existing.id, existing.accessTokenHash), now };
+      }
       return { kind: "existing" as const, booking: existing, payment, token: accessTokenForExisting(business.id, existing.id, existing.accessTokenHash), now };
     }
     const access = await loadBookingAccess(business, transaction);
@@ -387,6 +390,11 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
     if (onReserved) await onReserved(transaction, booking.id);
     return { kind: "created" as const, booking, payment, token, now, providerName: expiresAt ? (paymentProvider ?? getPaymentProvider()).name : null };
   });
+
+  if (reserved.kind === "refused" && reserved.payment) {
+    await markCreatingPaymentFailed(database, reserved.payment);
+    throw paymentUnavailable(false);
+  }
 
   // Fora de qualquer transação: cobra o gateway. O horário já está preso pela exclusão gist.
   if (reserved.payment?.status === "creating") {
@@ -446,19 +454,24 @@ export async function getBookingPayment(
     throw new HttpError(404, "booking_not_found", "Agendamento não encontrado.");
   }
   const now = new Date();
+  const present = async (row: typeof booking, at: Date) => {
+    const view = await bookingView(row, database, at);
+    return { ...withDerivedExpiry(view, at), chargeFailed: chargeFailedForPayment(view.payment) };
+  };
   const view = await bookingView(booking, database, now);
-  if (!shouldPollGateway(view.payment, now)) return withDerivedExpiry(view, now);
+  const current = { ...withDerivedExpiry(view, now), chargeFailed: chargeFailedForPayment(view.payment) };
+  if (!shouldPollGateway(view.payment, now)) return current;
   let provider = gateway?.provider;
   if (!provider) {
     try { provider = getPaymentProvider(); }
-    catch { return withDerivedExpiry(view, now); }
+    catch { return current; }
   }
   const payment = view.payment;
-  if (!payment?.externalId || provider.name !== payment.provider) return withDerivedExpiry(view, now);
+  if (!payment?.externalId || provider.name !== payment.provider) return current;
   let timeoutMs = gateway?.timeoutMs;
   if (timeoutMs == null) {
     try { timeoutMs = paymentsConfig().PAYMENT_PROVIDER_TIMEOUT_MS; }
-    catch { return withDerivedExpiry(view, now); }
+    catch { return current; }
   }
   let applied = false;
   try {
@@ -467,10 +480,9 @@ export async function getBookingPayment(
       provider, timeoutMs, now,
     });
   } catch {
-    return withDerivedExpiry(view, now);
+    return current;
   }
-  if (!applied) return withDerivedExpiry(view, now);
+  if (!applied) return current;
   const [fresh] = await database.select().from(schema.bookings).where(and(eq(schema.bookings.businessId, booking.businessId), eq(schema.bookings.id, booking.id))).limit(1);
-  const readAt = new Date();
-  return withDerivedExpiry(await bookingView(fresh ?? booking, database, readAt), readAt);
+  return present(fresh ?? booking, new Date());
 }
