@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import type { PublicService } from "./types";
 import { formatCurrency, formatDuration } from "./formatters";
 import { whatsappHref } from "./booking-error";
-import { BOOKINGS_PAUSED_COPY, TALK_TO_STORE } from "./customer-copy";
+import { BOOKINGS_PAUSED_COPY, BOOKINGS_PAUSED_LATER, BOOKINGS_PAUSED_RECEIPT, TALK_TO_STORE } from "./customer-copy";
 
 interface PausedStateProps {
   businessName: string;
@@ -18,7 +18,7 @@ interface PausedStateProps {
 }
 
 /** Página pública quando o negócio não aceita novos agendamentos. */
-export function PausedState({ businessName, contactWhatsapp, services, autoFocus = false }: PausedStateProps) {
+export function PausedState({ contactWhatsapp, services, autoFocus = false }: PausedStateProps) {
   const titleRef = useRef<HTMLHeadingElement>(null);
   const href = whatsappHref(contactWhatsapp);
 
@@ -40,9 +40,9 @@ export function PausedState({ businessName, contactWhatsapp, services, autoFocus
             <a href={href} target="_blank" rel="noopener noreferrer">{TALK_TO_STORE}</a>
           </Button>
         ) : (
-          <p className="mt-6 text-sm text-muted">Fale com {businessName} pelos canais de sempre.</p>
+          <p className="mt-6 text-sm text-muted">{BOOKINGS_PAUSED_LATER}</p>
         )}
-        <p className="mt-4 text-[13px] text-muted">Já agendou? Seu comprovante continua valendo.</p>
+        <p className="mt-4 text-[13px] text-muted">{BOOKINGS_PAUSED_RECEIPT}</p>
       </section>
 
       {services.length > 0 ? (

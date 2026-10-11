@@ -32,6 +32,10 @@ export const TALK_TO_STORE = "Falar com a loja";
 /** 403 `bookings_paused` na página pública. Não cita assinatura nem pagamento do dono. */
 export const BOOKINGS_PAUSED_COPY = "Esta agenda não está aceitando novos agendamentos agora.";
 
+export const BOOKINGS_PAUSED_LATER = "Tente de novo mais tarde.";
+
+export const BOOKINGS_PAUSED_RECEIPT = "Já agendou? Seu comprovante continua valendo.";
+
 export const BUSINESS_LOAD_COPY = "Não foi possível carregar os serviços deste estabelecimento.";
 
 export const BUSINESS_SLOW_COPY = "A conexão demorou muito para responder. Verifique sua internet e tente novamente.";

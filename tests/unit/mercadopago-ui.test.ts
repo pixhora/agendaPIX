@@ -133,7 +133,7 @@ describe("Mercado Pago connect consent", () => {
     expect(html).toContain('href="/onboarding/concluir"');
     expect(html).toContain("Último passo: receber o sinal no Pix");
     expect(html).toContain("Fazer depois");
-    expect(html).toContain("Se fizer depois, sua página já fica no ar e os serviços sem sinal podem ser agendados. Os serviços com sinal só voltam a aceitar agendamento quando você conectar.");
+    expect(html).toContain("Se fizer depois, sua página já fica no ar e os serviços sem sinal podem ser agendados. Os serviços com sinal aparecem como indisponíveis até você conectar.");
     expect(html).not.toContain("recomendado");
     expect(html).not.toContain("Agora não");
     expect(html).toContain("data-mp-sticky");

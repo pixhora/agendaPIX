@@ -64,7 +64,7 @@ function SkipNote() {
   return (
     <p id="mp-skip-note" className="mt-4 flex items-start gap-2 rounded-card bg-warning-soft px-3.5 py-3 text-sm leading-relaxed text-ink">
       <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-warning" />
-      <span>Se fizer depois, sua página já fica no ar e os serviços sem sinal podem ser agendados. Os serviços com sinal só voltam a aceitar agendamento quando você conectar.</span>
+      <span>Se fizer depois, sua página já fica no ar e os serviços sem sinal podem ser agendados. Os serviços com sinal aparecem como indisponíveis até você conectar.</span>
     </p>
   );
 }

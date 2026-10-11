@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import {
   CONTINUE_PAYMENT,
   CUSTOMER_BOOKINGS_PAUSED,
+  CUSTOMER_PAUSED_LATER,
+  CUSTOMER_PAUSED_RECEIPT,
   CUSTOMER_CONFLICT_BODY,
   CUSTOMER_CONFLICT_TITLE,
   CUSTOMER_EXPIRED_TITLE,
@@ -105,7 +107,10 @@ export function SlotLinkNotice({
           <Button asChild variant="pixDeep" size="lg" className="w-full">
             <a href={whatsapp} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">{TALK_TO_STORE}</a>
           </Button>
-        ) : null}
+        ) : (
+          <p className="text-sm text-muted">{CUSTOMER_PAUSED_LATER}</p>
+        )}
+        <p className="text-sm text-muted">{CUSTOMER_PAUSED_RECEIPT}</p>
       </NoticeFrame>
     );
   }

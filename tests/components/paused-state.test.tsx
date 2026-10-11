@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { PausedState } from "@/components/booking/PausedState";
-import { BOOKINGS_PAUSED_COPY } from "@/components/booking/customer-copy";
+import { BOOKINGS_PAUSED_COPY, BOOKINGS_PAUSED_LATER, BOOKINGS_PAUSED_RECEIPT } from "@/components/booking/customer-copy";
 
 const service = {
   id: "6b0b4a2e-1c3d-4e5f-8a9b-0c1d2e3f4a5b",
@@ -28,10 +28,15 @@ describe("agenda pausada na página pública", () => {
     expect(screen.queryByText(/assinatura|teste grátis|pagamento do dono|Chamar no WhatsApp|Agendamento online pausado/i)).toBeNull();
   });
 
-  it("sem WhatsApp não inventa botão de contato", () => {
-    render(<PausedState businessName="Salao da Ana" contactWhatsapp={null} services={[]} />);
-    expect(screen.getByRole("heading", { name: BOOKINGS_PAUSED_COPY })).toBeVisible();
-    expect(screen.queryByRole("link", { name: "Falar com a loja" })).toBeNull();
-    expect(screen.getByText("Fale com Salao da Ana pelos canais de sempre.")).toBeVisible();
+  it("sem WhatsApp pede para tentar de novo e não abre link vazio", () => {
+    const { container, rerender } = render(<PausedState businessName="Salao da Ana" contactWhatsapp={null} services={[]} />);
+    for (const phone of [null, "", "123", "   "]) {
+      rerender(<PausedState businessName="Salao da Ana" contactWhatsapp={phone} services={[]} />);
+      expect(screen.getByRole("heading", { name: BOOKINGS_PAUSED_COPY })).toBeVisible();
+      expect(screen.getByText(BOOKINGS_PAUSED_LATER)).toBeVisible();
+      expect(screen.getByText(BOOKINGS_PAUSED_RECEIPT)).toBeVisible();
+      expect(screen.queryByRole("link")).toBeNull();
+      expect(container.querySelector("a")).toBeNull();
+    }
   });
 });

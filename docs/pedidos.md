@@ -2,7 +2,7 @@
 
 ## P11 — Cliente: 403 bookings_paused
 
-Estado: neste branch de textos, sem merge. A página pública e a tela do link de horário tratam o código `bookings_paused` com “Esta agenda não está aceitando novos agendamentos agora.” e o botão “Falar com a loja”. Depende da PR #90 para o GET do link enviar `bookingsPaused` e para o POST soltar o claim ao recusar. No master atual o POST de pagamento já pode devolver o código via `createBooking`. O campo no GET fica opcional até a #90.
+Estado: neste branch de textos, sem merge. A página pública e a tela do link de horário tratam o código `bookings_paused` com “Esta agenda não está aceitando novos agendamentos agora.” e o botão “Falar com a loja”. Depende da PR #90 para o GET do link enviar `bookingsPaused` e para o POST soltar o claim ao recusar. No master atual o POST de pagamento já pode devolver o código via `createBooking`. O campo no GET fica opcional até a #90. No conflito de merge, fica o `z.boolean()` obrigatório da #90. Sem WhatsApp, a pausa mostra “Tente de novo mais tarde.”, sem botão.
 
 ## P10 — Contrato: boot PKCE, cache de alias e dedupe do mp-connect
 
