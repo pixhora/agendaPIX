@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getDb } from "../../db";
 import * as schema from "../../db/schema";
 import { hash } from "../bookings/service";
+import { logMailFailure } from "../email";
 import { HttpError, MAX_BODY_BYTES, readBody } from "../http";
 import { createDrizzleMpStore } from "../mercadopago-oauth/repository";
 import { purgeDisconnectedMercadoPagoTokens } from "../mercadopago-oauth/refresh";
@@ -86,7 +87,8 @@ export async function processWebhook(request: Request, providerName: string, dat
       try {
         await notifyDisconnectedConfirmation(ports, outcome.paymentId);
       } catch {
-        // O aviso não desfaz a confirmação.
+        // O aviso não desfaz a confirmação. Sem a auditoria, o próximo ciclo reenvia.
+        logMailFailure("disconnected_confirmation");
       }
     }
     if (outcome.businessId) {

@@ -7,7 +7,12 @@ export const metadata: Metadata = {
   robots: { index: false },
 };
 
-export default function RecebimentoPage() {
+export default async function RecebimentoPage({ searchParams }: { searchParams: Promise<{ erro?: string }> }) {
+  const { erro } = await searchParams;
+  // Só em desenvolvimento: o e2e abre esta query para ver o error boundary. Em produção o ramo some.
+  if (process.env.NODE_ENV !== "production" && erro === "retorno") {
+    throw new Error("onboarding_mp_return_probe");
+  }
   return (
     <Suspense
       fallback={

@@ -67,14 +67,38 @@ describe("navegação do connect com mp_oauth_pkce_invalid", () => {
     });
   });
 
-  it("não troca o 303 de sucesso nem outros erros", async () => {
+  it("não troca o 303 de sucesso", async () => {
     const success = await respondMercadoPagoConnect(formRequest("/dashboard"), async () => {
       return NextResponse.redirect("https://auth.mercadopago.com/authorization?state=abc", 303);
     });
     expect(success.status).toBe(303);
     expect(success.headers.get("location")).toBe("https://auth.mercadopago.com/authorization?state=abc");
+  });
 
-    const denied = await respondMercadoPagoConnect(formRequest("/dashboard"), async () => {
+  it("manda o formulário com sessão expirada para o login, com volta ao onboarding", async () => {
+    const denied = await respondMercadoPagoConnect(formRequest("/onboarding"), async () => {
+      throw new HttpError(401, "unauthorized", "Entre na sua conta para continuar.");
+    });
+    expect(denied.status).toBe(303);
+    expect(denied.headers.get("location")).toBe("https://app.example.com/login?next=%2Fonboarding");
+    expect(denied.headers.get("cache-control")).toBe("no-store");
+    const body = await denied.text();
+    expect(body).not.toContain("unauthorized");
+    expect(body).not.toContain("Entre na sua conta");
+
+    const fromReceipt = await respondMercadoPagoConnect(formRequest("/onboarding/recebimento"), async () => {
+      throw new HttpError(401, "unauthorized", "Entre na sua conta para continuar.");
+    });
+    expect(fromReceipt.headers.get("location")).toBe("https://app.example.com/login?next=%2Fonboarding");
+  });
+
+  it("mantém o 401 em JSON quando o cliente não é o formulário", async () => {
+    const request = new Request("https://app.example.com/api/businesses/x/mercadopago/connect", {
+      method: "POST",
+      headers: { accept: "application/json", "content-type": "application/json" },
+      body: JSON.stringify({ returnTo: "/onboarding", autoRefundAck: "on", consentVersion: "2026-10-09.v4" }),
+    });
+    const denied = await respondMercadoPagoConnect(request, async () => {
       throw new HttpError(401, "unauthorized", "Entre na sua conta para continuar.");
     });
     expect(denied.status).toBe(401);
