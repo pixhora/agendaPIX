@@ -1,6 +1,7 @@
 import { AppFrame } from "@/components/dashboard/app-frame";
 import { businessesWithDeposit } from "@/lib/dashboard/data";
 import { cachedOwnedBusinesses, rememberedBusinessId, requireOwner } from "@/lib/dashboard/session";
+import { legalPagesPublished } from "@/lib/marketing/flags";
 import { supportWhatsappUrl } from "@/lib/support-contact";
 
 export default async function OwnerLayout({ children }: { children: React.ReactNode }) {
@@ -15,5 +16,15 @@ export default async function OwnerLayout({ children }: { children: React.ReactN
   }));
   const rememberedId = await rememberedBusinessId();
   const defaultBusinessId = framed.find((business) => business.id === rememberedId)?.id;
-  return <AppFrame ownerName={owner.name} businesses={framed} defaultBusinessId={defaultBusinessId} supportWhatsappHref={supportWhatsappUrl()}>{children}</AppFrame>;
+  return (
+    <AppFrame
+      ownerName={owner.name}
+      businesses={framed}
+      defaultBusinessId={defaultBusinessId}
+      legalPagesPublished={legalPagesPublished()}
+      supportWhatsappHref={supportWhatsappUrl()}
+    >
+      {children}
+    </AppFrame>
+  );
 }

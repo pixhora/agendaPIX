@@ -48,6 +48,19 @@ describe("WhatsApp de apoio", () => {
     expect(readFileSync(join(import.meta.dirname, "../../.env.example"), "utf8")).not.toContain(retiredLandingNumber);
   });
 
+  it("componentes de cliente não importam o contato de suporte", () => {
+    const clientSurfaces = [
+      "components/booking/BookingFlow.tsx",
+      "components/dashboard/app-frame.tsx",
+      "app/onboarding/error.tsx",
+    ];
+    for (const file of clientSurfaces) {
+      const source = readFileSync(join(import.meta.dirname, "../../", file), "utf8");
+      expect(source, file).not.toContain("support-contact");
+      expect(source, file).not.toContain("supportWhatsappUrl(");
+    }
+  });
+
   it("a landing esconde o Fale com a gente sem a env e mostra o mesmo link do checkout com ela", () => {
     const key = "SUPPORT_WHATSAPP_NUMBER";
     const previous = process.env[key];

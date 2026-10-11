@@ -36,7 +36,6 @@ import { TrackingUnavailable } from "./tracking-unavailable";
 import { buildPublicBookingBody } from "./booking-payload";
 import { PausedState } from "./PausedState";
 import { AgendaPixFooter } from "@/components/slot-link/agenda-pix-footer";
-import { supportWhatsappUrl } from "@/lib/support-contact";
 const PolicySheet = React.lazy(() => import("@/components/policy/PolicySheet").then((mod) => ({ default: mod.PolicySheet })));
 
 interface BookingFlowProps {
@@ -48,7 +47,7 @@ interface BookingFlowProps {
   previewBusiness?: PublicBusinessData;
   /** Espelha `LEGAL_PAGES_PUBLISHED`. Desligado: sem link de privacidade. */
   legalPagesPublished?: boolean;
-  /** Link wa.me do suporte. Null esconde o link. A página pública manda o valor do servidor. */
+  /** Link wa.me do suporte. A página pública calcula no servidor. Null esconde o link. */
   supportWhatsappHref?: string | null;
 }
 
@@ -60,7 +59,7 @@ export function BookingFlow({
   initialBusiness,
   previewBusiness,
   legalPagesPublished = false,
-  supportWhatsappHref = supportWhatsappUrl(),
+  supportWhatsappHref = null,
 }: BookingFlowProps) {
   // Estado do Negócio
   const [business, setBusiness] = useState<PublicBusinessData | null>(previewBusiness ?? initialBusiness ?? null);

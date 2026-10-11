@@ -5,7 +5,6 @@ import { Suspense, type ReactNode } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { ACTION_ICONS, DASHBOARD_NAV_ICONS } from "@/lib/icons/registry";
-import { supportWhatsappUrl } from "@/lib/support-contact";
 import { BrandLink, BrandMark } from "@/components/ui/brand";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { cn } from "@/lib/utils";
@@ -57,21 +56,29 @@ function NavLinks({ businesses, defaultBusinessId, variant }: { businesses: Fram
   });
 }
 
+const frameLinkClass = "inline-flex min-h-11 items-center rounded-field px-3 text-sm font-semibold text-ink hover:bg-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+
 function SupportWhatsappLink({ href, className }: { href: string; className?: string }) {
   return (
     <a
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className={cn(
-        "inline-flex min-h-11 items-center gap-2 rounded-field px-3 text-sm font-semibold text-ink hover:bg-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-        className,
-      )}
+      className={cn(frameLinkClass, "gap-2", className)}
     >
       <Icon icon={ACTION_ICONS.whatsapp} size="md" />
       Suporte no WhatsApp
       <span className="sr-only"> (abre em nova aba)</span>
     </a>
+  );
+}
+
+function LegalPageLinks() {
+  return (
+    <>
+      <Link href="/termos" className={frameLinkClass}>Termos de uso</Link>
+      <Link href="/privacidade" className={frameLinkClass}>Política de privacidade</Link>
+    </>
   );
 }
 
@@ -100,13 +107,16 @@ export function AppFrame({
   ownerName,
   businesses,
   defaultBusinessId,
-  supportWhatsappHref = supportWhatsappUrl(),
+  legalPagesPublished = false,
+  supportWhatsappHref = null,
   children,
 }: {
   ownerName: string;
   businesses: FrameBusiness[];
   defaultBusinessId?: string;
-  /** Link wa.me do suporte. Null esconde o link. O layout do dono manda o valor do servidor. */
+  /** Espelha `LEGAL_PAGES_PUBLISHED`. O layout do dono manda o valor do servidor. */
+  legalPagesPublished?: boolean;
+  /** Link wa.me do suporte. O layout do dono calcula no servidor. Null esconde o link. */
   supportWhatsappHref?: string | null;
   children: ReactNode;
 }) {
@@ -123,7 +133,12 @@ export function AppFrame({
         </nav>
         <Suspense fallback={null}><PublicPageLink businesses={businesses} defaultBusinessId={defaultBusinessId} /></Suspense>
         <div className="mt-auto grid min-w-0 grid-cols-1 gap-4 border-t border-line pt-4">
-          {supportWhatsappHref ? <SupportWhatsappLink href={supportWhatsappHref} /> : null}
+          {legalPagesPublished || supportWhatsappHref ? (
+            <nav aria-label="AgendaPix" className="grid">
+              {legalPagesPublished ? <LegalPageLinks /> : null}
+              {supportWhatsappHref ? <SupportWhatsappLink href={supportWhatsappHref} /> : null}
+            </nav>
+          ) : null}
           <div className="flex items-center justify-between gap-2 px-1">
             <span className="text-xs font-semibold uppercase tracking-wide text-muted">Tema</span>
             <ThemeToggle />
@@ -150,10 +165,11 @@ export function AppFrame({
             </div>
             <Logout compact />
           </div>
-          {supportWhatsappHref ? (
-            <div className="px-2 pb-2">
-              <SupportWhatsappLink href={supportWhatsappHref} />
-            </div>
+          {legalPagesPublished || supportWhatsappHref ? (
+            <nav aria-label="AgendaPix" className="flex flex-wrap items-center px-2 pb-2">
+              {legalPagesPublished ? <LegalPageLinks /> : null}
+              {supportWhatsappHref ? <SupportWhatsappLink href={supportWhatsappHref} /> : null}
+            </nav>
           ) : null}
         </header>
 

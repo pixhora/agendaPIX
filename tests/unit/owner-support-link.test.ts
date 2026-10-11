@@ -35,5 +35,24 @@ describe("suporte no painel do dono", () => {
     expect(html).toContain("Ana Souza");
     expect(html).not.toContain("Suporte no WhatsApp");
     expect(html).not.toContain("wa.me");
+    expect(html).not.toContain('href="/termos"');
+    expect(html).not.toContain('href="/privacidade"');
+  });
+
+  it("mostra termos e privacidade quando o layout manda a flag ligada", async () => {
+    const { AppFrame } = await import("../../components/dashboard/app-frame");
+    // eslint-disable-next-line react/no-children-prop
+    const html = renderToStaticMarkup(createElement(AppFrame, {
+      ownerName: "Ana Souza",
+      businesses: [{ id: "1", name: "Studio Bella", slug: "studio-bella" }],
+      legalPagesPublished: true,
+      supportWhatsappHref: null,
+      children: "Agenda",
+    }));
+    expect(html).toContain('href="/termos"');
+    expect(html).toContain("Termos de uso");
+    expect(html).toContain('href="/privacidade"');
+    expect(html).toContain("Política de privacidade");
+    expect(html).not.toContain("Suporte no WhatsApp");
   });
 });
