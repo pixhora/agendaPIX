@@ -635,11 +635,12 @@ test("gerar novo link na rota real substitui, recusa e a cliente pede o link nov
   const taken = await createLink(page, service.id, takenSlot.date, takenSlot.time, `Ocupado ${testInfo.project.name}`);
   expect(taken.status).toBe(201);
   const takenService = taken.body.service as { priceCents: number; depositCents: number };
-  await occupySlot(taken.body.id as string, takenService.priceCents, takenService.depositCents);
   await page.goto(`/dashboard?businessId=${meta.businessAId}&date=${takenSlot.date}`);
   const takenRow = page.getByTestId("sent-links").getByRole("listitem").filter({ hasText: `Ocupado ${testInfo.project.name}` });
   await takenRow.getByRole("button", { name: "Gerar novo link" }).click();
   const takenDialog = page.getByRole("dialog", { name: "Gerar um novo link?" });
+  // A listagem recalcula o status e esconde o botão. A ocupação entra com a confirmação já aberta.
+  await occupySlot(taken.body.id as string, takenService.priceCents, takenService.depositCents);
   const unavailable = page.waitForResponse((response) => response.request().method() === "POST" && response.url().includes("/reissue"));
   await takenDialog.getByRole("button", { name: "Gerar novo link" }).click();
   expect((await unavailable).status()).toBe(409);
