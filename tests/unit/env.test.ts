@@ -14,6 +14,10 @@ describe("configuração do servidor", () => {
   it("converte false sem ativar TLS e exige credenciais em pares", () => {
     const smtp = { SMTP_HOST: "localhost", SMTP_PORT: "1025", SMTP_SECURE: "false", SMTP_FROM: "acesso@example.com" };
     expect(smtpEnvSchema.parse(smtp).SMTP_SECURE).toBe(false);
+    expect(smtpEnvSchema.parse(smtp).SMTP_REPLY_TO).toBeUndefined();
+    expect(smtpEnvSchema.parse({ ...smtp, SMTP_REPLY_TO: "  " }).SMTP_REPLY_TO).toBeUndefined();
+    expect(smtpEnvSchema.parse({ ...smtp, SMTP_REPLY_TO: "AgendaPix <oi@agendapix.dev.br>" }).SMTP_REPLY_TO).toBe("AgendaPix <oi@agendapix.dev.br>");
+    expect(smtpEnvSchema.safeParse({ ...smtp, SMTP_REPLY_TO: "linha\nquebrada" }).success).toBe(false);
     expect(smtpEnvSchema.safeParse({ ...smtp, SMTP_USER: "agenda" }).success).toBe(false);
   });
 });

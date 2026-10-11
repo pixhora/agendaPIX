@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "../../db/schema";
-import { appPublicHref, sendOwnerEmail } from "../email";
+import { appPublicHref, logMailFailure, sendOwnerEmail } from "../email";
 import { refundDeadlineEveNotice, type EveKind } from "../email/templates/refund-deadline-eve";
 import { MP_MANUAL_REFUND_CHANNEL } from "../mercadopago/connect-copy";
 import { formatAppointment } from "./notices";
@@ -159,6 +159,7 @@ export async function runManualRefundReminders(ports: ReminderPorts, now = new D
       for (const item of group) await ports.recordEve(item, now);
       emails += 1;
     } catch {
+      logMailFailure("refund_deadline_eve");
       for (const item of group) await ports.releaseEve(item.paymentId);
     }
   }
@@ -171,6 +172,7 @@ export async function runManualRefundReminders(ports: ReminderPorts, now = new D
       emails += 1;
     } catch {
       // Sem trava prévia: a próxima hora tenta de novo. Não move dinheiro.
+      logMailFailure("refund_deadline_daily");
     }
   }
   return { emails };
