@@ -7,6 +7,12 @@ export {
 } from "./errors";
 
 export {
+  MP_PIX_CREATE_FAILURE_REASONS,
+  mpPixCreateFailureReasonSchema,
+  type MpPixCreateFailureReason,
+} from "./mp-pix-create";
+
+export {
   SLOT_LINK_CANCEL_PATH,
   SLOT_LINK_REISSUE_PATH,
   SLOT_LINK_CUSTOMER_LABEL_MAX,

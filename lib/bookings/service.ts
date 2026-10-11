@@ -13,6 +13,7 @@ import { getPaymentProvider } from "../payments";
 import { MpAccountNotConnectedError } from "../payments/seller-account";
 import { pixChargeSchema, type PaymentProvider, type PixCharge } from "../payments/provider";
 import { callProvider, ProviderTimeoutError } from "../payments/timeout";
+import { markCreatingPaymentFailed, PixCreateRefusedError } from "../payments/pix-create-log";
 import { getBookingAccess } from "../billing/access";
 import { loadBookingAccess } from "../billing/load";
 import { depositPolicySchema, POLICY_CHANGED_CODE, POLICY_CHANGED_MESSAGE } from "../policy/schema";
@@ -195,6 +196,7 @@ export async function attachCreatedCharge(database: Database, payment: typeof sc
 }
 
 async function createChargeOutsideTx(
+  database: Database,
   payment: typeof schema.payments.$inferSelect,
   provider: PaymentProvider,
   customer?: { name: string; phone: string; cpfCnpj?: string },
@@ -209,6 +211,12 @@ async function createChargeOutsideTx(
     if (error instanceof MpAccountNotConnectedError) {
       throw new HttpError(409, "mp_account_not_connected", "Conecte o Mercado Pago ao AgendaPix para cobrar o sinal.");
     }
+    if (error instanceof PixCreateRefusedError) {
+      try {
+        await markCreatingPaymentFailed(database, payment);
+      } catch { /* o 503 segue; a linha pode continuar creating se o update falhar */ }
+      throw new HttpError(503, "payment_unavailable", "Não foi possível criar a cobrança. Tente novamente com a mesma chave.");
+    }
     if (error instanceof ProviderTimeoutError) throw new HttpError(503, "payment_unavailable", "Não foi possível criar a cobrança. Tente novamente com a mesma chave.");
     throw new HttpError(503, "payment_unavailable", "Não foi possível criar a cobrança. Tente novamente com a mesma chave.");
   }
@@ -220,7 +228,7 @@ async function finalizeCreatingPayment(
   provider: PaymentProvider,
   customer?: { name: string; phone: string; cpfCnpj?: string },
 ) {
-  const charge = await createChargeOutsideTx(payment, provider, customer);
+  const charge = await createChargeOutsideTx(database, payment, provider, customer);
   // Transação curta, sem lock do negócio: só anexa se ainda creating.
   const attached = await database.transaction(async (transaction) => attachCreatedCharge(transaction, payment, charge));
   if (!attached) {
