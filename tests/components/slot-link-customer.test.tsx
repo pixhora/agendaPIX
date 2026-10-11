@@ -7,7 +7,7 @@ import { AgendaPixFooter } from "@/components/slot-link/agenda-pix-footer";
 import { SlotLinkNotice } from "@/components/slot-link/slot-link-notice";
 import { memoryPayKeyStore, readOrCreatePayKey, slotLinkStorageKey } from "@/lib/slot-link/idempotency";
 import { createSlotLinkToken } from "../../lib/bookings/slot-link-token";
-import { CUSTOMER_IN_PROGRESS, CUSTOMER_USED_TITLE } from "@/lib/slot-link/copy";
+import { CUSTOMER_CONFLICT_BODY, CUSTOMER_CONFLICT_TITLE, CUSTOMER_IN_PROGRESS, CUSTOMER_USED_TITLE } from "@/lib/slot-link/copy";
 
 vi.mock("@/components/booking/StepPayment", () => ({
   StepPayment: ({ onPaymentConfirmed, booking }: { onPaymentConfirmed: () => void; booking: { payment: { copyPaste: string | null } | null } }) => (
@@ -99,6 +99,7 @@ describe("página da cliente", () => {
     const user = userEvent.setup();
     const store = memoryPayKeyStore();
     const keys: string[] = [];
+    const bodies: string[] = [];
     let posts = 0;
     const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -106,6 +107,7 @@ describe("página da cliente", () => {
         posts += 1;
         const headers = init?.headers as Record<string, string>;
         keys.push(headers["Idempotency-Key"]);
+        bodies.push(String(init?.body ?? ""));
         if (posts === 1) throw new TypeError("Failed to fetch");
         return json(201, payBody());
       }
@@ -120,8 +122,13 @@ describe("página da cliente", () => {
     await user.click(screen.getByRole("button", { name: "Tentar de novo" }));
     await user.click(await screen.findByRole("button", { name: /Pagar sinal de/ }));
     expect(await screen.findByText(/Pix 00020126580014BR.GOV.BCB.PIX/)).toBeVisible();
+    expect(screen.getByTestId("slot-link-payer")).toHaveTextContent("Ana Souza");
+    expect(screen.getByTestId("slot-link-payer")).toHaveTextContent("(11) 98765-4321");
+    expect(screen.queryByLabelText("Nome")).toBeNull();
+    expect(screen.queryByLabelText("WhatsApp")).toBeNull();
     expect(screen.queryByText(/já foi confirmado|já usado|link_used/i)).toBeNull();
     expect(keys).toEqual([keys[0], keys[0]]);
+    expect(bodies).toEqual([bodies[0], bodies[0]]);
     expect(keys[0]?.length).toBeGreaterThan(8);
     const saved = store.snapshot[await slotLinkStorageKey(token)] ?? "";
     expect(saved.includes(token)).toBe(false);
@@ -179,6 +186,42 @@ describe("página da cliente", () => {
     );
     expect(await screen.findByRole("heading", { name: "Este link expirou." })).toBeVisible();
     expect(expiredStore.snapshot[await slotLinkStorageKey(token)]).toBeUndefined();
+  });
+
+  it("409 idempotency_conflict reenvia o payload salvo e volta ao mesmo Pix", async () => {
+    const user = userEvent.setup();
+    const store = memoryPayKeyStore();
+    const bodies: string[] = [];
+    let posts = 0;
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/pay")) {
+        posts += 1;
+        bodies.push(String(init?.body ?? ""));
+        if (posts === 1) {
+          return json(409, {
+            error: { code: "idempotency_conflict", message: "Essa chave já foi usada em outro agendamento.", customerPhone: "+5511900000000" },
+          });
+        }
+        return json(201, payBody());
+      }
+      return json(200, openBody());
+    });
+    render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" store={store} fetchImpl={fetchImpl} now={() => new Date("2030-10-01T12:00:00.000Z")} />);
+    await fillAndPay(user);
+    expect(await screen.findByRole("heading", { name: CUSTOMER_CONFLICT_TITLE })).toBeVisible();
+    expect(screen.getByText(CUSTOMER_CONFLICT_BODY)).toBeVisible();
+    expect(screen.getByRole("button", { name: "Continuar pagamento" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Ver horários disponíveis" })).toHaveAttribute("href", "/salao");
+    expect(screen.queryByText(/\+5511900000000|já foi usada/)).toBeNull();
+    expect(screen.queryByLabelText("Nome")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Continuar pagamento" }));
+    expect(await screen.findByText(/Pix 00020126580014BR.GOV.BCB.PIX/)).toBeVisible();
+    expect(screen.getByTestId("slot-link-payer")).toHaveTextContent("Ana Souza");
+    expect(screen.queryByLabelText("WhatsApp")).toBeNull();
+    expect(bodies).toEqual([bodies[0], bodies[0]]);
+    const saved = JSON.parse(store.snapshot[await slotLinkStorageKey(token)] ?? "{}") as { payload?: { customer?: { name?: string } } };
+    expect(saved.payload?.customer?.name).toBe("Ana Souza");
   });
 
   it("GET 200 com status paid mostra o horário confirmado, sem botão de pagar", async () => {

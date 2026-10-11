@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { createSlotLinkToken } from "../../lib/bookings/slot-link-token";
 import { SLOT_LINK_IDEMPOTENCY_KEY_PATTERN } from "../../lib/contracts/slot-link";
-import { screenFromFailure, screenFromStatus, shouldClearPayKey, slotStartsInPast } from "../../lib/slot-link/customer-state";
-import { clearPayKey, createIdempotencyKey, memoryPayKeyStore, readOrCreatePayKey, slotLinkStorageKey } from "../../lib/slot-link/idempotency";
+import { failureCode, screenFromFailure, screenFromStatus, shouldClearPayKey, slotStartsInPast } from "../../lib/slot-link/customer-state";
+import { clearPayKey, createIdempotencyKey, lockPayPayload, memoryPayKeyStore, payRequestBody, readOrCreatePayKey, readPayResume, slotLinkStorageKey } from "../../lib/slot-link/idempotency";
 import { parseOwnerList } from "../../lib/slot-link/owner-link";
 import { isSlotLinkPagePath } from "../../lib/slot-link/paths";
 import { slotLinkPageHeaders } from "../../lib/slot-link/privacy";
@@ -90,6 +90,9 @@ describe("estados da cliente", () => {
     expect(screenFromFailure("link_used", { publicPath: "/salao", now }).kind).toBe("used");
     expect(screenFromStatus({ ...openBase, status: "paid" }, now).kind).toBe("used");
     expect(screenFromFailure("link_in_progress", { publicPath: "/salao", now }).kind).toBe("in_progress");
+    expect(screenFromFailure("idempotency_conflict", { publicPath: "/salao", now }).kind).toBe("conflict");
+    expect(failureCode(409, { error: { code: "idempotency_conflict", message: "interno", customerPhone: "+5511911112222" } })).toBe("idempotency_conflict");
+    expect(shouldClearPayKey({ kind: "conflict", publicPath: "/salao" })).toBe(false);
     expect(screenFromFailure("invalid_input", { publicPath: "/salao", now }).kind).toBe("error");
     expect(screenFromFailure("link_invalid", { publicPath: "/salao", now }).kind).toBe("unavailable");
   });
@@ -137,9 +140,32 @@ describe("idempotência do pagamento", () => {
     await clearPayKey(token, store);
     const again = await readOrCreatePayKey(token, store, () => "33333333-3333-4333-8333-333333333333");
     expect(again.record.idempotencyKey).toBe("33333333-3333-4333-8333-333333333333");
+    expect(again.record.payload).toBeUndefined();
     const key = await slotLinkStorageKey(token);
     expect(JSON.stringify(store.snapshot).includes(token)).toBe(false);
     expect(key.startsWith("agendapix.slot-link.pay.")).toBe(true);
+  });
+
+  it("o primeiro payload fica travado e a retomada reenvia esse corpo", async () => {
+    const token = createSlotLinkToken();
+    const store = memoryPayKeyStore();
+    const key = "11111111-1111-4111-8111-111111111111";
+    const first = {
+      customer: { name: "Ana Souza", phone: "+5511987654321" },
+      policyHash: "ab".repeat(32),
+    };
+    const locked = await lockPayPayload(token, store, first, () => key);
+    const again = await lockPayPayload(token, store, {
+      customer: { name: "Outra Pessoa", phone: "+5511987654000", cpfCnpj: "52998224725" },
+      policyHash: "cd".repeat(32),
+    }, () => "22222222-2222-4222-8222-222222222222");
+    expect(again.record.idempotencyKey).toBe(key);
+    expect(again.payload).toEqual(first);
+    expect(payRequestBody(again.payload)).toEqual(first);
+    expect(JSON.stringify(store.snapshot).includes(token)).toBe(false);
+    await clearPayKey(token, store);
+    expect(await readPayResume(token, store)).toBeNull();
+    expect(locked.payload.customer.name).toBe("Ana Souza");
   });
 });
 

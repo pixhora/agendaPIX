@@ -23,7 +23,7 @@ import {
   shouldClearPayKey,
   type CustomerScreen,
 } from "@/lib/slot-link/customer-state";
-import { browserPayKeyStore, clearPayKey, readOrCreatePayKey, readPayResume, savePayResume, type PayKeyStore } from "@/lib/slot-link/idempotency";
+import { browserPayKeyStore, clearPayKey, lockPayPayload, payRequestBody, readPayResume, savePayResume, type PayKeyStore, type SlotLinkPayPayload } from "@/lib/slot-link/idempotency";
 import { paySlotLinkUrl, publicSlotLinkUrl } from "@/lib/slot-link/paths";
 import { isOfflineError } from "@/components/booking/booking-error";
 import { AgendaPixFooter } from "./agenda-pix-footer";
@@ -34,7 +34,7 @@ type Phase =
   | { kind: "loading" }
   | CustomerScreen
   | { kind: "pix"; link: SlotLinkOpenResponse; booking: BookingResponse }
-  | { kind: "confirmed"; link: SlotLinkOpenResponse; booking: BookingResponse };
+  | { kind: "confirmed"; link: SlotLinkOpenResponse; booking: BookingResponse; customerName: string; customerPhone: string };
 
 type StoreContext = { publicPath: string; businessName: string | null; whatsapp: string | null; startsAt: string | null };
 
@@ -63,6 +63,8 @@ export function SlotLinkCustomer({
   const [accepted, setAccepted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [touched, setTouched] = useState(false);
+  const [savedPayload, setSavedPayload] = useState<SlotLinkPayPayload | null>(null);
+  const linkRef = React.useRef<SlotLinkOpenResponse | null>(null);
   const publicPath = `/${slug}`;
 
   const rememberStore = useCallback((link: SlotLinkOpenResponse): StoreContext => ({
@@ -84,6 +86,7 @@ export function SlotLinkCustomer({
     if (shouldClearPayKey(screen)) {
       const saved = await readPayResume(token, payStore);
       await clearPayKey(token, payStore);
+      setSavedPayload(null);
       if (screen.kind === "used" && saved?.accessToken && saved.bookingId && saved.serviceId) {
         try {
           sessionStorage.setItem(pixResumeStorageKey(slug), pixResumePayload({
@@ -116,10 +119,12 @@ export function SlotLinkCustomer({
         return screen;
       }
       const opened = parseOpenLink(body);
+      linkRef.current = opened;
       const next = rememberStore(opened);
       knownRef.current = next;
       setKnown(next);
       const saved = await readPayResume(token, payStore);
+      setSavedPayload(saved?.payload ?? null);
       const screen = screenFromStatus(opened, clock(), { resumePay: Boolean(saved?.idempotencyKey) });
       await applyScreen(screen);
       return screen;
@@ -148,42 +153,18 @@ export function SlotLinkCustomer({
     try {
       const fresh = await load();
       if (fresh.kind !== "form") return;
-      const { record } = await readOrCreatePayKey(token, payStore);
-      const customer: { name: string; phone: string; cpfCnpj?: string } = {
-        name: name.trim(),
-        phone: normalizePhoneToE164(phone),
-      };
-      if (link.requiresPayerCpf) customer.cpfCnpj = cpfDigitsOnly(cpf);
-      const response = await request(paySlotLinkUrl(slug, token), {
-        method: "POST",
-        cache: "no-store",
-        headers: {
-          "Content-Type": "application/json",
-          "Idempotency-Key": record.idempotencyKey,
+      const draft: SlotLinkPayPayload = {
+        customer: {
+          name: name.trim(),
+          phone: normalizePhoneToE164(phone),
+          ...(link.requiresPayerCpf ? { cpfCnpj: cpfDigitsOnly(cpf) } : {}),
         },
-        body: JSON.stringify({ customer, policyHash: link.policy.hash }),
-      });
-      const body: unknown = await response.json().catch(() => null);
-      if (response.status === 201) {
-        const booking = parsePayResult(body);
-        await savePayResume(token, payStore, {
-          bookingId: booking.bookingId,
-          accessToken: booking.accessToken,
-          expiresAt: booking.expiresAt,
-          serviceId: link.service.id,
-        });
-        setPhase({ kind: "pix", link, booking });
-        return;
-      }
-      const code = failureCode(response.status, body);
-      const screen = screenFromFailure(code, {
-        publicPath: link.business.publicPath,
-        businessName: link.business.name,
-        whatsapp: link.business.contactWhatsapp,
-        startsAt: link.startsAt,
-        now: now(),
-      });
-      await applyScreen(screen);
+        policyHash: link.policy.hash,
+      };
+      const { record, payload } = await lockPayPayload(token, payStore, draft);
+      setSavedPayload(payload);
+      const opened = await postPay(record.idempotencyKey, payload);
+      if (opened) setPhase({ kind: "pix", link, booking: opened });
     } catch (error) {
       if (isOfflineError(error)) setPhase({ kind: "offline", publicPath: link.business.publicPath });
       else setPhase({ kind: "offline", publicPath: link.business.publicPath });
@@ -192,18 +173,73 @@ export function SlotLinkCustomer({
     }
   }
 
+  async function postPay(idempotencyKey: string, payload: SlotLinkPayPayload) {
+    const response = await request(paySlotLinkUrl(slug, token), {
+      method: "POST",
+      cache: "no-store",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey,
+      },
+      body: JSON.stringify(payRequestBody(payload)),
+    });
+    const body: unknown = await response.json().catch(() => null);
+    if (response.status === 201) {
+      const booking = parsePayResult(body);
+      const current = linkRef.current;
+      await savePayResume(token, payStore, {
+        bookingId: booking.bookingId,
+        accessToken: booking.accessToken,
+        expiresAt: booking.expiresAt,
+        serviceId: current?.service.id ?? "",
+      });
+      return booking;
+    }
+    const current = linkRef.current;
+    const code = failureCode(response.status, body);
+    const screen = screenFromFailure(code, {
+      publicPath: current?.business.publicPath ?? publicPath,
+      businessName: current?.business.name,
+      whatsapp: current?.business.contactWhatsapp,
+      startsAt: current?.startsAt,
+      now: now(),
+    });
+    await applyScreen(screen);
+    return null;
+  }
+
   async function retryPay() {
     const screen = await load();
     if (screen.kind === "form") await pay(screen.link);
   }
 
+  async function continueSavedPay() {
+    if (submitting) return;
+    const saved = await readPayResume(token, payStore);
+    const current = linkRef.current;
+    if (!saved?.payload || !current) return;
+    setSubmitting(true);
+    try {
+      const booking = await postPay(saved.idempotencyKey, saved.payload);
+      if (booking) setPhase({ kind: "pix", link: current, booking });
+    } catch (error) {
+      if (isOfflineError(error)) setPhase({ kind: "offline", publicPath: current.business.publicPath });
+      else setPhase({ kind: "offline", publicPath: current.business.publicPath });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   const link = phase.kind === "form" || phase.kind === "pix" || phase.kind === "confirmed" ? phase.link : null;
   const when = link ? localDateParts(link.startsAt, timezone) : null;
   const askCpf = link?.requiresPayerCpf === true;
-  const nameOk = name.trim().length >= 2;
-  const phoneOk = isValidBrazilianPhone(phone);
-  const cpfOk = !askCpf || isValidCpf(cpf);
+  const locked = Boolean(savedPayload);
+  const nameOk = locked || name.trim().length >= 2;
+  const phoneOk = locked || isValidBrazilianPhone(phone);
+  const cpfOk = locked || !askCpf || isValidCpf(cpf);
   const canPay = Boolean(link?.policy) && accepted && nameOk && phoneOk && cpfOk && !submitting;
+  const payerName = savedPayload?.customer.name ?? name;
+  const payerPhone = savedPayload ? formatPhoneMask(savedPayload.customer.phone) : phone;
 
   return (
     <div className="min-h-dvh bg-paper">
@@ -230,6 +266,7 @@ export function SlotLinkCustomer({
             onRetry={phase.kind === "offline" || phase.kind === "in_progress" || phase.kind === "error"
               ? () => void (phase.kind === "in_progress" ? retryPay() : load())
               : undefined}
+            onContinue={phase.kind === "conflict" ? () => void continueSavedPay() : undefined}
           />
         ) : null}
         {phase.kind === "form" && link && when ? (
@@ -268,25 +305,29 @@ export function SlotLinkCustomer({
                 </label>
               </fieldset>
             ) : <p role="alert" className="text-sm text-warning">Não conseguimos carregar as regras do sinal. Tente de novo.</p>}
-            <div className="grid gap-4">
-              <div className="grid gap-1.5">
-                <Label htmlFor="slot-customer-name">Nome</Label>
-                <Input id="slot-customer-name" autoComplete="off" value={name} onChange={(event) => setName(event.target.value)} />
-                {touched && !nameOk ? <p className="text-sm text-danger">Informe seu nome (pelo menos 2 letras).</p> : null}
-              </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="slot-customer-phone">WhatsApp</Label>
-                <Input id="slot-customer-phone" inputMode="tel" autoComplete="off" value={phone} onChange={(event) => setPhone(formatPhoneMask(event.target.value))} />
-                {touched && !phoneOk ? <p className="text-sm text-danger">Informe um celular válido com DDD.</p> : null}
-              </div>
-              {askCpf ? (
+            {savedPayload ? (
+              <LockedPayer name={savedPayload.customer.name} phone={formatPhoneMask(savedPayload.customer.phone)} />
+            ) : (
+              <div className="grid gap-4">
                 <div className="grid gap-1.5">
-                  <Label htmlFor="slot-customer-cpf">CPF</Label>
-                  <Input id="slot-customer-cpf" inputMode="numeric" autoComplete="off" value={cpf} onChange={(event) => setCpf(formatCpfMask(event.target.value))} />
-                  {touched && !cpfOk ? <p className="text-sm text-danger">Informe um CPF válido.</p> : null}
+                  <Label htmlFor="slot-customer-name">Nome</Label>
+                  <Input id="slot-customer-name" autoComplete="off" value={name} onChange={(event) => setName(event.target.value)} />
+                  {touched && !nameOk ? <p className="text-sm text-danger">Informe seu nome (pelo menos 2 letras).</p> : null}
                 </div>
-              ) : null}
-            </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="slot-customer-phone">WhatsApp</Label>
+                  <Input id="slot-customer-phone" inputMode="tel" autoComplete="off" value={phone} onChange={(event) => setPhone(formatPhoneMask(event.target.value))} />
+                  {touched && !phoneOk ? <p className="text-sm text-danger">Informe um celular válido com DDD.</p> : null}
+                </div>
+                {askCpf ? (
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="slot-customer-cpf">CPF</Label>
+                    <Input id="slot-customer-cpf" inputMode="numeric" autoComplete="off" value={cpf} onChange={(event) => setCpf(formatCpfMask(event.target.value))} />
+                    {touched && !cpfOk ? <p className="text-sm text-danger">Informe um CPF válido.</p> : null}
+                  </div>
+                ) : null}
+              </div>
+            )}
             {touched && !accepted ? <p className="text-sm text-danger">Marque que você leu a política.</p> : null}
             <Button type="submit" variant="pix" size="lg" className="w-full" disabled={submitting || !link.policy}>
               {submitting ? "Gerando…" : payButtonLabel(link.depositCents)}
@@ -300,18 +341,22 @@ export function SlotLinkCustomer({
           </form>
         ) : null}
         {phase.kind === "pix" ? (
-          <StepPayment
-            slug={slug}
-            booking={phase.booking}
-            summary={{ service: serviceFrom(phase.link), slot: { startsAt: phase.link.startsAt, endsAt: phase.booking.endsAt }, timezone }}
-            businessName={phase.link.business.name}
-            contactWhatsapp={phase.link.business.contactWhatsapp}
-            onPaymentConfirmed={() => {
-              void clearPayKey(token, payStore);
-              setPhase({ kind: "confirmed", link: phase.link, booking: phase.booking });
-            }}
-            onRestart={() => { void load(); }}
-          />
+          <>
+            {savedPayload ? <LockedPayer name={savedPayload.customer.name} phone={formatPhoneMask(savedPayload.customer.phone)} /> : null}
+            <StepPayment
+              slug={slug}
+              booking={phase.booking}
+              summary={{ service: serviceFrom(phase.link), slot: { startsAt: phase.link.startsAt, endsAt: phase.booking.endsAt }, timezone }}
+              businessName={phase.link.business.name}
+              contactWhatsapp={phase.link.business.contactWhatsapp}
+              onPaymentConfirmed={() => {
+                void clearPayKey(token, payStore);
+                setSavedPayload(null);
+                setPhase({ kind: "confirmed", link: phase.link, booking: phase.booking, customerName: payerName, customerPhone: payerPhone });
+              }}
+              onRestart={() => { void load(); }}
+            />
+          </>
         ) : null}
         {phase.kind === "confirmed" ? (
           <>
@@ -320,8 +365,8 @@ export function SlotLinkCustomer({
               service={serviceFrom(phase.link)}
               slot={{ startsAt: phase.link.startsAt, endsAt: phase.booking.endsAt }}
               timezone={timezone}
-              customerName={name}
-              customerPhone={phone}
+              customerName={phase.customerName}
+              customerPhone={phase.customerPhone}
               policy={phase.booking.policy}
               policyText={phase.booking.policy?.text}
               contactWhatsapp={phase.link.business.contactWhatsapp}
@@ -331,6 +376,21 @@ export function SlotLinkCustomer({
           </>
         ) : null}
       </main>
+    </div>
+  );
+}
+
+function LockedPayer({ name, phone }: { name: string; phone: string }) {
+  return (
+    <div className="grid gap-3 rounded-card border border-line bg-surface p-5" data-testid="slot-link-payer">
+      <div>
+        <p className="text-sm font-semibold text-muted">Nome</p>
+        <p className="text-base font-semibold text-ink">{name}</p>
+      </div>
+      <div>
+        <p className="text-sm font-semibold text-muted">WhatsApp</p>
+        <p className="text-base font-semibold text-ink">{phone}</p>
+      </div>
     </div>
   );
 }

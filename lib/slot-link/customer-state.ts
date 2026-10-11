@@ -16,6 +16,7 @@ export type SlotLinkFailureCode =
   | "slot_unavailable"
   | "mp_not_connected"
   | "link_in_progress"
+  | "idempotency_conflict"
   | "invalid_input"
   | "offline"
   | "unknown";
@@ -29,6 +30,7 @@ export type CustomerScreen =
   | { kind: "offline"; publicPath: string }
   | { kind: "mp"; whatsapp: string | null; publicPath: string }
   | { kind: "in_progress"; publicPath: string }
+  | { kind: "conflict"; publicPath: string }
   | { kind: "error"; publicPath: string };
 
 const SLOT_LINK_CODES: readonly string[] = SLOT_LINK_ERROR_CODES;
@@ -94,6 +96,7 @@ export function screenFromFailure(
     return { kind: "mp", whatsapp: context.whatsapp ?? null, publicPath: context.publicPath };
   }
   if (code === "link_in_progress") return { kind: "in_progress", publicPath: context.publicPath };
+  if (code === "idempotency_conflict") return { kind: "conflict", publicPath: context.publicPath };
   if (code === "invalid_input") return { kind: "error", publicPath: context.publicPath };
   if (code === "offline") return { kind: "offline", publicPath: context.publicPath };
   if (code === "link_expired" || (code === "slot_unavailable" && past)) {
@@ -115,7 +118,7 @@ export function parseOpenLink(body: unknown) {
 export function failureCode(status: number, body: unknown): SlotLinkFailureCode {
   const code = readSlotLinkErrorCode(body);
   if (code === "link_expired" || status === 410) return "link_expired";
-  if (code === "link_used" || code === "link_cancelled" || code === "link_invalid" || code === "slot_unavailable" || code === "mp_not_connected" || code === "link_in_progress" || code === "invalid_input") {
+  if (code === "link_used" || code === "link_cancelled" || code === "link_invalid" || code === "slot_unavailable" || code === "mp_not_connected" || code === "link_in_progress" || code === "idempotency_conflict" || code === "invalid_input") {
     return code;
   }
   if (status === 404) return "link_invalid";

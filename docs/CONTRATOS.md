@@ -486,7 +486,7 @@ O POST de pagamento exige `Idempotency-Key`. Ausente ou fora do formato: `400 in
 
 `slotLinkOwnerSchema` inclui `cancellable`. É verdadeiro quando não há reserva ligada e o claim está livre ou vencido. O dono cancela nesse caso. Claim fresco ou reserva ligada: `409 link_used`.
 
-Códigos depois que o hash confere: `410 link_expired`, `409 link_used`, `409 link_in_progress`, `409 link_cancelled`, `409 slot_unavailable`, `409 mp_not_connected`. Antes disso, qualquer token que não casa é `404 link_invalid`.
+Códigos depois que o hash confere: `410 link_expired`, `409 link_used`, `409 link_in_progress`, `409 link_cancelled`, `409 slot_unavailable`, `409 mp_not_connected`, `409 idempotency_conflict`. A mesma chave com outro corpo (nome, WhatsApp ou política) cai nesse último: a tela guarda o primeiro payload e reenvia esse. A resposta não traz dado de outra cliente. Antes disso, qualquer token que não casa é `404 link_invalid`.
 
 Limites, janela de 1 minuto. O IP vem só de `bookingClientIdentity` (o handler não lê `X-Forwarded-For` na mão). O teto por IP entra primeiro. O teto por token só conta depois que o hash casa, para token aleatório não criar linha em `abuse_rate_limits`. Sem IP, o probe usa um balde global com teto de 10000 por minuto, não o teto por cliente. Esse balde só existe fora da Vercel: em produção `BOOKING_TRUST_PROXY` está ligado e a plataforma manda o IP. O teto por negócio continua valendo depois que o hash casa.
 

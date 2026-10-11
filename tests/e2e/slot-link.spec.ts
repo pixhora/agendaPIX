@@ -90,6 +90,17 @@ async function submitDeposit(page: Page, phone: string) {
   return responsePromise;
 }
 
+async function payLocked(page: Page) {
+  await page.getByLabel("Li e concordo com a política").check();
+  const responsePromise = page.waitForResponse((response) => (
+    response.request().method() === "POST"
+    && response.url().includes("/slot-links/")
+    && response.url().endsWith("/pay")
+  ));
+  await page.getByRole("button", { name: /Pagar sinal de/ }).click();
+  return responsePromise;
+}
+
 async function replaceStoredPayKey(page: Page, idempotencyKey: string) {
   await page.evaluate((nextKey) => {
     const prefix = "agendapix.slot-link.pay.";
@@ -207,6 +218,8 @@ test("caminho feliz até a tela de Pix, com rodapé fora do pagamento", async ({
   ));
   await page.getByRole("button", { name: /Pagar sinal de/ }).click();
   await expect(page.getByRole("button", { name: /Copiar código/ })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId("slot-link-payer")).toContainText("Ana Souza");
+  await expect(page.getByLabel("Nome")).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Crie a sua grátis" })).toHaveCount(0);
   if (testInfo.project.name === "desktop") await shootMatrix(page, "cliente-pix");
 });
@@ -232,8 +245,11 @@ test("retomada com o prazo do link vencido devolve o mesmo Pix", async ({ page }
   const copyPaste = firstBody.payment?.copyPaste ?? "";
   expect(copyPaste.length).toBeGreaterThan(10);
   const firstKey = first.request().headers()["idempotency-key"];
+  const firstPayload = first.request().postData();
   expect(firstKey).toMatch(/^[A-Za-z0-9_-]{16,128}$/);
   await expect(page.getByTestId("pix-copypaste")).toHaveValue(copyPaste);
+  await expect(page.getByTestId("slot-link-payer")).toContainText("Ana Souza");
+  await expect(page.getByLabel("Nome")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Este link expirou." })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Este horário já foi confirmado." })).toHaveCount(0);
 
@@ -242,13 +258,15 @@ test("retomada com o prazo do link vencido devolve o mesmo Pix", async ({ page }
     [created.body.id],
   ));
   await page.goto(`/${meta.businessASlug}/h/${token}`);
-  await expect(page.getByLabel("Nome")).toHaveValue("");
+  await expect(page.getByTestId("slot-link-payer")).toContainText("Ana Souza");
+  await expect(page.getByLabel("Nome")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Este link expirou." })).toHaveCount(0);
 
-  const resumed = await submitDeposit(page, phone);
+  const resumed = await payLocked(page);
   expect(resumed.status()).toBe(201);
   const resumedBody = await resumed.json() as { payment?: { copyPaste?: string | null; id?: string } };
   expect(resumed.request().headers()["idempotency-key"]).toBe(firstKey);
+  expect(resumed.request().postData()).toBe(firstPayload);
   expect(resumedBody.payment?.copyPaste).toBe(copyPaste);
   await expect(page.getByTestId("pix-copypaste")).toHaveValue(copyPaste);
   await expect(page.getByRole("heading", { name: "Este link expirou." })).toHaveCount(0);
@@ -258,9 +276,9 @@ test("retomada com o prazo do link vencido devolve o mesmo Pix", async ({ page }
   expect(otherKey).not.toBe(firstKey);
   await replaceStoredPayKey(page, otherKey);
   await page.goto(`/${meta.businessASlug}/h/${token}`);
-  await expect(page.getByLabel("Nome")).toBeVisible();
+  await expect(page.getByTestId("slot-link-payer")).toContainText("Ana Souza");
   await expect(page.getByRole("heading", { name: "Este link expirou." })).toHaveCount(0);
-  const refused = await submitDeposit(page, phone);
+  const refused = await payLocked(page);
   expect(refused.status()).toBe(410);
   expect(refused.request().headers()["idempotency-key"]).toBe(otherKey);
   const refusedBody = await refused.json() as { error?: { code?: string } };
@@ -268,6 +286,62 @@ test("retomada com o prazo do link vencido devolve o mesmo Pix", async ({ page }
   await expect(page.getByRole("heading", { name: "Este link expirou." })).toBeVisible();
   await expect(page.getByRole("button", { name: /Pagar sinal/ })).toHaveCount(0);
   await expect(page.getByTestId("pix-copypaste")).toHaveCount(0);
+});
+
+test("mesma chave com outros dados oferece continuar o pagamento", async ({ page }, testInfo) => {
+  test.setTimeout(120_000);
+  const phone = testInfo.project.name === "desktop" ? "11987654002" : "11987654001";
+  const service = await serviceId(page);
+  const slot = await freeSlot(page, service.id, saoPauloDay(8));
+  const created = await createLink(page, service.id, slot.date, slot.time);
+  expect(created.status).toBe(201);
+  const token = created.body.token as string;
+  const bodies: string[] = [];
+  let hits = 0;
+  await page.route(`**/api/public/${meta.businessASlug}/slot-links/${token}/pay`, async (route) => {
+    hits += 1;
+    bodies.push(route.request().postData() ?? "");
+    if (hits === 1) {
+      await route.fulfill({
+        status: 409,
+        contentType: "application/json",
+        body: JSON.stringify({
+          error: {
+            code: "idempotency_conflict",
+            message: "Essa chave já foi usada em outro agendamento.",
+            customerPhone: "+5511900000000",
+          },
+        }),
+      });
+      return;
+    }
+    await route.continue();
+  });
+  await page.goto(`/${meta.businessASlug}/h/${token}`);
+  await withPool((pool) => pool.query(
+    "update bookings set status = 'expired' where business_id = $1 and status = 'pending_payment'",
+    [meta.businessAId],
+  ));
+  const refused = await submitDeposit(page, phone);
+  expect(refused.status()).toBe(409);
+  await expect(page.getByRole("heading", { name: "Você já começou o pagamento deste horário com outros dados." })).toBeVisible();
+  await expect(page.getByText("Para corrigir nome ou WhatsApp, fale com a loja depois de pagar.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Ver horários disponíveis" })).toHaveAttribute("href", `/${meta.businessASlug}`);
+  await expect(page.getByText("+5511900000000")).toHaveCount(0);
+  await expect(page.getByText(/já foi usada/)).toHaveCount(0);
+  await expect(page.getByLabel("Nome")).toHaveCount(0);
+  if (testInfo.project.name === "desktop") await shootMatrix(page, "cliente-outros-dados");
+  const continued = page.waitForResponse((response) => (
+    response.request().method() === "POST" && response.url().endsWith("/pay")
+  ));
+  await page.getByRole("button", { name: "Continuar pagamento" }).click();
+  const resumed = await continued;
+  expect(resumed.status()).toBe(201);
+  expect(bodies[0]).toBe(bodies[1]);
+  expect(bodies[0]).toContain("Ana Souza");
+  await expect(page.getByRole("button", { name: /Copiar código/ })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId("slot-link-payer")).toContainText("Ana Souza");
+  await expect(page.getByLabel("Nome")).toHaveCount(0);
 });
 
 test("link expirado e link cancelado", async ({ page }, testInfo) => {

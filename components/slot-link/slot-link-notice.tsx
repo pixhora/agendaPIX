@@ -4,6 +4,9 @@ import { useEffect, useRef } from "react";
 import { Clock, Link2Off, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
+  CONTINUE_PAYMENT,
+  CUSTOMER_CONFLICT_BODY,
+  CUSTOMER_CONFLICT_TITLE,
   CUSTOMER_EXPIRED_TITLE,
   CUSTOMER_IN_PROGRESS,
   CUSTOMER_MP,
@@ -27,10 +30,13 @@ type Notice = Exclude<CustomerScreen, { kind: "form" }>;
 export function SlotLinkNotice({
   screen,
   onRetry,
+  onContinue,
 }: {
   screen: Notice;
   /** "Tentar de novo" do horário em pagamento: refaz a leitura e o pagamento. */
   onRetry?: () => void;
+  /** "Continuar pagamento": reenvia o payload salvo e volta ao mesmo Pix. */
+  onContinue?: () => void;
 }) {
   const titleRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
@@ -107,6 +113,22 @@ export function SlotLinkNotice({
     return (
       <NoticeFrame titleRef={titleRef} title={CUSTOMER_GENERIC} icon={<Link2Off aria-hidden="true" className="size-8" />}>
         {onRetry ? <Button type="button" variant="pix" size="lg" className="w-full" onClick={onRetry}>{TRY_AGAIN}</Button> : null}
+      </NoticeFrame>
+    );
+  }
+
+  if (screen.kind === "conflict") {
+    return (
+      <NoticeFrame titleRef={titleRef} title={CUSTOMER_CONFLICT_TITLE} icon={<Clock aria-hidden="true" className="size-8" />}>
+        <p className="text-sm text-muted">{CUSTOMER_CONFLICT_BODY}</p>
+        <div className="grid gap-2">
+          {onContinue ? (
+            <Button type="button" variant="pix" size="lg" className="w-full" onClick={onContinue}>{CONTINUE_PAYMENT}</Button>
+          ) : null}
+          <Button asChild variant="outline" size="lg" className="w-full">
+            <a href={publicPath} referrerPolicy="no-referrer">{SEE_SLOTS}</a>
+          </Button>
+        </div>
       </NoticeFrame>
     );
   }
