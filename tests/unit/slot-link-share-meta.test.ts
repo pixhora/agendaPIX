@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createSlotLinkToken, slotLinkTokenHash } from "../../lib/bookings/slot-link-token";
+import { STORE_CARD_NEGATIVE_TTL_MS, STORE_CARD_TTL_MS, forgetStoreCard } from "../../lib/slot-link/store-card-cache";
 import {
   SHARE_META_NO_IDENTITY,
   SHARE_META_PROBE_SCOPE,
@@ -54,7 +55,7 @@ function ports() {
     readPreview,
     storeCard,
   });
-  return { counts, seen, selects, known, probeConsume, findToken, options };
+  return { counts, seen, selects, known, probeConsume, findToken, storeCard, options };
 }
 
 function remember(known: Map<string, string>, token: string, previewId: string) {
@@ -172,5 +173,72 @@ describe("generateMetadata da prévia", () => {
     const fresh = await slotLinkShareMeta(slug, second, now, options("peer:c"));
     expect(fresh.title).toContain("Corte");
     expect(shareMetaCacheRecord(slug, second)?.negative).toBe(false);
+  });
+
+  it("com o bucket estourado a loja é lida no máximo uma vez por slug na janela", async () => {
+    const { counts, options, findToken, storeCard } = ports();
+    const now = 1_700_000_000_000;
+    counts.set("peer:flood", limit);
+    for (let index = 0; index < 8; index += 1) {
+      const meta = await slotLinkShareMeta(slug, createSlotLinkToken(), now, options("peer:flood"));
+      expect(meta.title).toBe("Negócio de teste · Agende pelo AgendaPix");
+      expect(meta.image).toBe(logo);
+    }
+    expect(storeCard).toHaveBeenCalledTimes(1);
+    expect(storeCard).toHaveBeenCalledWith(slug);
+    expect(findToken).not.toHaveBeenCalled();
+    await slotLinkShareMeta("outra-loja", createSlotLinkToken(), now, options("peer:flood"));
+    expect(storeCard).toHaveBeenCalledTimes(2);
+    await slotLinkShareMeta(slug, createSlotLinkToken(), now + STORE_CARD_TTL_MS - 1, options("peer:flood"));
+    expect(storeCard).toHaveBeenCalledTimes(2);
+    await slotLinkShareMeta(slug, createSlotLinkToken(), now + STORE_CARD_TTL_MS, options("peer:flood"));
+    expect(storeCard).toHaveBeenCalledTimes(3);
+  });
+
+  it("slugs aleatórios não repetem o SELECT e o mesmo slug consulta uma vez na janela", async () => {
+    const { counts, options } = ports();
+    const now = 1_700_000_000_000;
+    counts.set("peer:flood", limit);
+    let selects = 0;
+    const storeCard = vi.fn(async (name: string) => {
+      selects += 1;
+      if (name === slug) return { businessName: "Negócio de teste", logoUrl: logo, missing: false };
+      return { businessName: "AgendaPix", logoUrl: null, missing: true };
+    });
+    const call = (name: string, at: number) => slotLinkShareMeta(name, createSlotLinkToken(), at, { ...options("peer:flood"), storeCard });
+    const randomSlugs = Array.from({ length: 12 }, (_, index) => `loja-${index}`);
+    for (const name of randomSlugs) {
+      await call(name, now);
+      await call(name, now + 1_000);
+    }
+    expect(selects).toBe(randomSlugs.length);
+    const before = selects;
+    for (let index = 0; index < 6; index += 1) await call(slug, now + index);
+    expect(selects).toBe(before + 1);
+    await call(slug, now + STORE_CARD_TTL_MS - 1);
+    expect(selects).toBe(before + 1);
+    await call(randomSlugs[0] ?? "loja-0", now + STORE_CARD_NEGATIVE_TTL_MS);
+    expect(selects).toBe(before + 2);
+    forgetStoreCard(slug);
+    await call(slug, now);
+    expect(selects).toBe(before + 3);
+  });
+
+  it("erro ao ler o balde cai no genérico e avisa sem token", async () => {
+    const { options } = ports();
+    const token = createSlotLinkToken();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const meta = await slotLinkShareMeta(slug, token, 1_700_000_000_000, {
+      ...options("peer:warn"),
+      probeExhausted: async () => {
+        throw new Error(`db ${token}`);
+      },
+    });
+    expect(meta.title).toBe("Negócio de teste · Agende pelo AgendaPix");
+    expect(meta.title).not.toContain("Corte");
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0]?.[0])).not.toContain(token);
+    expect(String(warn.mock.calls[0]?.[0])).not.toMatch(/[a-f0-9]{64}/);
+    warn.mockRestore();
   });
 });

@@ -9,6 +9,7 @@ import { HttpError } from "../http";
 import { publicBookingPagePath } from "../public-api";
 import { findOwnedBusiness } from "../tenancy";
 import { invalidatePublicCatalog } from "../bookings/public-cache";
+import { forgetStoreCard } from "../slot-link/store-card-cache";
 import { invalidateAliasCache } from "./alias-cache";
 import { isUniqueViolation, rejectTakenSlug } from "./slug-conflict";
 import { ACTIVE_ALIAS_CAP, aliasHoldActive, PROFILE_PATCH_LIMIT, SLUG_CHANGE_LIMIT } from "./slug-policy";
@@ -115,6 +116,11 @@ export async function updateBusinessProfile(businessId: string, ownerId: string,
     const catalogSlugs = new Set(dropped);
     catalogSlugs.add(result.slug);
     for (const slug of catalogSlugs) await invalidatePublicCatalog(slug);
+    const nameChanged = parsed.data.name !== undefined && parsed.data.name !== existing.name;
+    if (nameChanged || result.slug !== existing.slug) {
+      forgetStoreCard(existing.slug);
+      if (result.slug !== existing.slug) forgetStoreCard(result.slug);
+    }
     return result;
   } catch (error) {
     if (error instanceof HttpError) throw error;

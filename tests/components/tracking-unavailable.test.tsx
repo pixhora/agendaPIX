@@ -14,7 +14,8 @@ describe("404 do acompanhamento", () => {
     expect(screen.queryByText(/não encontrado/i)).toBeNull();
     const talk = screen.getByRole("link", { name: TALK_TO_STORE });
     expect(talk.getAttribute("href")).toBe("https://wa.me/5511988887777");
-    expect(talk.className).toContain("bg-pix");
+    expect(talk.className).toContain("bg-pix-deep");
+    expect(talk.className).toContain("text-slab-foreground");
     expect(screen.queryByText(TRACKING_ASK_STORE)).toBeNull();
   });
 

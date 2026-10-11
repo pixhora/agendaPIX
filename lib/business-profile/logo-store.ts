@@ -8,6 +8,7 @@ import { FAKE_BLOB_HOST, LOGO_UPLOAD_FIELD, LOGO_UPLOAD_MAX_BYTES, businessLogoU
 import { consumeAbuseBucket } from "../abuse-rate-limit";
 import { HttpError } from "../http";
 import { invalidatePublicCatalog } from "../bookings/public-cache";
+import { forgetStoreCard } from "../slot-link/store-card-cache";
 import { findOwnedBusiness } from "../tenancy";
 import { reencodeLogo } from "./logo-image";
 
@@ -162,6 +163,7 @@ async function writeLogo(
     }
   }
   await invalidatePublicCatalog(business.slug);
+  forgetStoreCard(business.slug);
   return logoUploadResponseSchema.parse({ logoUrl: updated.logoUrl });
 }
 

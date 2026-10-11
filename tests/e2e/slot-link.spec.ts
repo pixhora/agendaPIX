@@ -387,12 +387,12 @@ test("mesma chave com outros dados oferece continuar o pagamento", async ({ page
   await expect(page.getByText("Para corrigir nome ou WhatsApp, fale com a loja depois de pagar.")).toBeVisible();
   const resume = page.getByRole("button", { name: "Continuar pagamento" });
   await expect(resume).toBeEnabled();
-  await expect(resume).toHaveClass(/bg-\[#0a6e63\]/);
-  await expect(resume).toHaveClass(/text-white/);
+  await expect(resume).toHaveClass(/bg-pix-deep/);
+  await expect(resume).toHaveClass(/text-slab-foreground/);
   const otherSlots = page.getByRole("link", { name: "Ver horários disponíveis" });
   await expect(otherSlots).toHaveAttribute("href", `/${meta.businessASlug}`);
   await expect(otherSlots).toHaveClass(/border/);
-  await expect(otherSlots).toHaveClass(/text-\[#0b0b0c\]/);
+  await expect(otherSlots).toHaveClass(/text-ink/);
   await expect(page.getByText("+5511900000000")).toHaveCount(0);
   await expect(page.getByText(/já foi usada/)).toHaveCount(0);
   await expect(page.getByLabel("Nome")).toHaveCount(0);
@@ -754,8 +754,8 @@ test("404 do acompanhamento pede o link novo sem dizer que está confirmado", as
     await openTracking();
     const talk = page.getByRole("link", { name: "Falar com a loja" });
     await expect(talk).toHaveAttribute("href", "https://wa.me/5511988887777");
-    await expect(talk).toHaveClass(/bg-pix/);
-    await expect(talk).toHaveClass(/text-pix-foreground/);
+    await expect(talk).toHaveClass(/bg-pix-deep/);
+    await expect(talk).toHaveClass(/text-slab-foreground/);
     if (testInfo.project.name === "desktop") await shootMatrix(page, "acompanhamento-404-botao");
 
     await page.goto(`/dashboard/settings?businessId=${meta.businessAId}`);

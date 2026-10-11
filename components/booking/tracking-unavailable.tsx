@@ -30,7 +30,7 @@ export function TrackingUnavailable({
         {TRACKING_LINK_UPDATED}
       </h1>
       {href ? (
-        <Button asChild variant="pix" size="lg" className="mt-6 w-full">
+        <Button asChild variant="pixDeep" size="lg" className="mt-6 w-full">
           <a href={href}>{TALK_TO_STORE}</a>
         </Button>
       ) : (

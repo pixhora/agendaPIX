@@ -12,7 +12,7 @@ import { PIX_RESUME_STORAGE_PREFIX, purgeExpiredBookingSessions } from "../../co
 import { GENERIC_OG_FALLBACK, parseSlotLinkPreview, slotLinkOgCopy, slotLinkOgLines } from "../../lib/slot-link/preview";
 import { sendOnWhatsApp } from "../../lib/slot-link/share";
 import { ownerSummary, reissueFailure, reissueFailureMessage, cancelFailure, slotLinkMessage, updatedLinkMessage, validityLine, REISSUE_EXPIRED, REISSUE_IN_PROGRESS, REISSUE_MP, REISSUE_PAID, REISSUE_TAKEN, CANCEL_EXPIRED, CANCEL_PAID, OWNER_NETWORK } from "../../lib/slot-link/copy";
-import { readShareMetaCache, shareMetaCacheKey, writeShareMetaCache, SHARE_META_CACHE_MAX, SHARE_META_NEGATIVE_TTL_MS, SHARE_META_TTL_MS } from "../../lib/slot-link/share-meta-cache";
+import { readShareMetaCache, shareMetaCacheKey, writeShareMetaCache, SHARE_META_CACHE_MAX, SHARE_META_NEGATIVE_MAX, SHARE_META_NEGATIVE_TTL_MS, SHARE_META_TTL_MS } from "../../lib/slot-link/share-meta-cache";
 const service = { id: "6b0b4a2e-1c3d-4e5f-8a9b-0c1d2e3f4a5b", name: "Corte", durationMinutes: 30, priceCents: 8000, depositCents: 4000 };
 const openBase = {
   business: { name: "Salao", slug: "salao", logoUrl: null, contactWhatsapp: "+5511999999999", publicPath: "/salao" },
@@ -376,22 +376,27 @@ describe("cache da prévia compartilhada", () => {
     expect(key).toContain(slotLinkTokenHash(token));
   });
 
-  it("guarda 'não achou' por poucos segundos e esquece a chave mais antiga além do teto", () => {
+  it("guarda 'não achou' por poucos segundos e não expulsa a prévia válida", () => {
     const cache = new Map<string, { at: number; value: { title: string }; negative?: boolean }>();
     const now = Date.parse("2030-01-01T12:00:00.000Z");
-    writeShareMetaCache(cache, "neg", now, { title: "Generico" }, { negative: true });
+    writeShareMetaCache(cache, "neg", now, { title: "Generico" }, { negative: true, negativeMax: 2 });
     expect(readShareMetaCache(cache, "neg", now + SHARE_META_NEGATIVE_TTL_MS - 1)?.title).toBe("Generico");
     expect(readShareMetaCache(cache, "neg", now + SHARE_META_NEGATIVE_TTL_MS)).toBeNull();
-    const max = 3;
-    writeShareMetaCache(cache, "a", now, { title: "a" }, { max });
-    writeShareMetaCache(cache, "b", now, { title: "b" }, { max });
-    writeShareMetaCache(cache, "c", now, { title: "c" }, { max });
+    writeShareMetaCache(cache, "a", now, { title: "a" }, { positiveMax: 2 });
+    writeShareMetaCache(cache, "b", now, { title: "b" }, { positiveMax: 2 });
     expect(readShareMetaCache(cache, "a", now)?.title).toBe("a");
-    writeShareMetaCache(cache, "d", now, { title: "d" }, { max });
+    writeShareMetaCache(cache, "c", now, { title: "c" }, { positiveMax: 2 });
     expect(cache.has("b")).toBe(false);
     expect(cache.has("a")).toBe(true);
-    expect(cache.has("d")).toBe(true);
+    writeShareMetaCache(cache, "n1", now, { title: "n1" }, { negative: true, negativeMax: 2 });
+    writeShareMetaCache(cache, "n2", now, { title: "n2" }, { negative: true, negativeMax: 2 });
+    writeShareMetaCache(cache, "n3", now, { title: "n3" }, { negative: true, negativeMax: 2 });
+    expect(cache.has("a")).toBe(true);
+    expect(cache.has("c")).toBe(true);
+    expect(cache.has("n1")).toBe(false);
+    expect(cache.has("n3")).toBe(true);
     expect(SHARE_META_CACHE_MAX).toBeGreaterThan(8);
+    expect(SHARE_META_NEGATIVE_MAX).toBeGreaterThan(8);
   });
 });
 

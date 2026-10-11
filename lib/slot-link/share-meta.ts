@@ -10,6 +10,7 @@ import { isSlotLinkToken, slotLinkTokenHash } from "@/lib/bookings/slot-link-tok
 import { slotLinkOgCopy, parseSlotLinkPreview, GENERIC_OG_FALLBACK, type SlotLinkPreviewView } from "./preview";
 import { slotLinkOgImagePath } from "./paths";
 import { readShareMetaCache, shareMetaCacheKey, writeShareMetaCache, type ShareMetaCacheEntry } from "./share-meta-cache";
+import { clearStoreCardCache, rememberedStoreCard, type StoreCard } from "./store-card-cache";
 
 export type SlotLinkShareMeta = { title: string; description: string; image: string | null };
 
@@ -30,14 +31,13 @@ export function shareMetaBucketIdentity(identity: string | null | undefined) {
 
 export function clearShareMetaCache() {
   shareMetaCache.clear();
+  clearStoreCardCache();
 }
 
 export function shareMetaCacheRecord(slug: string, token: string) {
   if (!isSlotLinkToken(token)) return null;
   return shareMetaCache.get(shareMetaCacheKey(slug, slotLinkTokenHash(token))) ?? null;
 }
-
-type StoreCard = { businessName: string; logoUrl: string | null };
 
 export type SlotLinkShareMetaOptions = {
   identity?: string | null;
@@ -57,15 +57,15 @@ function genericMeta(card: StoreCard): SlotLinkShareMeta {
 }
 
 async function defaultStoreCard(database: NonNullable<SlotLinkShareMetaOptions["database"]>, slug: string): Promise<StoreCard> {
-  const fallback = { businessName: GENERIC_OG_FALLBACK.businessName, logoUrl: GENERIC_OG_FALLBACK.logoUrl };
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return fallback;
+  const missing = { businessName: GENERIC_OG_FALLBACK.businessName, logoUrl: GENERIC_OG_FALLBACK.logoUrl, missing: true };
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return missing;
   const [business] = await database
     .select({ name: schema.businesses.name, logoUrl: schema.businesses.logoUrl })
     .from(schema.businesses)
     .where(eq(schema.businesses.slug, slug))
     .limit(1);
-  if (!business) return fallback;
-  return { businessName: business.name, logoUrl: business.logoUrl };
+  if (!business) return missing;
+  return { businessName: business.name, logoUrl: business.logoUrl, missing: false };
 }
 
 async function defaultFindToken(database: NonNullable<SlotLinkShareMetaOptions["database"]>, slug: string, tokenHash: string) {
@@ -95,8 +95,8 @@ export async function slotLinkShareMeta(slug: string, token: string, now = Date.
   const probeConsume = options.probeConsume ?? consumeAbuseBucket;
   const findToken = options.findToken ?? ((storeSlug, tokenHash) => defaultFindToken(database, storeSlug, tokenHash));
   const readPreview = options.readPreview ?? ((previewId, who) => readSlotLinkPreview(previewId, who, database as never, bookingConfig(), { probe: false }));
-  const storeCard = options.storeCard ?? ((storeSlug) => defaultStoreCard(database, storeSlug));
-  const fallback = async () => genericMeta(await storeCard(slug));
+  const loadStoreCard = options.storeCard ?? ((storeSlug: string) => defaultStoreCard(database, storeSlug));
+  const fallback = async () => genericMeta(await rememberedStoreCard(slug, now, loadStoreCard));
 
   if (!tokenOk) return fallback();
   const tokenHash = slotLinkTokenHash(token);
@@ -106,6 +106,7 @@ export async function slotLinkShareMeta(slug: string, token: string, now = Date.
   try {
     exhausted = await probeExhausted(SHARE_META_PROBE_SCOPE, bucket, limit, "minute", database);
   } catch {
+    console.warn("slot-link: não deu para ler o limite da prévia");
     return fallback();
   }
   if (exhausted) return fallback();

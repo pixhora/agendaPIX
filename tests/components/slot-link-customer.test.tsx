@@ -224,13 +224,14 @@ describe("página da cliente", () => {
     expect(screen.getByText(CUSTOMER_CONFLICT_BODY)).toBeVisible();
     const resume = screen.getByRole("button", { name: "Continuar pagamento" });
     expect(resume).toBeEnabled();
-    expect(resume.className).toMatch(/bg-\[#0a6e63\]/);
-    expect(resume.className).toMatch(/text-white/);
+    expect(resume.className).toMatch(/bg-pix-deep/);
+    expect(resume.className).toMatch(/text-slab-foreground/);
+    expect(resume.className).not.toMatch(/!/);
     const slots = screen.getByRole("link", { name: "Ver horários disponíveis" });
     expect(slots).toHaveAttribute("href", "/salao");
     expect(slots.className).toMatch(/border/);
-    expect(slots.className).toMatch(/text-\[#0b0b0c\]/);
-    expect(slots.className).toMatch(/bg-white/);
+    expect(slots.className).toMatch(/text-ink/);
+    expect(slots.className).toMatch(/bg-surface/);
     expect(slots.className).not.toMatch(/bg-pix/);
     expect(screen.queryByText(/\+5511900000000|já foi usada/)).toBeNull();
     expect(screen.queryByLabelText("Nome")).toBeNull();
