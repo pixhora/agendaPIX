@@ -134,16 +134,15 @@ describe("página de falha do connect antes do redirect", () => {
     expect(errorLog).not.toHaveBeenCalled();
   });
 
-  it("mostra MP-STATE quando gravar o state falha e mantém o 500", async () => {
+  it("mostra MP-STATE quando gravar o state falha sem SQLSTATE e mantém o 500", async () => {
     const response = await respondMercadoPagoConnect(formRequest("/dashboard"), async () => {
-      throw new MpConnectFailure(MpConnectFailureCode.State, Object.assign(new Error(leak), { code: "23505" }));
+      throw new MpConnectFailure(MpConnectFailureCode.State, new Error(leak));
     });
     expect(response.status).toBe(500);
     const html = await response.text();
     assertSafePage(html, MpConnectFailureCode.State);
-    expect(html).not.toContain("23505");
     expect(html).not.toContain("oauth_state_write");
-    expect(errorLog).toHaveBeenCalledWith("[mp-connect] code=MP-STATE cause=oauth_state_write sqlstate=23505");
+    expect(errorLog).toHaveBeenCalledWith("[mp-connect] code=MP-STATE cause=oauth_state_write");
   });
 
   it("mostra MP-DB num erro de banco e mantém o 500", async () => {
@@ -265,16 +264,49 @@ describe("página de falha do connect antes do redirect", () => {
     expect(errorLog).toHaveBeenCalledWith("[mp-connect] code=MP-CONFIG cause=mp_oauth_pkce_invalid");
   });
 
-  it("não troca o 303 de sucesso nem o 401", async () => {
+  it("não troca o 303 de sucesso", async () => {
     const success = await respondMercadoPagoConnect(formRequest("/dashboard"), async () => {
       return NextResponse.redirect("https://auth.mercadopago.com/authorization?state=abc", 303);
     });
     expect(success.status).toBe(303);
     expect(success.headers.get("location")).toBe("https://auth.mercadopago.com/authorization?state=abc");
     expect(errorLog).not.toHaveBeenCalled();
+  });
 
-    errorLog.mockClear();
-    const denied = await respondMercadoPagoConnect(formRequest("/dashboard"), async () => {
+  it("manda o formulário com sessão expirada para o login, com volta ao onboarding", async () => {
+    const denied = await respondMercadoPagoConnect(formRequest("/onboarding"), async () => {
+      throw new HttpError(401, "unauthorized", "Entre na sua conta para continuar.");
+    });
+    expect(denied.status).toBe(303);
+    expect(denied.headers.get("location")).toBe("https://app.example.com/login?next=%2Fonboarding");
+    expect(denied.headers.get("cache-control")).toBe("no-store");
+    const body = await denied.text();
+    expect(body).not.toContain("unauthorized");
+    expect(body).not.toContain("Entre na sua conta");
+    expect(body).not.toContain(MP_CONNECT_FAILURE_TITLE);
+    expect(body).not.toContain("application/json");
+    expect(errorLog).not.toHaveBeenCalled();
+
+    const fromReceipt = await respondMercadoPagoConnect(formRequest("/onboarding/recebimento"), async () => {
+      throw new HttpError(401, "unauthorized", "Entre na sua conta para continuar.");
+    });
+    expect(fromReceipt.status).toBe(303);
+    expect(fromReceipt.headers.get("location")).toBe("https://app.example.com/login?next=%2Fonboarding");
+
+    const fromPanel = await respondMercadoPagoConnect(formRequest("/dashboard"), async () => {
+      throw new HttpError(401, "unauthorized", "Entre na sua conta para continuar.");
+    });
+    expect(fromPanel.status).toBe(303);
+    expect(fromPanel.headers.get("location")).toBe("https://app.example.com/login");
+  });
+
+  it("mantém o 401 em JSON quando o cliente não é o formulário", async () => {
+    const request = new Request("https://app.example.com/api/businesses/x/mercadopago/connect", {
+      method: "POST",
+      headers: { accept: "application/json", "content-type": "application/json" },
+      body: JSON.stringify({ returnTo: "/onboarding", autoRefundAck: "on", consentVersion: "2026-10-09.v4" }),
+    });
+    const denied = await respondMercadoPagoConnect(request, async () => {
       throw new HttpError(401, "unauthorized", "Entre na sua conta para continuar.");
     });
     expect(denied.status).toBe(401);

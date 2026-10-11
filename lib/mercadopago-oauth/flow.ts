@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { isAutoRefundAck, MP_CONNECT_CONSENT_TEXT, MP_CONNECT_CONSENT_VERSION } from "../mercadopago/consent";
-import { MpConnectFailure, MpConnectFailureCode } from "../mercadopago/connect-failure";
+import { connectSqlState, MpConnectFailure, MpConnectFailureCode } from "../mercadopago/connect-failure";
 import { invalidatePublicCatalogForBusiness } from "../bookings/public-cache";
 import { normalizeClientAddress } from "../bookings/rate-limit";
 import { findOwnedBusiness } from "../tenancy";
@@ -235,6 +235,8 @@ export async function submitMercadoPagoConnect(input: {
     });
   } catch (error) {
     if (error instanceof MpConnectFailure) throw error;
+    // SQLSTATE é erro de banco, mesmo no insert do state. Sem ele, a falha continua MP-STATE.
+    if (connectSqlState(error)) throw new MpConnectFailure(MpConnectFailureCode.Database, error);
     throw new MpConnectFailure(MpConnectFailureCode.State, error);
   }
   return { kind: "redirect", location: started.authorizationUrl, cookie: started.cookie };

@@ -58,7 +58,7 @@ function unwrap(error: unknown): unknown {
 }
 
 /** SQLSTATE de 5 caracteres. A mensagem do driver fica de fora: ela pode trazer a URL do banco. */
-function postgresSqlState(error: unknown): string | null {
+export function connectSqlState(error: unknown): string | null {
   let current: unknown = error;
   for (let depth = 0; depth < 5; depth += 1) {
     if (!current || typeof current !== "object") return null;
@@ -90,7 +90,7 @@ export function classifyConnectFailure(error: unknown): MpConnectFailureCode {
   const code = error instanceof HttpError ? error.code : null;
   if (code === "forbidden_origin") return MpConnectFailureCode.Origin;
   if (code && CONFIG_CODES.has(code)) return MpConnectFailureCode.Config;
-  if (postgresSqlState(error)) return MpConnectFailureCode.Database;
+  if (connectSqlState(error)) return MpConnectFailureCode.Database;
   return MpConnectFailureCode.Unknown;
 }
 
@@ -115,7 +115,7 @@ function safeCause(code: MpConnectFailureCode, error: unknown): string {
 /** Linha de log só com código, causa curta e SQLSTATE. Sem mensagem, URL, state, code OAuth ou segredo. */
 export function formatConnectFailureLog(code: MpConnectFailureCode, error: unknown): string {
   const listed = publicCode(code);
-  const sqlstate = postgresSqlState(unwrap(error));
+  const sqlstate = connectSqlState(unwrap(error));
   const suffix = sqlstate ? ` sqlstate=${sqlstate}` : "";
   return `[mp-connect] code=${listed} cause=${safeCause(listed, error)}${suffix}`;
 }

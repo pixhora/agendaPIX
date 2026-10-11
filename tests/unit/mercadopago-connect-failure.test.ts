@@ -117,7 +117,7 @@ describe("códigos fixos da falha do connect", () => {
   it("etiqueta falha ao gravar o state e erro de banco no POST", async () => {
     const stateStore = createMemoryMpStore();
     stateStore.saveOAuthState = async () => {
-      throw Object.assign(new Error(nastyMessage()), { code: "23505" });
+      throw new Error(nastyMessage());
     };
     await expect(submitMercadoPagoConnect({
       request: connectRequest(),
@@ -126,6 +126,18 @@ describe("códigos fixos da falha do connect", () => {
       env,
       store: stateStore,
     })).rejects.toMatchObject({ failureCode: MpConnectFailureCode.State });
+
+    const sqlStore = createMemoryMpStore();
+    sqlStore.saveOAuthState = async () => {
+      throw Object.assign(new Error(nastyMessage()), { cause: { code: "23505", message: nastyMessage() } });
+    };
+    await expect(submitMercadoPagoConnect({
+      request: connectRequest(),
+      businessId: "biz",
+      ownerId: "owner",
+      env,
+      store: sqlStore,
+    })).rejects.toMatchObject({ failureCode: MpConnectFailureCode.Database });
 
     const dbStore = createMemoryMpStore();
     dbStore.findByBusinessId = async () => {
@@ -140,7 +152,7 @@ describe("códigos fixos da falha do connect", () => {
     })).rejects.toMatchObject({ failureCode: MpConnectFailureCode.Database });
   });
 
-  it("mostra MP-STATE na página e não deixa a mensagem crua vazar", async () => {
+  it("mostra MP-DB quando o state não grava por erro de banco e não deixa a mensagem crua vazar", async () => {
     const store = createMemoryMpStore();
     store.saveOAuthState = async () => {
       throw Object.assign(new Error(nastyMessage()), { code: "23505" });
@@ -154,10 +166,11 @@ describe("códigos fixos da falha do connect", () => {
     const html = await response.text();
     expect(html).toContain(MP_CONNECT_FAILURE_TITLE);
     expect(html).toContain(MP_CONNECT_FAILURE_BODY);
-    expect(html).toContain("Código: MP-STATE");
+    expect(html).toContain("Código: MP-DB");
+    expect(html).not.toContain("Código: MP-STATE");
     expect(html).not.toContain("23505");
     assertNoLeak(html);
-    expect(errorLog).toHaveBeenCalledWith("[mp-connect] code=MP-STATE cause=oauth_state_write sqlstate=23505");
+    expect(errorLog).toHaveBeenCalledWith("[mp-connect] code=MP-DB cause=database sqlstate=23505");
     expect(errorLog.mock.calls.flat().join("\n")).not.toContain(leak.databaseUrl);
   });
 });

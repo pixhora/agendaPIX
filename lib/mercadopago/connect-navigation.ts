@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server";
 import { isAutoRefundAck, MP_CONNECT_CONSENT_VERSION } from "../mercadopago/consent";
 import {
   classifyConnectFailure,
@@ -9,6 +10,7 @@ import {
 } from "../mercadopago/connect-failure";
 import { handleHttp, HttpError } from "../http";
 import { sanitizeMpReturnTo } from "../mercadopago-oauth/return-to";
+import { loginErrorPath } from "../safe-redirect";
 import { readSupportWhatsappNumber } from "../support-contact";
 
 /** Mesma frase de `mp_oauth_unconfigured`. O dono não vê código nem nome de variável. */
@@ -279,16 +281,28 @@ async function connectFailureDocument(request: Request, status: number, code: Mp
   });
 }
 
+/** Sessão expirada no envio nativo: o login devolve o dono ao onboarding (ou ao painel). */
+function sessionLoginRedirect(request: Request, returnTo: unknown) {
+  const next = backHref(sanitizeMpReturnTo(returnTo));
+  const redirect = NextResponse.redirect(new URL(loginErrorPath(next), request.url), 303);
+  redirect.headers.set("cache-control", "no-store");
+  return redirect;
+}
+
 /**
  * Sucesso do connect continua 303. Na navegação do formulário, falha antes do
  * redirect vira a página com código fixo. O callback mantém a página anterior.
- * 401 segue como JSON (sessão expirada tem tratamento próprio no cliente).
+ * O 401 do formulário abre o login antes de showsFailurePage e de isConnectPost:
+ * senão a sessão expirada volta como JSON cru. Quem pede JSON continua recebendo 401.
  */
 export async function presentOwnerConnectResponse(
   request: Request,
   response: Response,
   failure: MpConnectFailureCode | null = null,
 ) {
+  if (browserNavigation(request) && response.status === 401) {
+    return sessionLoginRedirect(request, await readReturnTo(request));
+  }
   if (!showsFailurePage(request, response)) return response;
   if (isConnectPost(request)) return connectFailureDocument(request, response.status, failure);
   const payload = await response.clone().json().catch(() => null) as { error?: { code?: unknown } } | null;
