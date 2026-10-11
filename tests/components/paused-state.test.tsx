@@ -24,6 +24,7 @@ describe("agenda pausada na página pública", () => {
     expect(talk).toHaveAttribute("href", "https://wa.me/5511988887777");
     expect(talk.className).toMatch(/bg-pix-deep/);
     expect(talk).toHaveAttribute("target", "_blank");
+    expect(screen.getByText("Já agendou? Seu comprovante continua valendo.")).toBeVisible();
     expect(screen.queryByText(/assinatura|teste grátis|pagamento do dono|Chamar no WhatsApp|Agendamento online pausado/i)).toBeNull();
   });
 

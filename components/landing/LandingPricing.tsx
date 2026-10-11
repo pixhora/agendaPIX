@@ -10,8 +10,7 @@ export function LandingPricing() {
       <div className="max-w-[40rem]">
         <Eyebrow>Preço</Eyebrow>
         <SectionTitle id="precos-titulo">R$ 49 por mês, por negócio.</SectionTitle>
-        <p className="mt-4 text-[14px] leading-relaxed text-pretty text-ink">{rule}</p>
-        <p className="mt-2 text-base leading-relaxed text-pretty text-muted lg:text-lg">7 dias grátis, sem cartão. Nada é cobrado automaticamente. O sinal cai direto na sua conta Mercado Pago, a que você conecta no AgendaPix.</p>
+        <p className="mt-4 text-base leading-relaxed text-pretty text-muted lg:text-lg">7 dias grátis, sem cartão. Nada é cobrado automaticamente. O sinal cai direto na sua conta Mercado Pago, a que você conecta no AgendaPix.</p>
       </div>
       <div className="mt-8 flex justify-center">
         <article aria-labelledby="plano-base" className="flex w-full max-w-md flex-col rounded-frame border-2 border-ink bg-surface p-5 shadow-[var(--shadow-card)] sm:p-6">

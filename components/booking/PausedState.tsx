@@ -42,6 +42,7 @@ export function PausedState({ businessName, contactWhatsapp, services, autoFocus
         ) : (
           <p className="mt-6 text-sm text-muted">Fale com {businessName} pelos canais de sempre.</p>
         )}
+        <p className="mt-4 text-[13px] text-muted">Já agendou? Seu comprovante continua valendo.</p>
       </section>
 
       {services.length > 0 ? (

@@ -173,7 +173,9 @@ describe("landing copy", () => {
     expect(subscriptionPriceRule(null)).toBe("R$ 49/mês, pago pela página de assinatura. Ativação assim que confirmarmos o pagamento.");
     expect(subscriptionPriceRule(1)).toBe("R$ 49/mês, pago pela página de assinatura. Ativação em até 1 hora depois do pagamento.");
     expect(subscriptionPriceRule(6)).toBe("R$ 49/mês, pago pela página de assinatura. Ativação em até 6 horas depois do pagamento.");
-    expect(readFileSync("components/landing/LandingPricing.tsx", "utf8")).toContain("text-[14px]");
+    const pricing = readFileSync("components/landing/LandingPricing.tsx", "utf8");
+    expect(pricing.match(/text-\[14px\]/g)).toHaveLength(1);
+    expect(pricing.match(/\{rule\}/g)).toHaveLength(1);
   });
 
   it("does not hardcode a payment deadline in the landing components", () => {
