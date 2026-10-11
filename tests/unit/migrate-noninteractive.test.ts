@@ -99,6 +99,7 @@ describe("migrate sem TTY", () => {
     expect(output).not.toMatch(/Passe --yes/);
     expect(output).toMatch(/Falha ao aplicar migrations/);
     expect(output).not.toContain("super-secret-password");
+    expect(output).not.toContain(secretUrl);
   });
 
   it("DATABASE_URL no ambiente segue sem --yes", async () => {

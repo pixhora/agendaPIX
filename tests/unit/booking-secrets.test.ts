@@ -118,8 +118,20 @@ describe("segredos separados", () => {
     expect(bookingAccessMacMatches(previousPay, payMessage, "hex", { ...env, BOOKING_ACCESS_SECRET_PREVIOUS: "curto" })).toBe(false);
 
     const stored = createHash("sha256").update(signedPrevious).digest("hex");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     expect(accessTokenForStoredHash(businessId, bookingId, stored, env)).toBe(signedPrevious);
+    expect(warn).not.toHaveBeenCalled();
     const unknown = createHash("sha256").update("outro-token").digest("hex");
     expect(accessTokenForStoredHash(businessId, bookingId, unknown, env)).toBe(signedCurrent);
+    const text = warn.mock.calls.map((call) => call.map(String).join(" ")).join("\n");
+    expect(text).toContain(bookingId);
+    expect(text).toContain("BOOKING_ACCESS_SECRET_PREVIOUS");
+    expect(text).toContain("não pode ser restaurado");
+    expect(text).not.toContain(unknown);
+    expect(text).not.toContain(signedCurrent);
+    expect(text).not.toContain(signedPrevious);
+    expect(text).not.toContain(current);
+    expect(text).not.toContain(previous);
+    warn.mockRestore();
   });
 });

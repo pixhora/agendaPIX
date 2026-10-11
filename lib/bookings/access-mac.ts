@@ -81,7 +81,7 @@ function storedTokenHashMatches(token: string, accessTokenHash: string | null) {
 /**
  * Token da reserva já gravada. Compara o sha256 do token do segredo atual e, se houver,
  * do anterior, com `accessTokenHash`. Devolve o que bate. Se nenhum bate, devolve o atual
- * e não o anterior.
+ * e não o anterior. O hash gravado não muda. O aviso leva só o id da reserva.
  */
 export function accessTokenForStoredHash(
   businessId: string,
@@ -96,9 +96,8 @@ export function accessTokenForStoredHash(
   const compared = previous ?? current;
   const currentOk = storedTokenHashMatches(current, accessTokenHash);
   const previousOk = storedTokenHashMatches(compared, accessTokenHash);
-  const currentKnown = bookingAccessTokenMatches(current, businessId, bookingId, env);
-  const previousKnown = bookingAccessTokenMatches(compared, businessId, bookingId, env);
-  if (currentOk && currentKnown) return current;
-  if (previous && previousOk && previousKnown) return previous;
+  if (currentOk) return current;
+  if (previous && previousOk) return previous;
+  console.warn(`O link de acompanhamento da reserva ${bookingId} não pode ser restaurado. Defina BOOKING_ACCESS_SECRET_PREVIOUS com o segredo de antes da rotação.`);
   return current;
 }
