@@ -9,7 +9,7 @@ import type {
   BookingResponse,
 } from "./types";
 import { cpfDigitsOnly, formatCurrency, normalizePhoneToE164 } from "./formatters";
-import { publicBookingPagePath, publicBookingPaymentUrl, publicBookingsUrl, publicServicesUrl } from "@/lib/public-api";
+import { publicBookingPagePath, publicBookingsUrl, publicServicesUrl } from "@/lib/public-api";
 import { parsePaymentStatusResponse } from "@/lib/public/payment-status";
 import { showDepositUnavailableCard } from "./deposit-availability";
 import { DepositUnavailableCard } from "./DepositUnavailable";
@@ -29,6 +29,7 @@ import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { BrandMark } from "@/components/ui/brand";
 import { BookingSummary } from "./BookingSummary";
 import { GENERIC_SUBMIT_MESSAGE, OFFLINE_MESSAGE, POLICY_CHANGED_MESSAGE, businessLoadCopy, isOfflineError, publicBookingErrorView, whatsappHref } from "./booking-error";
+import { pixRetryPaymentRequest } from "./pix-retry";
 import { PIX_RESUME_UNKNOWN, getPixResumeServerSnapshot, migratedPixResumePayload, pixResumePayload, pixResumeStorageKey, readPixResume, readPixResumeRaw, replacePixResume, subscribePixResume, shouldClearExpiredResume, shouldResumePix, type PixResumeSession } from "./pix-resume";
 import { keptAccessToken } from "@/lib/slot-link/idempotency";
 import { TrackingUnavailable } from "./tracking-unavailable";
@@ -177,14 +178,10 @@ export function BookingFlow({ slug, initialBookingId, initialBusiness, previewBu
     if (!shouldResumePix(stored, initialBookingId) || !stored) return;
 
     const session = stored;
+    const retry = pixRetryPaymentRequest(slug, session);
     let isCancelled = false;
 
-    fetch(publicBookingPaymentUrl(slug, session.bookingId), {
-      cache: "no-store",
-      headers: {
-        Authorization: `Bearer ${session.accessToken}`,
-      },
-    })
+    fetch(retry.url, retry.init)
       .then(async (res) => {
         if (res.status === 404) {
           if (!isCancelled) setTrackingMiss(true);

@@ -12,6 +12,7 @@ import {
   type MpCallbackView,
   type MpOwnerStatus,
 } from "@/lib/mercadopago/contract";
+import { stripOAuthReturnParams } from "@/lib/onboarding/oauth-return";
 import { ONBOARDING_RESUME_PATH, onboardingResumeSchema } from "@/lib/onboarding/resume-contract";
 import { loginErrorPath } from "@/lib/safe-redirect";
 import { MpOnboardingStep } from "./mp-onboarding-step";
@@ -26,12 +27,14 @@ function readCallback(searchParams: { get(name: string): string | null }) {
   return stored ? presentMpCallback(stored.mp, stored.reason) : null;
 }
 
-/** Tira id e slug da barra de endereço. Eles não escolhem o cadastro. */
+/** Tira id, slug, code e state da barra. Nenhum desses valores vai para o sessionStorage. */
 function dropBusinessHintsFromUrl() {
   const url = new URL(window.location.href);
-  if (!url.searchParams.has("businessId") && !url.searchParams.has("slug")) return;
+  const hinted = url.searchParams.has("businessId") || url.searchParams.has("slug") || url.searchParams.has("code") || url.searchParams.has("state");
+  if (!hinted) return;
   url.searchParams.delete("businessId");
   url.searchParams.delete("slug");
+  stripOAuthReturnParams(url.searchParams);
   const next = `${url.pathname}${url.search}${url.hash}`;
   window.history.replaceState(null, "", next);
 }
