@@ -26,6 +26,32 @@ function emailTransport() {
   return { env, transporter };
 }
 
+/** Quebra de linha no assunto vira espaço. O valor não entra em log. */
+export function mailSubject(subject: string) {
+  return subject.replace(/[\r\n]+/g, " ").trim();
+}
+
+/** Falha de envio. Sem destinatário, assunto ou nome. */
+export function logMailFailure(scope: string) {
+  console.error(`[mail] scope=${scope} code=send_failed`);
+}
+
+async function deliver(message: { to: string; subject: string; text: string; html?: string }) {
+  const { env, transporter } = emailTransport();
+  try {
+    await transporter.sendMail({
+      from: env.SMTP_FROM,
+      to: message.to,
+      subject: mailSubject(message.subject),
+      text: message.text,
+      ...(env.SMTP_REPLY_TO ? { replyTo: env.SMTP_REPLY_TO } : {}),
+      ...(message.html ? { html: message.html } : {}),
+    });
+  } finally {
+    transporter.close();
+  }
+}
+
 export async function verifyEmailTransport() {
   if (magicLinkCapturePath()) return;
   const { transporter } = emailTransport();
@@ -45,13 +71,7 @@ export async function sendMagicLinkEmail(email: string, url: string) {
     await writeFile(capture, `${email}\n${url}\n`, "utf8");
     return;
   }
-  const { env, transporter } = emailTransport();
-  await transporter.sendMail({
-    from: env.SMTP_FROM,
-    to: email,
-    subject: magicLinkEmail.subject,
-    text: magicLinkEmail.text(url),
-  });
+  await deliver({ to: email, subject: magicLinkEmail.subject, text: magicLinkEmail.text(url) });
 }
 
 function escapeHtml(value: string) {
@@ -115,8 +135,7 @@ export async function sendSignInCodeEmail(email: string, otp: string) {
     await writeFile(capture, `${email}\n${message.buttonUrl}\n`, "utf8");
     return;
   }
-  const { env, transporter } = emailTransport();
-  await transporter.sendMail({ from: env.SMTP_FROM, to: email, subject: message.subject, text: message.text, html: message.html });
+  await deliver({ to: email, subject: message.subject, text: message.text, html: message.html });
 }
 
 export type OwnerMailer = (to: string, subject: string, text: string) => Promise<void>;
@@ -129,6 +148,5 @@ export async function sendOwnerEmail(to: string, subject: string, text: string, 
     await writeFile(capture, `${to}\n${subject}\n${text}\n`, "utf8");
     return;
   }
-  const { env, transporter } = emailTransport();
-  await transporter.sendMail({ from: env.SMTP_FROM, to, subject, text, ...(html ? { html } : {}) });
+  await deliver({ to, subject, text, html });
 }

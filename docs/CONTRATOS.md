@@ -306,7 +306,7 @@ Erros deste fluxo usam `{ error: { code, message, ... } }`. `409 policy_changed`
 
 `businesses.trial_ends_at` é obrigatório. Negócio novo termina às 23:59:59 do 7º dia local. Negócio já existente recebe `now() + interval '7 days'` na migration `0011`. `subscriptions` guarda status `trialing | active | past_due | canceled` e `provider` (`manual` | `pix_platform`, ou nulo enquanto ninguém ativou). `GET /api/businesses/{businessId}/billing` exige sessão do dono e responde `{ state, trialEndsAt, daysLeft, bookingsPaused, plan: { name: "AgendaPix", priceCents: 4900 }, subscription, checkout }`. `state` é `trial`, `trial_ending`, `trial_last_day`, `paused` ou `active`. O objeto `checkout` está na seção da assinatura manual.
 
-Agenda pausada: `createBooking` responde `403 bookings_paused` antes do limite de tentativas. Replay da mesma `Idempotency-Key` não é bloqueado. Pix já gerado ainda confirma. Disponibilidade pública fica vazia com `bookingsPaused: true`.
+Agenda pausada: `createBooking` responde `403 bookings_paused` antes do limite de tentativas. Replay da mesma `Idempotency-Key` não é bloqueado. Pix já gerado ainda confirma. Disponibilidade pública fica vazia com `bookingsPaused: true`. Pagamento novo de link de horário (`mode=create`) responde o mesmo `403 bookings_paused` e solta o claim (`pay_started_at` e `booking_id` continuam nulos). A mesma `Idempotency-Key` de um Pix já começado retoma. `GET` do link inclui `bookingsPaused`.
 
 `getDepositBookability` em `lib/bookings/deposit-bookability.ts` continua retornando ok. A conta Mercado Pago entra por `assertMpConnectedForDeposit` e `getServiceBlockedReason`: serviço com sinal, sem conexão, responde `409` `mp_account_not_connected` e a listagem marca `bookable: false`. Conta `connected` cujo `consent_version` não é `2026-10-09.v4`, ou sem `auto_refund_ack_at`, responde `409` `mp_consent_outdated` com a mensagem "Aceite o texto novo da devolução automática para voltar a receber sinal." e a listagem marca `bookable: false`. Com `NODE_ENV=production` e `MERCADOPAGO_ENV=production`, conta conectada com `live_mode` false responde `409` `mp_account_test_mode` e a listagem marca `bookable: false` com esse `blockedReason`. Fora disso, `live_mode` false só aparece como aviso na tela. Essa checagem só vale para reserva nova e para ativar serviço com sinal. Repetir a mesma chave de idempotência, confirmar Pix já gerado e devolver não passam por ela. Não há checagem de chave Pix.
 
@@ -459,7 +459,7 @@ Migration `db/migrations/0018_business_profile.sql` tem de rodar antes do deploy
 
 ## Link de um horário
 
-Contratos em `lib/contracts/slot-link.ts`, reexportados por `lib/contracts/index.ts`. O corpo de erro é `{ error: { code, message, details? } }` via `handleHttp`. `slotLinkErrorCodeSchema` junta `link_expired`, `link_used`, `link_in_progress`, `link_cancelled`, `link_replaced`, `link_invalid`, `slot_unavailable`, `mp_not_connected` com `invalid_input`, `rate_limited`, `unauthorized`, `business_unavailable`, `origin_not_allowed` e `body_too_large`.
+Contratos em `lib/contracts/slot-link.ts`, reexportados por `lib/contracts/index.ts`. O corpo de erro é `{ error: { code, message, details? } }` via `handleHttp`. `slotLinkErrorCodeSchema` junta `link_expired`, `link_used`, `link_in_progress`, `link_cancelled`, `link_replaced`, `link_invalid`, `slot_unavailable`, `mp_not_connected`, `bookings_paused`, `idempotency_conflict` com `invalid_input`, `rate_limited`, `unauthorized`, `business_unavailable`, `origin_not_allowed` e `body_too_large`.
 
 Gerar o link não cria reserva nem cobrança. O hold e o Pix nascem só no POST de pagamento, pelo mesmo fluxo da reserva pública (`createBooking`). Um `23P01` da exclusão de horário vira `409 slot_unavailable`.
 
@@ -475,7 +475,7 @@ Nome e WhatsApp da cliente só entram na reserva, com a mesma retenção de `cus
 | `GET /api/businesses/{businessId}/slot-links?date=YYYY-MM-DD&cursor=&limit=` | `slotLinkListQuerySchema` | `slotLinkListResponseSchema` |
 | `POST /api/businesses/{businessId}/slot-links/{linkId}/cancel` | sem corpo | `slotLinkOwnerSchema` |
 | `POST /api/businesses/{businessId}/slot-links/{linkId}/reissue` | sem corpo | `201` `slotLinkCreatedResponseSchema` (token novo) |
-| `GET /api/public/{slug}/slot-links/{token}` | — | `slotLinkOpenResponseSchema` |
+| `GET /api/public/{slug}/slot-links/{token}` | — | `slotLinkOpenResponseSchema` (inclui `bookingsPaused`) |
 | `POST /api/public/{slug}/slot-links/{token}/pay` | header `Idempotency-Key` (16–128, base64url ou UUID) + `slotLinkPayRequestSchema` `{ customer: { name, phone, cpfCnpj? }, policyHash }` | `201` `slotLinkPayResponseSchema` |
 | `GET /api/public/slot-link-previews/{previewId}` | — | `slotLinkPreviewResponseSchema` |
 

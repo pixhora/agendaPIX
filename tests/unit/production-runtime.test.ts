@@ -14,6 +14,10 @@ const dedicatedBookingSecret = {
   BOOKING_ACCESS_SECRET: bookingAccess,
   BETTER_AUTH_SECRET: authSecret,
 };
+const checkoutEnv = {
+  SUPPORT_WHATSAPP_NUMBER: "5511912345678",
+  SUBSCRIPTION_MANUAL_ACTIVATION_HOURS: "1",
+};
 
 describe("boot de produção", () => {
   it("recusa captura, fixture e remetente example.com sem repetir o valor", () => {
@@ -60,6 +64,26 @@ describe("boot de produção", () => {
       SMTP_FROM: "AgendaPix <ci@agendapix.dev.br>",
       ...dedicatedBookingSecret,
     })).not.toThrow();
+  });
+
+  it("recusa SMTP_REPLY_TO no domínio example.com sem repetir o endereço", () => {
+    const reply = "AgendaPix <resposta-secreta@example.com>";
+    const env = {
+      NODE_ENV: "production",
+      SMTP_FROM: "AgendaPix <ci@agendapix.dev.br>",
+      SMTP_REPLY_TO: reply,
+      ...dedicatedBookingSecret,
+    };
+    expect(() => assertProductionSafeEnv(env)).toThrow("SMTP_REPLY_TO não pode usar o domínio example.com em produção.");
+    try {
+      assertProductionSafeEnv(env);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      expect(message).not.toContain("resposta-secreta");
+      expect(message).not.toContain(reply);
+    }
+    expect(() => assertProductionSafeEnv({ ...env, SMTP_REPLY_TO: "  " })).not.toThrow();
+    expect(() => assertProductionSafeEnv({ ...env, SMTP_REPLY_TO: "AgendaPix <oi@agendapix.dev.br>" })).not.toThrow();
   });
 
   it("exige PKCE ligado quando o Mercado Pago está em produção e não repete o valor", () => {
@@ -142,6 +166,7 @@ describe("build de produção na Vercel", () => {
       VERCEL_ENV: "production",
       MP_OAUTH_PKCE: " on ",
       ...dedicatedBookingSecret,
+      ...checkoutEnv,
     })).not.toThrow();
 
     const hold = "27";
@@ -184,6 +209,56 @@ describe("build de produção na Vercel", () => {
     const source = readFileSync("next.config.ts", "utf8");
     expect(source).toContain("assertVercelProductionBuild()");
   });
+
+  it("recusa o checkout da assinatura sem as envs e não repete o valor", () => {
+    const leakedNumber = "5500000000000";
+    const leakedHours = "02";
+    const production = {
+      VERCEL_ENV: "production",
+      MP_OAUTH_PKCE: "on",
+      ...dedicatedBookingSecret,
+      ...checkoutEnv,
+    };
+    expect(() => assertVercelProductionBuild({ ...production, SUPPORT_WHATSAPP_NUMBER: undefined })).toThrow("SUPPORT_WHATSAPP_NUMBER é obrigatório em produção para o checkout da assinatura.");
+    expect(() => assertVercelProductionBuild({ ...production, SUPPORT_WHATSAPP_NUMBER: "   " })).toThrow("SUPPORT_WHATSAPP_NUMBER é obrigatório em produção para o checkout da assinatura.");
+    expect(() => assertVercelProductionBuild({ ...production, SUBSCRIPTION_MANUAL_ACTIVATION_HOURS: undefined })).toThrow("SUBSCRIPTION_MANUAL_ACTIVATION_HOURS é obrigatório em produção para o checkout da assinatura.");
+    expect(() => assertVercelProductionBuild({ ...production, SUBSCRIPTION_MANUAL_ACTIVATION_HOURS: "  " })).toThrow("SUBSCRIPTION_MANUAL_ACTIVATION_HOURS é obrigatório em produção para o checkout da assinatura.");
+    expect(() => assertVercelProductionBuild({ ...production, SUPPORT_WHATSAPP_NUMBER: leakedNumber })).toThrow("SUPPORT_WHATSAPP_NUMBER inválido.");
+    expect(() => assertVercelProductionBuild({ ...production, SUBSCRIPTION_MANUAL_ACTIVATION_HOURS: leakedHours })).toThrow("SUBSCRIPTION_MANUAL_ACTIVATION_HOURS inválido.");
+    expect(() => assertVercelProductionBuild({ ...production, SUBSCRIPTION_MANUAL_ACTIVATION_HOURS: "0" })).toThrow("SUBSCRIPTION_MANUAL_ACTIVATION_HOURS inválido.");
+    expect(() => assertVercelProductionBuild({ ...production, SUBSCRIPTION_MANUAL_ACTIVATION_HOURS: "1.5" })).toThrow("SUBSCRIPTION_MANUAL_ACTIVATION_HOURS inválido.");
+    try {
+      assertVercelProductionBuild({ ...production, SUPPORT_WHATSAPP_NUMBER: leakedNumber, SUBSCRIPTION_MANUAL_ACTIVATION_HOURS: leakedHours });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      expect(message).toBe("SUPPORT_WHATSAPP_NUMBER inválido.");
+      expect(message).not.toContain(leakedNumber);
+      expect(message).not.toContain(leakedHours);
+      expect(message).not.toContain(checkoutEnv.SUPPORT_WHATSAPP_NUMBER);
+    }
+    const boot = {
+      NODE_ENV: "production",
+      VERCEL_ENV: "production",
+      SMTP_FROM: "AgendaPix <ci@agendapix.dev.br>",
+      ...dedicatedBookingSecret,
+    };
+    expect(() => assertProductionSafeEnv(boot)).toThrow("SUPPORT_WHATSAPP_NUMBER é obrigatório em produção para o checkout da assinatura.");
+    expect(() => assertProductionSafeEnv({ ...boot, ...checkoutEnv })).not.toThrow();
+    expect(() => assertProductionSafeEnv({
+      NODE_ENV: "production",
+      SMTP_FROM: "AgendaPix <ci@agendapix.dev.br>",
+      ...dedicatedBookingSecret,
+    })).not.toThrow();
+    expect(() => assertVercelProductionBuild({
+      VERCEL_ENV: "preview",
+      ...dedicatedBookingSecret,
+    })).not.toThrow();
+    expect(() => assertProductionSafeEnv({
+      NODE_ENV: "production",
+      NEXT_PHASE: "phase-production-build",
+      VERCEL_ENV: "production",
+    })).not.toThrow();
+  });
 });
 
 describe("BOOKING_ACCESS_SECRET em produção", () => {
@@ -196,6 +271,7 @@ describe("BOOKING_ACCESS_SECRET em produção", () => {
     VERCEL_ENV: "production",
     MP_OAUTH_PKCE: "on",
     ...dedicatedBookingSecret,
+    ...checkoutEnv,
   };
 
   it("recusa vazio, curto e igual a BETTER_AUTH_SECRET sem repetir o valor", () => {

@@ -2,7 +2,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { and, desc, eq, sql } from "drizzle-orm";
 import * as schema from "../../db/schema";
 import { HttpError } from "../http";
-import { sendOwnerEmail, type OwnerMailer } from "../email";
+import { logMailFailure, sendOwnerEmail, type OwnerMailer } from "../email";
 import type { PaymentProvider } from "./provider";
 import { paymentsConfig } from "./config";
 import { callProvider, ProviderTimeoutError } from "./timeout";
@@ -181,6 +181,7 @@ async function safeNotify(ports: RefundPorts, view: RefundView, action: string, 
     await notifyOnce(ports, view, action, mailer, notice);
   } catch {
     // O dinheiro já foi commitado. Sem a linha de auditoria, o próximo ciclo reenvia o aviso.
+    logMailFailure("owner_notice");
   }
 }
 
