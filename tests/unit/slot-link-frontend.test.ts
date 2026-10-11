@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { createSlotLinkToken, slotLinkTokenHash } from "../../lib/bookings/slot-link-token";
 import { SLOT_LINK_IDEMPOTENCY_KEY_PATTERN } from "../../lib/contracts/slot-link";
 import { failureCode, isReplacedLinkError, screenFromFailure, screenFromStatus, shouldClearPayKey, slotStartsInPast } from "../../lib/slot-link/customer-state";
-import { SLOT_LINK_HOLD_WINDOW_MS, claimDeadline, clearPayKey, createIdempotencyKey, lockPayPayload, memorySlotLinkStores, payRequestBody, purgeExpiredSlotLinkStorage, readOrCreatePayKey, readPayResume, savePayAccess, SLOT_LINK_CLAIM_PREFIX, slotLinkSessionKey, slotLinkStorageKey } from "../../lib/slot-link/idempotency";
+import { SLOT_LINK_HOLD_WINDOW_MS, claimDeadline, clearPayKey, createIdempotencyKey, keptAccessToken, lockPayPayload, memorySlotLinkStores, payRequestBody, purgeExpiredSlotLinkStorage, readOrCreatePayKey, readPayResume, savePayAccess, SLOT_LINK_CLAIM_PREFIX, slotLinkSessionKey, slotLinkStorageKey } from "../../lib/slot-link/idempotency";
 import { parseOwnerList } from "../../lib/slot-link/owner-link";
 import { isSlotLinkPagePath } from "../../lib/slot-link/paths";
 import { slotLinkPageHeaderRule, slotLinkPageHeaders } from "../../lib/slot-link/privacy";
@@ -239,6 +239,29 @@ describe("idempotência do pagamento", () => {
     const resume = await readPayResume(token, stores, now);
     expect(resume?.accessToken).toBe("token-secreto");
     expect(resume?.idempotencyKey).toBe(key);
+  });
+
+  it("mantém o accessToken do mesmo bookingId e troca quando o agendamento muda", async () => {
+    const token = createSlotLinkToken();
+    const stores = memorySlotLinkStores();
+    const bookingId = "7c1c5b3f-2d4e-5f60-9b0c-1d2e3f4a5b6c";
+    const otherId = "8d2d6c40-3e5f-4061-ac1d-2e3f4a5b6c7d";
+    const serviceId = "6b0b4a2e-1c3d-4e5f-8a9b-0c1d2e3f4a5b";
+    expect(keptAccessToken(null, { bookingId, accessToken: "novo" })).toBe("novo");
+    expect(keptAccessToken({ bookingId, accessToken: "antigo" }, { bookingId, accessToken: "novo" })).toBe("antigo");
+    expect(keptAccessToken({ bookingId, accessToken: "antigo" }, { bookingId: otherId, accessToken: "novo" })).toBe("novo");
+    await lockPayPayload(token, stores, {
+      customer: { name: "Ana Souza", phone: "+5511987654321" },
+      policyHash: "ab".repeat(32),
+    }, expiresAt, () => "11111111-1111-4111-8111-111111111111", now);
+    await savePayAccess(token, stores, { bookingId, accessToken: "token-antigo", expiresAt, serviceId }, now);
+    await savePayAccess(token, stores, { bookingId, accessToken: "token-novo", expiresAt, serviceId }, now);
+    const same = await readPayResume(token, stores, now);
+    expect(same?.accessToken).toBe("token-antigo");
+    await savePayAccess(token, stores, { bookingId: otherId, accessToken: "token-outro", expiresAt, serviceId }, now);
+    const changed = await readPayResume(token, stores, now);
+    expect(changed?.bookingId).toBe(otherId);
+    expect(changed?.accessToken).toBe("token-outro");
   });
 
   it("ao carregar, apaga chave, payload e token vencidos ou sem prazo", async () => {

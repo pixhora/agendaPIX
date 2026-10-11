@@ -21,6 +21,14 @@ export const SUBMIT_RETRY_COPY = "Não conseguimos concluir agora. Tente de novo
 
 export const BUSINESS_NOT_FOUND_COPY = "Estabelecimento não encontrado. Verifique o link informado.";
 
+/** 404 do acompanhamento. Não diz que o horário foi confirmado. */
+export const TRACKING_LINK_UPDATED = "Este link de acompanhamento foi atualizado. Para ver os detalhes do seu agendamento, fale com a loja.";
+
+/** Quando a rota não tem slug (ou não há WhatsApp para abrir). */
+export const TRACKING_ASK_STORE = "Procure a mensagem da loja no seu WhatsApp para falar com ela.";
+
+export const TALK_TO_STORE = "Falar com a loja";
+
 export const BUSINESS_LOAD_COPY = "Não foi possível carregar os serviços deste estabelecimento.";
 
 export const BUSINESS_SLOW_COPY = "A conexão demorou muito para responder. Verifique sua internet e tente novamente.";

@@ -10,6 +10,10 @@ const shots = "/opt/cursor/artifacts/slot-link";
 
 test.use({ storageState: ownerStorageState });
 
+test.beforeEach(async () => {
+  await withPool((pool) => pool.query("truncate booking_rate_limits, abuse_rate_limits"));
+});
+
 function saoPauloDay(offset: number) {
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   const [year, month, day] = today.split("-").map(Number);
@@ -550,7 +554,8 @@ test("dono gera o link na agenda e a prévia do horário responde imagem", async
 test("gerar novo link na rota real substitui, recusa e a cliente pede o link novo", async ({ page }, testInfo) => {
   test.setTimeout(240_000);
   const service = await serviceId(page);
-  const slot = await freeSlot(page, service.id, saoPauloDay(9));
+  const dayFor = (offset: number) => saoPauloDay(testInfo.project.name === "desktop" ? offset + 20 : offset);
+  const slot = await freeSlot(page, service.id, dayFor(9));
   const label = `Reemitir ${testInfo.project.name}`;
   const created = await createLink(page, service.id, slot.date, slot.time, label);
   expect(created.status).toBe(201);
@@ -612,7 +617,7 @@ test("gerar novo link na rota real substitui, recusa e a cliente pede o link nov
     await expect(page.getByRole("status").filter({ hasText: "WhatsApp salvo." })).toBeVisible();
   }
 
-  const payingSlot = await freeSlot(page, service.id, saoPauloDay(10));
+  const payingSlot = await freeSlot(page, service.id, dayFor(10));
   const paying = await createLink(page, service.id, payingSlot.date, payingSlot.time, `Pagando ${testInfo.project.name}`);
   expect(paying.status).toBe(201);
   await page.goto(`/${meta.businessASlug}/h/${paying.body.token}`);
@@ -631,7 +636,7 @@ test("gerar novo link na rota real substitui, recusa e a cliente pede o link nov
   await expect(payingRow).toContainText("Aguardando pagamento");
   await expect(payingRow.getByRole("button", { name: "Gerar novo link" })).toBeVisible();
 
-  const takenSlot = await freeSlot(page, service.id, saoPauloDay(11));
+  const takenSlot = await freeSlot(page, service.id, dayFor(11));
   const taken = await createLink(page, service.id, takenSlot.date, takenSlot.time, `Ocupado ${testInfo.project.name}`);
   expect(taken.status).toBe(201);
   const takenService = taken.body.service as { priceCents: number; depositCents: number };
@@ -649,7 +654,7 @@ test("gerar novo link na rota real substitui, recusa e a cliente pede o link nov
   await takenDialog.getByRole("button", { name: "Cancelar" }).click();
   await expect(takenRow).toContainText("Aguardando pagamento");
 
-  const limitedSlot = await freeSlot(page, service.id, saoPauloDay(12));
+  const limitedSlot = await freeSlot(page, service.id, dayFor(12));
   const limited = await createLink(page, service.id, limitedSlot.date, limitedSlot.time, `Limite ${testInfo.project.name}`);
   expect(limited.status).toBe(201);
   const limitHash = await fillCreateLimit();
@@ -698,6 +703,60 @@ test("limite da cliente pede para tentar de novo sem perder o horário", async (
     if (testInfo.project.name === "desktop") await shootMatrix(page, "cliente-tentar-de-novo");
   } finally {
     await page.unroute(`**/api/public/${meta.businessASlug}/slot-links/**`).catch(() => undefined);
+    await page.goto(`/dashboard/settings?businessId=${meta.businessAId}`);
+    await page.getByRole("textbox", { name: "WhatsApp do negócio" }).fill("");
+    await page.getByRole("button", { name: "Salvar WhatsApp" }).click();
+    await expect(page.getByRole("status").filter({ hasText: "WhatsApp salvo." })).toBeVisible();
+  }
+});
+
+test("404 do acompanhamento pede o link novo sem dizer que está confirmado", async ({ page }, testInfo) => {
+  test.setTimeout(120_000);
+  const bookingId = "7c1c5b3f-2d4e-5f60-9b0c-1d2e3f4a5b6c";
+  const title = "Este link de acompanhamento foi atualizado. Para ver os detalhes do seu agendamento, fale com a loja.";
+  const support = "Procure a mensagem da loja no seu WhatsApp para falar com ela.";
+  await page.goto(`/dashboard/settings?businessId=${meta.businessAId}`);
+  await page.getByRole("textbox", { name: "WhatsApp do negócio" }).fill("+5511988887777");
+  await page.getByRole("button", { name: "Salvar WhatsApp" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "WhatsApp salvo." })).toBeVisible();
+  await page.route(`**/api/public/${meta.businessASlug}/bookings/${bookingId}/payment`, (route) => route.fulfill({
+    status: 404,
+    contentType: "application/json",
+    body: JSON.stringify({ error: { code: "booking_not_found", message: "Agendamento não encontrado." } }),
+  }));
+  const openTracking = async () => {
+    await page.goto(`/${meta.businessASlug}`);
+    await page.evaluate(({ id, key }) => {
+      sessionStorage.setItem(key, JSON.stringify({
+        bookingId: id,
+        accessToken: "token-original",
+        expiresAt: "2030-01-01T16:00:00.000Z",
+        serviceId: "6b0b4a2e-1c3d-4e5f-8a9b-0c1d2e3f4a5b",
+      }));
+    }, { id: bookingId, key: `booking_session_${meta.businessASlug}` });
+    await page.goto(`/${meta.businessASlug}?bookingId=${bookingId}`);
+    await expect(page.getByRole("heading", { name: title })).toBeVisible();
+    await expect(page.getByText("Agendamento não encontrado.")).toHaveCount(0);
+    await expect(page.getByText(/confirmado/i)).toHaveCount(0);
+  };
+  try {
+    await openTracking();
+    const talk = page.getByRole("link", { name: "Falar com a loja" });
+    await expect(talk).toHaveAttribute("href", "https://wa.me/5511988887777");
+    await expect(talk).toHaveClass(/bg-pix/);
+    await expect(talk).toHaveClass(/text-pix-foreground/);
+    if (testInfo.project.name === "desktop") await shootMatrix(page, "acompanhamento-404-botao");
+
+    await page.goto(`/dashboard/settings?businessId=${meta.businessAId}`);
+    await page.getByRole("textbox", { name: "WhatsApp do negócio" }).fill("");
+    await page.getByRole("button", { name: "Salvar WhatsApp" }).click();
+    await expect(page.getByRole("status").filter({ hasText: "WhatsApp salvo." })).toBeVisible();
+    await openTracking();
+    await expect(page.getByText(support)).toBeVisible();
+    await expect(page.getByRole("link", { name: "Falar com a loja" })).toHaveCount(0);
+    if (testInfo.project.name === "desktop") await shootMatrix(page, "acompanhamento-404-apoio");
+  } finally {
+    await page.unroute(`**/api/public/${meta.businessASlug}/bookings/${bookingId}/payment`).catch(() => undefined);
     await page.goto(`/dashboard/settings?businessId=${meta.businessAId}`);
     await page.getByRole("textbox", { name: "WhatsApp do negócio" }).fill("");
     await page.getByRole("button", { name: "Salvar WhatsApp" }).click();

@@ -304,6 +304,21 @@ export async function readOrCreatePayKey(
   return { storageKey, record };
 }
 
+/**
+ * Token da retomada. O mesmo agendamento mantém o que já está no sessionStorage:
+ * um token novo que não casa no servidor responde 404, e o original continua válido.
+ * Sem token guardado, ou com outro bookingId, grava o da resposta.
+ */
+export function keptAccessToken(
+  stored: { bookingId: string; accessToken: string } | null | undefined,
+  incoming: { bookingId: string; accessToken: string },
+): string {
+  if (stored && stored.bookingId === incoming.bookingId && stored.accessToken.length > 0) {
+    return stored.accessToken;
+  }
+  return incoming.accessToken;
+}
+
 /** accessToken só na sessão. O claim local só atualiza o prazo do hold. */
 export async function savePayAccess(
   token: string,
@@ -317,13 +332,15 @@ export async function savePayAccess(
   if (!hold) return null;
   if (claim) stores.claim.set(claimKey, serializeClaim({ ...claim, expiresAt: hold }));
   if (!resume.bookingId || !resume.accessToken || !resume.serviceId) return null;
+  const sessionKey = await slotLinkSessionKey(token);
+  const existing = readSession(stores.session.get(sessionKey));
   const session: PaySession = {
     bookingId: resume.bookingId,
-    accessToken: resume.accessToken,
+    accessToken: keptAccessToken(existing, resume),
     serviceId: resume.serviceId,
     expiresAt: hold,
   };
-  stores.session.set(await slotLinkSessionKey(token), serializeSession(session));
+  stores.session.set(sessionKey, serializeSession(session));
   return session;
 }
 
