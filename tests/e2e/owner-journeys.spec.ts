@@ -123,7 +123,7 @@ test("cadastro concluído → \"Ir para o painel\" abre /dashboard com o negóci
 
   await openAccessLink(page, await capturedLink(email), email);
   await expect(page).toHaveURL(/\/onboarding\/recebimento$/, { timeout: 20_000 });
-  await page.getByRole("link", { name: "Agora não" }).click();
+  await page.getByRole("link", { name: "Fazer depois" }).click();
   await expect(page).toHaveURL(/\/onboarding\/concluir$/, { timeout: 20_000 });
   await expect(page.getByRole("heading", { name: "Sua agenda está no ar" })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText(`/${slug}`)).toBeVisible();

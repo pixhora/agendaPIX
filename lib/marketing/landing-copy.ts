@@ -88,7 +88,7 @@ export function faqItems(facts: PublicBookingFacts): FaqItem[] {
     {
       id: "change_link",
       question: "Posso mudar meu link depois?",
-      answer: "Por enquanto, não pelo painel. Escolha com calma no cadastro. Se precisar trocar, fale com a gente.",
+      answer: "Dá pra mudar o link em Configurações. O link antigo passa a levar para o novo.",
     },
   ];
 

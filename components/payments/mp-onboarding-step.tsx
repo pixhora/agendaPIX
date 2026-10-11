@@ -64,9 +64,7 @@ function SkipNote() {
   return (
     <p id="mp-skip-note" className="mt-4 flex items-start gap-2 rounded-card bg-warning-soft px-3.5 py-3 text-sm leading-relaxed text-ink">
       <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-warning" />
-      <span>
-        <strong className="font-semibold">Se pular agora:</strong> sua página fica no ar e serviços sem sinal funcionam. Serviços com sinal ficam indisponíveis até você conectar.
-      </span>
+      <span>Sem isso, os serviços com sinal ficam fora do ar.</span>
     </p>
   );
 }
@@ -120,9 +118,8 @@ export function MpOnboardingStep({
   return (
     <div className="bg-paper max-md:fixed max-md:inset-0 max-md:overflow-hidden md:static md:min-h-dvh md:py-10" style={{ scrollPaddingBottom: "calc(var(--sticky-cta-height) + 16px)" }}>
       <div className="mx-auto flex w-full max-w-[480px] flex-col bg-paper max-md:h-full max-md:overflow-hidden md:min-h-0 md:rounded-frame md:border md:border-line md:bg-surface md:shadow-[var(--shadow-card)]">
-        <header className="flex h-14 shrink-0 items-center justify-between px-4">
+        <header className="flex h-14 shrink-0 items-center px-4">
           <BrandLink href="/onboarding" />
-          <p className="text-xs text-muted">Quase lá · recomendado</p>
         </header>
         {connected ? (
           <ConnectedBody
@@ -149,7 +146,7 @@ export function MpOnboardingStep({
                 <CircleCheck aria-hidden="true" className="size-3.5" />
                 Conta criada
               </p>
-              <h1 className="mt-4 font-display text-[28px] font-extrabold leading-[1.12] tracking-tight">Conecte sua conta Mercado Pago para cobrar o sinal</h1>
+              <h1 className="mt-4 font-display text-[28px] font-extrabold leading-[1.12] tracking-tight">Último passo: receber o sinal no Pix</h1>
               <p className="mt-3 text-[15px] leading-relaxed text-muted">
                 O Pix do sinal vai cair direto na <strong className="font-semibold text-ink">sua</strong> conta Mercado Pago. O AgendaPix não recebe, não guarda e não transfere esse dinheiro.
               </p>
@@ -205,7 +202,7 @@ export function MpOnboardingStep({
                   aria-describedby="mp-skip-note"
                   className={cn(buttonVariants({ variant: "ghost", size: "lg" }), "mt-1 w-full")}
                 >
-                  Agora não
+                  Fazer depois
                 </Link>
                 <p className="pb-1 text-center text-xs leading-relaxed text-muted">Você será levado ao site do Mercado Pago. Não tem conta? Dá para criar lá.</p>
               </>

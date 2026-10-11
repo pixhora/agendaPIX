@@ -1,15 +1,17 @@
 import { CheckIcon } from "./icons";
-import { basePlan } from "@/lib/marketing/plans";
+import { basePlan, subscriptionActivationHours, subscriptionPriceRule } from "@/lib/marketing/plans";
 import { buttonVariants } from "@/components/ui/button";
 import { Eyebrow, Section, SectionTitle } from "./section";
 
 export function LandingPricing() {
+  const rule = subscriptionPriceRule(subscriptionActivationHours());
   return (
     <Section id="precos" labelledBy="precos-titulo" paint="always">
       <div className="max-w-[40rem]">
         <Eyebrow>Preço</Eyebrow>
         <SectionTitle id="precos-titulo">R$ 49 por mês, por negócio.</SectionTitle>
-        <p className="mt-4 text-base leading-relaxed text-pretty text-muted lg:text-lg">7 dias grátis, sem cartão. Nada é cobrado automaticamente. O sinal cai direto na sua conta Mercado Pago, a que você conecta no AgendaPix.</p>
+        <p className="mt-4 text-[14px] leading-relaxed text-pretty text-ink">{rule}</p>
+        <p className="mt-2 text-base leading-relaxed text-pretty text-muted lg:text-lg">7 dias grátis, sem cartão. Nada é cobrado automaticamente. O sinal cai direto na sua conta Mercado Pago, a que você conecta no AgendaPix.</p>
       </div>
       <div className="mt-8 flex justify-center">
         <article aria-labelledby="plano-base" className="flex w-full max-w-md flex-col rounded-frame border-2 border-ink bg-surface p-5 shadow-[var(--shadow-card)] sm:p-6">
@@ -33,8 +35,7 @@ export function LandingPricing() {
           <a href={basePlan.href} className={buttonVariants({ size: "lg", className: "mt-6 w-full" })}>
             {basePlan.cta}
           </a>
-          <p className="mt-3 text-[12px] leading-relaxed text-muted">{basePlan.guarantee}</p>
-          <p className="mt-2 text-[13px] leading-relaxed text-ink">{basePlan.activation}</p>
+          <p className="mt-3 text-[14px] leading-relaxed text-ink">{rule}</p>
         </article>
       </div>
     </Section>

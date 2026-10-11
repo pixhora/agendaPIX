@@ -105,8 +105,9 @@ export function StoreProfileForm({
     >
       <div className="flex-1 space-y-5 px-5 pt-6 pb-4">
         <div className="space-y-2">
+          <p className="text-sm font-semibold text-ink">Passo 1 de 2</p>
           <h1 className="font-display text-[28px] font-bold leading-[1.12] tracking-tight">Sua loja</h1>
-          <p className="max-w-[40rem] text-[15px] leading-normal text-muted-foreground">É assim que seus clientes vão ver você.</p>
+          <p className="max-w-[40rem] text-[15px] leading-normal text-muted-foreground">É assim que seus clientes vão ver você. Você pode mudar tudo depois.</p>
         </div>
         {formError ? (
           <div id="store-form-error" role="alert" tabIndex={-1} className="rounded-card border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">

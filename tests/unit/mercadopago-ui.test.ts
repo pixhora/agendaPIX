@@ -131,9 +131,13 @@ describe("Mercado Pago connect consent", () => {
     expect(html).not.toContain("horário já está ocupado");
     expect(html).toContain("Continuar para o Mercado Pago");
     expect(html).toContain('href="/onboarding/concluir"');
-    expect(html).toContain("Agora não");
+    expect(html).toContain("Último passo: receber o sinal no Pix");
+    expect(html).toContain("Fazer depois");
+    expect(html).toContain("Sem isso, os serviços com sinal ficam fora do ar.");
+    expect(html).not.toContain("recomendado");
+    expect(html).not.toContain("Agora não");
     expect(html).toContain("data-mp-sticky");
-    const skipAt = html.indexOf("Se pular agora");
+    const skipAt = html.indexOf("Sem isso, os serviços com sinal ficam fora do ar.");
     const consentAt = html.indexOf("Entendi e autorizo");
     const stickyAt = html.indexOf("data-mp-sticky");
     const ctaAt = html.indexOf("Continuar para o Mercado Pago");
