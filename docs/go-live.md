@@ -54,6 +54,18 @@ O código usa a mesma URL de API nos dois modos. Quem define o ambiente é o **a
       inexistente é aceitável (404/ignorada). O que importa é **não** responder `401 invalid_signature`.
       Se der 401, o secret está errado.
 
+## 1.1 E-mail sintético do pagador
+
+Sem e-mail do cliente, o Pix usa `hold-<id do pagamento>@pagador.agendapix.dev.br`. A parte local é só esse id. Não leva nome, telefone nem CPF, e não é uma caixa de entrada.
+
+No DNS de `agendapix.dev.br`, crie o null MX para esse host recusar correio ([RFC 7505](https://www.rfc-editor.org/rfc/rfc7505)):
+
+| Nome | Tipo | Prioridade | Valor |
+| --- | --- | --- | --- |
+| `pagador` | MX | 0 | `.` |
+
+O valor é um ponto sozinho (`MX 0 .`). Sem esse registro, um servidor pode tentar entregar mensagem nesse endereço.
+
 ## 2. Teste real com Pix pequeno (R$ 1)
 
 - [ ] Crie/use um negócio de teste com um serviço de sinal **R$ 1,00** (`depositCents = 100`).

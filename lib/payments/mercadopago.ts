@@ -209,10 +209,13 @@ function splitName(full: string) {
   return { firstName: parts[0] ?? "Cliente", lastName: parts.slice(1).join(" ") || parts[0] || "Cliente" };
 }
 
-/** Sem e-mail real, o pagador usa o endereço sintético do hold. CPF não entra no e-mail. */
+/** Domínio do e-mail sintético. No DNS: `MX 0 .` (null MX, RFC 7505). */
+export const SYNTHETIC_PAYER_EMAIL_DOMAIN = "pagador.agendapix.dev.br";
+
+/** Sem e-mail real, a parte local é só `hold-<reference>`. Sem nome, telefone ou CPF. */
 function payerEmail(customer: { email?: string } | undefined, reference: string) {
   if (customer?.email) return customer.email;
-  return `hold-${reference}@pagador.agendapix.invalid`;
+  return `hold-${reference}@${SYNTHETIC_PAYER_EMAIL_DOMAIN}`;
 }
 
 /**
