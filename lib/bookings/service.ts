@@ -215,10 +215,10 @@ async function createChargeOutsideTx(
       try {
         await markCreatingPaymentFailed(database, payment);
       } catch { /* o 503 segue; a linha pode continuar creating se o update falhar */ }
-      throw new HttpError(503, "payment_unavailable", "Não foi possível criar a cobrança. Tente novamente com a mesma chave.");
+      throw new HttpError(503, "payment_unavailable", "Não conseguimos gerar o Pix agora. Tente de novo em instantes ou fale com a loja.");
     }
-    if (error instanceof ProviderTimeoutError) throw new HttpError(503, "payment_unavailable", "Não foi possível criar a cobrança. Tente novamente com a mesma chave.");
-    throw new HttpError(503, "payment_unavailable", "Não foi possível criar a cobrança. Tente novamente com a mesma chave.");
+    if (error instanceof ProviderTimeoutError) throw new HttpError(503, "payment_unavailable", "Não conseguimos gerar o Pix agora. Tente de novo em instantes ou fale com a loja.");
+    throw new HttpError(503, "payment_unavailable", "Não conseguimos gerar o Pix agora. Tente de novo em instantes ou fale com a loja.");
   }
 }
 
@@ -234,7 +234,7 @@ async function finalizeCreatingPayment(
   if (!attached) {
     // Outro processo anexou, expirou ou reconciliou. Recarrega.
     const [current] = await database.select().from(schema.payments).where(and(eq(schema.payments.businessId, payment.businessId), eq(schema.payments.id, payment.id))).limit(1);
-    if (!current || current.status === "creating") throw new HttpError(503, "payment_unavailable", "Não foi possível criar a cobrança. Tente novamente com a mesma chave.");
+    if (!current || current.status === "creating") throw new HttpError(503, "payment_unavailable", "Não conseguimos gerar o Pix agora. Tente de novo em instantes ou fale com a loja.");
     return current;
   }
   return attached;
