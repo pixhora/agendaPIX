@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, within, act } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SlotLinkCustomer } from "@/components/slot-link/slot-link-customer";
 import { AgendaPixFooter } from "@/components/slot-link/agenda-pix-footer";
@@ -507,8 +507,7 @@ describe("página da cliente", () => {
     expect(rotated?.idempotencyKey).not.toBe(keys[1]);
     expect(rotated?.payload?.customer).toEqual({ name: "Ana Souza", phone: "+5511987654321" });
     await user.click(screen.getByRole("button", { name: /Pagar sinal de/ }));
-    await screen.findByRole("link", { name: PIX_CREATE_FAILED_STORE });
-    expect(keys).toHaveLength(3);
+    await waitFor(() => expect(keys).toHaveLength(3));
     expect(keys[2]).toBe(rotated?.idempotencyKey);
     expect(screen.getByText("Ana Souza")).toBeVisible();
   });
@@ -548,7 +547,48 @@ describe("página da cliente", () => {
     const held = await readPayResume(token, stores, now.getTime());
     expect(held?.idempotencyKey).toBe(keys[1]);
     await user.click(screen.getByRole("button", { name: /Pagar sinal de/ }));
+    await waitFor(() => expect(keys).toHaveLength(3));
+    expect(keys[2]).toBe(keys[1]);
+  });
+
+  it("error.details.retry_same_key false troca na primeira falha e true mantém na segunda", async () => {
+    const user = userEvent.setup();
+    const stores = memorySlotLinkStores();
+    const keys: string[] = [];
+    const message = "Não conseguimos gerar o Pix agora. Tente de novo em instantes ou fale com a loja.";
+    const now = new Date("2030-10-01T12:00:00.000Z");
+    let posts = 0;
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/pay")) {
+        posts += 1;
+        keys.push(new Headers(init?.headers).get("Idempotency-Key") ?? "");
+        return json(503, {
+          error: {
+            code: "payment_unavailable",
+            message,
+            details: { retry_same_key: posts === 1 ? false : true },
+          },
+        });
+      }
+      return json(200, openBody());
+    });
+    render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" stores={stores} fetchImpl={fetchImpl} now={() => now} />);
+    await fillAndPay(user);
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(PIX_CREATE_FAILED_COPY);
+    expect(alert).not.toHaveTextContent(message);
+    expect(document.body.textContent).not.toContain(message);
+    const forced = await readPayResume(token, stores, now.getTime());
+    expect(forced?.idempotencyKey).not.toBe(keys[0]);
+    expect(forced?.payload?.customer.name).toBe("Ana Souza");
+    await user.click(screen.getByRole("button", { name: /Pagar sinal de/ }));
     await screen.findByRole("link", { name: PIX_CREATE_FAILED_STORE });
+    expect(keys[1]).toBe(forced?.idempotencyKey);
+    const held = await readPayResume(token, stores, now.getTime());
+    expect(held?.idempotencyKey).toBe(keys[1]);
+    await user.click(screen.getByRole("button", { name: /Pagar sinal de/ }));
+    await waitFor(() => expect(keys).toHaveLength(3));
     expect(keys[2]).toBe(keys[1]);
   });
 

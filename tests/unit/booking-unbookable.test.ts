@@ -101,6 +101,24 @@ describe("serviço com sinal sem conta conectada", () => {
       retry_same_key: false,
       error: { code: "payment_unavailable", message: serverMessage },
     })).toEqual({ kind: "pix_create_failed", retrySameKey: false });
+    const contractMessage = "Não conseguimos gerar o Pix agora. Tente de novo em instantes ou fale com a loja.";
+    expect(publicBookingErrorView(503, {
+      error: { code: "payment_unavailable", message: contractMessage, details: { retry_same_key: false } },
+    })).toEqual({ kind: "pix_create_failed", retrySameKey: false });
+    expect(publicBookingErrorView(503, {
+      error: { code: "payment_unavailable", message: contractMessage, details: { retry_same_key: true } },
+    })).toEqual({ kind: "pix_create_failed", retrySameKey: true });
+    expect(JSON.stringify(publicBookingErrorView(503, {
+      error: { code: "payment_unavailable", message: contractMessage, details: { retry_same_key: false } },
+    }))).not.toContain(contractMessage);
+    expect(publicBookingErrorView(503, {
+      error: {
+        code: "payment_unavailable",
+        message: contractMessage,
+        retry_same_key: true,
+        details: { retry_same_key: false },
+      },
+    })).toEqual({ kind: "pix_create_failed", retrySameKey: false });
     expect(isPixCreateFailureBody({ error: { code: "internal_error", message: legacy } })).toBe(false);
     expect(publicBookingErrorView(503, { error: { code: "internal_error", message: legacy } })).toEqual({
       kind: "message",

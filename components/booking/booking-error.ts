@@ -88,12 +88,21 @@ function readApiErrorMessage(body: unknown): string | null {
   return typeof message === "string" && message.trim() ? message.trim() : null;
 }
 
+function readBooleanFlag(value: unknown): boolean | null {
+  return typeof value === "boolean" ? value : null;
+}
+
+/** Contrato: `error.details.retry_same_key`. Os outros caminhos ficam só se esse não vier booleano. */
 function readRetrySameKey(body: unknown): boolean | null {
   if (!body || typeof body !== "object") return null;
   const root = body as Record<string, unknown>;
   const error = root.error && typeof root.error === "object" ? (root.error as Record<string, unknown>) : null;
-  const value = error?.retry_same_key ?? root.retry_same_key;
-  return typeof value === "boolean" ? value : null;
+  const details = error?.details && typeof error.details === "object" ? (error.details as Record<string, unknown>) : null;
+  const fromDetails = readBooleanFlag(details?.retry_same_key);
+  if (fromDetails !== null) return fromDetails;
+  const fromError = readBooleanFlag(error?.retry_same_key);
+  if (fromError !== null) return fromError;
+  return readBooleanFlag(root.retry_same_key);
 }
 
 /**
