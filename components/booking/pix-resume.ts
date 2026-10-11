@@ -12,6 +12,49 @@ export function pixResumeStorageKey(slug: string): string {
   return `${PIX_RESUME_STORAGE_PREFIX}${slug}`;
 }
 
+/** Valor do servidor: ainda não lemos o sessionStorage deste separador. */
+export const PIX_RESUME_UNKNOWN = "\u0000";
+
+const pixResumeListeners = new Set<() => void>();
+
+export function subscribePixResume(listener: () => void) {
+  pixResumeListeners.add(listener);
+  return () => {
+    pixResumeListeners.delete(listener);
+  };
+}
+
+export function getPixResumeServerSnapshot(): string {
+  return PIX_RESUME_UNKNOWN;
+}
+
+export function readPixResumeRaw(slug: string): string {
+  try {
+    return sessionStorage.getItem(pixResumeStorageKey(slug)) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+/** Grava ou apaga a retomada e avisa quem está na tela. Sem mudança, não avisa. */
+export function replacePixResume(slug: string, value: string | null) {
+  const key = pixResumeStorageKey(slug);
+  try {
+    const current = sessionStorage.getItem(key);
+    if (value === null) {
+      if (current === null) return;
+      sessionStorage.removeItem(key);
+    } else if (current === value) {
+      return;
+    } else {
+      sessionStorage.setItem(key, value);
+    }
+  } catch {
+    return;
+  }
+  for (const listener of pixResumeListeners) listener();
+}
+
 /** Apaga retomadas de Pix vencidas. expiresAt nulo fica: a agenda pública ainda retoma. */
 export function purgeExpiredBookingSessions(
   store: { keys(): string[]; get(key: string): string | null; remove(key: string): void },

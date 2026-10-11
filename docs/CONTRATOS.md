@@ -284,6 +284,8 @@ Migration `0016_onboarding_drafts` adiciona `onboarding_drafts` e `abuse_rate_li
 
 `PATCH` aceita `{ email? , data? }` com ao menos um campo. `200` no mesmo formato do GET. Trocar o e-mail apaga códigos `sign-in-otp-<email>` anteriores. Rascunho já consumido: `409 draft_consumed`.
 
+`GET /api/onboarding/resume` não recebe id nem slug. A sessão do dono é a única chave: devolve `200 { businessId, slug, publicPath }` do negócio mais recente desse usuário. Sem sessão: `401 unauthorized`. Sessão sem negócio: `404 onboarding_not_found`. Query `businessId` ou `slug` na URL é ignorada e não entra na resposta. `Cache-Control: no-store`.
+
 `POST /api/onboarding/drafts/:id/commit` exige sessão e o mesmo e-mail. Em `NODE_ENV=production`, rascunho com `plan` `completo` responde `400 plan_unavailable` antes de criar o negócio; o replay de um commit que já deu certo continua `200`. Chama `provisionBusiness(userId, draftId, data)`. Primeira vez `201`; repetição `200` com o mesmo `{ businessId, slug, publicPath, serviceId }`, inclusive se o rascunho já venceu depois do sucesso. `401` sem sessão. Id que não é UUID v4: `400`. E-mail diferente: `404`.
 
 `GET /api/public/slugs/availability?slug=` → `200 { input, normalized, valid, available, reason, suggestions }` com `Cache-Control: no-store`. `reason`: `null | too_short | invalid | reserved | taken`. Sugestões só quando reservado ou tomado, no máximo 3, numa query `IN` (equivalente ao `ANY` da spec). `segment` e `uf` são opcionais; segmento fora da lista e UF que não tem 2 letras são ignorados. 30 consultas por IP por minuto.
