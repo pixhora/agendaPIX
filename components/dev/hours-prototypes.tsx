@@ -212,6 +212,7 @@ function SegmentedTime({ id, label, value, onChange }: { id: string; label: stri
           maxLength={2}
           value={hourDraft}
           className="w-8 bg-transparent text-center text-base text-ink outline-none"
+          onFocus={(event) => event.currentTarget.select()}
           onChange={(event) => {
             const digits = event.target.value.replace(/\D/g, "").slice(0, 2);
             setHourDraft(digits);
@@ -225,7 +226,7 @@ function SegmentedTime({ id, label, value, onChange }: { id: string; label: stri
             if (event.key === "ArrowUp") { event.preventDefault(); bump("hour", 1); }
             if (event.key === "ArrowDown") { event.preventDefault(); bump("hour", -1); }
           }}
-          onBlur={() => commit(hourDraft, minuteDraft)}
+          onBlur={(event) => commit(event.currentTarget.value, minuteDraft)}
         />
         <span aria-hidden="true" className="text-muted">:</span>
         <input
@@ -240,6 +241,7 @@ function SegmentedTime({ id, label, value, onChange }: { id: string; label: stri
           maxLength={2}
           value={minuteDraft}
           className="w-8 bg-transparent text-center text-base text-ink outline-none"
+          onFocus={(event) => event.currentTarget.select()}
           onChange={(event) => {
             const digits = event.target.value.replace(/\D/g, "").slice(0, 2);
             setMinuteDraft(digits);
@@ -249,7 +251,7 @@ function SegmentedTime({ id, label, value, onChange }: { id: string; label: stri
             if (event.key === "ArrowUp") { event.preventDefault(); bump("minute", 1); }
             if (event.key === "ArrowDown") { event.preventDefault(); bump("minute", -1); }
           }}
-          onBlur={() => commit(hourDraft, minuteDraft)}
+          onBlur={(event) => commit(hourDraft, event.currentTarget.value)}
         />
       </div>
     </div>
