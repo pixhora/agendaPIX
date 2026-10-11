@@ -216,8 +216,7 @@ export function PreviewBookingFlow({
         <h1 className="font-display text-2xl font-extrabold tracking-tight text-foreground">
           {MOCK_PUBLIC_BUSINESS.name}
         </h1>
-        <p className="flex items-center justify-center gap-1.5 text-xs font-medium text-muted-foreground">
-          <span className="inline-block h-1.5 w-1.5 rounded-full bg-success" />
+        <p className="text-xs font-medium text-muted-foreground">
           {MOCK_BUSINESS_INFO.address} · Agendamento com sinal Pix garantido
         </p>
       </div>
