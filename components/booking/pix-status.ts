@@ -2,7 +2,7 @@ import type { BookingResponse, PaymentStatusResponse, PixPaymentStatus } from ".
 import { resolvePixQr } from "./pix-qr";
 
 /** Fase anunciável na tela de Pix (contrato interno do provider). */
-export type PixUiPhase = "pending" | "confirming" | "paid" | "expired" | "cancelled" | "refund_pending" | "refunded";
+export type PixUiPhase = "pending" | "confirming" | "paid" | "expired" | "cancelled" | "charge_failed" | "refund_pending" | "refunded";
 
 export const CONFIRMING_PAYMENT_LABEL = "Confirmando pagamento";
 
@@ -22,8 +22,13 @@ export function pixUiPhase(
   if (paymentStatus === "paid" && data.status === "pending_payment") return "confirming";
   if (paymentStatus === "paid" && (data.status === "expired" || data.status === "cancelled")) return "refund_pending";
   if (data.status === "expired" || paymentStatus === "expired") return "expired";
-  if (data.status === "cancelled" || paymentStatus === "cancelled" || paymentStatus === "failed") return "cancelled";
+  if (data.status === "cancelled" || paymentStatus === "cancelled") return "cancelled";
+  if (paymentStatus === "failed") return "charge_failed";
   return "pending";
+}
+
+export function isFailedPixCharge(payment: { status?: string | null } | null | undefined): boolean {
+  return payment?.status === "failed";
 }
 
 export function isPixQrUsable(

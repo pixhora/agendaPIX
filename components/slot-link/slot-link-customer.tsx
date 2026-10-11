@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { BusinessAvatar } from "@/components/ui/business-avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,7 +27,10 @@ import {
 import { browserSlotLinkStores, clearPayKey, createIdempotencyKey, lockPayPayload, payRequestBody, readPayResume, rotatePayIdempotencyKey, savePayAccess, type SlotLinkPayDraft, type SlotLinkPayPayload, type SlotLinkPayStores } from "@/lib/slot-link/idempotency";
 import { paySlotLinkUrl, publicSlotLinkUrl } from "@/lib/slot-link/paths";
 import { isOfflineError, pixCreateFailure as readPixCreateFailure, shouldRotatePixIdempotencyKey, whatsappHref } from "@/components/booking/booking-error";
+import { PIX_GENERATING_LABEL } from "@/components/booking/customer-copy";
+import { PixChargeFailedScreen } from "@/components/booking/pix-charge-failed";
 import { PixCreateFailureAlert } from "@/components/booking/pix-create-error";
+import { isFailedPixCharge } from "@/components/booking/pix-status";
 import { AgendaPixFooter } from "./agenda-pix-footer";
 import { parsePayResult } from "./pay-result";
 import { SlotLinkNotice } from "./slot-link-notice";
@@ -68,6 +72,8 @@ export function SlotLinkCustomer({
   const [cpf, setCpf] = useState("");
   const [accepted, setAccepted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const payInFlight = useRef(false);
+  const [chargeFailed, setChargeFailed] = useState(false);
   const [touched, setTouched] = useState(false);
   const [savedPayload, setSavedPayload] = useState<SlotLinkPayPayload | null>(null);
   const [holdStarted, setHoldStarted] = useState(false);
@@ -162,7 +168,8 @@ export function SlotLinkCustomer({
   }, [load]);
 
   async function pay(link: SlotLinkOpenResponse) {
-    if (!link.policy) return;
+    if (payInFlight.current || !link.policy) return;
+    payInFlight.current = true;
     setSubmitting(true);
     try {
       const fresh = await load();
@@ -179,11 +186,15 @@ export function SlotLinkCustomer({
       if (locked) setSavedPayload(locked.payload);
       const replay = locked ? (locked.fresh ? draft : locked.payload) : draft;
       const opened = await postPay(locked?.record.idempotencyKey ?? createIdempotencyKey(), withCpf(replay, cpf, link.requiresPayerCpf));
-      if (opened) setPhase({ kind: "pix", link, booking: opened });
+      if (opened) {
+        setChargeFailed(false);
+        setPhase({ kind: "pix", link, booking: opened });
+      }
     } catch (error) {
       if (isOfflineError(error)) setPhase({ kind: "offline", publicPath: link.business.publicPath });
       else setPhase({ kind: "offline", publicPath: link.business.publicPath });
     } finally {
+      payInFlight.current = false;
       setSubmitting(false);
     }
   }
@@ -202,6 +213,15 @@ export function SlotLinkCustomer({
     if (response.status === 201) {
       const booking = parsePayResult(body);
       const current = linkRef.current;
+      if (isFailedPixCharge(booking.payment) && current) {
+        pixCreateFailures.current = 0;
+        await rotatePayIdempotencyKey(token, payStores, createIdempotencyKey, now().getTime());
+        setChargeFailed(true);
+        setPixCreateFailure(null);
+        setPhase({ kind: "form", link: current });
+        return null;
+      }
+      setChargeFailed(false);
       setHoldStarted(true);
       setFormError(null);
       setPixCreateFailure(null);
@@ -217,6 +237,7 @@ export function SlotLinkCustomer({
     const current = linkRef.current;
     const pixFailure = readPixCreateFailure(body);
     if (pixFailure && current) {
+      setChargeFailed(false);
       pixCreateFailures.current += 1;
       if (shouldRotatePixIdempotencyKey(pixFailure.retrySameKey, pixCreateFailures.current)) {
         await rotatePayIdempotencyKey(token, payStores, createIdempotencyKey, now().getTime());
@@ -305,7 +326,14 @@ export function SlotLinkCustomer({
             onContinue={phase.kind === "conflict" ? () => void continueSavedPay() : undefined}
           />
         ) : null}
-        {phase.kind === "form" && link && when ? (
+        {phase.kind === "form" && chargeFailed && link ? (
+          <PixChargeFailedScreen
+            storeHref={whatsappHref(link.business.contactWhatsapp)}
+            retrying={submitting}
+            onRetry={() => { void pay(link); }}
+          />
+        ) : null}
+        {phase.kind === "form" && !chargeFailed && link && when ? (
           <form
             className="grid gap-5"
             data-testid="slot-link-screen"
@@ -369,8 +397,9 @@ export function SlotLinkCustomer({
             {pixCreateFailure ? (
               <PixCreateFailureAlert repeated={pixCreateFailure.repeated} storeHref={whatsappHref(link.business.contactWhatsapp)} />
             ) : null}
-            <Button type="submit" variant="pix" size="lg" className="w-full" disabled={submitting || !link.policy}>
-              {submitting ? "Gerando…" : payButtonLabel(link.depositCents)}
+            <Button type="submit" variant="pix" size="lg" className="w-full" disabled={submitting || !link.policy} aria-busy={submitting || undefined}>
+              {submitting ? <Loader2 aria-hidden="true" className="animate-spin motion-reduce:animate-none" /> : null}
+              {submitting ? PIX_GENERATING_LABEL : payButtonLabel(link.depositCents)}
             </Button>
             <p className="text-center text-sm text-muted">
               Prefere outro horário?{" "}

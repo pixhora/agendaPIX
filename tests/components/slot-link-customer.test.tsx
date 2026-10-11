@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor, within, act } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SlotLinkCustomer } from "@/components/slot-link/slot-link-customer";
 import { AgendaPixFooter } from "@/components/slot-link/agenda-pix-footer";
@@ -10,7 +10,7 @@ import { SlotLinkStorageSweep } from "@/components/slot-link/storage-sweep";
 import { SentLinks } from "@/components/slot-link/sent-links";
 import { createSlotLinkToken } from "../../lib/bookings/slot-link-token";
 import { CANCEL_EXPIRED, CANCEL_PAID, CONNECT_MERCADO_PAGO, CUSTOMER_BOOKINGS_PAUSED, CUSTOMER_CONFLICT_BODY, CUSTOMER_CONFLICT_TITLE, CUSTOMER_CPF_REQUIRED, CUSTOMER_IN_PROGRESS, CUSTOMER_PAUSED_LATER, CUSTOMER_PAUSED_RECEIPT, CUSTOMER_RETRY_BODY, CUSTOMER_RETRY_TITLE, CUSTOMER_USED_TITLE, OWNER_NETWORK, REISSUE_BODY, REISSUE_EXPIRED, REISSUE_IN_PROGRESS, REISSUE_MP, REISSUE_PAID, REISSUE_TAKEN, REISSUE_TITLE, formatDayMonth, isoDateInZone, weekdayShort } from "@/lib/slot-link/copy";
-import { PIX_CREATE_FAILED_COPY, PIX_CREATE_FAILED_STORE } from "@/components/booking/customer-copy";
+import { PIX_CHARGE_FAILED_BODY, PIX_CHARGE_FAILED_RETRY, PIX_CHARGE_FAILED_TITLE, PIX_CREATE_FAILED_COPY, PIX_CREATE_FAILED_STORE, PIX_GENERATING_LABEL, TALK_TO_STORE } from "@/components/booking/customer-copy";
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
@@ -608,6 +608,71 @@ describe("página da cliente", () => {
     expect(alert).not.toHaveTextContent(serverMessage);
     expect(screen.queryByText(serverMessage)).toBeNull();
     expect(document.body.textContent).not.toContain(serverMessage);
+  });
+
+  it("duplo clique em pagar manda um único pedido", async () => {
+    const stores = memorySlotLinkStores();
+    let posts = 0;
+    let release: (value: Response) => void = () => {};
+    const pending = new Promise<Response>((resolve) => {
+      release = resolve;
+    });
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/pay")) {
+        posts += 1;
+        return pending;
+      }
+      return json(200, openBody());
+    });
+    const user = userEvent.setup();
+    render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" stores={stores} fetchImpl={fetchImpl} now={() => new Date("2030-10-01T12:00:00.000Z")} />);
+    await user.type(await screen.findByLabelText("Nome"), "Ana Souza");
+    await user.type(screen.getByLabelText("WhatsApp"), "11987654321");
+    await user.click(screen.getByLabelText("Li e concordo com a política"));
+    const form = screen.getByTestId("slot-link-screen");
+    fireEvent.submit(form);
+    fireEvent.submit(form);
+    await waitFor(() => expect(posts).toBe(1));
+    const busy = screen.getByRole("button", { name: PIX_GENERATING_LABEL });
+    expect(busy).toBeDisabled();
+    expect(busy).toHaveAttribute("aria-busy", "true");
+    release(json(503, { error: { code: "payment_unavailable", message: "Não foi possível criar a cobrança. Tente novamente com a mesma chave." } }));
+    expect(await screen.findByText(PIX_CREATE_FAILED_COPY)).toBeVisible();
+  });
+
+  it("reserva com pagamento failed mostra a falha do Pix e troca a chave", async () => {
+    const user = userEvent.setup();
+    const stores = memorySlotLinkStores();
+    const keys: string[] = [];
+    const now = new Date("2030-10-01T12:00:00.000Z");
+    const failed = {
+      ...payBody(),
+      payment: { ...payBody().payment, status: "failed", copyPaste: null, qrCodeDataUrl: null },
+    };
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/pay")) {
+        keys.push(new Headers(init?.headers).get("Idempotency-Key") ?? "");
+        return json(201, failed);
+      }
+      return json(200, openBody());
+    });
+    render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" stores={stores} fetchImpl={fetchImpl} now={() => now} />);
+    await fillAndPay(user);
+    expect(await screen.findByRole("heading", { name: PIX_CHARGE_FAILED_TITLE })).toBeVisible();
+    expect(screen.getByText(PIX_CHARGE_FAILED_BODY)).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "Pagamento cancelado" })).toBeNull();
+    const store = screen.getByRole("link", { name: TALK_TO_STORE });
+    expect(store).toHaveAttribute("href", "https://wa.me/5511988887777");
+    expect(store).toHaveAttribute("rel", "noopener noreferrer");
+    const rotated = await readPayResume(token, stores, now.getTime());
+    expect(rotated?.idempotencyKey).not.toBe(keys[0]);
+    expect(rotated?.payload?.customer).toEqual({ name: "Ana Souza", phone: "+5511987654321" });
+    await user.click(screen.getByRole("button", { name: PIX_CHARGE_FAILED_RETRY }));
+    await waitFor(() => expect(keys).toHaveLength(2));
+    expect(keys[1]).toBe(rotated?.idempotencyKey);
+    expect(keys[1]).not.toBe(keys[0]);
   });
 
   it("o texto antigo sem payment_unavailable não troca a chave nem a frase do Pix", async () => {

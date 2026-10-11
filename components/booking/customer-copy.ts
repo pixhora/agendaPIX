@@ -22,6 +22,15 @@ export const SUBMIT_RETRY_COPY = "Não conseguimos concluir agora. Tente de novo
 /** Mercado Pago não criou o Pix. Os dados do formulário continuam na tela. */
 export const PIX_CREATE_FAILED_COPY = "Não conseguimos gerar o Pix agora. Seus dados continuam salvos, é só tocar em Gerar Pix de novo.";
 
+/** A reserva voltou com pagamento `failed` (recusa). Não é prazo encerrado nem cancelamento. */
+export const PIX_CHARGE_FAILED_TITLE = "Não conseguimos gerar o Pix agora";
+
+export const PIX_CHARGE_FAILED_BODY = "Tente de novo em instantes ou fale com a loja.";
+
+export const PIX_CHARGE_FAILED_RETRY = "Gerar Pix de novo";
+
+export const PIX_GENERATING_LABEL = "Gerando Pix…";
+
 /** Segunda falha na mesma visita. Vira link só quando a loja tem WhatsApp. */
 export const PIX_CREATE_FAILED_STORE = "Se continuar, fale com a loja";
 
