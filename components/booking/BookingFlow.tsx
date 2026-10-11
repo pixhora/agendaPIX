@@ -47,8 +47,8 @@ interface BookingFlowProps {
   previewBusiness?: PublicBusinessData;
   /** Espelha `LEGAL_PAGES_PUBLISHED`. Desligado: sem link de privacidade. */
   legalPagesPublished?: boolean;
-  /** Link wa.me do suporte. A página pública manda o valor do servidor; o padrão é o mesmo da landing. */
-  supportWhatsappHref?: string;
+  /** Link wa.me do suporte. Null esconde o link. A página pública manda o valor do servidor. */
+  supportWhatsappHref?: string | null;
 }
 
 const footerLinkClass = "inline-flex min-h-11 items-center text-sm text-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
@@ -470,18 +470,22 @@ export function BookingFlow({
         </p>
       )}
       <div className="flex w-full flex-col items-center gap-2 sm:flex-row sm:items-center sm:justify-between sm:text-left">
-        <nav aria-label="AgendaPix" className="flex flex-wrap items-center justify-center gap-x-4 sm:justify-start">
-          {legalPagesPublished ? (
-            <>
-              <Link href="/termos" className={footerLinkClass}>Termos de uso</Link>
-              <Link href="/privacidade" className={footerLinkClass}>Política de privacidade</Link>
-            </>
-          ) : null}
-          <a href={supportWhatsappHref} target="_blank" rel="noopener noreferrer" className={footerLinkClass}>
-            Suporte no WhatsApp
-            <span className="sr-only"> (abre em nova aba)</span>
-          </a>
-        </nav>
+        {legalPagesPublished || supportWhatsappHref ? (
+          <nav aria-label="AgendaPix" className="flex flex-wrap items-center justify-center gap-x-4 sm:justify-start">
+            {legalPagesPublished ? (
+              <>
+                <Link href="/termos" className={footerLinkClass}>Termos de uso</Link>
+                <Link href="/privacidade" className={footerLinkClass}>Política de privacidade</Link>
+              </>
+            ) : null}
+            {supportWhatsappHref ? (
+              <a href={supportWhatsappHref} target="_blank" rel="noopener noreferrer" className={footerLinkClass}>
+                Suporte no WhatsApp
+                <span className="sr-only"> (abre em nova aba)</span>
+              </a>
+            ) : null}
+          </nav>
+        ) : null}
         <div className="flex items-center gap-3">
           <ThemeToggle className="sm:hidden" />
           <Link href="/" className="inline-flex min-h-11 items-center gap-2 font-semibold text-ink">

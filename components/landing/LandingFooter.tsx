@@ -54,10 +54,12 @@ export function LandingFooter() {
         <nav aria-label="Contato" className="flex flex-col">
           <p className="text-sm font-semibold text-ink">Contato</p>
           <a href={supportMailtoUrl()} className="inline-flex min-h-11 items-center text-sm text-muted hover:text-ink">{email}</a>
-          <a href={whatsapp} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-sm text-muted hover:text-ink">
-            WhatsApp
-            <span className="sr-only"> (abre em nova aba)</span>
-          </a>
+          {whatsapp ? (
+            <a href={whatsapp} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-sm text-muted hover:text-ink">
+              WhatsApp
+              <span className="sr-only"> (abre em nova aba)</span>
+            </a>
+          ) : null}
         </nav>
       </div>
       <div className="border-t border-line">

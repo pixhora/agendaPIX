@@ -106,8 +106,8 @@ export function AppFrame({
   ownerName: string;
   businesses: FrameBusiness[];
   defaultBusinessId?: string;
-  /** Link wa.me do suporte. O layout do dono manda o valor do servidor, o mesmo da landing. */
-  supportWhatsappHref?: string;
+  /** Link wa.me do suporte. Null esconde o link. O layout do dono manda o valor do servidor. */
+  supportWhatsappHref?: string | null;
   children: ReactNode;
 }) {
   const fallback = <span className="h-11" />;
@@ -123,7 +123,7 @@ export function AppFrame({
         </nav>
         <Suspense fallback={null}><PublicPageLink businesses={businesses} defaultBusinessId={defaultBusinessId} /></Suspense>
         <div className="mt-auto grid min-w-0 grid-cols-1 gap-4 border-t border-line pt-4">
-          <SupportWhatsappLink href={supportWhatsappHref} />
+          {supportWhatsappHref ? <SupportWhatsappLink href={supportWhatsappHref} /> : null}
           <div className="flex items-center justify-between gap-2 px-1">
             <span className="text-xs font-semibold uppercase tracking-wide text-muted">Tema</span>
             <ThemeToggle />
@@ -150,9 +150,11 @@ export function AppFrame({
             </div>
             <Logout compact />
           </div>
-          <div className="px-2 pb-2">
-            <SupportWhatsappLink href={supportWhatsappHref} />
-          </div>
+          {supportWhatsappHref ? (
+            <div className="px-2 pb-2">
+              <SupportWhatsappLink href={supportWhatsappHref} />
+            </div>
+          ) : null}
         </header>
 
         <div className="flex-1">

@@ -50,7 +50,7 @@ O lembrete da véspera da devolução manual não espera 09:00. Sai na primeira 
 | `MP_TOKEN_ENCRYPTION_KEY` | `openssl rand -hex 32` (cifra o token OAuth do dono) |
 | `MP_OAUTH_PKCE` | `on` quando `MERCADOPAGO_ENV=production` e no `next build` com `VERCEL_ENV=production`. Sem isso o boot de produção não sobe e o build da Vercel falha, em vez de publicar um deploy que responde 500. Ausente ou `off` só vale em preview e dev. Espaços nas pontas (` on `) valem `on`. Nunca vazio: string vazia derruba o boot (`mp_oauth_pkce_invalid`) |
 | `CRON_SECRET` | `openssl rand -hex 32` |
-| `SUPPORT_WHATSAPP_NUMBER` | dígitos E.164 sem `+`. Sem isso o checkout da assinatura fica `available: false` |
+| `SUPPORT_WHATSAPP_NUMBER` | dígitos E.164 sem `+`. Sem isso o checkout da assinatura fica `available: false` e os links de suporte (landing, loja e painel) somem |
 | `SUBSCRIPTION_MANUAL_ACTIVATION_HOURS` | inteiro ≥ 1, sem zero à esquerda. Sem isso o checkout responde 503 |
 | `BOOKING_TRUST_PROXY` | `true` (a Vercel sobrescreve `X-Real-IP`/`X-Forwarded-For`) |
 | `BOOKING_CLIENT_IP_HEADER` | `x-real-ip` |
