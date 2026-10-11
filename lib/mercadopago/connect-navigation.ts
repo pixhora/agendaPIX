@@ -1,5 +1,7 @@
+import { NextResponse } from "next/server";
 import { handleHttp } from "../http";
 import { sanitizeMpReturnTo } from "../mercadopago-oauth/return-to";
+import { loginErrorPath } from "../safe-redirect";
 
 /** Mesma frase de `mp_oauth_unconfigured`. O dono não vê código nem nome de variável. */
 export const MP_CONNECT_CONFIG_COPY = "A conexão com o Mercado Pago ainda não está configurada.";
@@ -86,14 +88,23 @@ function configErrorPage(returnTo: unknown, copyText: string = MP_CONNECT_CONFIG
   });
 }
 
+/** Sessão expirada no envio nativo: o login devolve o dono ao onboarding (ou ao painel). */
+function sessionLoginRedirect(request: Request, returnTo: unknown) {
+  const redirect = NextResponse.redirect(new URL(loginErrorPath(backHref(returnTo)), request.url), 303);
+  redirect.headers.set("cache-control", "no-store");
+  return redirect;
+}
+
 /**
  * Sucesso do connect continua 303. `mp_oauth_pkce_invalid` não redireciona:
  * o backend responde 503 JSON. Na navegação do formulário, o dono vê a frase
  * genérica de configuração, sem o código.
+ * Quem pede JSON (o painel) continua recebendo 401. O formulário nativo não sabe ler JSON:
+ * a sessão expirada abre o login, com volta ao onboarding quando o envio veio de lá.
  */
 export async function presentOwnerConnectResponse(request: Request, response: Response) {
-  // 401 segue como JSON de propósito (sessão expirada tem tratamento próprio no cliente).
-  if (!browserNavigation(request) || response.status < 400 || response.status === 401) return response;
+  if (!browserNavigation(request) || response.status < 400) return response;
+  if (response.status === 401) return sessionLoginRedirect(request, await readReturnTo(request));
   const payload = await response.clone().json().catch(() => null) as { error?: { code?: unknown } } | null;
   const code = typeof payload?.error?.code === "string" ? payload.error.code : null;
   if (response.status === 503 && ownerConnectConfigCopy(code)) {

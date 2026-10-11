@@ -52,7 +52,9 @@ export function AutoRefundAck({
   const errorId = "mp-auto-refund-error";
   return (
     <div className={cn("rounded-card border-[1.5px] border-ink bg-surface px-3.5 py-3 focus-within:border-ring focus-within:shadow-[var(--shadow-focus)]", invalid && "border-danger")}>
-      <label className="flex min-h-11 cursor-pointer items-start gap-3">
+      {/* relative prende o checkbox sr-only (absolute). Sem isso, no celular o bloco fixo
+          do onboarding vira o containing block: o foco marca scrollTop nele e a tela fica só com o fundo. */}
+      <label className="relative flex min-h-11 cursor-pointer items-start gap-3">
         <input
           ref={inputRef}
           type="checkbox"
@@ -145,6 +147,20 @@ export function MpConnectForm({
     const timer = window.setTimeout(() => revealAck(ackRef.current), 0);
     return () => window.clearTimeout(timer);
   }, [ackInvalid, requireAck]);
+  useEffect(() => {
+    // O envio nativo marca a trava antes de sair. No voltar pelo bfcache a página
+    // continua montada com a trava ligada; um erro no meio do caminho também.
+    function releaseSubmitLock(event: Event) {
+      const persisted = "persisted" in event && (event as PageTransitionEvent).persisted === true;
+      if ((event.type === "pageshow" && persisted) || event.type === "error") submittedRef.current = false;
+    }
+    window.addEventListener("pageshow", releaseSubmitLock);
+    window.addEventListener("error", releaseSubmitLock);
+    return () => {
+      window.removeEventListener("pageshow", releaseSubmitLock);
+      window.removeEventListener("error", releaseSubmitLock);
+    };
+  }, []);
 
   const ack = requireAck ? (
     <div className={pinActions ? "mt-4" : undefined}>
