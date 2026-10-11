@@ -1,5 +1,5 @@
 -- Rodar antes do deploy. Sem esta tabela o link de horário responde 500.
-CREATE TYPE "public"."slot_link_status" AS ENUM('pending', 'paid', 'expired', 'taken', 'cancelled');--> statement-breakpoint
+CREATE TYPE "public"."slot_link_status" AS ENUM('pending', 'paid', 'expired', 'taken', 'cancelled', 'replaced');--> statement-breakpoint
 CREATE TABLE "slot_links" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"business_id" uuid NOT NULL,
@@ -14,6 +14,7 @@ CREATE TABLE "slot_links" (
 	"pay_started_at" timestamp with time zone,
 	"pay_idempotency_hash" text,
 	"customer_label" text,
+	"replaced_by_link_id" uuid,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "slot_links_business_id_unique" UNIQUE("business_id","id"),
@@ -35,7 +36,10 @@ ALTER TABLE "slot_links" ADD CONSTRAINT "slot_links_service_tenant_fk" FOREIGN K
 ALTER TABLE "slot_links" ADD CONSTRAINT "slot_links_booking_tenant_fk" FOREIGN KEY ("business_id","booking_id") REFERENCES "public"."bookings"("business_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "slot_links_booking_id_unique" ON "slot_links" USING btree ("booking_id") WHERE "slot_links"."booking_id" IS NOT NULL;--> statement-breakpoint
 CREATE INDEX "slot_links_business_start_idx" ON "slot_links" USING btree ("business_id","starts_at");--> statement-breakpoint
-CREATE INDEX "slot_links_business_created_idx" ON "slot_links" USING btree ("business_id","created_at");
+CREATE INDEX "slot_links_business_created_idx" ON "slot_links" USING btree ("business_id","created_at");--> statement-breakpoint
+ALTER TABLE "slot_links" ADD CONSTRAINT "slot_links_replaced_by_fk" FOREIGN KEY ("business_id","replaced_by_link_id") REFERENCES "public"."slot_links"("business_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+CREATE UNIQUE INDEX "slot_links_replaced_by_unique" ON "slot_links" USING btree ("replaced_by_link_id") WHERE "slot_links"."replaced_by_link_id" IS NOT NULL;--> statement-breakpoint
+ALTER TABLE "slot_links" ADD CONSTRAINT "slot_links_replaced_pair" CHECK (("slot_links"."status" = 'replaced') = ("slot_links"."replaced_by_link_id" IS NOT NULL));
 --> statement-breakpoint
 CREATE TABLE "slot_link_bookings" (
 	"business_id" uuid NOT NULL,

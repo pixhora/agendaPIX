@@ -164,7 +164,7 @@ export const bookings = pgTable("bookings", {
   check("bookings_policy_snapshot_pair", sql`(${table.policySnapshot} IS NULL) = (${table.policyText} IS NULL) AND (${table.policySnapshot} IS NULL) = (${table.policyHash} IS NULL)`),
 ]);
 
-export const slotLinkStatus = pgEnum("slot_link_status", ["pending", "paid", "expired", "taken", "cancelled"]);
+export const slotLinkStatus = pgEnum("slot_link_status", ["pending", "paid", "expired", "taken", "cancelled", "replaced"]);
 
 /**
  * Link de um horário. Não reserva: o hold nasce só no pagamento.
@@ -187,6 +187,8 @@ export const slotLinks = pgTable("slot_links", {
   payIdempotencyHash: text("pay_idempotency_hash"),
   /** Lembrete do dono. Não preenche o cadastro da cliente. */
   customerLabel: text("customer_label"),
+  /** Link novo emitido no lugar deste. Só preenchido quando `status` é `replaced`. */
+  replacedByLinkId: uuid("replaced_by_link_id"),
   ...timestamps(),
 }, (table) => [
   unique("slot_links_business_id_unique").on(table.businessId, table.id),
@@ -206,6 +208,13 @@ export const slotLinks = pgTable("slot_links", {
   check("slot_links_paid_has_booking", sql`${table.status} <> 'paid' OR ${table.bookingId} IS NOT NULL`),
   check("slot_links_pay_claim_pair", sql`(${table.payStartedAt} IS NULL) = (${table.payIdempotencyHash} IS NULL)`),
   check("slot_links_pay_idempotency_hash_format", sql`${table.payIdempotencyHash} IS NULL OR ${table.payIdempotencyHash} ~ '^[a-f0-9]{64}$'`),
+  check("slot_links_replaced_pair", sql`(${table.status} = 'replaced') = (${table.replacedByLinkId} IS NOT NULL)`),
+  uniqueIndex("slot_links_replaced_by_unique").on(table.replacedByLinkId).where(sql`${table.replacedByLinkId} IS NOT NULL`),
+  foreignKey({
+    name: "slot_links_replaced_by_fk",
+    columns: [table.businessId, table.replacedByLinkId],
+    foreignColumns: [table.businessId, table.id],
+  }),
 ]);
 
 /**

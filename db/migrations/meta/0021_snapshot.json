@@ -1145,7 +1145,7 @@
         },
         "mercadopago_connections_account_email_masked": {
           "name": "mercadopago_connections_account_email_masked",
-          "value": "\"mercadopago_connections\".\"account_email_masked\" IS NULL OR \"mercadopago_connections\".\"account_email_masked\" ~ '^.{1,2}••@.+$'"
+          "value": "\"mercadopago_connections\".\"account_email_masked\" IS NULL OR \"mercadopago_connections\".\"account_email_masked\" ~ '^.{1,2}\u2022\u2022@.+$'"
         },
         "mercadopago_connections_tokens_match_status": {
           "name": "mercadopago_connections_tokens_match_status",
@@ -2776,6 +2776,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "replaced_by_link_id": {
+          "name": "replaced_by_link_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -2849,6 +2855,22 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "slot_links_replaced_by_unique": {
+          "name": "slot_links_replaced_by_unique",
+          "columns": [
+            {
+              "expression": "replaced_by_link_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"slot_links\".\"replaced_by_link_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -2887,6 +2909,21 @@
           "columnsFrom": [
             "business_id",
             "booking_id"
+          ],
+          "columnsTo": [
+            "business_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "slot_links_replaced_by_fk": {
+          "name": "slot_links_replaced_by_fk",
+          "tableFrom": "slot_links",
+          "tableTo": "slot_links",
+          "columnsFrom": [
+            "business_id",
+            "replaced_by_link_id"
           ],
           "columnsTo": [
             "business_id",
@@ -2958,6 +2995,10 @@
         "slot_links_pay_idempotency_hash_format": {
           "name": "slot_links_pay_idempotency_hash_format",
           "value": "\"slot_links\".\"pay_idempotency_hash\" IS NULL OR \"slot_links\".\"pay_idempotency_hash\" ~ '^[a-f0-9]{64}$'"
+        },
+        "slot_links_replaced_pair": {
+          "name": "slot_links_replaced_pair",
+          "value": "(\"slot_links\".\"status\" = 'replaced') = (\"slot_links\".\"replaced_by_link_id\" IS NOT NULL)"
         }
       },
       "isRLSEnabled": false
@@ -3733,7 +3774,8 @@
         "paid",
         "expired",
         "taken",
-        "cancelled"
+        "cancelled",
+        "replaced"
       ]
     },
     "public.subscription_status": {
