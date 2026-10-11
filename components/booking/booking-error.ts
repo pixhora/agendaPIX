@@ -38,6 +38,7 @@ export type BookingFailure =
   | { kind: "policy_changed"; update: PolicyChangedUpdate }
   | { kind: "unavailable"; message: string; contactWhatsapp: string | null }
   | { kind: "slot_unavailable"; message: string }
+  | { kind: "pix_create_failed"; retrySameKey: boolean | null }
   | { kind: "message"; message: string };
 
 /** Falha de rede do `fetch` (TypeError ou mensagem de conexão). */
@@ -87,6 +88,44 @@ function readApiErrorMessage(body: unknown): string | null {
   return typeof message === "string" && message.trim() ? message.trim() : null;
 }
 
+function readBooleanFlag(value: unknown): boolean | null {
+  return typeof value === "boolean" ? value : null;
+}
+
+/** Contrato: `error.details.retry_same_key`. Os outros caminhos ficam só se esse não vier booleano. */
+function readRetrySameKey(body: unknown): boolean | null {
+  if (!body || typeof body !== "object") return null;
+  const root = body as Record<string, unknown>;
+  const error = root.error && typeof root.error === "object" ? (root.error as Record<string, unknown>) : null;
+  const details = error?.details && typeof error.details === "object" ? (error.details as Record<string, unknown>) : null;
+  const fromDetails = readBooleanFlag(details?.retry_same_key);
+  if (fromDetails !== null) return fromDetails;
+  const fromError = readBooleanFlag(error?.retry_same_key);
+  if (fromError !== null) return fromError;
+  return readBooleanFlag(root.retry_same_key);
+}
+
+/**
+ * Cobrança Pix que o gateway não criou. O `message` do servidor não entra na tela.
+ * Sem `retry_same_key`, a primeira falha da visita mantém a Idempotency-Key (timeout ainda retoma).
+ * Da segunda `payment_unavailable` seguida em diante, a próxima tentativa usa chave nova.
+ * `retry_same_key: true` mantém; `false` troca já.
+ */
+export function pixCreateFailure(body: unknown): { retrySameKey: boolean | null } | null {
+  if (readApiErrorCode(body) !== "payment_unavailable") return null;
+  return { retrySameKey: readRetrySameKey(body) };
+}
+
+export function shouldRotatePixIdempotencyKey(retrySameKey: boolean | null, consecutiveFailures: number): boolean {
+  if (retrySameKey === true) return false;
+  if (retrySameKey === false) return true;
+  return consecutiveFailures >= 2;
+}
+
+export function isPixCreateFailureBody(body: unknown): boolean {
+  return pixCreateFailure(body) !== null;
+}
+
 /** Link `wa.me` a partir de um telefone publicado. Sem número útil, devolve null. */
 export function whatsappHref(phone: string | null | undefined): string | null {
   if (!phone) return null;
@@ -118,6 +157,8 @@ export function publicBookingErrorView(status: number, body: unknown): BookingFa
   if (status === 409 && code === "slot_unavailable") {
     return { kind: "slot_unavailable", message: SLOT_TAKEN_MESSAGE };
   }
+  const pixFailure = pixCreateFailure(body);
+  if (pixFailure) return { kind: "pix_create_failed", retrySameKey: pixFailure.retrySameKey };
   const serverMessage = readApiErrorMessage(body);
   if (serverMessage) return { kind: "message", message: serverMessage };
   return { kind: "message", message: GENERIC_SUBMIT_MESSAGE };

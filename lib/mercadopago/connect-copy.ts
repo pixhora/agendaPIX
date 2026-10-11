@@ -8,6 +8,13 @@ export const MP_AUTO_REFUND_ACK_HINT =
 
 export const MP_AUTO_REFUND_ACK_ERROR = "Marque a autorização da devolução automática para continuar.";
 
+/** Confirmação local, só na tela de recebimento com a conta já conectada. Não vai para o servidor. */
+export const MP_PIX_KEY_CONFIRM_LABEL = "Minha conta do Mercado Pago tem uma chave Pix cadastrada";
+export const MP_PIX_KEY_CONFIRM_HELP = "Marque que sua conta tem uma chave Pix cadastrada para continuar.";
+export const MP_PIX_KEY_HELP_LABEL = "Como cadastrar";
+/** Artigo oficial da central de ajuda: "Como cadastro minha chave Pix?" (id 19750). */
+export const MP_PIX_KEY_HELP_URL = "https://www.mercadopago.com.br/ajuda/como-cadastro-minha-chave-pix_19750";
+
 export const MP_GOOD_TO_KNOW = [
   "A tarifa do Pix é do Mercado Pago e é descontada da sua conta, conforme o seu contrato com ele.",
   "Devoluções, contestações e MED acontecem na sua conta Mercado Pago. Devoluções dependem de saldo disponível e valem até 180 dias depois do pagamento (regras do Mercado Pago). Se uma devolução automática falhar, você é avisado e devolve manualmente em até 7 dias corridos, contados do aviso.",

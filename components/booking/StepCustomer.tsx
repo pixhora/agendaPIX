@@ -16,6 +16,7 @@ import { PolicySummaryLine } from "@/components/policy/PolicySummaryLine";
 import { POLICY_MISSING_MESSAGE } from "./booking-error";
 import { policyLineTone, servicePolicyState } from "./policy-gate";
 import { privacyPolicyLink } from "@/lib/marketing/flags";
+import { PixCreateStoreLine } from "./pix-create-error";
 
 interface StepCustomerProps {
   service: PublicService;
@@ -27,6 +28,10 @@ interface StepCustomerProps {
   isSubmitting: boolean;
   errorMessage: string | null;
   errorContactHref?: string | null;
+  /** Segunda falha ao gerar o Pix: mostra "Se continuar, fale com a loja". */
+  errorStoreLine?: boolean;
+  /** `wa.me` da loja. Sem número, a frase da loja aparece e o link não. */
+  errorStoreHref?: string | null;
   /** `calm` para o estabelecimento pausado: o cliente não errou o preenchimento. */
   errorTone?: "danger" | "calm";
   onChangeName: (name: string) => void;
@@ -53,6 +58,8 @@ export function StepCustomer({
   isSubmitting,
   errorMessage,
   errorContactHref,
+  errorStoreLine = false,
+  errorStoreHref = null,
   errorTone = "danger",
   onChangeName,
   onChangePhone,
@@ -201,6 +208,7 @@ export function StepCustomer({
           }
         >
           <p>{errorMessage}</p>
+          {errorStoreLine ? <PixCreateStoreLine href={errorStoreHref ?? null} /> : null}
           {errorContactHref ? (
             <a
               href={errorContactHref}

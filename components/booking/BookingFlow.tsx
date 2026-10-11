@@ -28,7 +28,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { BrandMark } from "@/components/ui/brand";
 import { BookingSummary } from "./BookingSummary";
-import { GENERIC_SUBMIT_MESSAGE, OFFLINE_MESSAGE, POLICY_CHANGED_MESSAGE, businessLoadCopy, isOfflineError, publicBookingErrorView, whatsappHref } from "./booking-error";
+import { GENERIC_SUBMIT_MESSAGE, OFFLINE_MESSAGE, POLICY_CHANGED_MESSAGE, businessLoadCopy, isOfflineError, publicBookingErrorView, shouldRotatePixIdempotencyKey, whatsappHref } from "./booking-error";
+import { PIX_CREATE_FAILED_COPY } from "./customer-copy";
 import { pixRetryPaymentRequest } from "./pix-retry";
 import { PIX_RESUME_UNKNOWN, getPixResumeServerSnapshot, migratedPixResumePayload, pixResumePayload, pixResumeStorageKey, readPixResume, readPixResumeRaw, replacePixResume, subscribePixResume, shouldClearExpiredResume, shouldResumePix, type PixResumeSession } from "./pix-resume";
 import { keptAccessToken } from "@/lib/slot-link/idempotency";
@@ -79,7 +80,15 @@ export function BookingFlow({
 
   // Submissão da Reserva
   const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
-  const [bookingError, setBookingError] = useState<{ message: string; contactHref: string | null; tone: "danger" | "calm" } | null>(null);
+  const [bookingError, setBookingError] = useState<{
+    message: string;
+    contactHref: string | null;
+    tone: "danger" | "calm";
+    storeLine?: boolean;
+    storeHref?: string | null;
+  } | null>(null);
+  /** `payment_unavailable` seguidas nesta visita. A primeira mantém a chave. */
+  const pixCreateFailures = React.useRef(0);
   const [depositBlocked, setDepositBlocked] = useState(false);
   const [policySheet, setPolicySheet] = useState<{ open: boolean; notice: string | null; trigger: HTMLElement | null }>({
     open: false,
@@ -110,6 +119,13 @@ export function BookingFlow({
     }
     return "00000000-0000-4000-8000-000000000000";
   });
+  const rotateIdempotencyKey = () => {
+    pixCreateFailures.current = 0;
+    if (typeof crypto !== "undefined" && crypto.randomUUID) setIdempotencyKey(crypto.randomUUID());
+  };
+  const replaceIdempotencyKey = () => {
+    if (typeof crypto !== "undefined" && crypto.randomUUID) setIdempotencyKey(crypto.randomUUID());
+  };
 
   const [reloadCount, setReloadCount] = useState(0);
   const [slotsReload, setSlotsReload] = useState(0);
@@ -318,6 +334,7 @@ export function BookingFlow({
 
       if (!res.ok) {
         const failure = publicBookingErrorView(res.status, data);
+        if (failure.kind !== "pix_create_failed") pixCreateFailures.current = 0;
         if (failure.kind === "paused") {
           setBusiness((current) => (current ? { ...current, bookingsPaused: true } : current));
           setBookingError(null);
@@ -334,13 +351,26 @@ export function BookingFlow({
           }
           return;
         }
+        if (failure.kind === "pix_create_failed") {
+          pixCreateFailures.current += 1;
+          if (shouldRotatePixIdempotencyKey(failure.retrySameKey, pixCreateFailures.current)) replaceIdempotencyKey();
+          const repeated = pixCreateFailures.current >= 2;
+          setBookingError({
+            message: PIX_CREATE_FAILED_COPY,
+            contactHref: null,
+            tone: "danger",
+            storeLine: repeated,
+            storeHref: repeated ? whatsappHref(business?.contactWhatsapp ?? business?.phone) : null,
+          });
+          return;
+        }
         if (failure.kind === "slot_unavailable") {
           setSelectedSlot(null);
           setSlotNotice(failure.message);
           setBookingError(null);
           setStep(2);
           setSlotsReload((count) => count + 1);
-          if (typeof crypto !== "undefined" && crypto.randomUUID) setIdempotencyKey(crypto.randomUUID());
+          rotateIdempotencyKey();
           return;
         }
         if (failure.kind === "policy_changed") {
@@ -353,7 +383,7 @@ export function BookingFlow({
           } : current));
           setBookingError(null);
           setPolicySheet({ open: true, notice: POLICY_CHANGED_MESSAGE, trigger: null });
-          if (typeof crypto !== "undefined" && crypto.randomUUID) setIdempotencyKey(crypto.randomUUID());
+          rotateIdempotencyKey();
           return;
         }
         setBookingError({ message: failure.message, contactHref: null, tone: "danger" });
@@ -394,6 +424,7 @@ export function BookingFlow({
       }
     } catch (err: unknown) {
       console.error(err);
+      pixCreateFailures.current = 0;
       const msg = isOfflineError(err) ? OFFLINE_MESSAGE : GENERIC_SUBMIT_MESSAGE;
       setBookingError({ message: msg, contactHref: null, tone: "danger" });
     } finally {
@@ -433,9 +464,7 @@ export function BookingFlow({
         // ignore
       }
     }
-    if (typeof crypto !== "undefined" && crypto.randomUUID) {
-      setIdempotencyKey(crypto.randomUUID());
-    }
+    rotateIdempotencyKey();
   };
 
 
@@ -725,6 +754,8 @@ export function BookingFlow({
                 isSubmitting={isSubmittingBooking}
                 errorMessage={bookingError?.message ?? null}
                 errorContactHref={bookingError?.contactHref}
+                errorStoreLine={bookingError?.storeLine}
+                errorStoreHref={bookingError?.storeHref}
                 errorTone={bookingError?.tone ?? "danger"}
                 onChangeName={setCustomerName}
                 onChangePhone={setCustomerPhone}

@@ -19,6 +19,12 @@ export const SLOTS_LOAD_COPY = "Não foi possível carregar os horários. Tente 
 
 export const SUBMIT_RETRY_COPY = "Não conseguimos concluir agora. Tente de novo em instantes.";
 
+/** Mercado Pago não criou o Pix. Os dados do formulário continuam na tela. */
+export const PIX_CREATE_FAILED_COPY = "Não conseguimos gerar o Pix agora. Seus dados continuam salvos, é só tocar em Gerar Pix de novo.";
+
+/** Segunda falha na mesma visita. Vira link só quando a loja tem WhatsApp. */
+export const PIX_CREATE_FAILED_STORE = "Se continuar, fale com a loja";
+
 export const BUSINESS_NOT_FOUND_COPY = "Estabelecimento não encontrado. Verifique o link informado.";
 
 /** 404 do acompanhamento. Não diz que o horário foi confirmado. */
