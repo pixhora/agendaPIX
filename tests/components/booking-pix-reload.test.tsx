@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { BookingFlow } from "@/components/booking/BookingFlow";
+import { PIX_CHARGE_FAILED_BODY, PIX_CHARGE_FAILED_TITLE } from "@/components/booking/customer-copy";
 import { pixResumePayload, pixResumeStorageKey } from "@/components/booking/pix-resume";
 import { pixRetryPaymentRequest } from "@/components/booking/pix-retry";
 
@@ -236,6 +237,33 @@ it("status 500 mantém a reserva e oferece tentar de novo", async () => {
   expect(kept).toContain(bookingId);
   expect(kept).toContain("token-pix");
   expect(window.location.search).toContain(`bookingId=${bookingId}`);
+});
+
+it("GET com chargeFailed true abre a falha do Pix", async () => {
+  seedPixResume();
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
+    ...payment,
+    chargeFailed: true,
+    payment: { ...payment.payment, status: "pending", copyPaste: null, qrCodeDataUrl: null },
+  }), { status: 200, headers: { "content-type": "application/json" } })));
+  renderPixResume();
+  expect(await screen.findByRole("heading", { name: PIX_CHARGE_FAILED_TITLE })).toBeVisible();
+  expect(screen.getByText(PIX_CHARGE_FAILED_BODY)).toBeVisible();
+  const icon = screen.getByRole("alert").querySelector("svg");
+  expect(icon).toHaveAttribute("aria-hidden", "true");
+  expect(screen.queryByRole("heading", { name: "Pagamento cancelado" })).toBeNull();
+});
+
+it("GET com status failed abre a falha do Pix sem chargeFailed", async () => {
+  seedPixResume();
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
+    ...payment,
+    payment: { ...payment.payment, status: "failed", copyPaste: null, qrCodeDataUrl: null },
+  }), { status: 200, headers: { "content-type": "application/json" } })));
+  renderPixResume();
+  expect(await screen.findByRole("heading", { name: PIX_CHARGE_FAILED_TITLE })).toBeVisible();
+  expect(screen.getByText(PIX_CHARGE_FAILED_BODY)).toBeVisible();
+  expect(screen.queryByRole("heading", { name: "Pagamento cancelado" })).toBeNull();
 });
 
 it("erro de rede mantém a reserva e oferece tentar de novo", async () => {

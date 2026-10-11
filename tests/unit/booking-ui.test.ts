@@ -99,6 +99,21 @@ describe("Pix UI status helpers (contrato PixCharge)", () => {
     expect(pixUiPhase({ status: "pending_payment", payment: { status: "failed" } as never })).toBe("charge_failed");
     expect(pixUiPhase({ status: "cancelled", payment: { status: "failed" } as never })).toBe("cancelled");
     expect(pixUiPhase({ status: "expired", payment: { status: "failed" } as never })).toBe("expired");
+    expect(pixUiPhase({
+      status: "pending_payment",
+      chargeFailed: true,
+      payment: { status: "pending" } as never,
+    })).toBe("charge_failed");
+    expect(pixUiPhase({
+      status: "expired",
+      chargeFailed: true,
+      payment: { status: "failed" } as never,
+    })).toBe("charge_failed");
+    expect(pixUiPhase({
+      status: "pending_payment",
+      chargeFailed: false,
+      payment: { status: "failed" } as never,
+    })).toBe("charge_failed");
   });
 
   it("accepts only PNG data URLs with copyPaste while pending", () => {

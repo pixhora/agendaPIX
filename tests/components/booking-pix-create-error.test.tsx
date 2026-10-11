@@ -300,7 +300,17 @@ it("outro erro transitório repete a mesma chave", async () => {
   expect(screen.getByLabelText("Seu nome")).toHaveValue("Matheus");
 });
 
-function createdBooking(paymentStatus: "failed" | "cancelled" | "expired") {
+function expectChargeFailedIcon() {
+  const icon = screen.getByRole("alert").querySelector("svg");
+  expect(icon).not.toBeNull();
+  expect(icon).toHaveAttribute("aria-hidden", "true");
+  expect(icon).toHaveAttribute("width", "32");
+  expect(icon).toHaveAttribute("height", "32");
+  expect(icon).toHaveClass("mx-auto");
+  expect(icon).toHaveClass("text-ink");
+}
+
+function createdBooking(paymentStatus: "failed" | "cancelled" | "expired" | "pending") {
   return {
     bookingId: "00000000-0000-4000-8000-0000000000c1",
     status: "pending_payment",
@@ -385,6 +395,7 @@ it("reserva com pagamento failed mostra a falha do Pix e troca a chave", async (
   await user.click(screen.getByRole("button", { name: /Gerar Pix de R\$\s*0,50/ }));
   expect(await screen.findByRole("heading", { name: PIX_CHARGE_FAILED_TITLE })).toBeVisible();
   expect(screen.getByText(PIX_CHARGE_FAILED_BODY)).toBeVisible();
+  expectChargeFailedIcon();
   expect(screen.queryByRole("heading", { name: "Pagamento cancelado" })).toBeNull();
   const store = screen.getByRole("link", { name: TALK_TO_STORE });
   expect(store).toHaveAttribute("href", "https://wa.me/5514997504655");
@@ -434,5 +445,59 @@ it("pagamento expirado não vira a falha de gerar o Pix", async () => {
   await user.click(screen.getByRole("button", { name: /Gerar Pix de R\$\s*0,50/ }));
   expect(await screen.findByRole("heading", { name: EXPIRED_PIX_TITLE })).toBeVisible();
   expect(screen.queryByRole("heading", { name: PIX_CHARGE_FAILED_TITLE })).toBeNull();
+  expect(screen.queryByRole("heading", { name: "Pagamento cancelado" })).toBeNull();
+});
+
+it("GET de status com chargeFailed true mostra a falha do Pix", async () => {
+  const user = userEvent.setup();
+  vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.includes("/availability")) return availability(url);
+    if (url.includes("/bookings") && init?.method === "POST") {
+      return new Response(JSON.stringify(createdBooking("pending")), {
+        status: 201,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    if (url.includes("/payment")) {
+      return new Response(JSON.stringify({
+        ...createdBooking("pending"),
+        chargeFailed: true,
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    }
+    throw new Error(`pedido inesperado: ${url}`);
+  }));
+  await reachGenerate(user);
+  await user.click(screen.getByRole("button", { name: /Gerar Pix de R\$\s*0,50/ }));
+  expect(await screen.findByRole("heading", { name: PIX_CHARGE_FAILED_TITLE })).toBeVisible();
+  expect(screen.getByText(PIX_CHARGE_FAILED_BODY)).toBeVisible();
+  expectChargeFailedIcon();
+  expect(screen.queryByRole("heading", { name: "Pagamento cancelado" })).toBeNull();
+  expect(screen.queryByRole("heading", { name: EXPIRED_PIX_TITLE })).toBeNull();
+});
+
+it("GET de status com pagamento failed mostra a falha mesmo sem chargeFailed", async () => {
+  const user = userEvent.setup();
+  vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.includes("/availability")) return availability(url);
+    if (url.includes("/bookings") && init?.method === "POST") {
+      return new Response(JSON.stringify(createdBooking("pending")), {
+        status: 201,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    if (url.includes("/payment")) {
+      return new Response(JSON.stringify({
+        ...createdBooking("failed"),
+        chargeFailed: false,
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    }
+    throw new Error(`pedido inesperado: ${url}`);
+  }));
+  await reachGenerate(user);
+  await user.click(screen.getByRole("button", { name: /Gerar Pix de R\$\s*0,50/ }));
+  expect(await screen.findByRole("heading", { name: PIX_CHARGE_FAILED_TITLE })).toBeVisible();
+  expect(screen.getByText(PIX_CHARGE_FAILED_BODY)).toBeVisible();
   expect(screen.queryByRole("heading", { name: "Pagamento cancelado" })).toBeNull();
 });

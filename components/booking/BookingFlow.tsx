@@ -230,12 +230,15 @@ export function BookingFlow({
       .then((paymentData) => {
         if (isCancelled || !paymentData) return;
 
-        // Invariante: expirado/cancelado permanece terminal
+        // Invariante: expirado/cancelado permanece terminal, salvo recusa em que o Pix não foi criado.
         if (
-          paymentData.status === "expired"
-          || paymentData.status === "cancelled"
-          || paymentData.payment?.status === "expired"
-          || paymentData.payment?.status === "cancelled"
+          paymentData.chargeFailed !== true
+          && (
+            paymentData.status === "expired"
+            || paymentData.status === "cancelled"
+            || paymentData.payment?.status === "expired"
+            || paymentData.payment?.status === "cancelled"
+          )
         ) {
           replacePixResume(slug, null);
           try {
@@ -286,6 +289,7 @@ export function BookingFlow({
                 refundWindowClosedAtBooking: paymentData.policy.refundWindowClosedAtBooking,
               }
             : null,
+          chargeFailed: paymentData.chargeFailed,
         };
 
         setPixResumeFailure(null);

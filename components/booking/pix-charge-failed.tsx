@@ -1,5 +1,6 @@
-import { Loader2 } from "lucide-react";
+import { AlertCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
 import { PIX_CHARGE_FAILED_BODY, PIX_CHARGE_FAILED_RETRY, PIX_CHARGE_FAILED_TITLE, PIX_GENERATING_LABEL, TALK_TO_STORE } from "./customer-copy";
 
 /** Recusa do Pix na reserva. O botão principal pede de novo com outra Idempotency-Key. */
@@ -14,7 +15,8 @@ export function PixChargeFailedScreen({
 }) {
   return (
     <div className="space-y-4">
-      <div role="alert" aria-live="assertive" className="space-y-3 rounded-card border border-line bg-surface p-6 text-center">
+      <div role="alert" aria-live="assertive" className="space-y-4 rounded-card border border-line bg-surface p-6 text-center">
+        <Icon icon={AlertCircle} size="xl" className="mx-auto text-ink" />
         <h2 className="font-display text-xl font-bold text-ink">{PIX_CHARGE_FAILED_TITLE}</h2>
         <p className="text-sm text-ink">{PIX_CHARGE_FAILED_BODY}</p>
       </div>

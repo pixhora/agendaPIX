@@ -140,6 +140,8 @@ export interface BookingResponse {
   accessToken: string;
   payment: PixPaymentData | null;
   policy?: BookingPolicyView | null;
+  /** Espelho opcional do GET de status. `true` abre a tela de falha do Pix. */
+  chargeFailed?: boolean;
 }
 
 export type { PaymentStatusResponse } from "@/lib/public/payment-status";
