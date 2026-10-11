@@ -13,6 +13,7 @@ import { reconcileOnce } from "../../lib/payments/reconcile";
 import { applyPaidEvent } from "../../lib/payments/apply-paid";
 import { drizzleRefundPorts, settleAutomaticLateRefund } from "../../lib/payments/refund-flow";
 import { polledPaidEvent, type ChargeInput, type PaymentProvider } from "../../lib/payments/provider";
+import { bookingPaymentUnavailableErrorSchema } from "../../lib/contracts/booking-payment-error";
 import { PixCreateRefusedError } from "../../lib/payments/pix-create-log";
 import { withAppCors } from "../../lib/origins";
 import { PIX_APPROVAL_TOLERANCE_MS } from "../../lib/payments/rules";
@@ -32,6 +33,16 @@ let provider: FakePaymentProvider;
 
 const slot = (index: number) => new Date(Date.UTC(2030, 0, 1, 12, 0) + index * 1800000).toISOString();
 const input = (index = 0, phone = "+5511999999900") => ({ serviceId, startsAt: slot(index), customer: { name: "Cliente", phone, cpfCnpj: "52998224725" }, policyHash: padraoPolicyHash("Negócio") });
+const PIX_UNAVAILABLE = "Não foi possível criar a cobrança. Tente novamente com a mesma chave.";
+
+async function publicPaymentUnavailable(error: unknown) {
+  const response = await withAppCors(
+    new Request(`http://localhost/api/public/${slug}/bookings`, { method: "POST" }),
+    async () => { throw error; },
+  );
+  const body: unknown = await response.json();
+  return { status: response.status, body: bookingPaymentUnavailableErrorSchema.parse(body), raw: JSON.stringify(body) };
+}
 
 beforeEach(async () => {
   ownerId = randomUUID(); businessId = randomUUID(); serviceId = randomUUID(); slug = `out-${businessId}`;
@@ -86,7 +97,23 @@ describe("cobrança fora da transação", () => {
     vi.stubEnv("PAYMENT_PROVIDER_TIMEOUT_MS", "150");
     provider.latencyMs = 400;
     const key = randomUUID();
-    await expect(createBooking(slug, input(0), key, database, provider)).rejects.toMatchObject({ status: 503 });
+    let caught: unknown;
+    try {
+      await createBooking(slug, input(0), key, database, provider);
+    } catch (error) {
+      caught = error;
+    }
+    const unavailable = await publicPaymentUnavailable(caught);
+    expect(unavailable.status).toBe(503);
+    expect(unavailable.body).toEqual({
+      error: {
+        code: "payment_unavailable",
+        message: PIX_UNAVAILABLE,
+        details: { retry_same_key: true },
+      },
+    });
+    expect(unavailable.raw).not.toContain("reason");
+    expect(unavailable.raw).not.toContain("mp_");
     expect(store.calls.create).toBe(1);
     const [payment] = await database.select().from(schema.payments).where(eq(schema.payments.businessId, businessId));
     expect(payment.status).toBe("creating");
@@ -170,22 +197,19 @@ describe("cobrança fora da transação", () => {
     } catch (error) {
       caught = error;
     }
-    const response = await withAppCors(
-      new Request(`http://localhost/api/public/${slug}/bookings`, { method: "POST" }),
-      async () => { throw caught; },
-    );
-    expect(response.status).toBe(503);
-    const body: { error: Record<string, unknown> } = await response.json();
-    expect(body).toEqual({
+    const unavailable = await publicPaymentUnavailable(caught);
+    expect(unavailable.status).toBe(503);
+    expect(unavailable.body).toEqual({
       error: {
         code: "payment_unavailable",
-        message: "Não foi possível criar a cobrança. Tente novamente com a mesma chave.",
+        message: PIX_UNAVAILABLE,
+        details: { retry_same_key: false },
       },
     });
-    expect(body.error).not.toHaveProperty("reason");
-    expect(body.error).not.toHaveProperty("details");
-    expect(JSON.stringify(body)).not.toContain("reason");
-    expect(JSON.stringify(body)).not.toContain("mp_");
+    expect(unavailable.body.error).not.toHaveProperty("reason");
+    expect(Object.keys(unavailable.body.error.details)).toEqual(["retry_same_key"]);
+    expect(unavailable.raw).not.toContain("reason");
+    expect(unavailable.raw).not.toContain("mp_");
     const [payment] = await database.select().from(schema.payments).where(eq(schema.payments.businessId, businessId));
     expect(payment.status).toBe("failed");
     expect(payment.externalId).toBeNull();

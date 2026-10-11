@@ -11,8 +11,9 @@ import { assertMpConnectedForDeposit } from "../mercadopago-oauth/bookability";
 import { createDrizzleMpStore } from "../mercadopago-oauth/repository";
 import { getPaymentProvider } from "../payments";
 import { MpAccountNotConnectedError } from "../payments/seller-account";
+import { bookingPaymentUnavailableDetailsSchema } from "../contracts/booking-payment-error";
 import { pixChargeSchema, type PaymentProvider, type PixCharge } from "../payments/provider";
-import { callProvider, ProviderTimeoutError } from "../payments/timeout";
+import { callProvider } from "../payments/timeout";
 import { markCreatingPaymentFailed, PixCreateRefusedError } from "../payments/pix-create-log";
 import { getBookingAccess } from "../billing/access";
 import { loadBookingAccess } from "../billing/load";
@@ -195,6 +196,26 @@ export async function attachCreatedCharge(database: Database, payment: typeof sc
   return updated;
 }
 
+const PIX_CHARGE_UNAVAILABLE = "Não foi possível criar a cobrança. Tente novamente com a mesma chave.";
+
+function paymentUnavailable(retrySameKey: boolean) {
+  const details = bookingPaymentUnavailableDetailsSchema.parse({ retry_same_key: retrySameKey });
+  return new HttpError(503, "payment_unavailable", PIX_CHARGE_UNAVAILABLE, undefined, { details });
+}
+
+/** Só `failed` pede chave nova. Status desconhecido continua `true` para não abrir outra cobrança. */
+async function retrySameKeyFor(database: Database, payment: { businessId: string; id: string }) {
+  try {
+    const [current] = await database.select({ status: schema.payments.status }).from(schema.payments).where(and(
+      eq(schema.payments.businessId, payment.businessId),
+      eq(schema.payments.id, payment.id),
+    )).limit(1);
+    return current?.status !== "failed";
+  } catch {
+    return true;
+  }
+}
+
 async function createChargeOutsideTx(
   database: Database,
   payment: typeof schema.payments.$inferSelect,
@@ -215,10 +236,8 @@ async function createChargeOutsideTx(
       try {
         await markCreatingPaymentFailed(database, payment);
       } catch { /* o 503 segue; a linha pode continuar creating se o update falhar */ }
-      throw new HttpError(503, "payment_unavailable", "Não foi possível criar a cobrança. Tente novamente com a mesma chave.");
     }
-    if (error instanceof ProviderTimeoutError) throw new HttpError(503, "payment_unavailable", "Não foi possível criar a cobrança. Tente novamente com a mesma chave.");
-    throw new HttpError(503, "payment_unavailable", "Não foi possível criar a cobrança. Tente novamente com a mesma chave.");
+    throw paymentUnavailable(await retrySameKeyFor(database, payment));
   }
 }
 
@@ -234,7 +253,7 @@ async function finalizeCreatingPayment(
   if (!attached) {
     // Outro processo anexou, expirou ou reconciliou. Recarrega.
     const [current] = await database.select().from(schema.payments).where(and(eq(schema.payments.businessId, payment.businessId), eq(schema.payments.id, payment.id))).limit(1);
-    if (!current || current.status === "creating") throw new HttpError(503, "payment_unavailable", "Não foi possível criar a cobrança. Tente novamente com a mesma chave.");
+    if (!current || current.status === "creating") throw paymentUnavailable(true);
     return current;
   }
   return attached;
