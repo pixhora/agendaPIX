@@ -129,6 +129,9 @@ export function uploadLogoFile(
       finish({ ok: false, message: profileErrorCopy("internal_error") });
     };
     xhr.onerror = () => finish({ ok: false, message: "Não deu para enviar a imagem. Tente de novo." });
+    // Conexão travada não pode deixar o envio preso até recarregar a página.
+    xhr.timeout = 60_000;
+    xhr.ontimeout = () => finish({ ok: false, message: "A conexão demorou demais. Tente de novo." });
     xhr.onabort = () => finish({ ok: false, message: "", cancelled: true });
     if (options.signal.aborted) {
       finish({ ok: false, message: "", cancelled: true });

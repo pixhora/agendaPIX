@@ -102,7 +102,14 @@ export function ServiceImageUpload({
           />
         </label>
         <div className="grid min-w-0 gap-1 font-normal">
-          {busy ? <p className="text-sm text-muted" aria-live="polite">Enviando… {progress}%</p> : null}
+          {busy ? (
+            <div className="grid gap-1" aria-live="polite">
+              <p className="text-sm text-muted">Enviando… {progress}%</p>
+              <button type="button" className="inline-flex min-h-11 items-center self-start font-semibold underline underline-offset-4" onClick={() => abortRef.current?.abort()}>
+                Cancelar
+              </button>
+            </div>
+          ) : null}
           {!busy && shown ? (
             <button type="button" className="inline-flex min-h-11 items-center self-start font-semibold underline underline-offset-4" onClick={() => inputRef.current?.click()}>
               Trocar foto

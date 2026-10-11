@@ -51,9 +51,10 @@ function PendingLine({ children }: { children: string }) {
   return <p role="status" aria-busy="true" className="flex items-center gap-2 text-sm text-muted"><Loader2 aria-hidden="true" className="size-4 animate-spin motion-reduce:animate-none" />{children}</p>;
 }
 
-function FormCta({ pending, idle }: { pending: boolean; idle: string }) {
+function FormCta({ pending, idle, offline = false }: { pending: boolean; idle: string; offline?: boolean }) {
+  // Sem internet o botão fica parado, sem dizer "Salvando…": o aviso de "Sem internet" aparece ao lado.
   return (
-    <Button type="submit" disabled={pending} aria-busy={pending} className="dash-disabled w-full md:w-auto">
+    <Button type="submit" disabled={pending || offline} aria-busy={pending} className="dash-disabled w-full md:w-auto">
       {pending ? <><Loader2 aria-hidden="true" className="animate-spin motion-reduce:animate-none" />Salvando…</> : idle}
     </Button>
   );
@@ -263,7 +264,7 @@ export function ServiceForm({ businessId, businessName, contactWhatsapp = null, 
     {!online && <p role="alert" className="text-sm font-medium text-danger">Sem internet. Suas mudanças não foram salvas.</p>}
     {clientError && <p role="alert" className="text-sm font-medium text-danger">{clientError}</p>}
     <div aria-live="polite" className="empty:hidden">{pending ? <PendingLine>Salvando…</PendingLine> : <Feedback state={state} showSuccess={showSuccess} />}</div>
-    <FormCta pending={pending || !online} idle={service ? "Salvar serviço" : "Cadastrar serviço"} />
+    <FormCta pending={pending} offline={!online} idle={service ? "Salvar serviço" : "Cadastrar serviço"} />
     <dialog ref={dialogRef} aria-labelledby={`${prefix}-future-title`} className="m-auto w-[min(calc(100%-2rem),28rem)] rounded-card border border-line bg-surface p-5 text-ink backdrop:bg-ink/50">
       <h2 id={`${prefix}-future-title`} className="font-display text-lg font-bold">Reservas já feitas</h2>
       <p className="mt-2 text-sm leading-relaxed">{futureWarning}</p>

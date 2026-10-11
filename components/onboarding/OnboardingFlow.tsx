@@ -569,7 +569,7 @@ export function OnboardingFlow({ legalPagesPublished = false, publicHost }: { le
                 alert={emailAlert}
                 replacesPreviousCode={Boolean(otpEmail) && otpEmail !== data.email.trim().toLowerCase()}
                 legalPagesPublished={legalPagesPublished}
-                onBack={() => go("business")}
+                onBack={() => go(previousStep("email") ?? "business")}
                 onSubmit={() => void submitEmail()}
               />
             )}

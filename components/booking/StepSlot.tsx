@@ -38,6 +38,20 @@ const PERIODS: { id: Period; label: string; Icon: (typeof PERIOD_ICONS)[Period] 
 ];
 
 /** Agrupa horários em manhã (<12h), tarde (12–18h) e noite (≥18h) no fuso do negócio. */
+
+/** Dia (AAAA-MM-DD) de um horário no fuso da loja. */
+function dateKeyInTimezone(iso: string, timezone: string): string | null {
+  try {
+    const parts = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: timezone }).formatToParts(new Date(iso));
+    const y = parts.find((p) => p.type === "year")?.value;
+    const m = parts.find((p) => p.type === "month")?.value;
+    const d = parts.find((p) => p.type === "day")?.value;
+    return y && m && d ? `${y}-${m}-${d}` : null;
+  } catch {
+    return null;
+  }
+}
+
 export function groupSlotsByPeriod(slots: AvailabilitySlot[], timezone: string): Record<Period, AvailabilitySlot[]> {
   const groups: Record<Period, AvailabilitySlot[]> = { morning: [], afternoon: [], evening: [] };
   for (const slot of slots) {
@@ -115,7 +129,9 @@ export function StepSlot({
   notice,
 }: StepSlotProps) {
   const days = useMemo(() => generateInitialDays(timezone), [timezone]);
-  const [selectedDate, setSelectedDate] = useState<string>(() => days[0]?.dateString || "");
+  // Ao voltar de outra etapa, abre no dia do horário já escolhido (não sempre em "Hoje").
+  const chosenDay = selectedStartsAt ? dateKeyInTimezone(selectedStartsAt, timezone) : null;
+  const [selectedDate, setSelectedDate] = useState<string>(() => (chosenDay && days.some((d) => d.dateString === chosenDay) ? chosenDay : days[0]?.dateString || ""));
   const [daySlotCounts, setDaySlotCounts] = useState<Record<string, number | null>>({});
   const [slotsByDate, setSlotsByDate] = useState<Record<string, AvailabilitySlot[]>>({});
   const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
@@ -317,7 +333,9 @@ export function StepSlot({
     setSlotsRetryCount((c) => c + 1);
   };
 
-  const selectedSlot = slots.find((s) => s.startsAt === selectedStartsAt);
+  // O horário escolhido pode ser de outro dia já carregado: o resumo e o botão continuam coerentes.
+  const selectedSlot = slots.find((s) => s.startsAt === selectedStartsAt)
+    ?? Object.values(slotsByDate).flat().find((s) => s.startsAt === selectedStartsAt);
 
   const groups = groupSlotsByPeriod(slots, timezone);
   const nextDayWithSlots = days.find((day) => day.dateString > selectedDate && (daySlotCounts[day.dateString] ?? 0) > 0);
