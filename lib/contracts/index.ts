@@ -13,6 +13,13 @@ export {
 } from "./mp-pix-create";
 
 export {
+  bookingPaymentUnavailableDetailsSchema,
+  bookingPaymentUnavailableErrorSchema,
+  type BookingPaymentUnavailableDetails,
+  type BookingPaymentUnavailableError,
+} from "./booking-payment-error";
+
+export {
   SLOT_LINK_CANCEL_PATH,
   SLOT_LINK_REISSUE_PATH,
   SLOT_LINK_CUSTOMER_LABEL_MAX,
