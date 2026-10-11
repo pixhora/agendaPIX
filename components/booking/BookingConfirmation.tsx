@@ -1,15 +1,15 @@
 "use client";
 
-import React, { useMemo } from "react";
 import type { AvailabilitySlot, BookingPolicyView, PublicService } from "./types";
 import { formatCurrency, formatDateFull, formatTimeSlot, formatDuration } from "./formatters";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { CONFIRMATION_ICONS } from "@/lib/icons/registry";
-import { TriangleAlert } from "lucide-react";
+import { CalendarPlus, TriangleAlert } from "lucide-react";
 import { ReservedTimeBand } from "./ReservedTimeBand";
 import { confirmationCardTone, confirmationPolicyText, isFutureInstant, policyReceiptRefund } from "./policy-copy";
 import { REMAINDER_LABEL } from "@/lib/copy/booking-summary";
+import { buildAppointmentIcs } from "@/lib/calendar/appointment-ics";
 
 interface BookingConfirmationProps {
   businessName: string;
@@ -25,49 +25,18 @@ interface BookingConfirmationProps {
   /** `policy.refundWindowClosedAtBooking`. Liga o tom de aviso. */
   refundWindowClosedAtBooking?: boolean;
   contactWhatsapp?: string | null;
+  /** Endereço da loja. Se existir, entra no arquivo como LOCATION. */
+  address?: string | null;
   onNewBooking: () => void;
 }
 
-function icsText(value: string) {
-  return value.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
-}
-
-function buildIcs({
-  businessName,
-  service,
-  slot,
-  customerName,
-  policyLine,
-}: {
-  businessName: string;
-  service: PublicService;
-  slot: AvailabilitySlot;
-  customerName: string;
-  policyLine: string | null;
-}) {
-  const stamp = (iso: string) =>
-    new Date(iso).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
-  const uid = `agendapix-${stamp(slot.startsAt)}@agendapix`;
-  const summary = `${service.name} · ${businessName}`;
-  const namedGuest = customerName.trim();
-  const description = [`${namedGuest ? `Agendamento de ${namedGuest} em ${businessName}` : `Agendamento em ${businessName}`}. Sinal pago via Pix.`, policyLine].filter(Boolean).join(" ");
-  const lines = [
-    "BEGIN:VCALENDAR",
-    "VERSION:2.0",
-    "PRODID:-//AgendaPix//PT",
-    "CALSCALE:GREGORIAN",
-    "METHOD:PUBLISH",
-    "BEGIN:VEVENT",
-    `UID:${uid}`,
-    `DTSTAMP:${stamp(new Date().toISOString())}`,
-    `DTSTART:${stamp(slot.startsAt)}`,
-    `DTEND:${stamp(slot.endsAt)}`,
-    `SUMMARY:${summary}`,
-    `DESCRIPTION:${icsText(description)}`,
-    "END:VEVENT",
-    "END:VCALENDAR",
-  ];
-  return `data:text/calendar;charset=utf-8,${encodeURIComponent(lines.join("\r\n"))}`;
+function downloadAppointmentFile(content: string) {
+  const anchor = document.createElement("a");
+  anchor.setAttribute("href", `data:text/calendar;charset=utf-8,${encodeURIComponent(content)}`);
+  anchor.setAttribute("download", "agenda.ics");
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
 }
 
 export function BookingConfirmation({
@@ -81,6 +50,7 @@ export function BookingConfirmation({
   policyText: policyTextProp,
   refundWindowClosedAtBooking,
   contactWhatsapp,
+  address,
   onNewBooking,
 }: BookingConfirmationProps) {
   const remainingCents = Math.max(0, service.priceCents - service.depositCents);
@@ -96,10 +66,17 @@ export function BookingConfirmation({
   const policyText = confirmationPolicyText(policyTextProp ?? policy?.text, datedRefund);
   const policyTone = confirmationCardTone(windowClosed);
   const rescheduleOpen = !windowClosed && isFutureInstant(policy?.rescheduleDeadlineAt);
-  const icsHref = useMemo(
-    () => buildIcs({ businessName, service, slot, customerName, policyLine: policyText }),
-    [businessName, service, slot, customerName, policyText],
-  );
+
+  function handleAddToCalendar() {
+    downloadAppointmentFile(buildAppointmentIcs({
+      serviceId: service.id,
+      serviceName: service.name,
+      businessName,
+      startsAt: slot.startsAt,
+      durationMinutes: service.durationMinutes,
+      address,
+    }));
+  }
 
   const whatsappNumber = contactWhatsapp?.replace(/^\+/, "") ?? "";
   const guestName = customerName.trim();
@@ -183,6 +160,11 @@ export function BookingConfirmation({
         ) : null}
       </article>
 
+      <Button type="button" variant="outline" size="lg" className="h-12 w-full sm:w-auto" onClick={handleAddToCalendar}>
+        <CalendarPlus aria-hidden="true" />
+        Adicionar à agenda
+      </Button>
+
       {whatsappNumber ? (
         <p className="rounded-card border border-line bg-surface p-4 text-sm text-muted">
           <strong className="font-semibold text-ink">Vai se atrasar ou precisa remarcar?</strong> Avise o estabelecimento pelo WhatsApp o quanto antes.
@@ -191,17 +173,12 @@ export function BookingConfirmation({
 
       <div className="grid gap-3 sm:grid-cols-2">
         {whatsappNumber ? (
-          <Button asChild size="lg">
+          <Button asChild size="lg" className="sm:col-span-2">
             <a href={`https://wa.me/${whatsappNumber}?text=${whatsappMessage}`} target="_blank" rel="noopener noreferrer">
               <Icon icon={CONFIRMATION_ICONS.whatsapp} size="md" /> Enviar no WhatsApp
             </a>
           </Button>
         ) : null}
-        <Button asChild variant="outline" size="lg">
-          <a href={icsHref} download={`${service.name.replace(/\s+/g, "-").toLowerCase()}.ics`}>
-            <Icon icon={CONFIRMATION_ICONS.addToCalendar} size="md" /> Adicionar ao calendário
-          </a>
-        </Button>
         <Button onClick={onNewBooking} variant="ghost" size="lg" className="sm:col-span-2">
           <Icon icon={CONFIRMATION_ICONS.restart} size="md" /> Fazer outro agendamento
         </Button>

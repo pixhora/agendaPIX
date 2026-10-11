@@ -276,6 +276,7 @@ export function PreviewBookingFlow({
                       customerPhone={customerPhone}
                       policy={closedPreviewPolicy(item.lateCancel)}
                       refundWindowClosedAtBooking
+                      address={MOCK_PUBLIC_BUSINESS.address}
                       onNewBooking={handleRestart}
                     />
                   </div>
@@ -292,6 +293,7 @@ export function PreviewBookingFlow({
               customerName={customerName}
               customerPhone={customerPhone}
               policy={previewPolicy(selectedSlot)}
+              address={MOCK_PUBLIC_BUSINESS.address}
               onNewBooking={handleRestart}
             />
           </div>
