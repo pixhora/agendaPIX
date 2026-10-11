@@ -8,7 +8,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { MP_CONNECT_CONSENT_VERSION } from "@/lib/mercadopago/consent";
 import { PERMISSIONS, callbackFocusesAck, presentMpCallback, type MpCallbackView, type MpOwnerStatus } from "@/lib/mercadopago/contract";
-import { MP_GOOD_TO_KNOW } from "@/lib/mercadopago/connect-copy";
+import { MP_GOOD_TO_KNOW, MP_PIX_KEY_CONFIRM_HELP, MP_PIX_KEY_CONFIRM_LABEL, MP_PIX_KEY_HELP_LABEL, MP_PIX_KEY_HELP_URL } from "@/lib/mercadopago/connect-copy";
 import { MpConnectForm } from "./mp-connect-form";
 import { MpConnectionCard } from "./mp-settings-card";
 
@@ -238,6 +238,52 @@ function connectedOwnerStatus(input: {
   };
 }
 
+const PIX_KEY_HELP_ID = "mp-pix-key-required";
+
+function PixKeyConfirm({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <div className="mt-4 rounded-card border border-line bg-surface px-3.5 py-3 focus-within:border-ring focus-within:shadow-[var(--shadow-focus)]">
+      <label className="relative flex min-h-11 cursor-pointer items-start gap-3">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(event) => onChange(event.target.checked)}
+          aria-describedby={checked ? undefined : PIX_KEY_HELP_ID}
+          className="peer sr-only outline-none focus:outline-none focus-visible:outline-none"
+        />
+        <span
+          aria-hidden="true"
+          className="mt-0.5 grid size-[22px] shrink-0 place-items-center rounded-[6px] border-2 border-ink bg-surface peer-checked:bg-ink"
+        >
+          {checked ? (
+            <svg viewBox="0 0 24 24" className="size-3.5 text-paper" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true">
+              <path d="M5 12.5 10 17.5 19 7.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          ) : null}
+        </span>
+        <span className="text-sm leading-snug text-ink">{MP_PIX_KEY_CONFIRM_LABEL}</span>
+      </label>
+      <p className="mt-2 pl-[34px]">
+        <a href={MP_PIX_KEY_HELP_URL} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-sm font-semibold text-ink underline underline-offset-4">
+          {MP_PIX_KEY_HELP_LABEL}
+          <span className="sr-only"> (abre em nova aba)</span>
+        </a>
+      </p>
+      {checked ? null : (
+        <p id={PIX_KEY_HELP_ID} className="mt-1 pl-[34px] text-[13px] leading-relaxed text-muted">
+          {MP_PIX_KEY_CONFIRM_HELP}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function ConnectedBody({
   businessId,
   status,
@@ -247,6 +293,7 @@ function ConnectedBody({
   status: MpOwnerStatus | null;
   onStatus: (status: MpOwnerStatus) => void;
 }) {
+  const [pixKeyConfirmed, setPixKeyConfirmed] = useState(false);
   if (!status) return null;
   return (
     <>
@@ -258,9 +305,16 @@ function ConnectedBody({
           onStatus={onStatus}
           returnTo="/onboarding"
         />
+        <PixKeyConfirm checked={pixKeyConfirmed} onChange={setPixKeyConfirmed} />
       </div>
       <ActionBar>
-        <Link href="/onboarding/concluir" className={cn(buttonVariants({ size: "lg" }), "w-full")}>Continuar</Link>
+        {pixKeyConfirmed ? (
+          <Link href="/onboarding/concluir" className={cn(buttonVariants({ size: "lg" }), "w-full")}>Continuar</Link>
+        ) : (
+          <button type="button" disabled aria-describedby={PIX_KEY_HELP_ID} className={cn(buttonVariants({ size: "lg" }), "w-full")}>
+            Continuar
+          </button>
+        )}
       </ActionBar>
     </>
   );
