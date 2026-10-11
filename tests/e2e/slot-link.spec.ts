@@ -2,6 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Pool } from "pg";
 import { expect, type Page } from "@playwright/test";
+import { tenantScopedHash } from "../../lib/bookings/rate-limit";
 import { expectNoAxeViolations, ownerStorageState, readMeta, test } from "./helpers";
 
 const meta = readMeta();
@@ -55,6 +56,51 @@ async function freeSlot(page: Page, id: string, date: string) {
   const slot = body.slots?.[body.slots.length - 1];
   if (!slot) throw new Error(`Sem horário livre em ${date}`);
   return { startsAt: slot.startsAt, time: localTime(slot.startsAt), date };
+}
+
+async function occupySlot(linkId: string, priceCents: number, depositCents: number) {
+  await withPool(async (pool) => {
+    const link = await pool.query<{ starts_at: Date; ends_at: Date; service_id: string }>(
+      "select starts_at, ends_at, service_id from slot_links where id = $1",
+      [linkId],
+    );
+    const row = link.rows[0];
+    if (!row) throw new Error("link ausente");
+    const phone = `+55119${String(Math.floor(Math.random() * 1e8)).padStart(8, "0")}`;
+    const customer = await pool.query<{ id: string }>(
+      "insert into customers (business_id, name, phone) values ($1, 'Outra cliente', $2) returning id",
+      [meta.businessAId, phone],
+    );
+    await pool.query(
+      `insert into bookings (business_id, service_id, customer_id, request_key, starts_at, ends_at, price_cents, deposit_cents, status)
+       values ($1, $2, $3, gen_random_uuid(), $4, $5, $6, $7, 'confirmed')`,
+      [meta.businessAId, row.service_id, customer.rows[0]?.id, row.starts_at, row.ends_at, priceCents, depositCents],
+    );
+  });
+}
+
+async function fillCreateLimit() {
+  const owner = await withPool(async (pool) => {
+    const { rows } = await pool.query<{ owner_id: string }>("select owner_id from businesses where id = $1", [meta.businessAId]);
+    return rows[0]?.owner_id ?? "";
+  });
+  if (!owner) throw new Error("dono ausente");
+  const hash = tenantScopedHash("slot-link-create:v1", meta.businessAId, owner);
+  await withPool((pool) => pool.query(
+    `insert into booking_rate_limits (business_id, client_hash, attempts, window_started_at)
+     values ($1, $2, 1000, now())
+     on conflict (business_id, client_hash)
+     do update set attempts = 1000, window_started_at = now()`,
+    [meta.businessAId, hash],
+  ));
+  return hash;
+}
+
+async function clearCreateLimit(hash: string) {
+  await withPool((pool) => pool.query(
+    "delete from booking_rate_limits where business_id = $1 and client_hash = $2",
+    [meta.businessAId, hash],
+  ));
 }
 
 async function createLink(page: Page, service: string, date: string, time: string, customerLabel?: string) {
@@ -326,7 +372,12 @@ test("mesma chave com outros dados oferece continuar o pagamento", async ({ page
   expect(refused.status()).toBe(409);
   await expect(page.getByRole("heading", { name: "Você já começou o pagamento deste horário com outros dados." })).toBeVisible();
   await expect(page.getByText("Para corrigir nome ou WhatsApp, fale com a loja depois de pagar.")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Ver horários disponíveis" })).toHaveAttribute("href", `/${meta.businessASlug}`);
+  const resume = page.getByRole("button", { name: "Continuar pagamento" });
+  await expect(resume).toBeEnabled();
+  await expect(resume).toHaveClass(/bg-pix/);
+  const otherSlots = page.getByRole("link", { name: "Ver horários disponíveis" });
+  await expect(otherSlots).toHaveAttribute("href", `/${meta.businessASlug}`);
+  await expect(otherSlots).toHaveClass(/border/);
   await expect(page.getByText("+5511900000000")).toHaveCount(0);
   await expect(page.getByText(/já foi usada/)).toHaveCount(0);
   await expect(page.getByLabel("Nome")).toHaveCount(0);
@@ -355,6 +406,11 @@ test("link expirado e link cancelado", async ({ page }, testInfo) => {
     [expired.body.id],
   ));
   await page.goto(`/${meta.businessASlug}/h/${expired.body.token}`);
+  await expect(page.getByLabel("Nome")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Este link expirou." })).toHaveCount(0);
+  const expiredPay = await submitDeposit(page, testInfo.project.name === "desktop" ? "11987656002" : "11987656001");
+  expect(expiredPay.status()).toBe(410);
+  expect((await expiredPay.json() as { error?: { code?: string } }).error?.code).toBe("link_expired");
   await expect(page.getByRole("heading", { name: "Este link expirou." })).toBeVisible();
   await expect(page.getByRole("link", { name: "Ver horários disponíveis" })).toBeVisible();
   if (testInfo.project.name === "desktop") await shootMatrix(page, "cliente-expirado");
@@ -491,8 +547,8 @@ test("dono gera o link na agenda e a prévia do horário responde imagem", async
   await shootMatrix(page, "cliente-em-pagamento");
 });
 
-test("gerar novo link confirma, substitui o antigo e explica o erro", async ({ page }, testInfo) => {
-  test.setTimeout(180_000);
+test("gerar novo link na rota real substitui, recusa e a cliente pede o link novo", async ({ page }, testInfo) => {
+  test.setTimeout(240_000);
   const service = await serviceId(page);
   const slot = await freeSlot(page, service.id, saoPauloDay(9));
   const label = `Reemitir ${testInfo.project.name}`;
@@ -509,62 +565,27 @@ test("gerar novo link confirma, substitui o antigo e explica o erro", async ({ p
   await expect(dialog.getByRole("button", { name: "Cancelar" })).toBeVisible();
   if (testInfo.project.name === "desktop") await shootMatrix(page, "dono-reemitir-confirma");
 
-  const nextToken = "A".repeat(43);
-  const next = {
-    ...created.body,
-    id: "11111111-1111-4111-8111-111111111111",
-    token: nextToken,
-    path: `/api/public/${meta.businessASlug}/slot-links/${nextToken}`,
-    previewId: "C".repeat(22),
-    status: "pending",
-    cancellable: true,
-  };
-  let mode: "in_progress" | "taken" | "rate" | "ok" = "in_progress";
-  await page.route(`**/slot-links/${linkId}/reissue`, async (route) => {
-    if (mode === "ok") {
-      return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify(next) });
-    }
-    const code = mode === "in_progress" ? "link_in_progress" : mode === "taken" ? "slot_unavailable" : "rate_limited";
-    const status = mode === "rate" ? 429 : 409;
-    return route.fulfill({
-      status,
-      contentType: "application/json",
-      body: JSON.stringify({ error: { code, message: "interno" } }),
-    });
-  });
-
+  const reissueResponse = page.waitForResponse((response) => response.request().method() === "POST" && response.url().includes(`/slot-links/${linkId}/reissue`));
   await dialog.getByRole("button", { name: "Gerar novo link" }).click();
-  await expect(dialog.getByText("A cliente está pagando este horário agora. Espere alguns minutos antes de gerar outro link.")).toBeVisible();
-  await expect(dialog.getByText("interno")).toHaveCount(0);
-  if (testInfo.project.name === "desktop") await shootMatrix(page, "dono-reemitir-pagando");
-
-  mode = "taken";
-  await dialog.getByRole("button", { name: "Gerar novo link" }).click();
-  await expect(dialog.getByText("Este horário já foi ocupado. O link antigo continua na lista, mas não dá pra gerar outro para ele.")).toBeVisible();
-  if (testInfo.project.name === "desktop") await shootMatrix(page, "dono-reemitir-ocupado");
-
-  mode = "rate";
-  await dialog.getByRole("button", { name: "Gerar novo link" }).click();
-  await expect(dialog.getByText("Não deu para gerar agora. Tente de novo.")).toBeVisible();
-  if (testInfo.project.name === "desktop") await shootMatrix(page, "dono-reemitir-limite");
-
-  mode = "ok";
-  await dialog.getByRole("button", { name: "Gerar novo link" }).click();
+  expect((await reissueResponse).status()).toBe(201);
   const ready = page.getByRole("dialog", { name: "Link pronto" });
   await expect(ready.getByRole("heading", { name: "Link pronto" })).toBeVisible();
   await expect(ready.getByTestId("slot-link-ready").getByRole("button", { name: "Copiar link", exact: true })).toBeVisible();
   await expect(ready.getByRole("button", { name: "Enviar no WhatsApp" })).toBeVisible();
   if (testInfo.project.name === "desktop") await shootMatrix(page, "dono-reemitir-pronto");
   await ready.getByRole("button", { name: "Fechar" }).click();
-  await expect(page.getByText("Substituído")).toBeVisible();
-  await expect(page.getByText("Aguardando pagamento").first()).toBeVisible();
-  await expect(page.getByTestId("sent-links")).not.toContainText(nextToken);
-  await expect(page.getByTestId("sent-links").getByRole("button", { name: "Copiar link" })).toHaveCount(0);
+  const list = page.getByTestId("sent-links");
+  const first = list.getByRole("listitem").first();
+  await expect(first).toContainText("Aguardando pagamento");
+  await expect(first).toContainText(label);
+  await expect(first.getByRole("button", { name: "Gerar novo link" })).toBeVisible();
+  const replaced = list.getByRole("listitem").filter({ hasText: "Substituído" });
+  await expect(replaced).toHaveCount(1);
+  await expect(replaced.getByRole("button", { name: "Gerar novo link" })).toHaveCount(0);
+  await expect(replaced.getByRole("button", { name: "Cancelar link" })).toHaveCount(0);
+  await expect(list).not.toContainText(created.body.token as string);
   if (testInfo.project.name === "desktop") await shootMatrix(page, "dono-reemitir-lista");
-});
 
-test("link substituído pede o novo para a loja e o cancelado comum não muda", async ({ page }, testInfo) => {
-  test.setTimeout(180_000);
   await page.goto(`/dashboard/settings?businessId=${meta.businessAId}`);
   await page.getByRole("textbox", { name: "WhatsApp do negócio" }).fill("+5511988887777");
   await page.getByRole("button", { name: "Salvar WhatsApp" }).click();
@@ -572,50 +593,108 @@ test("link substituído pede o novo para a loja e o cancelado comum não muda", 
   const listed = await page.request.get(`/api/public/${meta.businessASlug}/services`);
   const store = await listed.json() as { name: string; contactWhatsapp: string | null };
   expect(store.contactWhatsapp).toBe("+5511988887777");
-
-  const token = "b".repeat(43);
-  let mode: "replaced-code" | "replaced-reason" | "cancelled" = "replaced-code";
-  await page.route(`**/api/public/${meta.businessASlug}/slot-links/**`, (route) => {
-    if (mode === "replaced-code") {
-      return route.fulfill({
-        status: 409,
-        contentType: "application/json",
-        body: JSON.stringify({ error: { code: "link_replaced", message: "interno" } }),
-      });
-    }
-    if (mode === "replaced-reason") {
-      return route.fulfill({
-        status: 409,
-        contentType: "application/json",
-        body: JSON.stringify({ error: { code: "link_cancelled", message: "interno", reason: "replaced" } }),
-      });
-    }
-    return route.fulfill({
-      status: 409,
-      contentType: "application/json",
-      body: JSON.stringify({ error: { code: "link_cancelled", message: "interno" } }),
-    });
-  });
-
   const updated = `Este link foi atualizado. Peça o link novo para ${store.name}.`;
   try {
-    await page.goto(`/${meta.businessASlug}/h/${token}`);
+    await page.goto(`/${meta.businessASlug}/h/${created.body.token}`);
     await expect(page.getByRole("heading", { name: updated })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Falar com a loja" })).toHaveAttribute("href", "https://wa.me/5511988887777");
-    await expect(page.getByRole("link", { name: "Ver horários disponíveis" })).toHaveAttribute("href", `/${meta.businessASlug}`);
+    const talk = page.getByRole("link", { name: "Falar com a loja" });
+    await expect(talk).toHaveAttribute("href", "https://wa.me/5511988887777");
+    await expect(talk).toHaveClass(/bg-pix/);
+    const slotsLink = page.getByRole("link", { name: "Ver horários disponíveis" });
+    await expect(slotsLink).toHaveAttribute("href", `/${meta.businessASlug}`);
+    await expect(slotsLink).toHaveClass(/border/);
     await expect(page.getByText("interno")).toHaveCount(0);
-
-    mode = "cancelled";
-    await page.goto(`/${meta.businessASlug}/h/${"c".repeat(43)}`);
-    await expect(page.getByRole("heading", { name: "Este link não está mais disponível." })).toBeVisible();
-    await expect(page.getByText(/foi atualizado/)).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "Falar com a loja" })).toHaveCount(0);
-
-    mode = "replaced-reason";
-    await page.goto(`/${meta.businessASlug}/h/${token}`);
-    await expect(page.getByRole("heading", { name: updated })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Falar com a loja" })).toBeVisible();
     if (testInfo.project.name === "desktop") await shootMatrix(page, "cliente-link-atualizado");
+  } finally {
+    await page.goto(`/dashboard/settings?businessId=${meta.businessAId}`);
+    await page.getByRole("textbox", { name: "WhatsApp do negócio" }).fill("");
+    await page.getByRole("button", { name: "Salvar WhatsApp" }).click();
+    await expect(page.getByRole("status").filter({ hasText: "WhatsApp salvo." })).toBeVisible();
+  }
+
+  const payingSlot = await freeSlot(page, service.id, saoPauloDay(10));
+  const paying = await createLink(page, service.id, payingSlot.date, payingSlot.time, `Pagando ${testInfo.project.name}`);
+  expect(paying.status).toBe(201);
+  await page.goto(`/${meta.businessASlug}/h/${paying.body.token}`);
+  const paid = await submitDeposit(page, testInfo.project.name === "desktop" ? "11987657002" : "11987657001");
+  expect(paid.status()).toBe(201);
+  await page.goto(`/dashboard?businessId=${meta.businessAId}&date=${payingSlot.date}`);
+  const payingRow = page.getByTestId("sent-links").getByRole("listitem").filter({ hasText: `Pagando ${testInfo.project.name}` });
+  await payingRow.getByRole("button", { name: "Gerar novo link" }).click();
+  const payingDialog = page.getByRole("dialog", { name: "Gerar um novo link?" });
+  const blocked = page.waitForResponse((response) => response.request().method() === "POST" && response.url().includes("/reissue"));
+  await payingDialog.getByRole("button", { name: "Gerar novo link" }).click();
+  expect((await blocked).status()).toBe(409);
+  await expect(payingDialog.getByText("A cliente está pagando este horário agora. Espere alguns minutos antes de gerar outro link.")).toBeVisible();
+  if (testInfo.project.name === "desktop") await shootMatrix(page, "dono-reemitir-pagando");
+  await payingDialog.getByRole("button", { name: "Cancelar" }).click();
+  await expect(payingRow).toContainText("Aguardando pagamento");
+  await expect(payingRow.getByRole("button", { name: "Gerar novo link" })).toBeVisible();
+
+  const takenSlot = await freeSlot(page, service.id, saoPauloDay(11));
+  const taken = await createLink(page, service.id, takenSlot.date, takenSlot.time, `Ocupado ${testInfo.project.name}`);
+  expect(taken.status).toBe(201);
+  const takenService = taken.body.service as { priceCents: number; depositCents: number };
+  await occupySlot(taken.body.id as string, takenService.priceCents, takenService.depositCents);
+  await page.goto(`/dashboard?businessId=${meta.businessAId}&date=${takenSlot.date}`);
+  const takenRow = page.getByTestId("sent-links").getByRole("listitem").filter({ hasText: `Ocupado ${testInfo.project.name}` });
+  await takenRow.getByRole("button", { name: "Gerar novo link" }).click();
+  const takenDialog = page.getByRole("dialog", { name: "Gerar um novo link?" });
+  const unavailable = page.waitForResponse((response) => response.request().method() === "POST" && response.url().includes("/reissue"));
+  await takenDialog.getByRole("button", { name: "Gerar novo link" }).click();
+  expect((await unavailable).status()).toBe(409);
+  await expect(takenDialog.getByText("Este horário já foi ocupado. O link antigo continua na lista, mas não dá pra gerar outro para ele.")).toBeVisible();
+  if (testInfo.project.name === "desktop") await shootMatrix(page, "dono-reemitir-ocupado");
+  await takenDialog.getByRole("button", { name: "Cancelar" }).click();
+  await expect(takenRow).toContainText("Aguardando pagamento");
+
+  const limitedSlot = await freeSlot(page, service.id, saoPauloDay(12));
+  const limited = await createLink(page, service.id, limitedSlot.date, limitedSlot.time, `Limite ${testInfo.project.name}`);
+  expect(limited.status).toBe(201);
+  const limitHash = await fillCreateLimit();
+  try {
+    await page.goto(`/dashboard?businessId=${meta.businessAId}&date=${limitedSlot.date}`);
+    const limitedRow = page.getByTestId("sent-links").getByRole("listitem").filter({ hasText: `Limite ${testInfo.project.name}` });
+    await limitedRow.getByRole("button", { name: "Gerar novo link" }).click();
+    const limitedDialog = page.getByRole("dialog", { name: "Gerar um novo link?" });
+    const limitedResponse = page.waitForResponse((response) => response.request().method() === "POST" && response.url().includes("/reissue"));
+    await limitedDialog.getByRole("button", { name: "Gerar novo link" }).click();
+    expect((await limitedResponse).status()).toBe(429);
+    await expect(limitedDialog.getByText("Não deu para gerar agora. Tente de novo.")).toBeVisible();
+    if (testInfo.project.name === "desktop") await shootMatrix(page, "dono-reemitir-limite");
+    await limitedDialog.getByRole("button", { name: "Cancelar" }).click();
+    await expect(limitedRow).toContainText("Aguardando pagamento");
+  } finally {
+    await clearCreateLimit(limitHash);
+  }
+});
+
+test("limite da cliente pede para tentar de novo sem perder o horário", async ({ page }, testInfo) => {
+  test.setTimeout(120_000);
+  await page.goto(`/dashboard/settings?businessId=${meta.businessAId}`);
+  await page.getByRole("textbox", { name: "WhatsApp do negócio" }).fill("+5511988887777");
+  await page.getByRole("button", { name: "Salvar WhatsApp" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "WhatsApp salvo." })).toBeVisible();
+  await page.route(`**/api/public/${meta.businessASlug}/slot-links/**`, (route) => {
+    if (route.request().method() !== "GET") return route.continue();
+    return route.fulfill({
+      status: 429,
+      contentType: "application/json",
+      headers: { "retry-after": "10" },
+      body: JSON.stringify({ error: { code: "rate_limited", message: "interno" } }),
+    });
+  });
+  try {
+    await page.goto(`/${meta.businessASlug}/h/${"g".repeat(43)}`);
+    await expect(page.getByRole("heading", { name: "Não conseguimos carregar agora." })).toBeVisible();
+    await expect(page.getByText("Seu horário não foi perdido. Tente de novo em alguns segundos.")).toBeVisible();
+    const retry = page.getByRole("button", { name: /Tentar de novo em \d+s/ });
+    await expect(retry).toBeDisabled();
+    await expect(retry).toHaveClass(/bg-pix/);
+    const talk = page.getByRole("link", { name: "Falar com a loja" });
+    await expect(talk).toHaveAttribute("href", "https://wa.me/5511988887777");
+    await expect(talk).toHaveClass(/border/);
+    if (testInfo.project.name === "desktop") await shootMatrix(page, "cliente-tentar-de-novo");
   } finally {
     await page.unroute(`**/api/public/${meta.businessASlug}/slot-links/**`).catch(() => undefined);
     await page.goto(`/dashboard/settings?businessId=${meta.businessAId}`);

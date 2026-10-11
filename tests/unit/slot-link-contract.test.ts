@@ -48,6 +48,8 @@ describe("contrato do link de horário", () => {
     const body = slotLinkErrorBodySchema.parse({ error: { code: "link_invalid", message: "Este link não está mais disponível." } });
     expect(apiErrorBodySchema.parse(body).error.code).toBe("link_invalid");
     expect(SLOT_LINK_TTL_DEFAULT_MINUTES).toBe(1440);
+    expect(slotLinkErrorCodeSchema.options).toContain("idempotency_conflict");
+    expect(slotLinkErrorBodySchema.safeParse({ error: { code: "link_cancelled", message: "Este link não está mais disponível.", reason: "replaced" } }).success).toBe(false);
   });
 
   it("o aberto traz horário e política, e a prévia distingue horário de capa genérica", () => {

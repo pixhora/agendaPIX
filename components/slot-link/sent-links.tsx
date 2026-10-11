@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { isOfflineError, readApiErrorCode } from "@/components/booking/booking-error";
-import { SLOT_LINK_STATUS_LABEL, clockInZone, formatDayMonth, isoDateInZone, reissueFailureMessage, weekdayShort } from "@/lib/slot-link/copy";
+import { SLOT_LINK_STATUS_LABEL, cancelFailure, clockInZone, formatDayMonth, isoDateInZone, reissueFailure, weekdayShort } from "@/lib/slot-link/copy";
 import { ownerFromCreated, parseCreatedLink, parseOwnerLink, parseOwnerList, slotLinkReadyView, type OwnerLink, type SlotLinkReadyView } from "@/lib/slot-link/owner-link";
 import { cancelSlotLinkUrl, ownerSlotLinksUrl, reissueSlotLinkUrl } from "@/lib/slot-link/paths";
 import { ReissueDialog } from "./reissue-dialog";
@@ -30,6 +30,10 @@ export function SentLinks({
   const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
   const [reissueLink, setReissueLink] = useState<OwnerLink | null>(null);
   const [reissueError, setReissueError] = useState<string | null>(null);
+  const [reissueFinal, setReissueFinal] = useState(false);
+  const [reissueConnect, setReissueConnect] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  const [cancelFinal, setCancelFinal] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -58,21 +62,56 @@ export function SentLinks({
     };
   }, [load, reloadToken]);
 
+  const reload = useCallback(async () => {
+    setStatus("loading");
+    try {
+      const page = await load();
+      setLinks(page.links);
+      setCursor(page.nextCursor);
+      setStatus("ready");
+    } catch {
+      setStatus("error");
+    }
+  }, [load]);
+
+  function dismissCancel() {
+    const shouldReload = cancelFinal;
+    setConfirmCancelId(null);
+    setCancelError(null);
+    setCancelFinal(false);
+    if (shouldReload) void reload();
+  }
+
+  function dismissReissue() {
+    if (reissueLink && busyId === reissueLink.id) return;
+    const shouldReload = reissueFinal;
+    setReissueLink(null);
+    setReissueError(null);
+    setReissueFinal(false);
+    setReissueConnect(false);
+    if (shouldReload) void reload();
+  }
+
   async function cancel(link: OwnerLink) {
     setBusyId(link.id);
     setNotice(null);
+    setCancelError(null);
     try {
       const response = await fetch(cancelSlotLinkUrl(businessId, link.id), { method: "POST" });
       const body: unknown = await response.json().catch(() => null);
       if (!response.ok) {
-        setNotice("Não deu para cancelar agora. Tente de novo.");
+        const outcome = cancelFailure(readApiErrorCode(body), response.status);
+        setCancelError(outcome.message);
+        setCancelFinal(outcome.final);
         return;
       }
       const updated = parseOwnerLink(body);
       setLinks((current) => current.map((item) => (item.id === updated.id ? updated : item)));
       setConfirmCancelId(null);
+      setCancelFinal(false);
     } catch (error) {
-      setNotice(isOfflineError(error) ? "Sem conexão. Verifique sua internet e tente de novo." : "Não deu para cancelar agora. Tente de novo.");
+      setCancelError(isOfflineError(error) ? "Sem conexão. Verifique sua internet e tente de novo." : cancelFailure(null, 500).message);
+      setCancelFinal(false);
     } finally {
       setBusyId(null);
     }
@@ -81,12 +120,16 @@ export function SentLinks({
   async function reissue(link: OwnerLink) {
     setBusyId(link.id);
     setReissueError(null);
+    setReissueConnect(false);
     setNotice(null);
     try {
       const response = await fetch(reissueSlotLinkUrl(businessId, link.id), { method: "POST", cache: "no-store" });
       const body: unknown = await response.json().catch(() => null);
       if (!response.ok) {
-        setReissueError(reissueFailureMessage(readApiErrorCode(body)));
+        const outcome = reissueFailure(readApiErrorCode(body), response.status);
+        setReissueError(outcome.message);
+        setReissueFinal(outcome.final);
+        setReissueConnect(outcome.connect);
         return;
       }
       const created = parseCreatedLink(body);
@@ -97,8 +140,11 @@ export function SentLinks({
       ]);
       onReady(slotLinkReadyView(created, slug, timezone, window.location.origin));
       setReissueLink(null);
+      setReissueFinal(false);
     } catch (error) {
-      setReissueError(isOfflineError(error) ? "Sem conexão. Verifique sua internet e tente de novo." : reissueFailureMessage(null));
+      setReissueError(isOfflineError(error) ? "Sem conexão. Verifique sua internet e tente de novo." : reissueFailure(null, 500).message);
+      setReissueFinal(false);
+      setReissueConnect(false);
     } finally {
       setBusyId(null);
     }
@@ -144,13 +190,14 @@ export function SentLinks({
                   confirmCancelId === link.id ? (
                     <div className="grid gap-2 rounded-field bg-subtle p-3">
                       <p className="text-sm text-ink">Cancelar este link? A cliente deixa de conseguir pagar.</p>
+                      {cancelError ? <p role="alert" className="text-sm text-danger">{cancelError}</p> : null}
                       <div className="flex flex-wrap gap-2">
                         <Button type="button" variant="danger" disabled={busyId === link.id} onClick={() => void cancel(link)}>Cancelar link</Button>
-                        <Button type="button" variant="outline" onClick={() => setConfirmCancelId(null)}>Manter link</Button>
+                        <Button type="button" variant="outline" onClick={dismissCancel}>Manter link</Button>
                       </div>
                     </div>
                   ) : (
-                    <Button type="button" variant="ghost" className="justify-self-start px-0" onClick={() => setConfirmCancelId(link.id)}>Cancelar link</Button>
+                    <Button type="button" variant="ghost" className="justify-self-start px-0" onClick={() => { setCancelError(null); setCancelFinal(false); setConfirmCancelId(link.id); }}>Cancelar link</Button>
                   )
                 ) : null}
               </li>
@@ -174,7 +221,8 @@ export function SentLinks({
         <ReissueDialog
           pending={busyId === reissueLink.id}
           error={reissueError}
-          onCancel={() => { if (busyId === reissueLink.id) return; setReissueLink(null); setReissueError(null); }}
+          connectHref={reissueConnect ? `/dashboard/settings?businessId=${businessId}#recebimento` : null}
+          onCancel={dismissReissue}
           onConfirm={() => void reissue(reissueLink)}
         />
       ) : null}

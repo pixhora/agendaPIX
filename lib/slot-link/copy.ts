@@ -24,11 +24,41 @@ export const OWNER_NO_DEPOSIT = "Para mandar um link, ative o sinal no Pix em pe
 export const OWNER_NO_SLOTS = "Nenhum horário livre nesse dia. Escolha outra data.";
 export const OWNER_HOLD_HINT = "O horário só fica reservado quando a cliente pagar o sinal.";
 
-/** Limite e falha genérica usam o mesmo texto de “Gerar link”. */
-export function reissueFailureMessage(code: string | null) {
-  if (code === "link_in_progress") return REISSUE_IN_PROGRESS;
-  if (code === "slot_unavailable") return REISSUE_TAKEN;
-  return OWNER_NETWORK;
+export const REISSUE_PAID = "Este horário já foi pago. Não dá pra gerar outro link.";
+export const REISSUE_EXPIRED = "Este link já venceu. Gere um link novo pelos horários livres.";
+export const REISSUE_MP = "Conecte o Mercado Pago pra gerar links com sinal.";
+export const CANCEL_PAID = "Este horário já foi pago, não dá pra cancelar o link.";
+export const CANCEL_EXPIRED = "Este link já venceu e não precisa ser cancelado.";
+export const CANCEL_RETRY = "Não deu para cancelar agora. Tente de novo.";
+export const CONNECT_MERCADO_PAGO = "Conectar Mercado Pago";
+
+export type OwnerActionFailure = { message: string; final: boolean; connect: boolean };
+
+/**
+ * O texto do limite é o mesmo de “Gerar link” (`OWNER_NETWORK`).
+ * Ele só entra no limite e no 5xx (ou quando o pedido nem teve resposta).
+ */
+export function reissueFailure(code: string | null, status = 0): OwnerActionFailure {
+  if (code === "link_in_progress") return { message: REISSUE_IN_PROGRESS, final: false, connect: false };
+  if (code === "slot_unavailable") return { message: REISSUE_TAKEN, final: false, connect: false };
+  if (code === "link_used") return { message: REISSUE_PAID, final: true, connect: false };
+  if (code === "link_expired") return { message: REISSUE_EXPIRED, final: true, connect: false };
+  if (code === "mp_not_connected") return { message: REISSUE_MP, final: true, connect: true };
+  if (code === "rate_limited" || status === 429 || status >= 500 || status === 0) {
+    return { message: OWNER_NETWORK, final: false, connect: false };
+  }
+  return { message: "Não deu para gerar este link. Atualize a lista e tente de novo.", final: false, connect: false };
+}
+
+export function reissueFailureMessage(code: string | null, status = 0) {
+  return reissueFailure(code, status).message;
+}
+
+export function cancelFailure(code: string | null, status = 0): OwnerActionFailure {
+  if (status === 429 || status >= 500) return { message: CANCEL_RETRY, final: false, connect: false };
+  if (code === "link_used") return { message: CANCEL_PAID, final: true, connect: false };
+  if (code === "link_expired") return { message: CANCEL_EXPIRED, final: true, connect: false };
+  return { message: CANCEL_RETRY, final: false, connect: false };
 }
 
 export const REISSUE_TITLE = "Gerar um novo link?";
@@ -61,6 +91,9 @@ export const CONTINUE_PAYMENT = "Continuar pagamento";
 export const SEE_SLOTS = "Ver horários disponíveis";
 export const TALK_TO_STORE = "Falar com a loja";
 export const TRY_AGAIN = "Tentar de novo";
+export const CUSTOMER_RETRY_TITLE = "Não conseguimos carregar agora.";
+export const CUSTOMER_RETRY_BODY = "Seu horário não foi perdido. Tente de novo em alguns segundos.";
+export const CUSTOMER_CPF_REQUIRED = "Informe o CPF para gerar o Pix.";
 export const POLICY_CHECK = "Li e concordo com a política";
 
 function pad(value: number) {

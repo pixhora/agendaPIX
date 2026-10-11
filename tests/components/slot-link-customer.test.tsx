@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, within, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SlotLinkCustomer } from "@/components/slot-link/slot-link-customer";
 import { AgendaPixFooter } from "@/components/slot-link/agenda-pix-footer";
@@ -9,7 +9,7 @@ import { memorySlotLinkStores, readOrCreatePayKey, slotLinkSessionKey, slotLinkS
 import { SlotLinkStorageSweep } from "@/components/slot-link/storage-sweep";
 import { SentLinks } from "@/components/slot-link/sent-links";
 import { createSlotLinkToken } from "../../lib/bookings/slot-link-token";
-import { CUSTOMER_CONFLICT_BODY, CUSTOMER_CONFLICT_TITLE, CUSTOMER_IN_PROGRESS, CUSTOMER_USED_TITLE, OWNER_NETWORK, REISSUE_BODY, REISSUE_IN_PROGRESS, REISSUE_TAKEN, REISSUE_TITLE, formatDayMonth, isoDateInZone, weekdayShort } from "@/lib/slot-link/copy";
+import { CANCEL_EXPIRED, CANCEL_PAID, CONNECT_MERCADO_PAGO, CUSTOMER_CONFLICT_BODY, CUSTOMER_CONFLICT_TITLE, CUSTOMER_CPF_REQUIRED, CUSTOMER_IN_PROGRESS, CUSTOMER_RETRY_BODY, CUSTOMER_RETRY_TITLE, CUSTOMER_USED_TITLE, OWNER_NETWORK, REISSUE_BODY, REISSUE_EXPIRED, REISSUE_IN_PROGRESS, REISSUE_MP, REISSUE_PAID, REISSUE_TAKEN, REISSUE_TITLE, formatDayMonth, isoDateInZone, weekdayShort } from "@/lib/slot-link/copy";
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
@@ -222,8 +222,14 @@ describe("página da cliente", () => {
     await fillAndPay(user);
     expect(await screen.findByRole("heading", { name: CUSTOMER_CONFLICT_TITLE })).toBeVisible();
     expect(screen.getByText(CUSTOMER_CONFLICT_BODY)).toBeVisible();
-    expect(screen.getByRole("button", { name: "Continuar pagamento" })).toBeVisible();
-    expect(screen.getByRole("link", { name: "Ver horários disponíveis" })).toHaveAttribute("href", "/salao");
+    const resume = screen.getByRole("button", { name: "Continuar pagamento" });
+    expect(resume).toBeEnabled();
+    expect(resume.className).toMatch(/bg-pix/);
+    expect(resume.className).toMatch(/text-pix-foreground/);
+    const slots = screen.getByRole("link", { name: "Ver horários disponíveis" });
+    expect(slots).toHaveAttribute("href", "/salao");
+    expect(slots.className).toMatch(/border/);
+    expect(slots.className).not.toMatch(/bg-pix/);
     expect(screen.queryByText(/\+5511900000000|já foi usada/)).toBeNull();
     expect(screen.queryByLabelText("Nome")).toBeNull();
     await user.click(screen.getByRole("button", { name: "Continuar pagamento" }));
@@ -291,12 +297,8 @@ describe("página da cliente", () => {
     expect(stores.session.snapshot[await slotLinkSessionKey(token)]).toBeUndefined();
   });
 
-  it.each([
-    ["código link_replaced", { error: { code: "link_replaced", message: "interno" } }],
-    ["motivo replaced", { error: { code: "link_cancelled", message: "interno", reason: "replaced" } }],
-    ["motivo em details", { error: { code: "link_cancelled", message: "interno", details: { reason: "replaced" } } }],
-  ])("link antigo atualizado (%s) pede o link novo", async (_label, body) => {
-    const fetchImpl = vi.fn(async () => json(409, body));
+  it("link antigo atualizado pede o link novo", async () => {
+    const fetchImpl = vi.fn(async () => json(409, { error: { code: "link_replaced", message: "interno" } }));
     render(
       <SlotLinkCustomer
         slug="salao"
@@ -309,9 +311,14 @@ describe("página da cliente", () => {
       />,
     );
     expect(await screen.findByRole("heading", { name: "Este link foi atualizado. Peça o link novo para Salao da Ana." })).toBeVisible();
-    expect(screen.getByRole("link", { name: "Falar com a loja" })).toHaveAttribute("href", "https://wa.me/5511988887777");
-    expect(screen.getByRole("link", { name: "Falar com a loja" })).toHaveAttribute("target", "_blank");
-    expect(screen.getByRole("link", { name: "Ver horários disponíveis" })).toHaveAttribute("href", "/salao");
+    const talk = screen.getByRole("link", { name: "Falar com a loja" });
+    expect(talk).toHaveAttribute("href", "https://wa.me/5511988887777");
+    expect(talk).toHaveAttribute("target", "_blank");
+    expect(talk.className).toMatch(/bg-pix/);
+    const slots = screen.getByRole("link", { name: "Ver horários disponíveis" });
+    expect(slots).toHaveAttribute("href", "/salao");
+    expect(slots.className).toMatch(/border/);
+    expect(slots.className).not.toMatch(/bg-pix/);
     expect(screen.queryByRole("heading", { name: "Este link não está mais disponível." })).toBeNull();
     expect(screen.queryByText("interno")).toBeNull();
   });
@@ -332,6 +339,23 @@ describe("página da cliente", () => {
     expect(await screen.findByRole("heading", { name: "Este link foi atualizado. Peça o link novo para Salao da Ana." })).toBeVisible();
     expect(screen.queryByRole("link", { name: "Falar com a loja" })).toBeNull();
     expect(screen.getByRole("link", { name: "Ver horários disponíveis" })).toHaveAttribute("href", "/salao");
+  });
+
+  it("link_cancelled com reason replaced continua indisponível", async () => {
+    const fetchImpl = vi.fn(async () => json(409, { error: { code: "link_cancelled", message: "interno", reason: "replaced", details: { reason: "replaced" } } }));
+    render(
+      <SlotLinkCustomer
+        slug="salao"
+        token={token}
+        timezone="America/Sao_Paulo"
+        businessName="Salao da Ana"
+        contactWhatsapp="+5511988887777"
+        fetchImpl={fetchImpl}
+        now={() => new Date("2030-10-01T12:00:00.000Z")}
+      />,
+    );
+    expect(await screen.findByRole("heading", { name: "Este link não está mais disponível." })).toBeVisible();
+    expect(screen.queryByText(/foi atualizado/)).toBeNull();
   });
 
   it("link_cancelled sem motivo mantém a tela de cancelado", async () => {
@@ -360,14 +384,75 @@ describe("página da cliente", () => {
     expect(screen.getByRole("link", { name: "Falar com a loja" })).toHaveAttribute("href", "https://wa.me/5511988887777");
   });
 
-  it("sem chave salva, expiresAt vencido não chama o pay", async () => {
+  it("expiresAt vencido no GET deixa o formulário; link_expired do POST é que expira", async () => {
+    const user = userEvent.setup();
     const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
-      if (String(input).endsWith("/pay")) throw new Error("não deveria pagar");
-      return json(200, { ...openBody("pending"), expiresAt: "2020-01-01T00:00:00.000Z" });
+      if (String(input).endsWith("/pay")) return json(410, { error: { code: "link_expired", message: "Este link expirou." } });
+      return json(200, { ...openBody("expired"), expiresAt: "2020-01-01T00:00:00.000Z" });
     });
     render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" fetchImpl={fetchImpl} now={() => new Date("2030-10-01T12:00:00.000Z")} />);
+    expect(await screen.findByRole("button", { name: /Pagar sinal/ })).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "Este link expirou." })).toBeNull();
+    await fillAndPay(user);
     expect(await screen.findByRole("heading", { name: "Este link expirou." })).toBeVisible();
-    expect(screen.queryByRole("button", { name: /Pagar sinal/ })).toBeNull();
+  });
+
+  it("mantém o CPF se a tentativa falhou antes da reserva e não grava o número", async () => {
+    const user = userEvent.setup();
+    const stores = memorySlotLinkStores();
+    const bodies: string[] = [];
+    let posts = 0;
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/pay")) {
+        posts += 1;
+        bodies.push(String(init?.body ?? ""));
+        if (posts === 1) return json(400, { error: { code: "payer_cpf_required", message: "Informe o CPF para gerar o Pix." } });
+        return json(201, payBody());
+      }
+      return json(200, { ...openBody(), requiresPayerCpf: true });
+    });
+    render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" stores={stores} fetchImpl={fetchImpl} now={() => new Date("2030-10-01T12:00:00.000Z")} />);
+    await user.type(await screen.findByLabelText("Nome"), "Ana Souza");
+    await user.type(screen.getByLabelText("WhatsApp"), "11987654321");
+    await user.type(screen.getByLabelText("CPF"), "52998224725");
+    await user.click(screen.getByLabelText("Li e concordo com a política"));
+    await user.click(screen.getByRole("button", { name: /Pagar sinal de/ }));
+    expect(await screen.findByText(CUSTOMER_CPF_REQUIRED)).toBeVisible();
+    expect(screen.getByLabelText("CPF")).toBeVisible();
+    const saved = stores.claim.snapshot[await slotLinkStorageKey(token)] ?? "";
+    expect(saved).not.toContain("52998224725");
+    expect(saved).not.toContain("cpf");
+    await user.click(screen.getByRole("button", { name: /Pagar sinal de/ }));
+    expect(await screen.findByText(/Pix 00020126580014BR.GOV.BCB.PIX/)).toBeVisible();
+    expect(bodies[1]).toContain("52998224725");
+    expect(stores.claim.snapshot[await slotLinkStorageKey(token)] ?? "").not.toContain("52998224725");
+  });
+
+  it("429 espera 10 segundos e 5xx deixa tentar na hora, com WhatsApp só se houver", async () => {
+    vi.useFakeTimers();
+    const onRetry = vi.fn();
+    const { rerender } = render(
+      <SlotLinkNotice
+        screen={{ kind: "retry", rateLimited: true, whatsapp: "+5511988887777", publicPath: "/salao", issuedAt: 1 }}
+        onRetry={onRetry}
+      />,
+    );
+    expect(screen.getByRole("heading", { name: CUSTOMER_RETRY_TITLE })).toBeVisible();
+    expect(screen.getByText(CUSTOMER_RETRY_BODY)).toBeVisible();
+    const waiting = screen.getByRole("button", { name: "Tentar de novo em 10s" });
+    expect(waiting).toBeDisabled();
+    expect(waiting.className).toMatch(/bg-pix/);
+    const talk = screen.getByRole("link", { name: "Falar com a loja" });
+    expect(talk.className).toMatch(/border/);
+    expect(talk.className).not.toMatch(/bg-pix/);
+    await act(async () => { vi.advanceTimersByTime(10_000); });
+    const ready = screen.getByRole("button", { name: "Tentar de novo" });
+    expect(ready).toBeEnabled();
+    rerender(<SlotLinkNotice screen={{ kind: "retry", rateLimited: false, whatsapp: null, publicPath: "/salao", issuedAt: 2 }} onRetry={onRetry} />);
+    expect(screen.getByRole("button", { name: "Tentar de novo" })).toBeEnabled();
+    expect(screen.queryByRole("link", { name: "Falar com a loja" })).toBeNull();
+    vi.useRealTimers();
   });
 });
 
@@ -476,6 +561,13 @@ describe("links enviados", () => {
     expect(within(dialog).getByText(REISSUE_BODY)).toBeVisible();
     await user.click(within(dialog).getByRole("button", { name: "Gerar novo link" }));
     expect(await screen.findByText("Substituído")).toBeVisible();
+    const items = screen.getAllByRole("listitem");
+    expect(items[0]).toHaveTextContent("Aguardando pagamento");
+    expect(within(items[0]).getByRole("button", { name: "Gerar novo link" })).toBeVisible();
+    const replaced = items.find((item) => item.textContent?.includes("Substituído"));
+    expect(replaced).toBeTruthy();
+    expect(within(replaced as HTMLElement).queryByRole("button", { name: "Gerar novo link" })).toBeNull();
+    expect(within(replaced as HTMLElement).queryByRole("button", { name: "Cancelar link" })).toBeNull();
     expect(screen.getAllByText("Aguardando pagamento").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Ana da lista")).toHaveLength(1);
     expect(onReady).toHaveBeenCalledWith(expect.objectContaining({ url: expect.stringContaining(`/h/${body.token}`) }));
@@ -498,6 +590,76 @@ describe("links enviados", () => {
     expect(screen.queryByText("Substituído")).toBeNull();
     expect(screen.getByText("Ana da lista")).toBeVisible();
     expect(within(dialog).queryByText("interno")).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
+  it("erro final do reissue fica na confirmação e a lista recarrega ao fechar", async () => {
+    const user = userEvent.setup();
+    let gets = 0;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/reissue") && init?.method === "POST") {
+        return json(409, { error: { code: "link_used", message: "interno" } });
+      }
+      gets += 1;
+      const listed = gets > 1 ? { ...pending, status: "paid", cancellable: false } : pending;
+      return json(200, { links: [listed], nextCursor: null });
+    }));
+    render(<SentLinks businessId={businessId} slug="salao" date="2030-10-18" timezone="America/Sao_Paulo" onReady={vi.fn()} />);
+    await user.click(await screen.findByRole("button", { name: "Gerar novo link" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: "Gerar novo link" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(REISSUE_PAID);
+    expect(screen.queryByText(OWNER_NETWORK)).toBeNull();
+    const before = gets;
+    await user.click(within(dialog).getByRole("button", { name: "Cancelar" }));
+    await vi.waitFor(() => expect(gets).toBeGreaterThan(before));
+    vi.unstubAllGlobals();
+  });
+
+  it("mp_not_connected oferece conectar e o 5xx usa o texto do limite", async () => {
+    const user = userEvent.setup();
+    let mode: "mp" | "server" = "mp";
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/reissue") && init?.method === "POST") {
+        if (mode === "mp") return json(409, { error: { code: "mp_not_connected", message: "interno" } });
+        return json(500, { error: { code: "internal_error", message: "interno" } });
+      }
+      return json(200, { links: [pending], nextCursor: null });
+    }));
+    render(<SentLinks businessId={businessId} slug="salao" date="2030-10-18" timezone="America/Sao_Paulo" onReady={vi.fn()} />);
+    await user.click(await screen.findByRole("button", { name: "Gerar novo link" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: "Gerar novo link" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(REISSUE_MP);
+    expect(within(dialog).getByRole("link", { name: CONNECT_MERCADO_PAGO })).toHaveAttribute("href", `/dashboard/settings?businessId=${businessId}#recebimento`);
+    mode = "server";
+    await user.click(within(dialog).getByRole("button", { name: "Gerar novo link" }));
+    expect(await within(dialog).findByText(OWNER_NETWORK)).toBeVisible();
+    expect(within(dialog).queryByText(REISSUE_EXPIRED)).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
+  it("erro final ao cancelar fica na confirmação e recarrega ao manter", async () => {
+    const user = userEvent.setup();
+    let gets = 0;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/cancel") && init?.method === "POST") {
+        return json(409, { error: { code: "link_expired", message: "interno" } });
+      }
+      gets += 1;
+      return json(200, { links: [pending], nextCursor: null });
+    }));
+    render(<SentLinks businessId={businessId} slug="salao" date="2030-10-18" timezone="America/Sao_Paulo" onReady={vi.fn()} />);
+    await user.click(await screen.findByRole("button", { name: "Cancelar link" }));
+    await user.click(screen.getByRole("button", { name: "Cancelar link" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(CANCEL_EXPIRED);
+    expect(screen.queryByText(CANCEL_PAID)).toBeNull();
+    const before = gets;
+    await user.click(screen.getByRole("button", { name: "Manter link" }));
+    await vi.waitFor(() => expect(gets).toBeGreaterThan(before));
     vi.unstubAllGlobals();
   });
 });
@@ -524,6 +686,12 @@ describe("limpeza ao abrir", () => {
       expiresAt: "2020-01-01T00:00:00.000Z",
       serviceId: service.id,
     }));
+    window.localStorage.setItem("booking_session_outro", JSON.stringify({
+      bookingId: "7c1c5b3f-2d4e-5f60-9b0c-1d2e3f4a5b6c",
+      accessToken: "token-local",
+      expiresAt: "2020-01-01T00:00:00.000Z",
+      serviceId: service.id,
+    }));
     render(<SlotLinkStorageSweep />);
     await vi.waitFor(() => {
       expect(window.localStorage.getItem(`${claimKey}vencido`)).toBeNull();
@@ -534,6 +702,8 @@ describe("limpeza ao abrir", () => {
     expect(claim).toContain("Ana Souza");
     expect(window.sessionStorage.getItem(sessionKey)).toContain("token-secreto");
     expect(window.sessionStorage.getItem("booking_session_salao")).toBeNull();
+    expect(window.localStorage.getItem("booking_session_outro")).toContain("token-local");
+    window.localStorage.removeItem("booking_session_outro");
     window.localStorage.removeItem(claimKey);
     window.sessionStorage.removeItem(sessionKey);
   });

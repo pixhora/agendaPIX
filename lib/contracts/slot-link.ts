@@ -72,8 +72,6 @@ export const slotLinkErrorBodySchema = z.object({
   error: z.object({
     code: slotLinkErrorCodeSchema,
     message: z.string().min(1),
-    /** `link_cancelled` com `replaced` é o link que o dono trocou por outro. */
-    reason: z.string().optional(),
     details: apiErrorDetailsSchema.optional(),
   }).strict(),
 }).strict();

@@ -14,7 +14,7 @@ import type { BookingResponse, PublicService } from "@/components/booking/types"
 import { publicBookingPagePath } from "@/lib/public-api";
 import { pixResumePayload, pixResumeStorageKey } from "@/components/booking/pix-resume";
 import type { SlotLinkOpenResponse } from "@/lib/contracts/slot-link";
-import { POLICY_CHECK, localDateParts, payButtonLabel } from "@/lib/slot-link/copy";
+import { CUSTOMER_CPF_REQUIRED, POLICY_CHECK, localDateParts, payButtonLabel } from "@/lib/slot-link/copy";
 import {
   failureCode,
   parseOpenLink,
@@ -23,7 +23,7 @@ import {
   shouldClearPayKey,
   type CustomerScreen,
 } from "@/lib/slot-link/customer-state";
-import { browserSlotLinkStores, clearPayKey, lockPayPayload, payRequestBody, readPayResume, savePayAccess, type SlotLinkPayDraft, type SlotLinkPayPayload, type SlotLinkPayStores } from "@/lib/slot-link/idempotency";
+import { browserSlotLinkStores, clearPayKey, createIdempotencyKey, lockPayPayload, payRequestBody, readPayResume, savePayAccess, type SlotLinkPayDraft, type SlotLinkPayPayload, type SlotLinkPayStores } from "@/lib/slot-link/idempotency";
 import { paySlotLinkUrl, publicSlotLinkUrl } from "@/lib/slot-link/paths";
 import { isOfflineError } from "@/components/booking/booking-error";
 import { AgendaPixFooter } from "./agenda-pix-footer";
@@ -69,6 +69,8 @@ export function SlotLinkCustomer({
   const [submitting, setSubmitting] = useState(false);
   const [touched, setTouched] = useState(false);
   const [savedPayload, setSavedPayload] = useState<SlotLinkPayPayload | null>(null);
+  const [holdStarted, setHoldStarted] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const linkRef = React.useRef<SlotLinkOpenResponse | null>(null);
   const publicPath = `/${slug}`;
 
@@ -130,7 +132,8 @@ export function SlotLinkCustomer({
       setKnown(next);
       const saved = await readPayResume(token, payStores, clock().getTime());
       setSavedPayload(saved?.payload ?? null);
-      const screen = screenFromStatus(opened, clock(), { resumePay: Boolean(saved?.idempotencyKey) });
+      if (saved?.bookingId) setHoldStarted(true);
+      const screen = screenFromStatus(opened, clock());
       await applyScreen(screen);
       return screen;
     } catch (error) {
@@ -167,18 +170,9 @@ export function SlotLinkCustomer({
         policyHash: link.policy.hash,
       };
       const locked = await lockPayPayload(token, payStores, draft, link.expiresAt, undefined, now().getTime());
-      if (!locked) {
-        await applyScreen(screenFromFailure("link_expired", {
-          publicPath: link.business.publicPath,
-          businessName: link.business.name,
-          whatsapp: link.business.contactWhatsapp,
-          startsAt: link.startsAt,
-          now: now(),
-        }));
-        return;
-      }
-      setSavedPayload(locked.payload);
-      const opened = await postPay(locked.record.idempotencyKey, locked.fresh ? draft : locked.payload);
+      if (locked) setSavedPayload(locked.payload);
+      const replay = locked ? (locked.fresh ? draft : locked.payload) : draft;
+      const opened = await postPay(locked?.record.idempotencyKey ?? createIdempotencyKey(), withCpf(replay, cpf, link.requiresPayerCpf));
       if (opened) setPhase({ kind: "pix", link, booking: opened });
     } catch (error) {
       if (isOfflineError(error)) setPhase({ kind: "offline", publicPath: link.business.publicPath });
@@ -202,6 +196,8 @@ export function SlotLinkCustomer({
     if (response.status === 201) {
       const booking = parsePayResult(body);
       const current = linkRef.current;
+      setHoldStarted(true);
+      setFormError(null);
       await savePayAccess(token, payStores, {
         bookingId: booking.bookingId,
         accessToken: booking.accessToken,
@@ -211,6 +207,12 @@ export function SlotLinkCustomer({
       return booking;
     }
     const current = linkRef.current;
+    const rawCode = readRawErrorCode(body);
+    if (rawCode === "payer_cpf_required" && current) {
+      setFormError(CUSTOMER_CPF_REQUIRED);
+      setPhase({ kind: "form", link: current });
+      return null;
+    }
     const code = failureCode(response.status, body);
     const screen = screenFromFailure(code, {
       publicPath: current?.business.publicPath ?? publicPath,
@@ -235,7 +237,7 @@ export function SlotLinkCustomer({
     if (!saved?.payload || !current) return;
     setSubmitting(true);
     try {
-      const booking = await postPay(saved.idempotencyKey, saved.payload);
+      const booking = await postPay(saved.idempotencyKey, withCpf(saved.payload, cpf, Boolean(current.requiresPayerCpf)));
       if (booking) setPhase({ kind: "pix", link: current, booking });
     } catch (error) {
       if (isOfflineError(error)) setPhase({ kind: "offline", publicPath: current.business.publicPath });
@@ -247,11 +249,11 @@ export function SlotLinkCustomer({
 
   const link = phase.kind === "form" || phase.kind === "pix" || phase.kind === "confirmed" ? phase.link : null;
   const when = link ? localDateParts(link.startsAt, timezone) : null;
-  const askCpf = link?.requiresPayerCpf === true;
+  const askCpf = link?.requiresPayerCpf === true && !holdStarted;
   const locked = Boolean(savedPayload);
   const nameOk = locked || name.trim().length >= 2;
   const phoneOk = locked || isValidBrazilianPhone(phone);
-  const cpfOk = locked || !askCpf || isValidCpf(cpf);
+  const cpfOk = !askCpf || isValidCpf(cpf);
   const canPay = Boolean(link?.policy) && accepted && nameOk && phoneOk && cpfOk && !submitting;
   const payerName = savedPayload?.customer.name ?? name;
   const payerPhone = savedPayload ? formatPhoneMask(savedPayload.customer.phone) : phone;
@@ -278,7 +280,7 @@ export function SlotLinkCustomer({
         {phase.kind !== "loading" && phase.kind !== "form" && phase.kind !== "pix" && phase.kind !== "confirmed" ? (
           <SlotLinkNotice
             screen={phase}
-            onRetry={phase.kind === "offline" || phase.kind === "in_progress" || phase.kind === "error"
+            onRetry={phase.kind === "offline" || phase.kind === "in_progress" || phase.kind === "error" || phase.kind === "retry"
               ? () => void (phase.kind === "in_progress" ? retryPay() : load())
               : undefined}
             onContinue={phase.kind === "conflict" ? () => void continueSavedPay() : undefined}
@@ -334,15 +336,16 @@ export function SlotLinkCustomer({
                   <Input id="slot-customer-phone" inputMode="tel" autoComplete="off" value={phone} onChange={(event) => setPhone(formatPhoneMask(event.target.value))} />
                   {touched && !phoneOk ? <p className="text-sm text-danger">Informe um celular válido com DDD.</p> : null}
                 </div>
-                {askCpf ? (
-                  <div className="grid gap-1.5">
-                    <Label htmlFor="slot-customer-cpf">CPF</Label>
-                    <Input id="slot-customer-cpf" inputMode="numeric" autoComplete="off" value={cpf} onChange={(event) => setCpf(formatCpfMask(event.target.value))} />
-                    {touched && !cpfOk ? <p className="text-sm text-danger">Informe um CPF válido.</p> : null}
-                  </div>
-                ) : null}
               </div>
             )}
+            {askCpf ? (
+              <div className="grid gap-1.5">
+                <Label htmlFor="slot-customer-cpf">CPF</Label>
+                <Input id="slot-customer-cpf" inputMode="numeric" autoComplete="off" value={cpf} onChange={(event) => setCpf(formatCpfMask(event.target.value))} />
+                {touched && !cpfOk ? <p className="text-sm text-danger">Informe um CPF válido.</p> : null}
+                {formError ? <p role="alert" className="text-sm text-danger">{formError}</p> : null}
+              </div>
+            ) : null}
             {touched && !accepted ? <p className="text-sm text-danger">Marque que você leu a política.</p> : null}
             <Button type="submit" variant="pix" size="lg" className="w-full" disabled={submitting || !link.policy}>
               {submitting ? "Gerando…" : payButtonLabel(link.depositCents)}
@@ -393,6 +396,21 @@ export function SlotLinkCustomer({
       </main>
     </div>
   );
+}
+
+function withCpf(payload: SlotLinkPayDraft, cpf: string, required: boolean): SlotLinkPayDraft {
+  const customer: SlotLinkPayDraft["customer"] = { name: payload.customer.name, phone: payload.customer.phone };
+  if (required) {
+    const digits = cpfDigitsOnly(cpf);
+    if (digits) customer.cpfCnpj = digits;
+  }
+  return { customer, policyHash: payload.policyHash };
+}
+
+function readRawErrorCode(body: unknown) {
+  if (!body || typeof body !== "object" || !("error" in body)) return null;
+  const error = (body as { error?: { code?: unknown } }).error;
+  return typeof error?.code === "string" ? error.code : null;
 }
 
 function LockedPayer({ name, phone }: { name: string; phone: string }) {

@@ -8,6 +8,29 @@ export const SLOT_LINK_SESSION_PREFIX = "agendapix.slot-link.session.";
 const PHONE = /^\+[1-9][0-9]{7,14}$/;
 const POLICY_HASH = /^[a-f0-9]{64}$/;
 
+/**
+ * Janela do hold no cliente. Igual a `BOOKING_HOLD_DEFAULT_MINUTES`.
+ * O navegador não lê a env do servidor.
+ */
+export const SLOT_LINK_HOLD_WINDOW_MS = 30 * 60_000;
+
+/** O maior entre o hold da reserva e o prazo do link somado à janela do hold. */
+export function claimDeadline(linkExpiresAt: string, holdDeadline?: string | null, holdWindowMs = SLOT_LINK_HOLD_WINDOW_MS) {
+  const linkMs = Date.parse(linkExpiresAt);
+  const extended = Number.isFinite(linkMs) ? linkMs + holdWindowMs : Number.NaN;
+  const holdMs = holdDeadline ? Date.parse(holdDeadline) : Number.NaN;
+  const chosen = [extended, holdMs].filter((value) => Number.isFinite(value));
+  if (chosen.length === 0) return linkExpiresAt;
+  return new Date(Math.max(...chosen)).toISOString();
+}
+
+function laterFuture(left: string | null | undefined, right: string | null | undefined, now: number) {
+  const ranked = [left, right]
+    .filter((value): value is string => Boolean(value) && isFuture(value, now))
+    .sort((a, b) => Date.parse(b) - Date.parse(a));
+  return ranked[0] ?? null;
+}
+
 /** Corpo guardado para a retomada. Sem CPF: o digest do pagamento ignora esse campo. */
 export type SlotLinkPayPayload = {
   customer: { name: string; phone: string };
@@ -219,6 +242,7 @@ export function purgeExpiredSlotLinkStorage(stores: SlotLinkPayStores, now = Dat
     const raw = stores.claim.get(key);
     const claim = readClaim(raw);
     const legacy = hash ? readLegacyAccess(raw) : null;
+    // `expiresAt` aqui é o prazo da retomada (hold, ou link + janela do hold), não o TTL cru do link.
     if (!hash || !claim || !isFuture(claim.expiresAt, now)) {
       stores.claim.remove(key);
       if (hash) stores.session.remove(`${SLOT_LINK_SESSION_PREFIX}${hash}`);
@@ -254,7 +278,7 @@ export async function lockPayPayload(
   }
   const payload = storedPayload(draft);
   if (!payload) return null;
-  const existing = await readOrCreatePayKey(token, stores, expiresAt, mint, now);
+  const existing = await readOrCreatePayKey(token, stores, claimDeadline(expiresAt), mint, now);
   if (!existing) return null;
   if (existing.record.payload) return { ...existing, payload: existing.record.payload, fresh: false as const };
   const next: PayClaim = { ...existing.record, payload };
@@ -289,11 +313,7 @@ export async function savePayAccess(
 ) {
   const claimKey = await slotLinkStorageKey(token);
   const claim = readClaim(stores.claim.get(claimKey));
-  const hold = resume.expiresAt && isFuture(resume.expiresAt, now)
-    ? resume.expiresAt
-    : claim && isFuture(claim.expiresAt, now)
-      ? claim.expiresAt
-      : null;
+  const hold = laterFuture(resume.expiresAt, claim?.expiresAt, now);
   if (!hold) return null;
   if (claim) stores.claim.set(claimKey, serializeClaim({ ...claim, expiresAt: hold }));
   if (!resume.bookingId || !resume.accessToken || !resume.serviceId) return null;

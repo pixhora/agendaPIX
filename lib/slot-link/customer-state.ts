@@ -19,6 +19,8 @@ export type SlotLinkFailureCode =
   | "link_in_progress"
   | "idempotency_conflict"
   | "invalid_input"
+  | "rate_limited"
+  | "server"
   | "offline"
   | "unknown";
 
@@ -33,6 +35,7 @@ export type CustomerScreen =
   | { kind: "mp"; whatsapp: string | null; publicPath: string }
   | { kind: "in_progress"; publicPath: string }
   | { kind: "conflict"; publicPath: string }
+  | { kind: "retry"; rateLimited: boolean; whatsapp: string | null; publicPath: string; issuedAt: number }
   | { kind: "error"; publicPath: string };
 
 const SLOT_LINK_CODES: readonly string[] = SLOT_LINK_ERROR_CODES;
@@ -59,32 +62,19 @@ function storeOf(link: SlotLinkOpenResponse) {
   };
 }
 
-function linkTtlPassed(expiresAt: string, now: Date) {
-  const time = new Date(expiresAt).getTime();
-  return Number.isFinite(time) && time <= now.getTime();
-}
-
 /**
  * `paid` no GET é o mesmo estado de link pago (link_used), sem botão de pagar.
  * Horário de atendimento que já passou continua expirado.
- * Com chave de pagamento salva, o expiresAt do link não esconde o formulário:
- * o POST retoma o Pix. A tela de expirado, nesse caminho, só aparece se o
- * backend responder `link_expired`.
+ * O prazo do link (`expiresAt` ou status `expired`) não abre a tela de expirado:
+ * essa tela só entra quando o backend responde `link_expired`.
  */
-export function screenFromStatus(
-  link: SlotLinkOpenResponse,
-  now: Date,
-  options?: { resumePay?: boolean },
-): CustomerScreen {
+export function screenFromStatus(link: SlotLinkOpenResponse, now: Date): CustomerScreen {
   const store = storeOf(link);
   if (link.status === "paid") return { kind: "used", publicPath: store.publicPath };
   if (link.status === "replaced") return { kind: "updated", ...store };
   if (link.status === "cancelled") return { kind: "unavailable", publicPath: store.publicPath };
   if (slotStartsInPast(link.startsAt, now)) return { kind: "expired", ...store };
   if (link.status === "taken") return { kind: "taken", publicPath: store.publicPath };
-  if (!options?.resumePay && (link.status === "expired" || linkTtlPassed(link.expiresAt, now))) {
-    return { kind: "expired", ...store };
-  }
   return { kind: "form", link };
 }
 
@@ -109,6 +99,15 @@ export function screenFromFailure(
   if (code === "link_in_progress") return { kind: "in_progress", publicPath: context.publicPath };
   if (code === "idempotency_conflict") return { kind: "conflict", publicPath: context.publicPath };
   if (code === "invalid_input") return { kind: "error", publicPath: context.publicPath };
+  if (code === "rate_limited" || code === "server") {
+    return {
+      kind: "retry",
+      rateLimited: code === "rate_limited",
+      whatsapp: context.whatsapp ?? null,
+      publicPath: context.publicPath,
+      issuedAt: context.now.getTime(),
+    };
+  }
   if (code === "offline") return { kind: "offline", publicPath: context.publicPath };
   if (code === "link_expired" || (code === "slot_unavailable" && past)) {
     return {
@@ -126,29 +125,17 @@ export function parseOpenLink(body: unknown) {
   return slotLinkOpenResponseSchema.parse(body);
 }
 
-function errorFields(body: unknown) {
-  if (!body || typeof body !== "object" || !("error" in body)) return { code: null, reason: null };
-  const error = (body as { error?: unknown }).error;
-  if (!error || typeof error !== "object") return { code: null, reason: null };
-  const record = error as { code?: unknown; reason?: unknown; details?: unknown };
-  const code = typeof record.code === "string" ? record.code : null;
-  const direct = typeof record.reason === "string" ? record.reason : null;
-  const details = record.details;
-  const nested = details && typeof details === "object" && "reason" in details && typeof details.reason === "string"
-    ? details.reason
-    : null;
-  return { code, reason: direct ?? nested };
-}
-
-/** O link antigo da cliente: código `link_replaced` ou `link_cancelled` com motivo `replaced`. */
+/** O link antigo da cliente responde só com o código `link_replaced`. */
 export function isReplacedLinkError(body: unknown) {
-  const { code, reason } = errorFields(body);
-  return code === "link_replaced" || (code === "link_cancelled" && reason === "replaced");
+  return readSlotLinkErrorCode(body) === "link_replaced";
 }
 
 export function failureCode(status: number, body: unknown): SlotLinkFailureCode {
+  if (status === 429) return "rate_limited";
+  if (status >= 500) return "server";
   if (isReplacedLinkError(body)) return "link_replaced";
   const code = readSlotLinkErrorCode(body);
+  if (code === "rate_limited") return "rate_limited";
   if (code === "link_expired" || status === 410) return "link_expired";
   if (code === "link_used" || code === "link_cancelled" || code === "link_replaced" || code === "link_invalid" || code === "slot_unavailable" || code === "mp_not_connected" || code === "link_in_progress" || code === "idempotency_conflict" || code === "invalid_input") {
     return code;

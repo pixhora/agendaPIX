@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Clock, Link2Off, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +14,8 @@ import {
   CUSTOMER_TAKEN_BODY,
   CUSTOMER_TAKEN_TITLE,
   CUSTOMER_GENERIC,
+  CUSTOMER_RETRY_BODY,
+  CUSTOMER_RETRY_TITLE,
   CUSTOMER_UNAVAILABLE_TITLE,
   CUSTOMER_USED_HINT,
   CUSTOMER_USED_TITLE,
@@ -145,6 +147,16 @@ export function SlotLinkNotice({
     );
   }
 
+  if (screen.kind === "retry") {
+    const whatsapp = whatsAppStoreHref(screen.whatsapp);
+    return (
+      <NoticeFrame titleRef={titleRef} title={CUSTOMER_RETRY_TITLE} icon={<WifiOff aria-hidden="true" className="size-8" />}>
+        <p className="text-sm text-muted">{CUSTOMER_RETRY_BODY}</p>
+        <RetryActions rateLimited={screen.rateLimited} issuedAt={screen.issuedAt} onRetry={onRetry} whatsapp={whatsapp} />
+      </NoticeFrame>
+    );
+  }
+
   if (screen.kind === "updated") {
     const whatsapp = whatsAppStoreHref(screen.whatsapp);
     return (
@@ -169,6 +181,43 @@ export function SlotLinkNotice({
     <NoticeFrame titleRef={titleRef} title={CUSTOMER_UNAVAILABLE_TITLE} icon={<Link2Off aria-hidden="true" className="size-8" />}>
       {slots}
     </NoticeFrame>
+  );
+}
+
+function RetryActions({
+  rateLimited,
+  issuedAt,
+  onRetry,
+  whatsapp,
+}: {
+  rateLimited: boolean;
+  issuedAt: number;
+  onRetry?: () => void;
+  whatsapp: string | null;
+}) {
+  const [left, setLeft] = useState(rateLimited ? 10 : 0);
+  useEffect(() => {
+    if (!rateLimited) return;
+    const started = Date.now();
+    const tick = () => setLeft(Math.max(0, 10 - Math.floor((Date.now() - started) / 1000)));
+    tick();
+    const id = window.setInterval(tick, 200);
+    return () => window.clearInterval(id);
+  }, [issuedAt, rateLimited]);
+  const waiting = rateLimited && left > 0;
+  return (
+    <div className="grid gap-2">
+      {onRetry ? (
+        <Button type="button" variant="pix" size="lg" className="w-full" disabled={waiting} onClick={onRetry}>
+          {waiting ? `Tentar de novo em ${left}s` : TRY_AGAIN}
+        </Button>
+      ) : null}
+      {whatsapp ? (
+        <Button asChild variant="outline" size="lg" className="w-full">
+          <a href={whatsapp} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">{TALK_TO_STORE}</a>
+        </Button>
+      ) : null}
+    </div>
   );
 }
 

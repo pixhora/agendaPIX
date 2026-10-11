@@ -2,17 +2,19 @@
 
 import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { REISSUE_ACTION, REISSUE_BODY, REISSUE_TITLE } from "@/lib/slot-link/copy";
+import { CONNECT_MERCADO_PAGO, REISSUE_ACTION, REISSUE_BODY, REISSUE_TITLE } from "@/lib/slot-link/copy";
 
 /** Folha no celular e diálogo no desktop, antes de invalidar o link já enviado. */
 export function ReissueDialog({
   pending,
   error,
+  connectHref,
   onCancel,
   onConfirm,
 }: {
   pending: boolean;
   error: string | null;
+  connectHref?: string | null;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
@@ -39,6 +41,11 @@ export function ReissueDialog({
       <h2 id="reissue-title" className="font-display text-xl font-extrabold tracking-tight">{REISSUE_TITLE}</h2>
       <p id="reissue-body" className="mt-3 text-sm leading-relaxed text-ink">{REISSUE_BODY}</p>
       {error ? <p role="alert" className="mt-3 text-sm text-danger">{error}</p> : null}
+      {connectHref ? (
+        <Button asChild variant="pix" size="lg" className="mt-4 w-full">
+          <a href={connectHref}>{CONNECT_MERCADO_PAGO}</a>
+        </Button>
+      ) : null}
       <div className="mt-4 grid gap-2 sm:grid-cols-2">
         <Button type="button" variant="default" size="lg" className="w-full" disabled={pending} aria-busy={pending || undefined} onClick={onConfirm}>
           {pending ? "Gerando…" : REISSUE_ACTION}

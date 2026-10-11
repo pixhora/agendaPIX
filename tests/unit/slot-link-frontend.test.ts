@@ -1,18 +1,18 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { createSlotLinkToken } from "../../lib/bookings/slot-link-token";
+import { createSlotLinkToken, slotLinkTokenHash } from "../../lib/bookings/slot-link-token";
 import { SLOT_LINK_IDEMPOTENCY_KEY_PATTERN } from "../../lib/contracts/slot-link";
 import { failureCode, isReplacedLinkError, screenFromFailure, screenFromStatus, shouldClearPayKey, slotStartsInPast } from "../../lib/slot-link/customer-state";
-import { clearPayKey, createIdempotencyKey, lockPayPayload, memorySlotLinkStores, payRequestBody, purgeExpiredSlotLinkStorage, readOrCreatePayKey, readPayResume, savePayAccess, SLOT_LINK_CLAIM_PREFIX, slotLinkSessionKey, slotLinkStorageKey } from "../../lib/slot-link/idempotency";
+import { SLOT_LINK_HOLD_WINDOW_MS, claimDeadline, clearPayKey, createIdempotencyKey, lockPayPayload, memorySlotLinkStores, payRequestBody, purgeExpiredSlotLinkStorage, readOrCreatePayKey, readPayResume, savePayAccess, SLOT_LINK_CLAIM_PREFIX, slotLinkSessionKey, slotLinkStorageKey } from "../../lib/slot-link/idempotency";
 import { parseOwnerList } from "../../lib/slot-link/owner-link";
 import { isSlotLinkPagePath } from "../../lib/slot-link/paths";
 import { slotLinkPageHeaderRule, slotLinkPageHeaders } from "../../lib/slot-link/privacy";
 import { PIX_RESUME_STORAGE_PREFIX, purgeExpiredBookingSessions } from "../../components/booking/pix-resume";
 import { GENERIC_OG_FALLBACK, parseSlotLinkPreview, slotLinkOgCopy, slotLinkOgLines } from "../../lib/slot-link/preview";
 import { sendOnWhatsApp } from "../../lib/slot-link/share";
-import { ownerSummary, reissueFailureMessage, slotLinkMessage, updatedLinkMessage, validityLine, REISSUE_IN_PROGRESS, REISSUE_TAKEN, OWNER_NETWORK } from "../../lib/slot-link/copy";
-
+import { ownerSummary, reissueFailure, reissueFailureMessage, cancelFailure, slotLinkMessage, updatedLinkMessage, validityLine, REISSUE_EXPIRED, REISSUE_IN_PROGRESS, REISSUE_MP, REISSUE_PAID, REISSUE_TAKEN, CANCEL_EXPIRED, CANCEL_PAID, OWNER_NETWORK } from "../../lib/slot-link/copy";
+import { readShareMetaCache, shareMetaCacheKey, writeShareMetaCache, SHARE_META_TTL_MS } from "../../lib/slot-link/share-meta-cache";
 const service = { id: "6b0b4a2e-1c3d-4e5f-8a9b-0c1d2e3f4a5b", name: "Corte", durationMinutes: 30, priceCents: 8000, depositCents: 4000 };
 const openBase = {
   business: { name: "Salao", slug: "salao", logoUrl: null, contactWhatsapp: "+5511999999999", publicPath: "/salao" },
@@ -115,24 +115,27 @@ describe("estados da cliente", () => {
     expect(updatedLinkMessage("Salao")).toBe("Este link foi atualizado. Peça o link novo para Salao.");
     expect(updatedLinkMessage("  ")).toBe("Este link foi atualizado. Peça o link novo para a loja.");
     expect(isReplacedLinkError({ error: { code: "link_replaced", message: "interno" } })).toBe(true);
-    expect(isReplacedLinkError({ error: { code: "link_cancelled", message: "interno", reason: "replaced" } })).toBe(true);
-    expect(isReplacedLinkError({ error: { code: "link_cancelled", message: "interno", details: { reason: "replaced" } } })).toBe(true);
+    expect(isReplacedLinkError({ error: { code: "link_cancelled", message: "interno", reason: "replaced" } })).toBe(false);
+    expect(isReplacedLinkError({ error: { code: "link_cancelled", message: "interno", details: { reason: "replaced" } } })).toBe(false);
     expect(isReplacedLinkError({ error: { code: "link_cancelled", message: "interno" } })).toBe(false);
     expect(failureCode(409, { error: { code: "link_replaced", message: "interno" } })).toBe("link_replaced");
-    expect(failureCode(409, { error: { code: "link_cancelled", message: "interno", reason: "replaced" } })).toBe("link_replaced");
-    expect(failureCode(409, { error: { code: "link_cancelled", message: "interno", details: { reason: "replaced" } } })).toBe("link_replaced");
+    expect(failureCode(409, { error: { code: "link_cancelled", message: "interno", reason: "replaced" } })).toBe("link_cancelled");
+    expect(failureCode(409, { error: { code: "link_cancelled", message: "interno", details: { reason: "replaced" } } })).toBe("link_cancelled");
     expect(failureCode(409, { error: { code: "link_cancelled", message: "interno" } })).toBe("link_cancelled");
   });
 
-  it("chave salva não bloqueia pelo expiresAt; sem chave, o prazo vencido expira", () => {
+  it("o prazo do link não abre a tela de expirado; só o código link_expired", () => {
     const stale = { ...openBase, status: "expired" as const, expiresAt: "2030-01-01T11:00:00.000Z" };
-    expect(screenFromStatus(stale, now, { resumePay: true }).kind).toBe("form");
-    expect(screenFromStatus({ ...stale, status: "pending" }, now, { resumePay: true }).kind).toBe("form");
-    expect(screenFromStatus(stale, now).kind).toBe("expired");
-    expect(screenFromStatus({ ...stale, status: "pending" }, now).kind).toBe("expired");
+    expect(screenFromStatus(stale, now).kind).toBe("form");
+    expect(screenFromStatus({ ...stale, status: "pending" }, now).kind).toBe("form");
     expect(screenFromFailure("link_expired", { publicPath: "/salao", now }).kind).toBe("expired");
     const past = { ...openBase, startsAt: "2020-01-01T12:00:00.000Z", status: "pending" as const };
-    expect(screenFromStatus(past, now, { resumePay: true }).kind).toBe("expired");
+    expect(screenFromStatus(past, now).kind).toBe("expired");
+    const retry = screenFromFailure("rate_limited", { publicPath: "/salao", whatsapp: "+5511999999999", now });
+    expect(retry).toMatchObject({ kind: "retry", rateLimited: true, whatsapp: "+5511999999999" });
+    expect(screenFromFailure("server", { publicPath: "/salao", now })).toMatchObject({ kind: "retry", rateLimited: false });
+    expect(failureCode(429, { error: { code: "rate_limited", message: "interno" } })).toBe("rate_limited");
+    expect(failureCode(503, { error: { code: "internal_error", message: "interno" } })).toBe("server");
   });
 
   it("pago e expirado apagam a chave; pagamento em andamento não", () => {
@@ -299,6 +302,55 @@ describe("idempotência do pagamento", () => {
     purgeExpiredBookingSessions(sessions, now);
     expect(sessions.snapshot[`${PIX_RESUME_STORAGE_PREFIX}salao`]).toBeUndefined();
     expect(sessions.snapshot[`${PIX_RESUME_STORAGE_PREFIX}outro`]).toContain("token-vivo");
+
+    const split = memorySlotLinkStores();
+    const sessionKeyName = `${PIX_RESUME_STORAGE_PREFIX}salao`;
+    const staleSession = JSON.stringify({
+      bookingId: legacy.bookingId,
+      accessToken: "token-local",
+      expiresAt: "2020-01-01T00:00:00.000Z",
+      serviceId: legacy.serviceId,
+    });
+    split.claim.set(sessionKeyName, staleSession);
+    split.session.set(sessionKeyName, staleSession);
+    purgeExpiredBookingSessions(split.session, now);
+    expect(split.session.snapshot[sessionKeyName]).toBeUndefined();
+    expect(split.claim.snapshot[sessionKeyName]).toContain("token-local");
+  });
+
+  it("guarda o claim até o hold, mesmo depois do expiresAt do link", async () => {
+    const token = createSlotLinkToken();
+    const stores = memorySlotLinkStores();
+    const linkExpires = new Date(now - 60_000).toISOString();
+    const locked = await lockPayPayload(token, stores, {
+      customer: { name: "Ana Souza", phone: "+5511987654321", cpfCnpj: "52998224725" },
+      policyHash: "ab".repeat(32),
+    }, linkExpires, () => "11111111-1111-4111-8111-111111111111", now);
+    expect(locked?.record.expiresAt).toBe(claimDeadline(linkExpires));
+    expect(Date.parse(locked?.record.expiresAt ?? "")).toBe(Date.parse(linkExpires) + SLOT_LINK_HOLD_WINDOW_MS);
+    const claimKey = await slotLinkStorageKey(token);
+    expect(JSON.parse(stores.claim.snapshot[claimKey] ?? "{}").payload.customer.cpfCnpj).toBeUndefined();
+    purgeExpiredSlotLinkStorage(stores, now);
+    expect(stores.claim.snapshot[claimKey]).toContain("Ana Souza");
+    purgeExpiredSlotLinkStorage(stores, now + SLOT_LINK_HOLD_WINDOW_MS + 1000);
+    expect(stores.claim.snapshot[claimKey]).toBeUndefined();
+    const laterHold = new Date(Date.parse(expiresAt) + SLOT_LINK_HOLD_WINDOW_MS + 60_000).toISOString();
+    expect(claimDeadline(expiresAt, laterHold)).toBe(laterHold);
+  });
+});
+
+describe("cache da prévia compartilhada", () => {
+  it("repete a leitura só depois do prazo e a chave é o hash, não o token", () => {
+    const token = createSlotLinkToken();
+    const cache = new Map<string, { at: number; value: { title: string } }>();
+    const key = shareMetaCacheKey("salao", slotLinkTokenHash(token));
+    const now = Date.parse("2030-01-01T12:00:00.000Z");
+    expect(readShareMetaCache(cache, key, now)).toBeNull();
+    writeShareMetaCache(cache, key, now, { title: "Salao" });
+    expect(readShareMetaCache(cache, key, now + SHARE_META_TTL_MS - 1)?.title).toBe("Salao");
+    expect(readShareMetaCache(cache, key, now + SHARE_META_TTL_MS)).toBeNull();
+    expect(key).not.toContain(token);
+    expect(key).toContain(slotLinkTokenHash(token));
   });
 });
 
@@ -323,10 +375,20 @@ describe("lista do dono", () => {
   it("aceita status replaced e traduz os erros de gerar de novo", () => {
     const parsed = parseOwnerList({ links: [{ ...owner, status: "replaced" }], nextCursor: null });
     expect(parsed.links[0]?.status).toBe("replaced");
-    expect(reissueFailureMessage("link_in_progress")).toBe(REISSUE_IN_PROGRESS);
-    expect(reissueFailureMessage("slot_unavailable")).toBe(REISSUE_TAKEN);
-    expect(reissueFailureMessage("rate_limited")).toBe(OWNER_NETWORK);
-    expect(reissueFailureMessage(null)).toBe(OWNER_NETWORK);
+    expect(reissueFailureMessage("link_in_progress", 409)).toBe(REISSUE_IN_PROGRESS);
+    expect(reissueFailureMessage("slot_unavailable", 409)).toBe(REISSUE_TAKEN);
+    expect(reissueFailureMessage("rate_limited", 429)).toBe(OWNER_NETWORK);
+    expect(reissueFailureMessage(null, 500)).toBe(OWNER_NETWORK);
+    expect(reissueFailureMessage("link_used", 409)).toBe(REISSUE_PAID);
+    expect(reissueFailureMessage("link_expired", 410)).toBe(REISSUE_EXPIRED);
+    expect(reissueFailureMessage("mp_not_connected", 409)).toBe(REISSUE_MP);
+    expect(reissueFailureMessage("link_used", 409)).not.toBe(OWNER_NETWORK);
+    expect(reissueFailure("mp_not_connected", 409)).toMatchObject({ final: true, connect: true });
+    expect(reissueFailure("link_used", 409).final).toBe(true);
+    expect(reissueFailure("rate_limited", 429).final).toBe(false);
+    expect(cancelFailure("link_used", 409)).toMatchObject({ message: CANCEL_PAID, final: true });
+    expect(cancelFailure("link_expired", 410)).toMatchObject({ message: CANCEL_EXPIRED, final: true });
+    expect(cancelFailure("rate_limited", 429).final).toBe(false);
   });
 });
 
