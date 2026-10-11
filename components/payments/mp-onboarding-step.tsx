@@ -297,7 +297,7 @@ function ConnectedBody({
   if (!status) return null;
   return (
     <>
-      <div data-mp-scroll="" className="min-h-0 flex-1 overflow-y-auto px-5 pt-4 max-md:pb-4 md:overflow-visible" role="status">
+      <div data-mp-scroll="" className="min-h-0 flex-1 overflow-y-auto px-5 pt-4 max-md:pb-[calc(96px+env(safe-area-inset-bottom))] md:overflow-visible" role="status">
         <MpConnectionCard
           businessId={businessId}
           status={status}

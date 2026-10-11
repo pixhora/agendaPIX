@@ -49,6 +49,9 @@ describe("confirmação da chave Pix no recebimento", () => {
       />,
     );
 
+    const scroller = document.querySelector("[data-mp-scroll]");
+    expect(scroller?.className).toContain("max-md:pb-[calc(96px+env(safe-area-inset-bottom))]");
+
     const checkbox = screen.getByRole("checkbox", { name: MP_PIX_KEY_CONFIRM_LABEL });
     expect(checkbox).not.toBeChecked();
     const blocked = screen.getByRole("button", { name: "Continuar" });
