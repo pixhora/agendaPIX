@@ -3,10 +3,11 @@ import type { ReactNode } from "react";
 import { Icon } from "@/components/ui/icon";
 import { ACTION_ICONS } from "@/lib/icons/registry";
 import { buttonVariants } from "@/components/ui/button";
+import { Select } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { RememberBusiness } from "./remember-business";
 
-export function DashboardShell({ title, description, path, businesses, businessId, actions, notice, children }: {
+export function DashboardShell({ title, description, path, businesses, businessId, actions, notice, contentClassName, children }: {
   title: string;
   description: string;
   path: string;
@@ -15,28 +16,40 @@ export function DashboardShell({ title, description, path, businesses, businessI
   /** Ações principais da página (ex.: "Novo serviço"). */
   actions?: ReactNode;
   notice?: ReactNode;
+  /** Classe do bloco aviso + conteúdo. Configurações usa 16px entre os cards. */
+  contentClassName?: string;
   children: ReactNode;
 }) {
+  const body = contentClassName ? <div className={contentClassName}>{notice}{children}</div> : <>{notice}{children}</>;
   return <main id="content" tabIndex={-1} className="mx-auto w-full max-w-6xl min-w-0 space-y-6 px-4 py-6 outline-none sm:px-6 lg:px-10 lg:py-10">
     <header className="flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-0 flex-1 basis-72">
         <h1 className="break-words font-display text-2xl font-extrabold tracking-tight sm:text-3xl">{title}</h1>
         <p className="mt-1.5 max-w-[65ch] text-sm leading-relaxed text-muted sm:text-base">{description}</p>
       </div>
-      {(actions || businesses.length > 1) && <div className="flex w-full flex-wrap items-end gap-2 sm:w-auto">
+      {(actions || businesses.length > 0) && <div className="flex w-full flex-wrap items-end gap-2 sm:w-auto">
         {businesses.length > 1 && <form action={path} className="flex min-w-0 flex-1 items-end gap-2 sm:flex-none">
-          <label className="grid min-w-0 flex-1 gap-1.5 text-xs font-semibold text-muted" htmlFor="business">Negócio
-            <select key={businessId} id="business" name="businessId" defaultValue={businessId} className="min-h-11 w-full min-w-0 rounded-field border border-line-strong/60 bg-surface px-3 text-base font-medium text-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring sm:min-w-48">
+          <div className="grid min-w-0 flex-1 gap-1.5 sm:min-w-48">
+            <label className="text-xs font-semibold text-muted" htmlFor="business">Negócio</label>
+            <Select key={businessId} id="business" name="businessId" defaultValue={businessId}>
               {businesses.map((business) => <option value={business.id} key={business.id}>{business.name}</option>)}
-            </select>
-          </label>
+            </Select>
+          </div>
+          <button className={buttonVariants({ variant: "outline" })} type="submit">Abrir</button>
+        </form>}
+        {businesses.length === 1 && <form action={path} className="flex min-w-0 flex-1 items-end gap-2 sm:flex-none">
+          <div className="grid min-w-0 flex-1 gap-1.5">
+            <span className="text-xs font-semibold text-muted">Negócio</span>
+            <p className="truncate text-base font-medium text-ink">{businesses[0].name}</p>
+          </div>
+          <input type="hidden" name="businessId" value={businesses[0].id} />
           <button className={buttonVariants({ variant: "outline" })} type="submit">Abrir</button>
         </form>}
         {actions}
       </div>}
     </header>
 
-    {businessId ? <><RememberBusiness businessId={businessId} />{notice}{children}</> : <section className="rounded-card border border-line bg-surface p-6 sm:p-8">
+    {businessId ? <><RememberBusiness businessId={businessId} />{body}</> : <section className="rounded-card border border-line bg-surface p-6 sm:p-8">
       <Icon icon={ACTION_ICONS.emptyBusiness} size="xl" className="mb-4 text-muted" />
       <h2 className="font-display text-xl font-bold">{businesses.length ? "Negócio indisponível" : "Seu negócio ainda não foi cadastrado"}</h2>
       <p className="mt-2 max-w-[60ch] text-muted">{businesses.length ? "Este negócio não está disponível para sua conta. Escolha um dos seus negócios para continuar." : "Conclua o cadastro do negócio para começar a organizar seus horários."}</p>

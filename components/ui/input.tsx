@@ -1,4 +1,5 @@
 import * as React from "react";
+import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const fieldShell =
@@ -23,12 +24,13 @@ function Input({ className, shellClassName, type = "text", ...props }: React.Com
 
 function Select({ className, ...props }: React.ComponentProps<"select">) {
   return (
-    <div className={fieldShell}>
+    <div className={cn(fieldShell, "relative")}>
       <select
         data-slot="select"
-        className={cn(fieldControl, "px-3", className)}
+        className={cn(fieldControl, "appearance-none bg-none py-0 pr-10 pl-3", className)}
         {...props}
       />
+      <ChevronDown aria-hidden="true" className="pointer-events-none absolute top-1/2 right-4 size-4 -translate-y-1/2 text-muted" />
     </div>
   );
 }

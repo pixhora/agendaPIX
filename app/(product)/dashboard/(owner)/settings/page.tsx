@@ -15,6 +15,9 @@ import { friendlyTimezoneLabel } from "@/lib/dashboard/timezone-label";
 import { Icon } from "@/components/ui/icon";
 import { ACTION_ICONS } from "@/lib/icons/registry";
 import { StoreSettingsForm } from "@/components/store/StoreSettingsForm";
+import { SettingsPanelLinks } from "@/components/dashboard/settings-links";
+import { legalPagesPublished } from "@/lib/marketing/flags";
+import { supportWhatsappUrl } from "@/lib/support-contact";
 import { siteOrigin } from "@/lib/site";
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ businessId?: string; mpFixture?: string }> }) {
@@ -34,9 +37,9 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     ])
     : [[] as Awaited<ReturnType<typeof dashboardHours>>, null, null];
   const mpStatus = fixture ?? mpLive;
-  return <DashboardShell title="Configurações" description="Link público, horários de atendimento, recebimento e aparência do painel." path="/dashboard/settings" businesses={businesses} businessId={business?.id} notice={business && billing ? <OwnerBillingNotice ownerId={owner.id} businessId={business.id} timeZone={business.timezone} publicSlug={business.slug} billing={billing} /> : undefined}>
-    {business && <div className="grid gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(18rem,0.7fr)] lg:items-start">
-      <div className="grid min-w-0 gap-6">
+  return <DashboardShell title="Configurações" description="Link público, horários de atendimento, recebimento e aparência do painel." path="/dashboard/settings" businesses={businesses} businessId={business?.id} contentClassName="space-y-4" notice={business && billing ? <OwnerBillingNotice ownerId={owner.id} businessId={business.id} timeZone={business.timezone} publicSlug={business.slug} billing={billing} /> : undefined}>
+    {business && <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(18rem,0.7fr)] lg:items-start">
+      <div className="grid min-w-0 gap-4">
         <SectionCard title="Loja" headingId="store-settings-title" icon={<Icon icon={ACTION_ICONS.link} size="md" />} description="Nome, link e logo que seus clientes veem.">
           <StoreSettingsForm businessId={business.id} initialName={business.name} initialSlug={business.slug} initialLogoUrl={business.logoUrl} prefix={siteOrigin().host} />
         </SectionCard>
@@ -49,7 +52,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <WhatsappForm key={`wa-${business.id}`} businessId={business.id} contactWhatsapp={business.contactWhatsapp} />
         </SectionCard>
       </div>
-      <div className="grid min-w-0 gap-6 lg:sticky lg:top-8">
+      <div className="grid min-w-0 gap-4 lg:sticky lg:top-8">
         <SectionCard title="Sua página pública" headingId="public-link-title" icon={<Icon icon={ACTION_ICONS.link} size="md" />} description="Compartilhe este link para receber reservas com sinal via Pix.">
           <PublicLink slug={business.slug} />
         </SectionCard>
@@ -57,6 +60,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <ThemeToggle />
         </SectionCard>
       </div>
+      <SettingsPanelLinks legalPagesPublished={legalPagesPublished()} supportWhatsappHref={supportWhatsappUrl()} />
     </div>}
   </DashboardShell>;
 }
