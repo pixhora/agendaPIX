@@ -294,6 +294,7 @@ describe("cobrança fora da transação", () => {
       createBooking(slug, input(2, "+5511999999903"), randomUUID(), database, provider),
     ]);
     expect(replay.status).toBe("rejected");
+    if (replay.status !== "rejected") return;
     expect(replay.reason).toMatchObject({ status: 503, code: "payment_unavailable" });
     expect((replay.reason as { details?: { details?: { retry_same_key?: boolean } } }).details?.details?.retry_same_key).toBe(false);
     expect(next.status).toBe("fulfilled");

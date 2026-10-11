@@ -52,7 +52,7 @@ export const paymentStatusResponseSchema = z.object({
   startsAt: z.string(),
   endsAt: z.string(),
   expiresAt: z.string().nullable(),
-  chargeFailed: z.boolean().default(false),
+  chargeFailed: z.boolean().optional(),
   payment: pixPaymentSchema.nullable(),
   policy: paymentStatusPolicySchema.nullable(),
 });

@@ -43,7 +43,7 @@ describe("schema do status do Pix", () => {
     expect(expiredPixBody(latePaymentChoice(refund.policy))).toContain("Como o prazo terminou");
     expect(expiredPixBody(latePaymentChoice(rebook.policy))).toContain("horário continuar livre");
     expect(paymentStatusResponseSchema.safeParse({ ...base, status: "nope" }).success).toBe(false);
-    expect(parsePaymentStatusResponse(base).chargeFailed).toBe(false);
+    expect(parsePaymentStatusResponse(base).chargeFailed).toBeUndefined();
     expect(parsePaymentStatusResponse({
       ...base,
       status: "expired",
@@ -53,6 +53,7 @@ describe("schema do status do Pix", () => {
     expect(parsePaymentStatusResponse({
       ...base,
       status: "expired",
+      chargeFailed: false,
       payment: { ...base.payment, status: "expired", externalId: null, qrCodeDataUrl: null, copyPaste: null },
     }).chargeFailed).toBe(false);
   });
