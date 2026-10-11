@@ -13,6 +13,7 @@ import {
   MercadoPagoPaymentProvider,
   resolveMpAccessToken,
   signMercadoPagoWebhook,
+  SYNTHETIC_PAYER_EMAIL_DOMAIN,
 } from "../../lib/payments/mercadopago";
 import { InMemoryChargeReferenceStore } from "../../lib/payments/reference-store";
 
@@ -180,7 +181,7 @@ describe("MercadoPagoPaymentProvider: cobrança", () => {
       notification_url: "https://example.test/api/webhooks/payments/mercadopago",
       date_of_expiration: new Date(expiresAt.getTime() + 2 * 60_000).toISOString().replace(/Z$/, "-00:00"),
       payer: {
-        email: `hold-${reference}@pagador.agendapix.invalid`,
+        email: `hold-${reference}@${SYNTHETIC_PAYER_EMAIL_DOMAIN}`,
         first_name: "Cliente",
         last_name: "Teste Silva",
       },
@@ -193,6 +194,32 @@ describe("MercadoPagoPaymentProvider: cobrança", () => {
     expect(centsToTransactionAmount(1000)).toBe(10);
     // Não há mais lookup GET antes do POST; cache local resolve idempotência
     expect(mock.calls.filter((call) => call.method === "POST").map((call) => call.url.endsWith("/v1/payments"))).toEqual([true]);
+  });
+
+  it("e-mail sintético é hold-<reference> no domínio fixo, sem nome, telefone ou CPF", async () => {
+    const { mock, mp } = provider();
+    const reference = randomUUID();
+    const name = "Zuleica Pagarina";
+    const phone = "+5511912345678";
+    const cpf = "39053344705";
+    await mp.createPixCharge({
+      idempotencyKey: randomUUID(),
+      reference,
+      amountCents: 1000,
+      expiresAt: new Date(now.getTime() + 40 * 60_000),
+      customer: { name, phone, cpfCnpj: cpf },
+    });
+    const post = mock.calls.find((call) => call.method === "POST")!;
+    const payer = post.body?.payer as { email?: string };
+    const email = payer.email ?? "";
+    expect(SYNTHETIC_PAYER_EMAIL_DOMAIN).toBe("pagador.agendapix.dev.br");
+    expect(email).toBe(`hold-${reference}@pagador.agendapix.dev.br`);
+    expect(email.split("@")).toEqual([`hold-${reference}`, SYNTHETIC_PAYER_EMAIL_DOMAIN]);
+    expect(email).not.toContain("Zuleica");
+    expect(email).not.toContain("Pagarina");
+    expect(email).not.toContain("11912345678");
+    expect(email).not.toContain(cpf);
+    expect(email).not.toContain(".invalid");
   });
 
   it("envia date_of_expiration com margem de 2 min e devolve o hold no expiresAt", async () => {
