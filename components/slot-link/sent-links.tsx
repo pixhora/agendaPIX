@@ -1,32 +1,35 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { LINK_COPIED, SLOT_LINK_STATUS_LABEL, clockInZone, formatDayMonth, isoDateInZone, weekdayShort } from "@/lib/slot-link/copy";
-import { parseOwnerLink, parseOwnerList, type OwnerLink } from "@/lib/slot-link/owner-link";
-import { cancelSlotLinkUrl, ownerSlotLinksUrl } from "@/lib/slot-link/paths";
-import { isOfflineError } from "@/components/booking/booking-error";
+import { isOfflineError, readApiErrorCode } from "@/components/booking/booking-error";
+import { SLOT_LINK_STATUS_LABEL, clockInZone, formatDayMonth, isoDateInZone, reissueFailureMessage, weekdayShort } from "@/lib/slot-link/copy";
+import { ownerFromCreated, parseCreatedLink, parseOwnerLink, parseOwnerList, slotLinkReadyView, type OwnerLink, type SlotLinkReadyView } from "@/lib/slot-link/owner-link";
+import { cancelSlotLinkUrl, ownerSlotLinksUrl, reissueSlotLinkUrl } from "@/lib/slot-link/paths";
+import { ReissueDialog } from "./reissue-dialog";
 
 export function SentLinks({
   businessId,
+  slug,
   date,
   timezone,
   reloadToken = 0,
-  copyUrls = {},
+  onReady,
 }: {
   businessId: string;
+  slug: string;
   date: string;
   timezone: string;
   reloadToken?: number;
-  /** URL só na memória desta visita. A lista não recebe o token da API. */
-  copyUrls?: Record<string, string>;
+  onReady: (ready: SlotLinkReadyView) => void;
 }) {
   const [links, setLinks] = useState<OwnerLink[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
+  const [reissueLink, setReissueLink] = useState<OwnerLink | null>(null);
+  const [reissueError, setReissueError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -55,15 +58,6 @@ export function SentLinks({
     };
   }, [load, reloadToken]);
 
-  async function copyLink(url: string) {
-    try {
-      await navigator.clipboard.writeText(url);
-      toast.success(LINK_COPIED);
-    } catch {
-      toast.error("Não foi possível copiar. Tente de novo.");
-    }
-  }
-
   async function cancel(link: OwnerLink) {
     setBusyId(link.id);
     setNotice(null);
@@ -76,9 +70,35 @@ export function SentLinks({
       }
       const updated = parseOwnerLink(body);
       setLinks((current) => current.map((item) => (item.id === updated.id ? updated : item)));
-      setConfirmId(null);
+      setConfirmCancelId(null);
     } catch (error) {
       setNotice(isOfflineError(error) ? "Sem conexão. Verifique sua internet e tente de novo." : "Não deu para cancelar agora. Tente de novo.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function reissue(link: OwnerLink) {
+    setBusyId(link.id);
+    setReissueError(null);
+    setNotice(null);
+    try {
+      const response = await fetch(reissueSlotLinkUrl(businessId, link.id), { method: "POST", cache: "no-store" });
+      const body: unknown = await response.json().catch(() => null);
+      if (!response.ok) {
+        setReissueError(reissueFailureMessage(readApiErrorCode(body)));
+        return;
+      }
+      const created = parseCreatedLink(body);
+      const listed = ownerFromCreated(created);
+      setLinks((current) => [
+        listed,
+        ...current.map((item) => (item.id === link.id ? { ...item, status: "replaced" as const, cancellable: false } : item)),
+      ]);
+      onReady(slotLinkReadyView(created, slug, timezone, window.location.origin));
+      setReissueLink(null);
+    } catch (error) {
+      setReissueError(isOfflineError(error) ? "Sem conexão. Verifique sua internet e tente de novo." : reissueFailureMessage(null));
     } finally {
       setBusyId(null);
     }
@@ -106,7 +126,6 @@ export function SentLinks({
           {links.map((link) => {
             const pending = link.status === "pending";
             const day = isoDateInZone(link.startsAt, timezone);
-            const copyUrl = pending ? copyUrls[link.id] : undefined;
             return (
               <li key={link.id} className="grid gap-2 rounded-card border border-line bg-surface p-4">
                 {pending && link.customerLabel ? <p className="font-semibold text-ink">{link.customerLabel}</p> : null}
@@ -116,20 +135,22 @@ export function SentLinks({
                 </div>
                 <p className="text-sm text-muted">{weekdayShort(day)}, {formatDayMonth(day)}</p>
                 <p className="text-sm font-semibold tabular-nums text-ink">{clockInZone(link.startsAt, timezone)}</p>
-                {copyUrl ? (
-                  <Button type="button" variant="outline" className="justify-self-start" onClick={() => void copyLink(copyUrl)}>Copiar link</Button>
+                {pending ? (
+                  <Button type="button" variant="outline" className="justify-self-start" onClick={() => { setReissueError(null); setReissueLink(link); }}>
+                    Gerar novo link
+                  </Button>
                 ) : null}
                 {pending && link.cancellable ? (
-                  confirmId === link.id ? (
+                  confirmCancelId === link.id ? (
                     <div className="grid gap-2 rounded-field bg-subtle p-3">
                       <p className="text-sm text-ink">Cancelar este link? A cliente deixa de conseguir pagar.</p>
                       <div className="flex flex-wrap gap-2">
                         <Button type="button" variant="danger" disabled={busyId === link.id} onClick={() => void cancel(link)}>Cancelar link</Button>
-                        <Button type="button" variant="outline" onClick={() => setConfirmId(null)}>Manter link</Button>
+                        <Button type="button" variant="outline" onClick={() => setConfirmCancelId(null)}>Manter link</Button>
                       </div>
                     </div>
                   ) : (
-                    <Button type="button" variant="ghost" className="justify-self-start px-0" onClick={() => setConfirmId(link.id)}>Cancelar link</Button>
+                    <Button type="button" variant="ghost" className="justify-self-start px-0" onClick={() => setConfirmCancelId(link.id)}>Cancelar link</Button>
                   )
                 ) : null}
               </li>
@@ -148,6 +169,14 @@ export function SentLinks({
         >
           Carregar mais
         </Button>
+      ) : null}
+      {reissueLink ? (
+        <ReissueDialog
+          pending={busyId === reissueLink.id}
+          error={reissueError}
+          onCancel={() => { if (busyId === reissueLink.id) return; setReissueLink(null); setReissueError(null); }}
+          onConfirm={() => void reissue(reissueLink)}
+        />
       ) : null}
     </section>
   );

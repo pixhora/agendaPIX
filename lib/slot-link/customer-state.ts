@@ -76,7 +76,7 @@ export function screenFromStatus(
 ): CustomerScreen {
   const store = storeOf(link);
   if (link.status === "paid") return { kind: "used", publicPath: store.publicPath };
-  if (link.status === "cancelled") return { kind: "unavailable", publicPath: store.publicPath };
+  if (link.status === "cancelled" || link.status === "replaced") return { kind: "unavailable", publicPath: store.publicPath };
   if (slotStartsInPast(link.startsAt, now)) return { kind: "expired", ...store };
   if (link.status === "taken") return { kind: "taken", publicPath: store.publicPath };
   if (!options?.resumePay && (link.status === "expired" || linkTtlPassed(link.expiresAt, now))) {
@@ -130,5 +130,5 @@ export function shouldClearPayKey(screen: CustomerScreen | { kind: "confirmed" }
 }
 
 export function statusIsTerminal(status: SlotLinkStatus) {
-  return status === "paid" || status === "expired" || status === "cancelled" || status === "taken";
+  return status === "paid" || status === "expired" || status === "cancelled" || status === "taken" || status === "replaced";
 }

@@ -38,6 +38,7 @@ import { createSlotLinkPreviewId, createSlotLinkToken, isSlotLinkPreviewId, isSl
 
 type Database = NodePgDatabase<typeof schema>;
 type LinkRow = typeof schema.slotLinks.$inferSelect;
+type StoredSlotLinkStatus = Exclude<SlotLinkStatus, "replaced">;
 type ServiceRow = typeof schema.services.$inferSelect;
 type BusinessRow = typeof schema.businesses.$inferSelect;
 
@@ -234,7 +235,7 @@ async function confirmedSlotLinkBooking(database: Database, link: LinkRow) {
   return row ?? null;
 }
 
-async function pointLinkAtPaidBooking(database: Database, link: LinkRow, bookingId: string, now: Date): Promise<SlotLinkStatus> {
+async function pointLinkAtPaidBooking(database: Database, link: LinkRow, bookingId: string, now: Date): Promise<StoredSlotLinkStatus> {
   if (link.status === "cancelled") return "cancelled";
   await database.update(schema.slotLinks).set({ status: "paid", bookingId, updatedAt: now }).where(and(
     eq(schema.slotLinks.businessId, link.businessId),
@@ -244,7 +245,7 @@ async function pointLinkAtPaidBooking(database: Database, link: LinkRow, booking
   return "paid";
 }
 
-async function writeStatus(database: Database, link: LinkRow, status: SlotLinkStatus, now: Date) {
+async function writeStatus(database: Database, link: LinkRow, status: StoredSlotLinkStatus, now: Date): Promise<StoredSlotLinkStatus> {
   if (link.status === status || link.status === "cancelled" || link.status === "paid") return link.status;
   const [updated] = await database.update(schema.slotLinks).set({ status, updatedAt: now }).where(and(
     eq(schema.slotLinks.businessId, link.businessId),
@@ -259,7 +260,7 @@ function holdStillActive(booking: typeof schema.bookings.$inferSelect, now: Date
 }
 
 /** Recalcula o status no banco. Pago e cancelado não voltam atrás. */
-export async function refreshSlotLinkStatus(database: Database, link: LinkRow, now: Date): Promise<SlotLinkStatus> {
+export async function refreshSlotLinkStatus(database: Database, link: LinkRow, now: Date): Promise<StoredSlotLinkStatus> {
   if (link.status === "cancelled") return "cancelled";
   if (link.status === "paid") return "paid";
   const [booking, overlap, origin] = await Promise.all([
@@ -448,7 +449,7 @@ export async function openSlotLink(slug: string, token: string, identity: string
   });
 }
 
-function payRefusal(link: LinkRow, status: SlotLinkStatus, now: Date) {
+function payRefusal(link: LinkRow, status: StoredSlotLinkStatus, now: Date) {
   if (status === "cancelled" || link.status === "cancelled") return new HttpError(409, "link_cancelled", LINK_CANCELLED_MESSAGE);
   if (status === "paid" || link.status === "paid") return new HttpError(409, "link_used", LINK_USED_MESSAGE);
   // `expiresAt` do link não bloqueia aqui: a mesma chave ainda retoma o Pix se o hold da reserva vale.

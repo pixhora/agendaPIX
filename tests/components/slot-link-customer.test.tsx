@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SlotLinkCustomer } from "@/components/slot-link/slot-link-customer";
 import { AgendaPixFooter } from "@/components/slot-link/agenda-pix-footer";
@@ -9,7 +9,7 @@ import { memorySlotLinkStores, readOrCreatePayKey, slotLinkSessionKey, slotLinkS
 import { SlotLinkStorageSweep } from "@/components/slot-link/storage-sweep";
 import { SentLinks } from "@/components/slot-link/sent-links";
 import { createSlotLinkToken } from "../../lib/bookings/slot-link-token";
-import { CUSTOMER_CONFLICT_BODY, CUSTOMER_CONFLICT_TITLE, CUSTOMER_IN_PROGRESS, CUSTOMER_USED_TITLE, formatDayMonth, isoDateInZone, weekdayShort } from "@/lib/slot-link/copy";
+import { CUSTOMER_CONFLICT_BODY, CUSTOMER_CONFLICT_TITLE, CUSTOMER_IN_PROGRESS, CUSTOMER_USED_TITLE, OWNER_NETWORK, REISSUE_BODY, REISSUE_IN_PROGRESS, REISSUE_TAKEN, REISSUE_TITLE, formatDayMonth, isoDateInZone, weekdayShort } from "@/lib/slot-link/copy";
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
@@ -327,50 +327,108 @@ describe("estados e rodapé", () => {
 });
 
 describe("links enviados", () => {
-  it("copia o link só enquanto está pendente e não mostra o token", async () => {
-    const user = userEvent.setup();
-    const secret = `https://exemplo.test/salao/h/${token}`;
-    const pending = {
-      id: "7c1c5b3f-2d4e-5f60-9b0c-1d2e3f4a5b6c",
-      service,
-      startsAt: "2030-10-18T14:30:00.000Z",
-      expiresAt: "2030-10-18T14:00:00.000Z",
-      status: "pending",
-      createdAt: "2026-10-10T12:00:00.000Z",
-      previewId: "aaaaaaaaaaaaaaaaaaaaaa",
-      customerLabel: "Ana da lista",
-      cancellable: true,
-    };
-    const paid = {
+  const businessId = "6b0b4a2e-1c3d-4e5f-8a9b-0c1d2e3f4a5b";
+  const pending = {
+    id: "7c1c5b3f-2d4e-5f60-9b0c-1d2e3f4a5b6c",
+    service,
+    startsAt: "2030-10-18T14:30:00.000Z",
+    expiresAt: "2030-10-18T14:00:00.000Z",
+    status: "pending",
+    createdAt: "2026-10-10T12:00:00.000Z",
+    previewId: "aaaaaaaaaaaaaaaaaaaaaa",
+    customerLabel: "Ana da lista",
+    cancellable: true,
+  };
+  const paid = {
+    ...pending,
+    id: "8d2d6c40-3e5f-4061-8c1d-2e3f4a5b6c7d",
+    status: "paid",
+    customerLabel: "Segredo",
+    cancellable: true,
+  };
+
+  beforeEach(() => {
+    HTMLDialogElement.prototype.showModal = function showModal() { this.setAttribute("open", ""); };
+    if (!HTMLDialogElement.prototype.close) {
+      HTMLDialogElement.prototype.close = function close() { this.removeAttribute("open"); };
+    }
+  });
+
+  function createdBody() {
+    const nextToken = createSlotLinkToken();
+    return {
       ...pending,
-      id: "8d2d6c40-3e5f-4061-8c1d-2e3f4a5b6c7d",
-      status: "paid",
-      customerLabel: "Segredo",
-      cancellable: true,
+      id: "9e3e7d51-4f60-4172-9d2e-3f4a5b6c7d8e",
+      token: nextToken,
+      path: `/api/public/salao/slot-links/${nextToken}`,
+      customerLabel: "Ana da lista",
+      status: "pending",
     };
-    const writeText = vi.fn(async () => undefined);
-    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
-    vi.stubGlobal("fetch", vi.fn(async () => json(200, { links: [pending, paid], nextCursor: null })));
+  }
+
+  function renderList(post?: { status: number; body: unknown }) {
+    const onReady = vi.fn();
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/reissue") && init?.method === "POST") {
+        return json(post?.status ?? 500, post?.body ?? { error: { code: "rate_limited", message: "limite" } });
+      }
+      return json(200, { links: [pending, paid], nextCursor: null });
+    }));
     const view = render(
-      <SentLinks
-        businessId="6b0b4a2e-1c3d-4e5f-8a9b-0c1d2e3f4a5b"
-        date="2030-10-18"
-        timezone="America/Sao_Paulo"
-        copyUrls={{ [pending.id]: secret }}
-      />,
+      <SentLinks businessId={businessId} slug="salao" date="2030-10-18" timezone="America/Sao_Paulo" onReady={onReady} />,
     );
+    return { view, onReady };
+  }
+
+  it("não mostra o token e só oferece gerar de novo enquanto está pendente", async () => {
+    const { view } = renderList();
     expect(await screen.findByText("Ana da lista")).toBeVisible();
     expect(screen.getByText("Aguardando pagamento")).toBeVisible();
     expect(screen.getByText("Pago, horário confirmado")).toBeVisible();
     expect(screen.queryByText("Segredo")).toBeNull();
-    expect(screen.getAllByRole("button", { name: "Copiar link" })).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "Copiar link" })).toBeNull();
+    expect(screen.getAllByRole("button", { name: "Gerar novo link" })).toHaveLength(1);
     expect(screen.getAllByRole("button", { name: "Cancelar link" })).toHaveLength(1);
     const day = isoDateInZone(pending.startsAt, "America/Sao_Paulo");
     expect(screen.getAllByText(`${weekdayShort(day)}, ${formatDayMonth(day)}`).length).toBeGreaterThan(0);
     expect(view.container.textContent).not.toContain(token);
     expect(view.container.innerHTML).not.toContain("/h/");
-    await user.click(screen.getByRole("button", { name: "Copiar link" }));
-    expect(writeText).toHaveBeenCalledWith(secret);
+    vi.unstubAllGlobals();
+  });
+
+  it("confirma, troca o antigo por substituído e abre o link pronto sem o token na lista", async () => {
+    const user = userEvent.setup();
+    const body = createdBody();
+    const { view, onReady } = renderList({ status: 201, body });
+    await user.click(await screen.findByRole("button", { name: "Gerar novo link" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("heading", { name: REISSUE_TITLE })).toBeVisible();
+    expect(within(dialog).getByText(REISSUE_BODY)).toBeVisible();
+    await user.click(within(dialog).getByRole("button", { name: "Gerar novo link" }));
+    expect(await screen.findByText("Substituído")).toBeVisible();
+    expect(screen.getAllByText("Aguardando pagamento").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Ana da lista")).toHaveLength(1);
+    expect(onReady).toHaveBeenCalledWith(expect.objectContaining({ url: expect.stringContaining(`/h/${body.token}`) }));
+    expect(view.container.textContent).not.toContain(body.token);
+    expect(view.container.innerHTML).not.toContain("/h/");
+    vi.unstubAllGlobals();
+  });
+
+  it.each([
+    ["link_in_progress", 409, REISSUE_IN_PROGRESS],
+    ["slot_unavailable", 409, REISSUE_TAKEN],
+    ["rate_limited", 429, OWNER_NETWORK],
+  ] as const)("mostra o erro %s sem trocar o link", async (code, status, message) => {
+    const user = userEvent.setup();
+    renderList({ status, body: { error: { code, message: "interno" } } });
+    await user.click(await screen.findByRole("button", { name: "Gerar novo link" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: "Gerar novo link" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(message);
+    expect(screen.queryByText("Substituído")).toBeNull();
+    expect(screen.getByText("Ana da lista")).toBeVisible();
+    expect(within(dialog).queryByText("interno")).toBeNull();
     vi.unstubAllGlobals();
   });
 });

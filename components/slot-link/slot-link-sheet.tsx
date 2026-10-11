@@ -29,7 +29,7 @@ import {
   weekdayShort,
   formatDayMonth,
 } from "@/lib/slot-link/copy";
-import { parseCreatedLink } from "@/lib/slot-link/owner-link";
+import { parseCreatedLink, type SlotLinkReadyView } from "@/lib/slot-link/owner-link";
 import { ownerSlotLinksUrl, slotLinkPagePath } from "@/lib/slot-link/paths";
 import { sendOnWhatsApp } from "@/lib/slot-link/share";
 import type { DepositService, SlotSeed } from "./types";
@@ -52,6 +52,7 @@ export function SlotLinkSheet({
   mpReady,
   seed,
   onCreated,
+  initialReady = null,
 }: {
   onClose: () => void;
   businessId: string;
@@ -62,6 +63,7 @@ export function SlotLinkSheet({
   mpReady: boolean;
   seed: SlotSeed | null;
   onCreated: (created: { id: string; url: string }) => void;
+  initialReady?: SlotLinkReadyView | null;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [serviceId, setServiceId] = useState(seed?.serviceId ?? "");
@@ -75,7 +77,7 @@ export function SlotLinkSheet({
   const [slotsReload, setSlotsReload] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [ready, setReady] = useState<{ url: string; message: string; expiresAt: string; statusLabel: string } | null>(null);
+  const [ready, setReady] = useState<SlotLinkReadyView | null>(initialReady);
 
   useEffect(() => {
     const dialog = dialogRef.current;

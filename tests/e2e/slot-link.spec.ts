@@ -57,16 +57,16 @@ async function freeSlot(page: Page, id: string, date: string) {
   return { startsAt: slot.startsAt, time: localTime(slot.startsAt), date };
 }
 
-async function createLink(page: Page, service: string, date: string, time: string) {
+async function createLink(page: Page, service: string, date: string, time: string, customerLabel?: string) {
   await page.goto(`/dashboard?businessId=${meta.businessAId}`);
-  return page.evaluate(async ({ businessId, serviceId: id, date: day, time: hour }) => {
+  return page.evaluate(async ({ businessId, serviceId: id, date: day, time: hour, customerLabel: label }) => {
     const response = await fetch(`/api/businesses/${businessId}/slot-links`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ serviceId: id, date: day, time: hour }),
+      body: JSON.stringify({ serviceId: id, date: day, time: hour, ...(label ? { customerLabel: label } : {}) }),
     });
     return { status: response.status, body: await response.json() };
-  }, { businessId: meta.businessAId, serviceId: service, date, time });
+  }, { businessId: meta.businessAId, serviceId: service, date, time, customerLabel: customerLabel ?? "" });
 }
 
 const frames = [
@@ -489,4 +489,75 @@ test("dono gera o link na agenda e a prévia do horário responde imagem", async
   await expect(page.getByRole("button", { name: "Tentar de novo" })).toBeVisible();
   await expect(page.getByRole("timer")).toHaveCount(0);
   await shootMatrix(page, "cliente-em-pagamento");
+});
+
+test("gerar novo link confirma, substitui o antigo e explica o erro", async ({ page }, testInfo) => {
+  test.setTimeout(180_000);
+  const service = await serviceId(page);
+  const slot = await freeSlot(page, service.id, saoPauloDay(9));
+  const label = `Reemitir ${testInfo.project.name}`;
+  const created = await createLink(page, service.id, slot.date, slot.time, label);
+  expect(created.status).toBe(201);
+  const linkId = created.body.id as string;
+  await page.goto(`/dashboard?businessId=${meta.businessAId}&date=${slot.date}`);
+  await expect(page.getByRole("heading", { name: "Links enviados" })).toBeVisible();
+  const row = page.getByTestId("sent-links").getByRole("listitem").filter({ hasText: label });
+  await expect(row.getByRole("button", { name: "Copiar link" })).toHaveCount(0);
+  await row.getByRole("button", { name: "Gerar novo link" }).click();
+  const dialog = page.getByRole("dialog", { name: "Gerar um novo link?" });
+  await expect(dialog.getByText("O link que você já enviou para este horário vai parar de funcionar. Envie o novo para a cliente.")).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Cancelar" })).toBeVisible();
+  if (testInfo.project.name === "desktop") await shootMatrix(page, "dono-reemitir-confirma");
+
+  const nextToken = "A".repeat(43);
+  const next = {
+    ...created.body,
+    id: "11111111-1111-4111-8111-111111111111",
+    token: nextToken,
+    path: `/api/public/${meta.businessASlug}/slot-links/${nextToken}`,
+    previewId: "C".repeat(22),
+    status: "pending",
+    cancellable: true,
+  };
+  let mode: "in_progress" | "taken" | "rate" | "ok" = "in_progress";
+  await page.route(`**/slot-links/${linkId}/reissue`, async (route) => {
+    if (mode === "ok") {
+      return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify(next) });
+    }
+    const code = mode === "in_progress" ? "link_in_progress" : mode === "taken" ? "slot_unavailable" : "rate_limited";
+    const status = mode === "rate" ? 429 : 409;
+    return route.fulfill({
+      status,
+      contentType: "application/json",
+      body: JSON.stringify({ error: { code, message: "interno" } }),
+    });
+  });
+
+  await dialog.getByRole("button", { name: "Gerar novo link" }).click();
+  await expect(dialog.getByText("A cliente está pagando este horário agora. Espere alguns minutos antes de gerar outro link.")).toBeVisible();
+  await expect(dialog.getByText("interno")).toHaveCount(0);
+  if (testInfo.project.name === "desktop") await shootMatrix(page, "dono-reemitir-pagando");
+
+  mode = "taken";
+  await dialog.getByRole("button", { name: "Gerar novo link" }).click();
+  await expect(dialog.getByText("Este horário já foi ocupado. O link antigo continua na lista, mas não dá pra gerar outro para ele.")).toBeVisible();
+  if (testInfo.project.name === "desktop") await shootMatrix(page, "dono-reemitir-ocupado");
+
+  mode = "rate";
+  await dialog.getByRole("button", { name: "Gerar novo link" }).click();
+  await expect(dialog.getByText("Não deu para gerar agora. Tente de novo.")).toBeVisible();
+  if (testInfo.project.name === "desktop") await shootMatrix(page, "dono-reemitir-limite");
+
+  mode = "ok";
+  await dialog.getByRole("button", { name: "Gerar novo link" }).click();
+  await expect(page.getByRole("heading", { name: "Link pronto" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Copiar link" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Enviar no WhatsApp" })).toBeVisible();
+  if (testInfo.project.name === "desktop") await shootMatrix(page, "dono-reemitir-pronto");
+  await page.getByRole("button", { name: "Fechar" }).click();
+  await expect(page.getByText("Substituído")).toBeVisible();
+  await expect(page.getByText("Aguardando pagamento").first()).toBeVisible();
+  await expect(page.getByTestId("sent-links")).not.toContainText(nextToken);
+  await expect(page.getByTestId("sent-links").getByRole("button", { name: "Copiar link" })).toHaveCount(0);
+  if (testInfo.project.name === "desktop") await shootMatrix(page, "dono-reemitir-lista");
 });

@@ -20,6 +20,10 @@ export function cancelSlotLinkUrl(businessId: string, linkId: string) {
   return `/api/businesses/${seg(businessId)}/slot-links/${seg(linkId)}/cancel`;
 }
 
+export function reissueSlotLinkUrl(businessId: string, linkId: string) {
+  return `/api/businesses/${seg(businessId)}/slot-links/${seg(linkId)}/reissue`;
+}
+
 export function publicSlotLinkUrl(slug: string, token: string) {
   return `/api/public/${seg(slug)}/slot-links/${seg(token)}`;
 }

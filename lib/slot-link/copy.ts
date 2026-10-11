@@ -14,6 +14,7 @@ export const SLOT_LINK_STATUS_LABEL: Record<SlotLinkStatus, string> = {
   expired: "Expirado",
   taken: "Horário ocupado por outra reserva",
   cancelled: "Cancelado pelo dono",
+  replaced: "Substituído",
 };
 
 export const OWNER_SLOT_TAKEN = "Esse horário acabou de ser ocupado. Escolha outro.";
@@ -22,6 +23,19 @@ export const OWNER_MP = "Conecte o Mercado Pago para cobrar sinal.";
 export const OWNER_NO_DEPOSIT = "Para mandar um link, ative o sinal no Pix em pelo menos um serviço.";
 export const OWNER_NO_SLOTS = "Nenhum horário livre nesse dia. Escolha outra data.";
 export const OWNER_HOLD_HINT = "O horário só fica reservado quando a cliente pagar o sinal.";
+
+/** Limite e falha genérica usam o mesmo texto de “Gerar link”. */
+export function reissueFailureMessage(code: string | null) {
+  if (code === "link_in_progress") return REISSUE_IN_PROGRESS;
+  if (code === "slot_unavailable") return REISSUE_TAKEN;
+  return OWNER_NETWORK;
+}
+
+export const REISSUE_TITLE = "Gerar um novo link?";
+export const REISSUE_BODY = "O link que você já enviou para este horário vai parar de funcionar. Envie o novo para a cliente.";
+export const REISSUE_ACTION = "Gerar novo link";
+export const REISSUE_IN_PROGRESS = "A cliente está pagando este horário agora. Espere alguns minutos antes de gerar outro link.";
+export const REISSUE_TAKEN = "Este horário já foi ocupado. O link antigo continua na lista, mas não dá pra gerar outro para ele.";
 export const LINK_COPIED = "Link copiado.";
 export const MESSAGE_COPIED = "Mensagem copiada.";
 

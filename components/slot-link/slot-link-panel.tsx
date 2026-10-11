@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { publicAvailabilityUrl } from "@/lib/public-api";
 import { OWNER_NO_DEPOSIT, clockInZone } from "@/lib/slot-link/copy";
+import type { SlotLinkReadyView } from "@/lib/slot-link/owner-link";
 import { SentLinks } from "./sent-links";
 import { SlotLinkSheet } from "./slot-link-sheet";
 import type { DepositService, SlotSeed } from "./types";
@@ -32,7 +33,7 @@ export function SlotLinkPanel({
   const [sheet, setSheet] = useState<{ seed: SlotSeed | null; id: number } | null>(null);
   const [sheetSeq, setSheetSeq] = useState(0);
   const [reloadToken, setReloadToken] = useState(0);
-  const [copyUrls, setCopyUrls] = useState<Record<string, string>>({});
+  const [readySheet, setReadySheet] = useState<SlotLinkReadyView | null>(null);
   const [free, setFree] = useState<FreeSlot[]>([]);
   const requestKey = `${date}:${services.map((service) => service.id).join(",")}:${reloadToken}`;
 
@@ -72,7 +73,15 @@ export function SlotLinkPanel({
   function openWith(seed: SlotSeed | null) {
     const id = sheetSeq + 1;
     setSheetSeq(id);
+    setReadySheet(null);
     setSheet({ seed, id });
+  }
+
+  function openReady(ready: SlotLinkReadyView) {
+    const id = sheetSeq + 1;
+    setSheetSeq(id);
+    setReadySheet(ready);
+    setSheet({ seed: null, id });
   }
 
   function openBlank() {
@@ -117,7 +126,7 @@ export function SlotLinkPanel({
           )}
         </section>
       )}
-      <SentLinks businessId={businessId} date={date} timezone={timezone} reloadToken={reloadToken} copyUrls={copyUrls} />
+      <SentLinks businessId={businessId} slug={slug} date={date} timezone={timezone} reloadToken={reloadToken} onReady={openReady} />
       {sheet ? (
         <SlotLinkSheet
           key={sheet.id}
@@ -129,10 +138,8 @@ export function SlotLinkPanel({
           services={services}
           mpReady={mpReady}
           seed={sheet.seed}
-          onCreated={(created) => {
-            setCopyUrls((current) => ({ ...current, [created.id]: created.url }));
-            setReloadToken((current) => current + 1);
-          }}
+          initialReady={readySheet}
+          onCreated={() => setReloadToken((current) => current + 1)}
         />
       ) : null}
     </div>

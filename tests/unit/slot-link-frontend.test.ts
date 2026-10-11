@@ -11,7 +11,7 @@ import { slotLinkPageHeaderRule, slotLinkPageHeaders } from "../../lib/slot-link
 import { PIX_RESUME_STORAGE_PREFIX, purgeExpiredBookingSessions } from "../../components/booking/pix-resume";
 import { GENERIC_OG_FALLBACK, parseSlotLinkPreview, slotLinkOgCopy, slotLinkOgLines } from "../../lib/slot-link/preview";
 import { sendOnWhatsApp } from "../../lib/slot-link/share";
-import { ownerSummary, slotLinkMessage, validityLine } from "../../lib/slot-link/copy";
+import { ownerSummary, reissueFailureMessage, slotLinkMessage, validityLine, REISSUE_IN_PROGRESS, REISSUE_TAKEN, OWNER_NETWORK } from "../../lib/slot-link/copy";
 
 const service = { id: "6b0b4a2e-1c3d-4e5f-8a9b-0c1d2e3f4a5b", name: "Corte", durationMinutes: 30, priceCents: 8000, depositCents: 4000 };
 const openBase = {
@@ -90,6 +90,7 @@ describe("estados da cliente", () => {
   it("horário futuro ocupado não vira expirado, e link pago continua confirmado", () => {
     expect(screenFromStatus({ ...openBase, status: "taken" }, now).kind).toBe("taken");
     expect(screenFromStatus({ ...openBase, status: "paid" }, now).kind).toBe("used");
+    expect(screenFromStatus({ ...openBase, status: "replaced" }, now).kind).toBe("unavailable");
     expect(screenFromFailure("link_used", { publicPath: "/salao", now }).kind).toBe("used");
     expect(screenFromStatus({ ...openBase, status: "paid" }, now).kind).toBe("used");
     expect(screenFromFailure("link_in_progress", { publicPath: "/salao", now }).kind).toBe("in_progress");
@@ -294,6 +295,15 @@ describe("lista do dono", () => {
     expect(parsed.links[0]?.cancellable).toBe(true);
     expect(parsed.links[1]?.cancellable).toBe(false);
     expect(() => parseOwnerList({ links: [{ ...owner, cancellable: undefined }], nextCursor: null })).toThrow();
+  });
+
+  it("aceita status replaced e traduz os erros de gerar de novo", () => {
+    const parsed = parseOwnerList({ links: [{ ...owner, status: "replaced" }], nextCursor: null });
+    expect(parsed.links[0]?.status).toBe("replaced");
+    expect(reissueFailureMessage("link_in_progress")).toBe(REISSUE_IN_PROGRESS);
+    expect(reissueFailureMessage("slot_unavailable")).toBe(REISSUE_TAKEN);
+    expect(reissueFailureMessage("rate_limited")).toBe(OWNER_NETWORK);
+    expect(reissueFailureMessage(null)).toBe(OWNER_NETWORK);
   });
 });
 
