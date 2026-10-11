@@ -26,7 +26,7 @@ export function claimDeadline(linkExpiresAt: string, holdDeadline?: string | nul
 
 function laterFuture(left: string | null | undefined, right: string | null | undefined, now: number) {
   const ranked = [left, right]
-    .filter((value): value is string => Boolean(value) && isFuture(value, now))
+    .filter((value): value is string => typeof value === "string" && isFuture(value, now))
     .sort((a, b) => Date.parse(b) - Date.parse(a));
   return ranked[0] ?? null;
 }
