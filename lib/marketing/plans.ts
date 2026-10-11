@@ -1,6 +1,6 @@
 export const basePlan = {
   name: "AgendaPix",
-  audience: "Para quem atende sozinho ou em dupla",
+  audience: "Para quem atende sozinho, com uma agenda só",
   price: "R$ 49",
   unit: "/ mês",
   note: "por negócio · depois do teste grátis",
