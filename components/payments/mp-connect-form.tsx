@@ -52,7 +52,9 @@ export function AutoRefundAck({
   const errorId = "mp-auto-refund-error";
   return (
     <div className={cn("rounded-card border-[1.5px] border-ink bg-surface px-3.5 py-3 focus-within:border-ring focus-within:shadow-[var(--shadow-focus)]", invalid && "border-danger")}>
-      <label className="flex min-h-11 cursor-pointer items-start gap-3">
+      {/* relative prende o checkbox sr-only (absolute). Sem isso, no celular o bloco fixo
+          do onboarding vira o containing block: o foco marca scrollTop nele e a tela fica só com o fundo. */}
+      <label className="relative flex min-h-11 cursor-pointer items-start gap-3">
         <input
           ref={inputRef}
           type="checkbox"
