@@ -25,7 +25,8 @@ import {
 } from "@/lib/slot-link/customer-state";
 import { browserSlotLinkStores, clearPayKey, createIdempotencyKey, lockPayPayload, payRequestBody, readPayResume, savePayAccess, type SlotLinkPayDraft, type SlotLinkPayPayload, type SlotLinkPayStores } from "@/lib/slot-link/idempotency";
 import { paySlotLinkUrl, publicSlotLinkUrl } from "@/lib/slot-link/paths";
-import { isOfflineError } from "@/components/booking/booking-error";
+import { isOfflineError, isPixCreateFailureBody, whatsappHref } from "@/components/booking/booking-error";
+import { PixCreateFailureAlert } from "@/components/booking/pix-create-error";
 import { AgendaPixFooter } from "./agenda-pix-footer";
 import { parsePayResult } from "./pay-result";
 import { SlotLinkNotice } from "./slot-link-notice";
@@ -71,6 +72,8 @@ export function SlotLinkCustomer({
   const [savedPayload, setSavedPayload] = useState<SlotLinkPayPayload | null>(null);
   const [holdStarted, setHoldStarted] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [pixCreateFailure, setPixCreateFailure] = useState<{ repeated: boolean } | null>(null);
+  const pixCreateFailures = React.useRef(0);
   const linkRef = React.useRef<SlotLinkOpenResponse | null>(null);
   const publicPath = `/${slug}`;
 
@@ -200,6 +203,8 @@ export function SlotLinkCustomer({
       const current = linkRef.current;
       setHoldStarted(true);
       setFormError(null);
+      setPixCreateFailure(null);
+      pixCreateFailures.current = 0;
       await savePayAccess(token, payStores, {
         bookingId: booking.bookingId,
         accessToken: booking.accessToken,
@@ -209,6 +214,12 @@ export function SlotLinkCustomer({
       return booking;
     }
     const current = linkRef.current;
+    if (isPixCreateFailureBody(body) && current) {
+      pixCreateFailures.current += 1;
+      setPixCreateFailure({ repeated: pixCreateFailures.current >= 2 });
+      setPhase({ kind: "form", link: current });
+      return null;
+    }
     const rawCode = readRawErrorCode(body);
     if (rawCode === "payer_cpf_required" && current) {
       setFormError(CUSTOMER_CPF_REQUIRED);
@@ -349,6 +360,9 @@ export function SlotLinkCustomer({
               </div>
             ) : null}
             {touched && !accepted ? <p className="text-sm text-danger">Marque que você leu a política.</p> : null}
+            {pixCreateFailure ? (
+              <PixCreateFailureAlert repeated={pixCreateFailure.repeated} storeHref={whatsappHref(link.business.contactWhatsapp)} />
+            ) : null}
             <Button type="submit" variant="pix" size="lg" className="w-full" disabled={submitting || !link.policy}>
               {submitting ? "Gerando…" : payButtonLabel(link.depositCents)}
             </Button>

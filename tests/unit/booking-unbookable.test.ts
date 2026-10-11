@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   SERVICE_UNAVAILABLE_MESSAGE,
   depositServiceUnbookable,
+  isPixCreateFailureBody,
   publicBookingErrorView,
   whatsappHref,
 } from "../../components/booking/booking-error";
@@ -71,6 +72,17 @@ describe("serviço com sinal sem conta conectada", () => {
       },
     });
     expect(view).toEqual({ kind: "paused" });
+  });
+
+  it("troca a falha ao criar a cobrança e esconde a chave interna", () => {
+    const legacy = "Não foi possível criar a cobrança. Tente novamente com a mesma chave.";
+    const view = publicBookingErrorView(503, {
+      error: { code: "payment_unavailable", message: legacy },
+    });
+    expect(view).toEqual({ kind: "pix_create_failed" });
+    expect(JSON.stringify(view)).not.toContain("mesma chave");
+    expect(isPixCreateFailureBody({ error: { code: "internal_error", message: "Tente novamente com a mesma chave." } })).toBe(true);
+    expect(publicBookingErrorView(503, { error: { code: "internal_error", message: "Tente novamente com a mesma chave." } }).kind).toBe("pix_create_failed");
   });
 
   it("não trata payout_key_missing como indisponível", () => {

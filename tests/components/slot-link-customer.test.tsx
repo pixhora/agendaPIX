@@ -10,6 +10,7 @@ import { SlotLinkStorageSweep } from "@/components/slot-link/storage-sweep";
 import { SentLinks } from "@/components/slot-link/sent-links";
 import { createSlotLinkToken } from "../../lib/bookings/slot-link-token";
 import { CANCEL_EXPIRED, CANCEL_PAID, CONNECT_MERCADO_PAGO, CUSTOMER_BOOKINGS_PAUSED, CUSTOMER_CONFLICT_BODY, CUSTOMER_CONFLICT_TITLE, CUSTOMER_CPF_REQUIRED, CUSTOMER_IN_PROGRESS, CUSTOMER_PAUSED_LATER, CUSTOMER_PAUSED_RECEIPT, CUSTOMER_RETRY_BODY, CUSTOMER_RETRY_TITLE, CUSTOMER_USED_TITLE, OWNER_NETWORK, REISSUE_BODY, REISSUE_EXPIRED, REISSUE_IN_PROGRESS, REISSUE_MP, REISSUE_PAID, REISSUE_TAKEN, REISSUE_TITLE, formatDayMonth, isoDateInZone, weekdayShort } from "@/lib/slot-link/copy";
+import { PIX_CREATE_FAILED_COPY, PIX_CREATE_FAILED_STORE } from "@/components/booking/customer-copy";
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
@@ -471,6 +472,64 @@ describe("página da cliente", () => {
     render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" fetchImpl={fetchImpl} now={() => new Date("2030-10-01T12:00:00.000Z")} />);
     expect(await screen.findByRole("heading", { name: "Este link foi atualizado. Peça o link novo para Salao da Ana." })).toBeVisible();
     expect(screen.getByRole("link", { name: "Falar com a loja" })).toHaveAttribute("href", "https://wa.me/5511988887777");
+  });
+
+  it("falha ao criar o Pix explica o retry e na segunda tentativa aponta a loja, com a mesma chave", async () => {
+    const user = userEvent.setup();
+    const stores = memorySlotLinkStores();
+    const keys: string[] = [];
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/pay")) {
+        keys.push(new Headers(init?.headers).get("Idempotency-Key") ?? "");
+        return json(503, { error: { code: "payment_unavailable", message: "Não foi possível criar a cobrança. Tente novamente com a mesma chave." } });
+      }
+      return json(200, openBody());
+    });
+    render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" stores={stores} fetchImpl={fetchImpl} now={() => new Date("2030-10-01T12:00:00.000Z")} />);
+    await fillAndPay(user);
+    const first = await screen.findByRole("alert");
+    expect(first).toHaveTextContent(PIX_CREATE_FAILED_COPY);
+    expect(first).not.toHaveTextContent(PIX_CREATE_FAILED_STORE);
+    expect(screen.queryByText(/mesma chave/)).toBeNull();
+    expect(screen.getByText("Ana Souza")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: /Pagar sinal de/ }));
+    const link = await screen.findByRole("link", { name: PIX_CREATE_FAILED_STORE });
+    expect(link).toHaveAttribute("href", "https://wa.me/5511988887777");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    expect(keys).toHaveLength(2);
+    expect(keys[0]).toBe(keys[1]);
+    expect(screen.getByText("Ana Souza")).toBeVisible();
+  });
+
+  it("segunda falha do Pix sem WhatsApp mostra a frase e omite o link", async () => {
+    const user = userEvent.setup();
+    const stores = memorySlotLinkStores();
+    const opened = { ...openBody(), business: { ...openBody().business, contactWhatsapp: null } };
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith("/pay")) {
+        return json(503, { error: { code: "payment_unavailable", message: "Não foi possível criar a cobrança. Tente novamente com a mesma chave." } });
+      }
+      return json(200, opened);
+    });
+    render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" stores={stores} fetchImpl={fetchImpl} now={() => new Date("2030-10-01T12:00:00.000Z")} />);
+    await fillAndPay(user);
+    await screen.findByRole("alert");
+    await user.click(screen.getByRole("button", { name: /Pagar sinal de/ }));
+    expect(await screen.findByText(PIX_CREATE_FAILED_STORE)).toBeVisible();
+    expect(screen.queryByRole("link", { name: PIX_CREATE_FAILED_STORE })).toBeNull();
+  });
+
+  it("outro 503 continua na tela de tentar de novo", async () => {
+    const user = userEvent.setup();
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith("/pay")) return json(503, { error: { code: "internal_error", message: "interno" } });
+      return json(200, openBody());
+    });
+    render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" stores={memorySlotLinkStores()} fetchImpl={fetchImpl} now={() => new Date("2030-10-01T12:00:00.000Z")} />);
+    await fillAndPay(user);
+    expect(await screen.findByRole("heading", { name: CUSTOMER_RETRY_TITLE })).toBeVisible();
+    expect(screen.queryByText(PIX_CREATE_FAILED_COPY)).toBeNull();
   });
 
   it("expiresAt vencido no GET deixa o formulário; link_expired do POST é que expira", async () => {

@@ -38,6 +38,7 @@ export type BookingFailure =
   | { kind: "policy_changed"; update: PolicyChangedUpdate }
   | { kind: "unavailable"; message: string; contactWhatsapp: string | null }
   | { kind: "slot_unavailable"; message: string }
+  | { kind: "pix_create_failed" }
   | { kind: "message"; message: string };
 
 /** Falha de rede do `fetch` (TypeError ou mensagem de conexão). */
@@ -87,6 +88,12 @@ function readApiErrorMessage(body: unknown): string | null {
   return typeof message === "string" && message.trim() ? message.trim() : null;
 }
 
+/** Cobrança Pix que o gateway não criou. A tela troca o texto do servidor, que cita a chave interna. */
+export function isPixCreateFailureBody(body: unknown): boolean {
+  if (readApiErrorCode(body) === "payment_unavailable") return true;
+  return Boolean(readApiErrorMessage(body)?.includes("mesma chave"));
+}
+
 /** Link `wa.me` a partir de um telefone publicado. Sem número útil, devolve null. */
 export function whatsappHref(phone: string | null | undefined): string | null {
   if (!phone) return null;
@@ -118,6 +125,7 @@ export function publicBookingErrorView(status: number, body: unknown): BookingFa
   if (status === 409 && code === "slot_unavailable") {
     return { kind: "slot_unavailable", message: SLOT_TAKEN_MESSAGE };
   }
+  if (isPixCreateFailureBody(body)) return { kind: "pix_create_failed" };
   const serverMessage = readApiErrorMessage(body);
   if (serverMessage) return { kind: "message", message: serverMessage };
   return { kind: "message", message: GENERIC_SUBMIT_MESSAGE };

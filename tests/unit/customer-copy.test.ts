@@ -8,6 +8,8 @@ import {
   BUSINESS_SLOW_COPY,
   REFUNDED_TITLE,
   REFUND_PENDING_TITLE,
+  PIX_CREATE_FAILED_COPY,
+  PIX_CREATE_FAILED_STORE,
   SLOTS_LOAD_COPY,
   SUBMIT_RETRY_COPY,
   refundPendingBody,
@@ -63,6 +65,18 @@ describe("textos da tela de Pix e de erro", () => {
     const slow = new Error("The operation was aborted");
     slow.name = "AbortError";
     expect(businessLoadCopy(slow)).toBe(BUSINESS_SLOW_COPY);
+  });
+
+  it("explica a falha do Pix sem citar a chave interna", () => {
+    expect(PIX_CREATE_FAILED_COPY).toBe("Não conseguimos gerar o Pix agora. Seus dados continuam salvos, é só tocar em Gerar Pix de novo.");
+    expect(PIX_CREATE_FAILED_STORE).toBe("Se continuar, fale com a loja");
+    expect(PIX_CREATE_FAILED_COPY).not.toMatch(/chave/i);
+    const roots = ["components", "app"];
+    const hits = roots.flatMap((root) => bookingSources(root).flatMap((file) => {
+      const source = readFileSync(file, "utf8");
+      return source.includes("Não foi possível criar a cobrança. Tente novamente com a mesma chave.") ? [file] : [];
+    }));
+    expect(hits).toEqual([]);
   });
 });
 
