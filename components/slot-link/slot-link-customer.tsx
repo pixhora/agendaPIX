@@ -25,7 +25,7 @@ import {
 } from "@/lib/slot-link/customer-state";
 import { browserSlotLinkStores, clearPayKey, createIdempotencyKey, lockPayPayload, payRequestBody, readPayResume, rotatePayIdempotencyKey, savePayAccess, type SlotLinkPayDraft, type SlotLinkPayPayload, type SlotLinkPayStores } from "@/lib/slot-link/idempotency";
 import { paySlotLinkUrl, publicSlotLinkUrl } from "@/lib/slot-link/paths";
-import { isOfflineError, pixCreateFailure as readPixCreateFailure, whatsappHref } from "@/components/booking/booking-error";
+import { isOfflineError, pixCreateFailure as readPixCreateFailure, shouldRotatePixIdempotencyKey, whatsappHref } from "@/components/booking/booking-error";
 import { PixCreateFailureAlert } from "@/components/booking/pix-create-error";
 import { AgendaPixFooter } from "./agenda-pix-footer";
 import { parsePayResult } from "./pay-result";
@@ -73,6 +73,7 @@ export function SlotLinkCustomer({
   const [holdStarted, setHoldStarted] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [pixCreateFailure, setPixCreateFailure] = useState<{ repeated: boolean } | null>(null);
+  /** `payment_unavailable` seguidas nesta visita. A primeira mantém a chave. */
   const pixCreateFailures = React.useRef(0);
   const linkRef = React.useRef<SlotLinkOpenResponse | null>(null);
   const publicPath = `/${slug}`;
@@ -217,11 +218,14 @@ export function SlotLinkCustomer({
     const pixFailure = readPixCreateFailure(body);
     if (pixFailure && current) {
       pixCreateFailures.current += 1;
-      if (pixFailure.rotateKey) await rotatePayIdempotencyKey(token, payStores, createIdempotencyKey, now().getTime());
+      if (shouldRotatePixIdempotencyKey(pixFailure.retrySameKey, pixCreateFailures.current)) {
+        await rotatePayIdempotencyKey(token, payStores, createIdempotencyKey, now().getTime());
+      }
       setPixCreateFailure({ repeated: pixCreateFailures.current >= 2 });
       setPhase({ kind: "form", link: current });
       return null;
     }
+    pixCreateFailures.current = 0;
     const rawCode = readRawErrorCode(body);
     if (rawCode === "payer_cpf_required" && current) {
       setFormError(CUSTOMER_CPF_REQUIRED);

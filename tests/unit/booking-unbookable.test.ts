@@ -4,6 +4,7 @@ import {
   depositServiceUnbookable,
   isPixCreateFailureBody,
   publicBookingErrorView,
+  shouldRotatePixIdempotencyKey,
   whatsappHref,
 } from "../../components/booking/booking-error";
 import { resolvePixQr } from "../../components/booking/pix-qr";
@@ -79,14 +80,41 @@ describe("serviço com sinal sem conta conectada", () => {
     const view = publicBookingErrorView(503, {
       error: { code: "payment_unavailable", message: legacy },
     });
-    expect(view).toEqual({ kind: "pix_create_failed", rotateKey: true });
+    expect(view).toEqual({ kind: "pix_create_failed", retrySameKey: null });
     expect(JSON.stringify(view)).not.toContain("mesma chave");
-    expect(isPixCreateFailureBody({ error: { code: "internal_error", message: "Tente novamente com a mesma chave." } })).toBe(true);
-    expect(publicBookingErrorView(503, { error: { code: "internal_error", message: "Tente novamente com a mesma chave." } })).toEqual({
-      kind: "pix_create_failed",
-      rotateKey: false,
+    const serverMessage = "A cobrança foi recusada pela conta do Mercado Pago.";
+    const replaced = publicBookingErrorView(503, {
+      error: { code: "payment_unavailable", message: serverMessage },
+    });
+    expect(replaced).toEqual({ kind: "pix_create_failed", retrySameKey: null });
+    expect(JSON.stringify(replaced)).not.toContain(serverMessage);
+    expect(publicBookingErrorView(503, {
+      error: { code: "payment_unavailable", message: serverMessage, retry_same_key: false },
+    })).toEqual({ kind: "pix_create_failed", retrySameKey: false });
+    expect(publicBookingErrorView(503, {
+      error: { code: "payment_unavailable", message: serverMessage, retry_same_key: true },
+    })).toEqual({ kind: "pix_create_failed", retrySameKey: true });
+    expect(publicBookingErrorView(503, {
+      error: { code: "payment_unavailable", message: serverMessage, retry_same_key: "false" },
+    })).toEqual({ kind: "pix_create_failed", retrySameKey: null });
+    expect(publicBookingErrorView(503, {
+      retry_same_key: false,
+      error: { code: "payment_unavailable", message: serverMessage },
+    })).toEqual({ kind: "pix_create_failed", retrySameKey: false });
+    expect(isPixCreateFailureBody({ error: { code: "internal_error", message: legacy } })).toBe(false);
+    expect(publicBookingErrorView(503, { error: { code: "internal_error", message: legacy } })).toEqual({
+      kind: "message",
+      message: legacy,
     });
     expect(publicBookingErrorView(503, { error: { code: "internal_error", message: "Tente de novo." } }).kind).toBe("message");
+  });
+
+  it("a primeira falha mantém a chave, a segunda troca, e retry_same_key vence", () => {
+    expect(shouldRotatePixIdempotencyKey(null, 1)).toBe(false);
+    expect(shouldRotatePixIdempotencyKey(null, 2)).toBe(true);
+    expect(shouldRotatePixIdempotencyKey(null, 3)).toBe(true);
+    expect(shouldRotatePixIdempotencyKey(true, 2)).toBe(false);
+    expect(shouldRotatePixIdempotencyKey(false, 1)).toBe(true);
   });
 
   it("não trata payout_key_missing como indisponível", () => {

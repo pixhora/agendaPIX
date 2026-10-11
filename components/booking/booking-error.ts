@@ -38,7 +38,7 @@ export type BookingFailure =
   | { kind: "policy_changed"; update: PolicyChangedUpdate }
   | { kind: "unavailable"; message: string; contactWhatsapp: string | null }
   | { kind: "slot_unavailable"; message: string }
-  | { kind: "pix_create_failed"; rotateKey: boolean }
+  | { kind: "pix_create_failed"; retrySameKey: boolean | null }
   | { kind: "message"; message: string };
 
 /** Falha de rede do `fetch` (TypeError ou mensagem de conexão). */
@@ -88,16 +88,29 @@ function readApiErrorMessage(body: unknown): string | null {
   return typeof message === "string" && message.trim() ? message.trim() : null;
 }
 
+function readRetrySameKey(body: unknown): boolean | null {
+  if (!body || typeof body !== "object") return null;
+  const root = body as Record<string, unknown>;
+  const error = root.error && typeof root.error === "object" ? (root.error as Record<string, unknown>) : null;
+  const value = error?.retry_same_key ?? root.retry_same_key;
+  return typeof value === "boolean" ? value : null;
+}
+
 /**
- * Cobrança Pix que o gateway não criou.
- * `payment_unavailable` troca a Idempotency-Key: a recusa definitiva marca o pagamento como failed
- * e a mesma chave só repete o erro. O texto "mesma chave" ainda reconhece a falha enquanto a #101
- * não está no master, mas não troca a chave.
+ * Cobrança Pix que o gateway não criou. O `message` do servidor não entra na tela.
+ * Sem `retry_same_key`, a primeira falha da visita mantém a Idempotency-Key (timeout ainda retoma).
+ * Da segunda `payment_unavailable` seguida em diante, a próxima tentativa usa chave nova.
+ * `retry_same_key: true` mantém; `false` troca já.
  */
-export function pixCreateFailure(body: unknown): { rotateKey: boolean } | null {
-  if (readApiErrorCode(body) === "payment_unavailable") return { rotateKey: true };
-  if (readApiErrorMessage(body)?.includes("mesma chave")) return { rotateKey: false };
-  return null;
+export function pixCreateFailure(body: unknown): { retrySameKey: boolean | null } | null {
+  if (readApiErrorCode(body) !== "payment_unavailable") return null;
+  return { retrySameKey: readRetrySameKey(body) };
+}
+
+export function shouldRotatePixIdempotencyKey(retrySameKey: boolean | null, consecutiveFailures: number): boolean {
+  if (retrySameKey === true) return false;
+  if (retrySameKey === false) return true;
+  return consecutiveFailures >= 2;
 }
 
 export function isPixCreateFailureBody(body: unknown): boolean {
@@ -136,7 +149,7 @@ export function publicBookingErrorView(status: number, body: unknown): BookingFa
     return { kind: "slot_unavailable", message: SLOT_TAKEN_MESSAGE };
   }
   const pixFailure = pixCreateFailure(body);
-  if (pixFailure) return { kind: "pix_create_failed", rotateKey: pixFailure.rotateKey };
+  if (pixFailure) return { kind: "pix_create_failed", retrySameKey: pixFailure.retrySameKey };
   const serverMessage = readApiErrorMessage(body);
   if (serverMessage) return { kind: "message", message: serverMessage };
   return { kind: "message", message: GENERIC_SUBMIT_MESSAGE };

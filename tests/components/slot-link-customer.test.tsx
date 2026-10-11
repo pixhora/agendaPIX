@@ -474,7 +474,7 @@ describe("página da cliente", () => {
     expect(screen.getByRole("link", { name: "Falar com a loja" })).toHaveAttribute("href", "https://wa.me/5511988887777");
   });
 
-  it("falha ao criar o Pix explica o retry, troca a chave no localStorage e mantém nome e WhatsApp", async () => {
+  it("a primeira falha do Pix mantém a chave e a segunda grava outra, com nome e WhatsApp", async () => {
     const user = userEvent.setup();
     const stores = memorySlotLinkStores();
     const keys: string[] = [];
@@ -494,24 +494,83 @@ describe("página da cliente", () => {
     expect(first).not.toHaveTextContent(PIX_CREATE_FAILED_STORE);
     expect(screen.queryByText(/mesma chave/)).toBeNull();
     expect(screen.getByText("Ana Souza")).toBeVisible();
-    const rotated = await readPayResume(token, stores, now.getTime());
-    expect(rotated?.idempotencyKey).toBeTruthy();
-    expect(rotated?.idempotencyKey).not.toBe(keys[0]);
-    expect(rotated?.payload?.customer).toEqual({ name: "Ana Souza", phone: "+5511987654321" });
+    const kept = await readPayResume(token, stores, now.getTime());
+    expect(kept?.idempotencyKey).toBe(keys[0]);
+    expect(kept?.payload?.customer).toEqual({ name: "Ana Souza", phone: "+5511987654321" });
     await user.click(screen.getByRole("button", { name: /Pagar sinal de/ }));
     const link = await screen.findByRole("link", { name: PIX_CREATE_FAILED_STORE });
     expect(link).toHaveAttribute("href", "https://wa.me/5511988887777");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
     expect(keys).toHaveLength(2);
-    expect(keys[1]).toBe(rotated?.idempotencyKey);
-    expect(keys[0]).not.toBe(keys[1]);
-    const again = await readPayResume(token, stores, now.getTime());
-    expect(again?.idempotencyKey).not.toBe(keys[1]);
-    expect(again?.payload?.customer).toEqual({ name: "Ana Souza", phone: "+5511987654321" });
+    expect(keys[1]).toBe(keys[0]);
+    const rotated = await readPayResume(token, stores, now.getTime());
+    expect(rotated?.idempotencyKey).not.toBe(keys[1]);
+    expect(rotated?.payload?.customer).toEqual({ name: "Ana Souza", phone: "+5511987654321" });
+    await user.click(screen.getByRole("button", { name: /Pagar sinal de/ }));
+    await screen.findByRole("link", { name: PIX_CREATE_FAILED_STORE });
+    expect(keys).toHaveLength(3);
+    expect(keys[2]).toBe(rotated?.idempotencyKey);
     expect(screen.getByText("Ana Souza")).toBeVisible();
   });
 
-  it("o texto antigo sem payment_unavailable explica o Pix e mantém a chave", async () => {
+  it("retry_same_key false troca na primeira falha e true mantém na segunda", async () => {
+    const user = userEvent.setup();
+    const stores = memorySlotLinkStores();
+    const keys: string[] = [];
+    const now = new Date("2030-10-01T12:00:00.000Z");
+    let posts = 0;
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/pay")) {
+        posts += 1;
+        keys.push(new Headers(init?.headers).get("Idempotency-Key") ?? "");
+        return json(503, {
+          error: {
+            code: "payment_unavailable",
+            message: "Texto que não pode aparecer.",
+            retry_same_key: posts === 1 ? false : true,
+          },
+        });
+      }
+      return json(200, openBody());
+    });
+    render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" stores={stores} fetchImpl={fetchImpl} now={() => now} />);
+    await fillAndPay(user);
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(PIX_CREATE_FAILED_COPY);
+    expect(alert).not.toHaveTextContent("Texto que não pode aparecer.");
+    const forced = await readPayResume(token, stores, now.getTime());
+    expect(forced?.idempotencyKey).not.toBe(keys[0]);
+    expect(forced?.payload?.customer.name).toBe("Ana Souza");
+    await user.click(screen.getByRole("button", { name: /Pagar sinal de/ }));
+    await screen.findByRole("link", { name: PIX_CREATE_FAILED_STORE });
+    expect(keys[1]).toBe(forced?.idempotencyKey);
+    const held = await readPayResume(token, stores, now.getTime());
+    expect(held?.idempotencyKey).toBe(keys[1]);
+    await user.click(screen.getByRole("button", { name: /Pagar sinal de/ }));
+    await screen.findByRole("link", { name: PIX_CREATE_FAILED_STORE });
+    expect(keys[2]).toBe(keys[1]);
+  });
+
+  it("payment_unavailable mostra só a frase do front e esconde o texto do servidor", async () => {
+    const serverMessage = "A cobrança foi recusada pela conta do Mercado Pago.";
+    const user = userEvent.setup();
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith("/pay")) {
+        return json(503, { error: { code: "payment_unavailable", message: serverMessage } });
+      }
+      return json(200, openBody());
+    });
+    render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" stores={memorySlotLinkStores()} fetchImpl={fetchImpl} now={() => new Date("2030-10-01T12:00:00.000Z")} />);
+    await fillAndPay(user);
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(PIX_CREATE_FAILED_COPY);
+    expect(alert).not.toHaveTextContent(serverMessage);
+    expect(screen.queryByText(serverMessage)).toBeNull();
+    expect(document.body.textContent).not.toContain(serverMessage);
+  });
+
+  it("o texto antigo sem payment_unavailable não troca a chave nem a frase do Pix", async () => {
     const user = userEvent.setup();
     const stores = memorySlotLinkStores();
     const keys: string[] = [];
@@ -526,14 +585,11 @@ describe("página da cliente", () => {
     });
     render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" stores={stores} fetchImpl={fetchImpl} now={() => now} />);
     await fillAndPay(user);
-    expect(await screen.findByRole("alert")).toHaveTextContent(PIX_CREATE_FAILED_COPY);
+    expect(await screen.findByRole("heading", { name: CUSTOMER_RETRY_TITLE })).toBeVisible();
+    expect(screen.queryByText(PIX_CREATE_FAILED_COPY)).toBeNull();
     const stored = await readPayResume(token, stores, now.getTime());
     expect(stored?.idempotencyKey).toBe(keys[0]);
-    await user.click(screen.getByRole("button", { name: /Pagar sinal de/ }));
-    await screen.findByRole("link", { name: PIX_CREATE_FAILED_STORE });
-    expect(keys).toHaveLength(2);
-    expect(keys[0]).toBe(keys[1]);
-    expect((await readPayResume(token, stores, now.getTime()))?.payload?.customer.name).toBe("Ana Souza");
+    expect(stored?.payload?.customer).toEqual({ name: "Ana Souza", phone: "+5511987654321" });
   });
 
   it("outro erro transitório não troca a chave guardada", async () => {

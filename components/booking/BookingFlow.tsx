@@ -28,7 +28,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { BrandMark } from "@/components/ui/brand";
 import { BookingSummary } from "./BookingSummary";
-import { GENERIC_SUBMIT_MESSAGE, OFFLINE_MESSAGE, POLICY_CHANGED_MESSAGE, businessLoadCopy, isOfflineError, publicBookingErrorView, whatsappHref } from "./booking-error";
+import { GENERIC_SUBMIT_MESSAGE, OFFLINE_MESSAGE, POLICY_CHANGED_MESSAGE, businessLoadCopy, isOfflineError, publicBookingErrorView, shouldRotatePixIdempotencyKey, whatsappHref } from "./booking-error";
 import { PIX_CREATE_FAILED_COPY } from "./customer-copy";
 import { pixRetryPaymentRequest } from "./pix-retry";
 import { PIX_RESUME_UNKNOWN, getPixResumeServerSnapshot, migratedPixResumePayload, pixResumePayload, pixResumeStorageKey, readPixResume, readPixResumeRaw, replacePixResume, subscribePixResume, shouldClearExpiredResume, shouldResumePix, type PixResumeSession } from "./pix-resume";
@@ -87,7 +87,7 @@ export function BookingFlow({
     storeLine?: boolean;
     storeHref?: string | null;
   } | null>(null);
-  /** Falhas ao criar o Pix nesta visita. Só `payment_unavailable` troca a chave. */
+  /** `payment_unavailable` seguidas nesta visita. A primeira mantém a chave. */
   const pixCreateFailures = React.useRef(0);
   const [depositBlocked, setDepositBlocked] = useState(false);
   const [policySheet, setPolicySheet] = useState<{ open: boolean; notice: string | null; trigger: HTMLElement | null }>({
@@ -334,6 +334,7 @@ export function BookingFlow({
 
       if (!res.ok) {
         const failure = publicBookingErrorView(res.status, data);
+        if (failure.kind !== "pix_create_failed") pixCreateFailures.current = 0;
         if (failure.kind === "paused") {
           setBusiness((current) => (current ? { ...current, bookingsPaused: true } : current));
           setBookingError(null);
@@ -352,7 +353,7 @@ export function BookingFlow({
         }
         if (failure.kind === "pix_create_failed") {
           pixCreateFailures.current += 1;
-          if (failure.rotateKey) replaceIdempotencyKey();
+          if (shouldRotatePixIdempotencyKey(failure.retrySameKey, pixCreateFailures.current)) replaceIdempotencyKey();
           const repeated = pixCreateFailures.current >= 2;
           setBookingError({
             message: PIX_CREATE_FAILED_COPY,
@@ -423,6 +424,7 @@ export function BookingFlow({
       }
     } catch (err: unknown) {
       console.error(err);
+      pixCreateFailures.current = 0;
       const msg = isOfflineError(err) ? OFFLINE_MESSAGE : GENERIC_SUBMIT_MESSAGE;
       setBookingError({ message: msg, contactHref: null, tone: "danger" });
     } finally {
