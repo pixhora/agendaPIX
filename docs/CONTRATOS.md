@@ -145,7 +145,7 @@ Respostas de domínio usam `Cache-Control: no-store`.
 
 Erros: `{ error: { code, message } }`, sem detalhes pessoais ou internos. `400` entrada inválida; `404` negócio/serviço/reserva inacessível; `409` horário ocupado, chave reutilizada ou `hold_capacity_reached`; `413` corpo acima de 16 KiB; `429` `rate_limited` ou `pending_hold_limit`; `503` pagamento ou agendamento indisponível; `500` falha interna. `429` e `hold_capacity_reached` trazem `Retry-After` em segundos.
 
-`503` de cobrança Pix é sempre `{ "error": { "code": "payment_unavailable", "message": "Não foi possível criar a cobrança. Tente novamente com a mesma chave." } }`. Não há `reason`, `details` nem texto do Mercado Pago. O motivo interno (`mp_pix_key_missing`, `mp_account_not_enabled`, `mp_unauthorized`, `mp_invalid_amount`, `mp_unknown`, em `lib/contracts/mp-pix-create.ts`) só aparece no log do servidor, no campo `reason`.
+`503` de cobrança Pix é sempre `{ "error": { "code": "payment_unavailable", "message": "Não conseguimos gerar o Pix agora. Tente de novo em instantes ou fale com a loja." } }`. Não há `reason`, `details` nem texto do Mercado Pago. O motivo interno (`mp_pix_key_missing`, `mp_account_not_enabled`, `mp_unauthorized`, `mp_invalid_amount`, `mp_unknown`, em `lib/contracts/mp-pix-create.ts`) só aparece no log do servidor, no campo `reason`.
 
 ### Limite de reservas pendentes
 

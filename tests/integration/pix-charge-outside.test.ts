@@ -179,7 +179,7 @@ describe("cobrança fora da transação", () => {
     expect(body).toEqual({
       error: {
         code: "payment_unavailable",
-        message: "Não foi possível criar a cobrança. Tente novamente com a mesma chave.",
+        message: "Não conseguimos gerar o Pix agora. Tente de novo em instantes ou fale com a loja.",
       },
     });
     expect(body.error).not.toHaveProperty("reason");
