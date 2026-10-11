@@ -17,7 +17,7 @@ export function LandingFaq({ facts }: { facts: PublicBookingFacts }) {
             {whatsapp ? (
               <>
                 <a href={whatsapp} target="_blank" rel="noopener noreferrer" className="font-semibold text-pix underline underline-offset-4">
-                  Fale no WhatsApp
+                  Suporte no WhatsApp
                   <span className="sr-only"> (abre em nova aba)</span>
                 </a>
                 {" "}ou escreva para{" "}

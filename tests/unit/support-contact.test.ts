@@ -59,7 +59,8 @@ describe("WhatsApp de apoio", () => {
       expect(hiddenFooter).toContain("Contato");
       expect(hiddenFooter).not.toContain("wa.me");
       expect(hiddenFaq).toContain("Escreva para ");
-      expect(hiddenFaq).not.toContain("Fale no WhatsApp");
+      expect(hiddenFooter).not.toContain("Suporte no WhatsApp");
+      expect(hiddenFaq).not.toContain("Suporte no WhatsApp");
       expect(hiddenFaq).not.toContain("wa.me");
 
       process.env[key] = "5511912345678";
@@ -67,7 +68,8 @@ describe("WhatsApp de apoio", () => {
       const faq = renderToStaticMarkup(createElement(LandingFaq, { facts }));
       expect(footer).toContain('href="https://wa.me/5511912345678"');
       expect(faq).toContain('href="https://wa.me/5511912345678"');
-      expect(faq).toContain("Fale no WhatsApp");
+      expect(footer).toContain("Suporte no WhatsApp");
+      expect(faq).toContain("Suporte no WhatsApp");
     } finally {
       if (previous === undefined) delete process.env[key];
       else process.env[key] = previous;

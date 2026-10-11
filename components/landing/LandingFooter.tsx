@@ -56,7 +56,7 @@ export function LandingFooter() {
           <a href={supportMailtoUrl()} className="inline-flex min-h-11 items-center text-sm text-muted hover:text-ink">{email}</a>
           {whatsapp ? (
             <a href={whatsapp} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-sm text-muted hover:text-ink">
-              WhatsApp
+              Suporte no WhatsApp
               <span className="sr-only"> (abre em nova aba)</span>
             </a>
           ) : null}
