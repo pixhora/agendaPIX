@@ -21,6 +21,14 @@ import {
   type RefundResult,
 } from "./provider";
 import { InMemoryChargeReferenceStore, type ChargeReferenceStore } from "./reference-store";
+import {
+  causeCodesFromMpBody,
+  classifyPixCreateRefusal,
+  isDefinitivePixRefusal,
+  logPixCreateFailure,
+  PixCreateRefusedError,
+  safeMpRequestId,
+} from "./pix-create-log";
 
 /** Mesma URL para sandbox e produção; o access token (teste vs prod) define o ambiente. */
 export const MERCADOPAGO_BASE_URL = "https://api.mercadopago.com";
@@ -112,9 +120,14 @@ const webhookBodySchema = z.object({
 }).passthrough();
 
 class MercadoPagoHttpError extends Error {
-  constructor(readonly status: number, message: string) {
+  readonly causeCodes: readonly string[];
+  readonly requestId: string | null;
+
+  constructor(readonly status: number, message: string, causeCodes: readonly string[] = [], requestId: string | null = null) {
     super(message);
     this.name = "MercadoPagoHttpError";
+    this.causeCodes = causeCodes;
+    this.requestId = requestId;
   }
 }
 
@@ -288,7 +301,12 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
       signal: init.signal,
     });
     const text = await response.text();
-    if (!response.ok) throw new MercadoPagoHttpError(response.status, `Mercado Pago ${init.method} ${path} → ${response.status}: ${text.slice(0, 300)}`);
+    if (!response.ok) {
+      const creatingPix = init.method === "POST" && path === "/v1/payments";
+      const causeCodes = creatingPix ? causeCodesFromMpBody(text) : [];
+      const requestId = creatingPix ? safeMpRequestId(response.headers.get("x-request-id")) : null;
+      throw new MercadoPagoHttpError(response.status, `Mercado Pago ${init.method} ${path} → ${response.status}`, causeCodes, requestId);
+    }
     return text ? JSON.parse(text) as unknown : {};
   }
 
@@ -357,8 +375,9 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
     }
     const names = data.customer ? splitName(data.customer.name) : { firstName: "Cliente", lastName: "AgendaPix" };
     const token = await this.tokenFor(options, "charge");
+    let createdRaw: unknown;
     try {
-      const created = paymentSchema.parse(await this.request("/v1/payments", {
+      createdRaw = await this.request("/v1/payments", {
         method: "POST",
         signal: options.signal,
         accessToken: token,
@@ -376,17 +395,47 @@ export class MercadoPagoPaymentProvider implements PaymentProvider {
             ...(payerCpf ? { identification: { type: "CPF", number: payerCpf } } : {}),
           },
         },
-      }));
-      await this.referenceStore.save(data.reference, created.id.toLowerCase());
-      // O `expiresAt` devolvido é o hold, não o `date_of_expiration` (hold + 2 min).
-      return this.toPix(await this.view(created, data.expiresAt), data.expiresAt);
+      });
     } catch (error) {
       if (error instanceof MercadoPagoHttpError && error.status < 500) {
-        const raced = await this.findChargeByReference(data.reference, options);
-        if (raced && raced.amountCents === data.amountCents) return this.toPix(raced, data.expiresAt);
+        try {
+          const raced = await this.findChargeByReference(data.reference, options);
+          if (raced && raced.amountCents === data.amountCents) return this.toPix(raced, data.expiresAt);
+        } catch { /* a busca não apaga a recusa do POST */ }
+      }
+      this.warnPixCreateFailure(data.reference, options.businessId, error);
+      if (error instanceof MercadoPagoHttpError && isDefinitivePixRefusal(error.status)) {
+        throw new PixCreateRefusedError(error.status);
       }
       throw error;
     }
+    const created = paymentSchema.parse(createdRaw);
+    await this.referenceStore.save(data.reference, created.id.toLowerCase());
+    // O `expiresAt` devolvido é o hold, não o `date_of_expiration` (hold + 2 min).
+    return this.toPix(await this.view(created, data.expiresAt), data.expiresAt);
+  }
+
+  /** Uma linha. Sem message, description, pagador, token ou corpo. */
+  private warnPixCreateFailure(paymentId: string, businessId: string | undefined, error: unknown) {
+    if (error instanceof MercadoPagoHttpError) {
+      logPixCreateFailure({
+        businessId: businessId ?? null,
+        paymentId,
+        mpStatus: error.status,
+        causeCodes: error.causeCodes,
+        requestId: error.requestId,
+        reason: classifyPixCreateRefusal(error.status, error.causeCodes),
+      });
+      return;
+    }
+    logPixCreateFailure({
+      businessId: businessId ?? null,
+      paymentId,
+      mpStatus: null,
+      causeCodes: [],
+      requestId: null,
+      reason: "mp_unknown",
+    });
   }
 
   async getCharge(externalId: string, options: ProviderCallOptions = {}) {

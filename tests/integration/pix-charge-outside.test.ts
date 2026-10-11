@@ -13,6 +13,8 @@ import { reconcileOnce } from "../../lib/payments/reconcile";
 import { applyPaidEvent } from "../../lib/payments/apply-paid";
 import { drizzleRefundPorts, settleAutomaticLateRefund } from "../../lib/payments/refund-flow";
 import { polledPaidEvent, type ChargeInput, type PaymentProvider } from "../../lib/payments/provider";
+import { PixCreateRefusedError } from "../../lib/payments/pix-create-log";
+import { withAppCors } from "../../lib/origins";
 import { PIX_APPROVAL_TOLERANCE_MS } from "../../lib/payments/rules";
 import { hash } from "../../lib/bookings/service";
 import { padraoPolicyHash } from "../helpers/deposit-policy";
@@ -146,6 +148,61 @@ describe("cobrança fora da transação", () => {
     expect(payments).toHaveLength(1);
     expect(payments[0].status).toBe("pending");
   });
+
+  it("recusa definitiva marca failed e o 503 público não traz reason", async () => {
+    let calls = 0;
+    const refused: PaymentProvider = {
+      name: provider.name,
+      createPixCharge: async () => {
+        calls += 1;
+        throw new PixCreateRefusedError(400);
+      },
+      getCharge: provider.getCharge.bind(provider),
+      findChargeByReference: provider.findChargeByReference.bind(provider),
+      cancelCharge: provider.cancelCharge.bind(provider),
+      verifyWebhook: provider.verifyWebhook.bind(provider),
+      refundCharge: provider.refundCharge.bind(provider),
+    };
+    const key = randomUUID();
+    let caught: unknown;
+    try {
+      await createBooking(slug, input(0), key, database, refused);
+    } catch (error) {
+      caught = error;
+    }
+    const response = await withAppCors(
+      new Request(`http://localhost/api/public/${slug}/bookings`, { method: "POST" }),
+      async () => { throw caught; },
+    );
+    expect(response.status).toBe(503);
+    const body: { error: Record<string, unknown> } = await response.json();
+    expect(body).toEqual({
+      error: {
+        code: "payment_unavailable",
+        message: "Não foi possível criar a cobrança. Tente novamente com a mesma chave.",
+      },
+    });
+    expect(body.error).not.toHaveProperty("reason");
+    expect(body.error).not.toHaveProperty("details");
+    expect(JSON.stringify(body)).not.toContain("reason");
+    expect(JSON.stringify(body)).not.toContain("mp_");
+    const [payment] = await database.select().from(schema.payments).where(eq(schema.payments.businessId, businessId));
+    expect(payment.status).toBe("failed");
+    expect(payment.externalId).toBeNull();
+    const [booking] = await database.select().from(schema.bookings).where(eq(schema.bookings.id, payment.bookingId));
+    expect(booking.status).toBe("pending_payment");
+    const replay = await createBooking(slug, input(0), key, database, refused);
+    expect(replay.replayed).toBe(true);
+    expect(replay.data.payment?.status).toBe("failed");
+    expect(replay.data).not.toHaveProperty("reason");
+    expect(calls).toBe(1);
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const report = await reconcileOnce(database, provider, { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50, RECONCILE_BUDGET_MS: 50_000 });
+    expect(report.stuckRetried).toBe(0);
+    expect(logged.mock.calls.flat().join(" ")).not.toContain("reconcile_failed");
+    expect(logged.mock.calls.flat().join(" ")).not.toContain(payment.id);
+    logged.mockRestore();
+  });
 });
 
 describe("reconciliação", () => {
@@ -158,6 +215,34 @@ describe("reconciliação", () => {
     const [payment] = await database.select().from(schema.payments).where(eq(schema.payments.businessId, businessId));
     expect(payment.status).toBe("pending");
     expect(payment.externalId).toBeTruthy();
+  });
+
+  it("creating preso com recusa definitiva vira failed e a passagem seguinte não registra reconcile_failed", async () => {
+    const broken = { name: provider.name, createPixCharge: async () => { throw new Error("fail"); }, getCharge: provider.getCharge.bind(provider), findChargeByReference: provider.findChargeByReference.bind(provider), cancelCharge: provider.cancelCharge.bind(provider), verifyWebhook: provider.verifyWebhook.bind(provider), refundCharge: provider.refundCharge.bind(provider) };
+    await expect(createBooking(slug, input(1), randomUUID(), database, broken)).rejects.toMatchObject({ status: 503, code: "payment_unavailable" });
+    await database.update(schema.payments).set({ updatedAt: new Date(Date.now() - 120_000) }).where(eq(schema.payments.businessId, businessId));
+    const refused: PaymentProvider = {
+      name: provider.name,
+      createPixCharge: async () => { throw new PixCreateRefusedError(400); },
+      getCharge: async () => null,
+      findChargeByReference: async () => null,
+      cancelCharge: async () => null,
+      verifyWebhook: provider.verifyWebhook.bind(provider),
+      refundCharge: provider.refundCharge.bind(provider),
+    };
+    const config = { PAYMENT_PROVIDER_TIMEOUT_MS: 8000, RECONCILE_INTERVAL_SECONDS: 60, RECONCILE_STUCK_SECONDS: 60, RECONCILE_BATCH_SIZE: 50, RECONCILE_BUDGET_MS: 50_000 };
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const report = await reconcileOnce(database, refused, config);
+    const [payment] = await database.select().from(schema.payments).where(eq(schema.payments.businessId, businessId));
+    expect(payment.status).toBe("failed");
+    expect(payment.externalId).toBeNull();
+    expect(report.stuckRetried).toBe(0);
+    logged.mockClear();
+    const again = await reconcileOnce(database, refused, config);
+    expect(again.stuckRetried).toBe(0);
+    expect(logged.mock.calls.flat().join(" ")).not.toContain("reconcile_failed");
+    expect(logged.mock.calls.flat().join(" ")).not.toContain(payment.id);
+    logged.mockRestore();
   });
 
   it("cancela no gateway cobranças pending já vencidas", async () => {

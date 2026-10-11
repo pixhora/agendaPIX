@@ -682,6 +682,7 @@ export function BookingFlow({
             policyText={bookingResponse?.policy?.text}
             refundWindowClosedAtBooking={bookingResponse?.policy?.refundWindowClosedAtBooking}
             contactWhatsapp={business.contactWhatsapp}
+            address={business.address}
             onNewBooking={handleRestart}
           />
           </React.Suspense>

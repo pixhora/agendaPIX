@@ -8,7 +8,7 @@ import { authClient } from "@/lib/auth-client";
 import { clearOnboardingProgress } from "@/components/onboarding/storage";
 import { Button } from "@/components/ui/button";
 
-export function Logout({ compact = false }: { compact?: boolean }) {
+export function Logout({ compact = false, menu = false }: { compact?: boolean; menu?: boolean }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   async function signOut() {
@@ -23,6 +23,19 @@ export function Logout({ compact = false }: { compact?: boolean }) {
       toast.error("Não foi possível sair. Tente novamente.");
       setPending(false);
     }
+  }
+  if (menu) {
+    return (
+      <button
+        type="button"
+        disabled={pending}
+        onClick={signOut}
+        className="inline-flex min-h-11 w-full items-center gap-2 rounded-field px-3 text-left text-sm font-semibold text-ink hover:bg-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:text-muted"
+      >
+        <Icon icon={DASHBOARD_NAV_ICONS.logout} size="md" />
+        {pending ? "Saindo…" : "Sair"}
+      </button>
+    );
   }
   if (compact) {
     return <Button variant="ghost" size="icon" disabled={pending} onClick={signOut} aria-label={pending ? "Saindo…" : "Sair da conta"} title="Sair da conta"><Icon icon={DASHBOARD_NAV_ICONS.logout} size="md" /></Button>;
