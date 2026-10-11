@@ -5,6 +5,7 @@ import { Eyebrow, SectionTitle } from "./section";
 import { FaqAccordion } from "./FaqAccordion";
 
 export function LandingFaq({ facts }: { facts: PublicBookingFacts }) {
+  const whatsapp = supportWhatsappUrl();
   return (
     <section id="perguntas-frequentes" aria-labelledby="faq-titulo" className="scroll-mt-24 border-t border-line py-16 lg:py-28">
       <div className="mx-auto grid w-full max-w-[1120px] gap-8 px-5 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-12">
@@ -13,11 +14,15 @@ export function LandingFaq({ facts }: { facts: PublicBookingFacts }) {
           <SectionTitle id="faq-titulo">Perguntas frequentes</SectionTitle>
           <p className="mt-4 text-sm leading-relaxed text-muted">
             Não achou?{" "}
-            <a href={supportWhatsappUrl()} target="_blank" rel="noopener noreferrer" className="font-semibold text-pix underline underline-offset-4">
-              Fale no WhatsApp
-              <span className="sr-only"> (abre em nova aba)</span>
-            </a>
-            {" "}ou escreva para{" "}
+            {whatsapp ? (
+              <>
+                <a href={whatsapp} target="_blank" rel="noopener noreferrer" className="font-semibold text-pix underline underline-offset-4">
+                  Suporte no WhatsApp
+                  <span className="sr-only"> (abre em nova aba)</span>
+                </a>
+                {" "}ou escreva para{" "}
+              </>
+            ) : "Escreva para "}
             <a href={supportMailtoUrl()} className="font-semibold text-pix underline underline-offset-4">
               {supportEmailAddress()}
             </a>

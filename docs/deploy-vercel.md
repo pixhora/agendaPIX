@@ -51,8 +51,8 @@ O lembrete da véspera da devolução manual não espera 09:00. Sai na primeira 
 | `MP_TOKEN_ENCRYPTION_KEY` | `openssl rand -hex 32` (cifra o token OAuth do dono) |
 | `MP_OAUTH_PKCE` | `on` quando `MERCADOPAGO_ENV=production` e no `next build` com `VERCEL_ENV=production`. Sem isso o boot de produção não sobe e o build da Vercel falha, em vez de publicar um deploy que responde 500. Ausente ou `off` só vale em preview e dev. Espaços nas pontas (` on `) valem `on`. Nunca vazio: string vazia derruba o boot (`mp_oauth_pkce_invalid`) |
 | `CRON_SECRET` | `openssl rand -hex 32` |
-| `SUPPORT_WHATSAPP_NUMBER` | dígitos E.164 sem `+`. Sem isso (ou com valor inválido) o painel mostra "A assinatura está indisponível no momento" e o dono não paga. O build com `VERCEL_ENV=production` falha e cita o nome, sem o valor. O número de apoio do "Fale com a gente" não vale para o checkout |
-| `SUBSCRIPTION_MANUAL_ACTIVATION_HOURS` | inteiro ≥ 1, sem zero à esquerda. É o prazo da ativação **manual** (`pnpm billing:activate`). Sem isso, ou com `0`, `02` ou fração, o mesmo aviso de assinatura indisponível aparece e o build de produção falha do mesmo jeito. Não há cobrança automática nem webhook de assinatura |
+| `SUPPORT_WHATSAPP_NUMBER` | dígitos E.164 sem `+`. Sem isso o checkout da assinatura fica `available: false` e os links de suporte (landing, loja e painel) somem |
+| `SUBSCRIPTION_MANUAL_ACTIVATION_HOURS` | inteiro ≥ 1, sem zero à esquerda. Sem isso o checkout responde 503 |
 | `BOOKING_TRUST_PROXY` | `true` (a Vercel sobrescreve `X-Real-IP`/`X-Forwarded-For`) |
 | `BOOKING_CLIENT_IP_HEADER` | `x-real-ip` |
 | `ENABLE_EXPERIMENTAL_COREPACK` | `1` (pnpm 12 do `packageManager`) |

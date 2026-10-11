@@ -64,8 +64,9 @@
   --ink: #f6f5f2;
   --ink-hover: #e2e1dd;
   --muted: #a3a3a8;
-  --line: #2c2c2f;
-  --line-strong: #6b6b70;
+  /* Cartão (--line) e campo (--line-strong a 60%) passam de 3:1 contra a superfície. */
+  --line: #6e6e74;
+  --line-strong: #a8a8ae;
   --slab: #000000;
   --slab-foreground: #ffffff;
   --slab-muted: #b8b8bd;
@@ -103,8 +104,8 @@
     --ink: #f6f5f2;
     --ink-hover: #e2e1dd;
     --muted: #a3a3a8;
-    --line: #2c2c2f;
-    --line-strong: #6b6b70;
+    --line: #6e6e74;
+    --line-strong: #a8a8ae;
     --slab: #000000;
     --slab-foreground: #ffffff;
     --slab-muted: #b8b8bd;

@@ -44,7 +44,13 @@ test("o error boundary do retorno do Mercado Pago oferece tentar de novo", async
   });
   await expect(page.getByText("Sua conta não foi alterada. Toque em \"Tentar de novo\" pra reconectar.")).toBeVisible();
   await expect(page.getByRole("main")).not.toContainText("onboarding_mp_return_probe");
-  await expect(page.getByRole("link", { name: "Falar com o suporte" })).toHaveAttribute("href", "https://wa.me/5514997504655");
+  const support = page.getByRole("link", { name: "Suporte no WhatsApp" });
+  const configured = process.env.SUPPORT_WHATSAPP_NUMBER?.trim() ?? "";
+  if (/^[1-9][0-9]{7,14}$/.test(configured)) {
+    await expect(support).toHaveAttribute("href", `https://wa.me/${configured}`);
+  } else {
+    await expect(support).toHaveCount(0);
+  }
   expect(logged.some((line) => line.includes("onboarding_mp_return") && line.includes("onboarding_mp_return_probe"))).toBe(true);
   await page.getByRole("button", { name: "Tentar de novo" }).click();
   await expect(page).toHaveURL(/\/onboarding\/recebimento$/);
@@ -67,7 +73,13 @@ test("o error boundary do cadastro mantém o rascunho e oferece tentar de novo",
   await expect(page.getByRole("heading", { name: "Algo deu errado no cadastro" })).toBeVisible();
   await expect(page.getByText("Seu cadastro está salvo. Toque em \"Tentar de novo\" para continuar.")).toBeVisible();
   await expect(page.getByRole("main")).not.toContainText("onboarding_generic_probe");
-  await expect(page.getByRole("link", { name: "Suporte no WhatsApp" })).toHaveAttribute("href", "https://wa.me/5514997504655");
+  const support = page.getByRole("link", { name: "Suporte no WhatsApp" });
+  const configured = process.env.SUPPORT_WHATSAPP_NUMBER?.trim() ?? "";
+  if (/^[1-9][0-9]{7,14}$/.test(configured)) {
+    await expect(support).toHaveAttribute("href", `https://wa.me/${configured}`);
+  } else {
+    await expect(support).toHaveCount(0);
+  }
   expect(logged.some((line) => line.includes("onboarding_mp_return") && line.includes("onboarding_generic_probe"))).toBe(true);
   expect(logged.some((line) => line.includes("@") || /[?&#](code|state)=(?!\[omitido\])/.test(line))).toBe(false);
   await page.evaluate(() => {
