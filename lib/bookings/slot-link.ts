@@ -32,6 +32,7 @@ import { clientPolicyText } from "../policy/text";
 import { localDate } from "./availability";
 import { bookingConfig, type BookingConfig } from "./config";
 import { consumeSlotLinkCreateRateLimit, consumeSlotLinkOpenRateLimit, consumeSlotLinkPayRateLimit } from "./rate-limit";
+import { rejectBlockedIdempotencyKey } from "./idempotency-key";
 import { createBooking, expirePending, listBookableSlots } from "./service";
 import { createSlotLinkPreviewId, createSlotLinkToken, isSlotLinkPreviewId, isSlotLinkToken, slotLinkTokenHash } from "./slot-link-token";
 
@@ -126,6 +127,7 @@ function parseIdempotencyKey(value: string | null) {
   if (!SLOT_LINK_IDEMPOTENCY_KEY_PATTERN.test(key)) {
     throw new HttpError(400, "invalid_input", "Confira os dados enviados.");
   }
+  rejectBlockedIdempotencyKey(key);
   return key;
 }
 
@@ -759,6 +761,7 @@ export async function paySlotLink(
   config: BookingConfig = bookingConfig(),
 ) {
   if (!isSlotLinkToken(token)) throw invalidLink();
+  rejectBlockedIdempotencyKey(idempotencyKey ?? "");
   await probeLimit(database, "slot-link-pay-probe", identity, config.SLOT_LINK_PAY_PER_CLIENT);
   const business = await businessBySlug(database, slug);
   const link = await linkByToken(database, token);

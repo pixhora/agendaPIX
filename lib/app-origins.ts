@@ -89,6 +89,15 @@ export function assertConfiguredAppOrigins(env: Readonly<Record<string, string |
   }
 }
 
+/**
+ * `Origin: null` é a origem opaca. Alguns navegadores de app no celular mandam
+ * isso num pedido da própria página. O predicado só olha o par de headers.
+ * Quem aceita é a rota pública de pagamento, e a resposta não ecoa CORS.
+ */
+export function opaqueNullOriginAllowed(origin: string, secFetchSite: string | null): boolean {
+  return origin === "null" && secFetchSite === "same-origin";
+}
+
 export function originEqualsAllowed(origin: string, allowed: readonly string[]): boolean {
   for (const candidate of allowed) {
     if (candidate === origin) return true;

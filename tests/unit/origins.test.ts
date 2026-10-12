@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { appPreflight, requireAppOrigin, trustedAppOrigins, withAppCors } from "../../lib/origins";
+import { appPreflight, publicPaymentOrigin, requireAppOrigin, trustedAppOrigins, withAppCors } from "../../lib/origins";
 
 beforeEach(() => {
   vi.stubEnv("NODE_ENV", "development");
@@ -19,6 +19,93 @@ it("allows credentialed preflight for exact localhost:3000", async () => {
   expect(response.headers.get("access-control-allow-methods")).toBe("GET, PUT, DELETE");
   expect(response.headers.get("access-control-allow-headers")).toBe("Content-Type, Authorization, Idempotency-Key");
   expect(response.headers.get("vary")).toContain("Origin");
+});
+
+const opaqueRequest = (url: string, method = "POST") => new Request(url, {
+  method,
+  headers: { origin: "null", "Sec-Fetch-Site": "same-origin" },
+});
+
+it("sem opt-in, Origin null com same-origin continua 403 e não ecoa ACAO", async () => {
+  const run = vi.fn(async () => Response.json({ ok: true }));
+  const request = opaqueRequest("http://localhost:3000/api/onboarding");
+  const response = await withAppCors(request, run);
+  expect(response.status).toBe(403);
+  expect(await response.json()).toMatchObject({ error: { code: "origin_not_allowed" } });
+  expect(response.headers.has("access-control-allow-origin")).toBe(false);
+  expect(response.headers.has("access-control-allow-credentials")).toBe(false);
+  expect(run).not.toHaveBeenCalled();
+  expect(() => requireAppOrigin(request)).toThrow(expect.objectContaining({ status: 403, code: "origin_not_allowed" }));
+});
+
+it("pagamento público aceita Origin null same-origin sem ACAO nem credentials", async () => {
+  const run = vi.fn(async () => Response.json({ ok: true }, {
+    headers: { "access-control-allow-origin": "null", "access-control-allow-credentials": "true" },
+  }));
+  const request = opaqueRequest("http://localhost:3000/api/public/salao/bookings");
+  expect(requireAppOrigin(request, publicPaymentOrigin)).toBe("");
+  const response = await withAppCors(request, run, publicPaymentOrigin);
+  expect(response.status).toBe(200);
+  expect(run).toHaveBeenCalledOnce();
+  expect(response.headers.has("access-control-allow-origin")).toBe(false);
+  expect(response.headers.has("access-control-allow-credentials")).toBe(false);
+  expect(response.headers.get("access-control-allow-origin")).not.toBe("null");
+});
+
+it("preflight de pagamento com Origin null same-origin não ecoa ACAO nem credentials", async () => {
+  const request = new Request("http://localhost:3000/api/public/salao/bookings", {
+    method: "OPTIONS",
+    headers: {
+      origin: "null",
+      "Sec-Fetch-Site": "same-origin",
+      "access-control-request-method": "POST",
+      "access-control-request-headers": "Content-Type, Idempotency-Key",
+    },
+  });
+  const response = await appPreflight(request, ["POST"], publicPaymentOrigin);
+  expect(response.status).toBe(204);
+  expect(response.headers.has("access-control-allow-origin")).toBe(false);
+  expect(response.headers.has("access-control-allow-credentials")).toBe(false);
+  expect(response.headers.get("access-control-allow-methods")).toBe("POST");
+  expect(response.headers.get("access-control-allow-origin")).not.toBe("null");
+});
+
+it("preflight sem opt-in recusa Origin null mesmo com same-origin", async () => {
+  const request = new Request("http://localhost:3000/api/onboarding", {
+    method: "OPTIONS",
+    headers: {
+      origin: "null",
+      "Sec-Fetch-Site": "same-origin",
+      "access-control-request-method": "POST",
+    },
+  });
+  const response = await appPreflight(request, ["POST"]);
+  expect(response.status).toBe(403);
+  expect(await response.json()).toMatchObject({ error: { code: "origin_not_allowed" } });
+  expect(response.headers.has("access-control-allow-origin")).toBe(false);
+  expect(response.headers.has("access-control-allow-credentials")).toBe(false);
+});
+
+it.each([undefined, "cross-site", "same-site", "none"] as const)("recusa Origin null fora de same-origin (%s)", async (site) => {
+  const headers = new Headers({ origin: "null" });
+  if (site) headers.set("sec-fetch-site", site);
+  const run = vi.fn();
+  const response = await withAppCors(new Request("http://localhost:3000/api/public/salao/bookings", { method: "POST", headers }), run);
+  expect(response.status).toBe(403);
+  expect(await response.json()).toMatchObject({ error: { code: "origin_not_allowed", message: "Origem da solicitação não permitida." } });
+  expect(response.headers.has("access-control-allow-origin")).toBe(false);
+  expect(run).not.toHaveBeenCalled();
+});
+
+it("origem fora da lista continua falhando, mesmo com Sec-Fetch-Site same-origin", async () => {
+  const run = vi.fn();
+  const response = await withAppCors(new Request("http://localhost:3000/api/public/salao/bookings", {
+    method: "POST",
+    headers: { origin: "https://evil.example", "Sec-Fetch-Site": "same-origin" },
+  }), run);
+  expect(response.status).toBe(403);
+  expect(await response.json()).toMatchObject({ error: { code: "origin_not_allowed" } });
+  expect(run).not.toHaveBeenCalled();
 });
 
 it.each(["http://untrusted.example", "http://localhost:3000.evil.example", "http://127.0.0.1:3000", "null", "http://localhost:3000/path", "http://localhost:3000/", "http://LOCALHOST:3000", "http://localhost:3001", "http://localhost:3005", "http://localhost:3343"])("rejects origin %s before running the handler", async (origin) => {

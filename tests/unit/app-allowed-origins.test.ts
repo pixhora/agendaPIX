@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { assertProductionSafeEnv, assertVercelProductionBuild } from "../../lib/env";
 import { MP_CONNECT_CONSENT_VERSION } from "../../lib/mercadopago/consent";
 import { createMemoryMpStore } from "../../lib/mercadopago-oauth/memory-store";
-import { submitMercadoPagoConnect } from "../../lib/mercadopago-oauth/flow";
+import { acceptMercadoPagoConsent, submitMercadoPagoConnect } from "../../lib/mercadopago-oauth/flow";
 import { logRejectedAppOrigin, resetRejectedOriginLog } from "../../lib/app-origins";
 import { requireAppOrigin, trustedAppOrigins } from "../../lib/origins";
 
@@ -62,6 +62,20 @@ describe("allowlist de origem do app", () => {
     expect(await connect({ origin: "null" })).toEqual(forbidden);
     expect(await connect({ referer: "https://www.agendapix.dev.br/dashboard" })).toEqual(forbidden);
     expect(await connect({ origin: "null", referer: "https://www.agendapix.dev.br/dashboard" })).toEqual(forbidden);
+    expect(await connect({ origin: "null", "sec-fetch-site": "same-origin", "content-type": "application/json" })).toEqual(forbidden);
+    const consent = await acceptMercadoPagoConsent({
+      request: new Request("https://www.agendapix.dev.br/api/businesses/x/mercadopago/consent", {
+        method: "POST",
+        headers: { origin: "null", "sec-fetch-site": "same-origin", "content-type": "application/json" },
+        body: JSON.stringify({ autoRefundAck: true, consentVersion: MP_CONNECT_CONSENT_VERSION }),
+      }),
+      businessId,
+      ownerId: "owner",
+      now,
+      env: connectEnv,
+      store: createMemoryMpStore(),
+    });
+    expect(consent).toMatchObject({ kind: "error", status: 403, body: { error: { code: "forbidden_origin" } } });
   });
 
   it("aceita www e o apex e recusa sufixo, http e host alheio", async () => {

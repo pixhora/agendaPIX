@@ -24,6 +24,7 @@ import { availableSlots, localDate } from "./availability";
 import { availabilityDates, busyIntervals, loadPublicCatalog, presentPublicServices, readCachedCatalog, slotsForCatalog } from "./public-catalog";
 import { assertDepositBookable } from "./deposit-bookability";
 import { SlugMoved, readAliasTarget, sqlStateOf } from "../business-profile/public-slug";
+import { rejectBlockedIdempotencyKey } from "./idempotency-key";
 import { availabilitySchema, bookingInputSchema, requestKeySchema, slugSchema } from "./validation";
 import { depositSlotAllowed } from "./hold";
 import { bookingConfig, type BookingConfig } from "./config";
@@ -305,6 +306,7 @@ export async function createBooking(slug: string, body: unknown, key: unknown, d
   const config = bookingConfig();
   const input = bookingInputSchema.parse(body);
   const requestKey = requestKeySchema.parse(key);
+  rejectBlockedIdempotencyKey(requestKey);
   const requestHash = bookingRequestDigest(input);
   const business = await businessBySlug(slug, database);
   const [priorRows, access] = await Promise.all([

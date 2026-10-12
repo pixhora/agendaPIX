@@ -1,11 +1,11 @@
 import { aliasTarget, SlugMoved, slugMovedResponse, sqlStateOf } from "./public-slug";
-import { withAppCors } from "../origins";
+import { withAppCors, type AppOriginPolicy } from "../origins";
 
 /**
  * 308 antes do restante da rota. Um alias do serviço também vira 308.
  * Se a consulta de alias falhar, loga só o SQLSTATE e segue sem redirect, como o proxy.
  */
-export function withPublicSlug(request: Request, slug: string, run: () => Promise<Response>) {
+export function withPublicSlug(request: Request, slug: string, run: () => Promise<Response>, origin?: AppOriginPolicy) {
   return withAppCors(request, async () => {
     try {
       const target = await aliasTarget(slug);
@@ -19,5 +19,5 @@ export function withPublicSlug(request: Request, slug: string, run: () => Promis
       if (error instanceof SlugMoved) return slugMovedResponse(request.url, slug, error.slug);
       throw error;
     }
-  });
+  }, origin);
 }
