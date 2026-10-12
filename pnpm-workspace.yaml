@@ -5,5 +5,8 @@ allowBuilds:
 
 # drizzle-kit ainda carrega @esbuild-kit/core-utils, que fixa esbuild ~0.18 (GHSA-67mh-4wv8-2f99).
 # A API usada (transform/transformSync) é compatível com 0.25; validado com db:migrate e db:generate.
+minimumReleaseAgeExclude:
+  - lintapple@0.1.20
+
 overrides:
   "@esbuild-kit/core-utils>esbuild": "^0.25.0"

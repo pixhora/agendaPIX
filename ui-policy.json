@@ -1,0 +1,57 @@
+{
+  "fonts": [
+    "Plus Jakarta Sans",
+    "Inter"
+  ],
+  "fontSizes": [
+    12,
+    14,
+    16,
+    18,
+    20,
+    24,
+    30,
+    36,
+    48,
+    60,
+    72,
+    96,
+    128
+  ],
+  "typeRules": [
+    {
+      "selector": "input, textarea, select",
+      "sizes": [
+        16
+      ]
+    }
+  ],
+  "minControlSize": 44,
+  "controlSizeRules": [],
+  "minControlGap": 8,
+  "minControlInset": 8,
+  "controlContainers": [
+    "[data-ui-container]"
+  ],
+  "minLayoutGap": 8,
+  "bannedCopy": [
+    "unlock your potential",
+    "seamlessly",
+    "game-changing"
+  ],
+  "viewports": [
+    {
+      "width": 390,
+      "height": 844
+    },
+    {
+      "width": 1440,
+      "height": 900
+    }
+  ],
+  "colorSchemes": [
+    "light",
+    "dark"
+  ],
+  "exceptions": []
+}
