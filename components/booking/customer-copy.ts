@@ -57,3 +57,6 @@ export const BUSINESS_SLOW_COPY = "A conexão demorou muito para responder. Veri
 
 /** Botão de WhatsApp quando o número existe e o nome do negócio não. */
 export const WHATSAPP_CONTACT_LABEL = "Falar no WhatsApp";
+
+/** WhatsApp do cliente ainda curto depois de tirar +55, zero de operadora e símbolos. */
+export const CUSTOMER_PHONE_ERROR = "Confira o DDD e o número, ex.: (14) 99999-9999";

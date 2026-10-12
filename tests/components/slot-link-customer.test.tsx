@@ -10,7 +10,7 @@ import { SlotLinkStorageSweep } from "@/components/slot-link/storage-sweep";
 import { SentLinks } from "@/components/slot-link/sent-links";
 import { createSlotLinkToken } from "../../lib/bookings/slot-link-token";
 import { CANCEL_EXPIRED, CANCEL_PAID, CONNECT_MERCADO_PAGO, CUSTOMER_BOOKINGS_PAUSED, CUSTOMER_CONFLICT_BODY, CUSTOMER_CONFLICT_TITLE, CUSTOMER_CPF_REQUIRED, CUSTOMER_IN_PROGRESS, CUSTOMER_PAUSED_LATER, CUSTOMER_PAUSED_RECEIPT, CUSTOMER_RETRY_BODY, CUSTOMER_RETRY_TITLE, CUSTOMER_USED_TITLE, OWNER_NETWORK, REISSUE_BODY, REISSUE_EXPIRED, REISSUE_IN_PROGRESS, REISSUE_MP, REISSUE_PAID, REISSUE_TAKEN, REISSUE_TITLE, formatDayMonth, isoDateInZone, weekdayShort } from "@/lib/slot-link/copy";
-import { PIX_CHARGE_FAILED_BODY, PIX_CHARGE_FAILED_RETRY, PIX_CHARGE_FAILED_TITLE, PIX_CREATE_FAILED_COPY, PIX_CREATE_FAILED_STORE, PIX_GENERATING_LABEL, TALK_TO_STORE } from "@/components/booking/customer-copy";
+import { CUSTOMER_PHONE_ERROR, PIX_CHARGE_FAILED_BODY, PIX_CHARGE_FAILED_RETRY, PIX_CHARGE_FAILED_TITLE, PIX_CREATE_FAILED_COPY, PIX_CREATE_FAILED_STORE, PIX_GENERATING_LABEL, TALK_TO_STORE } from "@/components/booking/customer-copy";
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
@@ -1044,6 +1044,46 @@ describe("links enviados", () => {
     await user.click(screen.getByRole("button", { name: "Manter link" }));
     await vi.waitFor(() => expect(gets).toBeGreaterThan(before));
     vi.unstubAllGlobals();
+  });
+});
+
+describe("telefone da cliente no link", () => {
+  it("aceita +55 com espaços e envia o E.164", async () => {
+    const user = userEvent.setup();
+    const stores = memorySlotLinkStores();
+    const bodies: string[] = [];
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith("/pay")) {
+        bodies.push(String(init?.body ?? ""));
+        return json(201, payBody());
+      }
+      return json(200, openBody());
+    });
+    render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" stores={stores} fetchImpl={fetchImpl} now={() => new Date("2030-10-01T12:00:00.000Z")} />);
+    await user.type(await screen.findByLabelText("Nome"), "Ana Souza");
+    fireEvent.change(screen.getByLabelText("WhatsApp"), { target: { value: "+55 14 99999-9999" } });
+    expect(screen.getByLabelText("WhatsApp")).toHaveValue("(14) 99999-9999");
+    await user.click(screen.getByLabelText("Li e concordo com a política"));
+    await user.click(screen.getByRole("button", { name: /Pagar sinal de/ }));
+    expect(await screen.findByText(/Pix 00020126580014BR.GOV.BCB.PIX/)).toBeVisible();
+    expect(bodies[0]).toContain("+5514999999999");
+    expect(screen.queryByText(CUSTOMER_PHONE_ERROR)).toBeNull();
+  });
+
+  it("avisa com o texto do DDD quando o número está curto", async () => {
+    const user = userEvent.setup();
+    const stores = memorySlotLinkStores();
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith("/pay")) throw new Error("não deveria pagar");
+      return json(200, openBody());
+    });
+    render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" stores={stores} fetchImpl={fetchImpl} now={() => new Date("2030-10-01T12:00:00.000Z")} />);
+    await user.type(await screen.findByLabelText("Nome"), "Ana Souza");
+    fireEvent.change(screen.getByLabelText("WhatsApp"), { target: { value: "14999" } });
+    await user.click(screen.getByLabelText("Li e concordo com a política"));
+    await user.click(screen.getByRole("button", { name: /Pagar sinal de/ }));
+    expect(await screen.findByText(CUSTOMER_PHONE_ERROR)).toBeVisible();
+    expect(screen.queryByText(/Pix /)).toBeNull();
   });
 });
 

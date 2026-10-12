@@ -12,12 +12,22 @@ export function formatDuration(minutes: number): string {
   return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}min` : `${hours}h`;
 }
 
-export function formatPhoneMask(value: string): string {
-  let cleanDigits = value.replace(/\D/g, "");
-  if (cleanDigits.startsWith("55") && cleanDigits.length >= 12) {
-    cleanDigits = cleanDigits.slice(2);
+/**
+ * Dígitos nacionais (DDD + número).
+ * Tira o que não é dígito, o +55/55 quando a sequência tem 12 ou 13 dígitos,
+ * e um zero de operadora na frente (011…).
+ */
+export function nationalPhoneDigits(value: string): string {
+  let digits = value.replace(/\D/g, "");
+  if (digits.startsWith("55") && (digits.length === 12 || digits.length === 13)) {
+    digits = digits.slice(2);
   }
-  const digits = cleanDigits.slice(0, 11);
+  if (digits.startsWith("0")) digits = digits.slice(1);
+  return digits;
+}
+
+export function formatPhoneMask(value: string): string {
+  const digits = nationalPhoneDigits(value).slice(0, 11);
   if (digits.length <= 2) return digits ? `(${digits}` : "";
   if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
   if (digits.length <= 10) {
@@ -27,18 +37,11 @@ export function formatPhoneMask(value: string): string {
 }
 
 export function normalizePhoneToE164(formattedOrRaw: string): string {
-  let digits = formattedOrRaw.replace(/\D/g, "");
-  if (digits.startsWith("55") && digits.length >= 12) {
-    digits = digits.slice(2);
-  }
-  return `+55${digits}`;
+  return `+55${nationalPhoneDigits(formattedOrRaw)}`;
 }
 
 export function isValidBrazilianPhone(value: string): boolean {
-  let digits = value.replace(/\D/g, "");
-  if (digits.startsWith("55") && digits.length >= 12) {
-    digits = digits.slice(2);
-  }
+  const digits = nationalPhoneDigits(value);
   return digits.length === 10 || digits.length === 11;
 }
 

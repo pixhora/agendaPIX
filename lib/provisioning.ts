@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { OnboardingData } from "@/components/onboarding/types";
 import { onboardingInputSchema } from "@/lib/onboarding/validation";
+import { randomUuid } from "@/lib/random-uuid";
 
 /** Rota real de provisionamento neste mesmo app (`app/api/onboarding`). */
 export const ONBOARDING_ENDPOINT = "/api/onboarding";
@@ -49,7 +50,7 @@ export async function provisionBusiness(
   data: OnboardingData,
   options?: { idempotencyKey?: string },
 ): Promise<ProvisioningResult> {
-  const idempotencyKey = options?.idempotencyKey || crypto.randomUUID();
+  const idempotencyKey = options?.idempotencyKey || randomUuid();
 
   let payload: ProvisioningPayload;
   try {

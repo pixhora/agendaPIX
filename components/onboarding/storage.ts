@@ -1,5 +1,6 @@
 import { activeBusinessCookie } from "@/lib/dashboard/active-business";
 import { localDraftEnvelope } from "@/lib/onboarding/local-draft";
+import { randomUuid } from "@/lib/random-uuid";
 import type { OnboardingData, OnboardingStep } from "./types";
 
 /** Para onde o link mágico do cadastro leva: provisiona o negócio já com a sessão ativa. */
@@ -18,11 +19,11 @@ export function ensureOnboardingIdempotencyKey(): string {
   try {
     const existing = localStorage.getItem(IDEMPOTENCY_KEY);
     if (existing) return existing;
-    const created = crypto.randomUUID();
+    const created = randomUuid();
     localStorage.setItem(IDEMPOTENCY_KEY, created);
     return created;
   } catch {
-    return crypto.randomUUID();
+    return randomUuid();
   }
 }
 

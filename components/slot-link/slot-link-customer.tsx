@@ -27,7 +27,7 @@ import {
 import { browserSlotLinkStores, clearPayKey, createIdempotencyKey, lockPayPayload, payRequestBody, readPayResume, rotatePayIdempotencyKey, savePayAccess, type SlotLinkPayDraft, type SlotLinkPayPayload, type SlotLinkPayStores } from "@/lib/slot-link/idempotency";
 import { paySlotLinkUrl, publicSlotLinkUrl } from "@/lib/slot-link/paths";
 import { isOfflineError, pixCreateFailure as readPixCreateFailure, shouldRotatePixIdempotencyKey, whatsappHref } from "@/components/booking/booking-error";
-import { PIX_GENERATING_LABEL } from "@/components/booking/customer-copy";
+import { CUSTOMER_PHONE_ERROR, PIX_GENERATING_LABEL } from "@/components/booking/customer-copy";
 import { PixChargeFailedScreen } from "@/components/booking/pix-charge-failed";
 import { PixCreateFailureAlert } from "@/components/booking/pix-create-error";
 import { isFailedPixCharge } from "@/components/booking/pix-status";
@@ -167,7 +167,7 @@ export function SlotLinkCustomer({
     };
   }, [load]);
 
-  async function pay(link: SlotLinkOpenResponse) {
+  async function pay(link: SlotLinkOpenResponse, phoneValue?: string) {
     if (payInFlight.current || !link.policy) return;
     payInFlight.current = true;
     setSubmitting(true);
@@ -177,7 +177,7 @@ export function SlotLinkCustomer({
       const draft: SlotLinkPayDraft = {
         customer: {
           name: name.trim(),
-          phone: normalizePhoneToE164(phone),
+          phone: normalizePhoneToE164(phoneValue ?? phone),
           ...(link.requiresPayerCpf ? { cpfCnpj: cpfDigitsOnly(cpf) } : {}),
         },
         policyHash: link.policy.hash,
@@ -294,7 +294,6 @@ export function SlotLinkCustomer({
   const nameOk = locked || name.trim().length >= 2;
   const phoneOk = locked || isValidBrazilianPhone(phone);
   const cpfOk = !askCpf || isValidCpf(cpf);
-  const canPay = Boolean(link?.policy) && accepted && nameOk && phoneOk && cpfOk && !submitting;
   const payerName = savedPayload?.customer.name ?? name;
   const payerPhone = savedPayload ? formatPhoneMask(savedPayload.customer.phone) : phone;
 
@@ -340,8 +339,12 @@ export function SlotLinkCustomer({
             noValidate
             onSubmit={(event) => {
               event.preventDefault();
+              const input = event.currentTarget.querySelector<HTMLInputElement>("#slot-customer-phone");
+              const normalizedPhone = locked ? phone : formatPhoneMask(input?.value ?? phone);
+              if (!locked && normalizedPhone !== phone) setPhone(normalizedPhone);
               setTouched(true);
-              if (canPay) void pay(link);
+              const phoneValid = locked || isValidBrazilianPhone(normalizedPhone);
+              if (Boolean(link.policy) && accepted && nameOk && phoneValid && cpfOk && !submitting) void pay(link, normalizedPhone);
             }}
           >
             <article className="grid gap-3 rounded-card border border-line bg-surface p-5 shadow-[var(--shadow-card)]">
@@ -380,8 +383,18 @@ export function SlotLinkCustomer({
                 </div>
                 <div className="grid gap-1.5">
                   <Label htmlFor="slot-customer-phone">WhatsApp</Label>
-                  <Input id="slot-customer-phone" inputMode="tel" autoComplete="off" value={phone} onChange={(event) => setPhone(formatPhoneMask(event.target.value))} />
-                  {touched && !phoneOk ? <p className="text-sm text-danger">Informe um celular válido com DDD.</p> : null}
+                  <Input
+                    id="slot-customer-phone"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    value={phone}
+                    onChange={(event) => setPhone(formatPhoneMask(event.target.value))}
+                    onBlur={(event) => {
+                      const normalized = formatPhoneMask(event.target.value);
+                      if (normalized !== phone) setPhone(normalized);
+                    }}
+                  />
+                  {touched && !phoneOk ? <p className="text-sm text-danger">{CUSTOMER_PHONE_ERROR}</p> : null}
                 </div>
               </div>
             )}

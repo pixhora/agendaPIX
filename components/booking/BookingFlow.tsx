@@ -34,6 +34,7 @@ import { PIX_CREATE_FAILED_COPY } from "./customer-copy";
 import { pixRetryPaymentRequest } from "./pix-retry";
 import { PIX_RESUME_UNKNOWN, getPixResumeServerSnapshot, migratedPixResumePayload, pixResumePayload, pixResumeStorageKey, readPixResume, readPixResumeRaw, replacePixResume, subscribePixResume, shouldClearExpiredResume, shouldResumePix, type PixResumeSession } from "./pix-resume";
 import { keptAccessToken } from "@/lib/slot-link/idempotency";
+import { randomUuid } from "@/lib/random-uuid";
 import { TrackingUnavailable } from "./tracking-unavailable";
 import { buildPublicBookingBody } from "./booking-payload";
 import { PausedState } from "./PausedState";
@@ -115,18 +116,13 @@ export function BookingFlow({
   }, [step, selectedService]);
 
   // Chave de Idempotência fixa por tentativa de reserva
-  const [idempotencyKey, setIdempotencyKey] = useState<string>(() => {
-    if (typeof crypto !== "undefined" && crypto.randomUUID) {
-      return crypto.randomUUID();
-    }
-    return "00000000-0000-4000-8000-000000000000";
-  });
+  const [idempotencyKey, setIdempotencyKey] = useState<string>(() => randomUuid());
   const rotateIdempotencyKey = () => {
     pixCreateFailures.current = 0;
-    if (typeof crypto !== "undefined" && crypto.randomUUID) setIdempotencyKey(crypto.randomUUID());
+    setIdempotencyKey(randomUuid());
   };
   const replaceIdempotencyKey = () => {
-    if (typeof crypto !== "undefined" && crypto.randomUUID) setIdempotencyKey(crypto.randomUUID());
+    setIdempotencyKey(randomUuid());
   };
 
   const [reloadCount, setReloadCount] = useState(0);
@@ -307,7 +303,7 @@ export function BookingFlow({
   }, [business, slug, initialBookingId, step, isCompleted, bookingResponse, trackingMiss, pixResumeAttempt, resumeRaw]);
 
   // Cria a reserva chamando POST /api/public/[slug]/bookings
-  const handleCreateBooking = async () => {
+  const handleCreateBooking = async (submittedPhone?: string) => {
     if (createInFlight.current) return;
     if (!selectedService || !selectedSlot) return;
 
@@ -319,7 +315,7 @@ export function BookingFlow({
       service: selectedService,
       startsAt: selectedSlot.startsAt,
       name: customerName.trim(),
-      phone: normalizePhoneToE164(customerPhone),
+      phone: normalizePhoneToE164(submittedPhone ?? customerPhone),
       cpfDigits: cpfDigitsOnly(customerCpf),
       requiresPayerCpf: business?.requiresPayerCpf,
     });
