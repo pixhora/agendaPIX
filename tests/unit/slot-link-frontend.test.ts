@@ -9,7 +9,7 @@ import { parseOwnerList } from "../../lib/slot-link/owner-link";
 import { isSlotLinkPagePath } from "../../lib/slot-link/paths";
 import { slotLinkPageHeaderRule, slotLinkPageHeaders } from "../../lib/slot-link/privacy";
 import { PIX_RESUME_STORAGE_PREFIX, purgeExpiredBookingSessions } from "../../components/booking/pix-resume";
-import { GENERIC_OG_FALLBACK, parseSlotLinkPreview, slotLinkOgCopy, slotLinkOgLines } from "../../lib/slot-link/preview";
+import { GENERIC_OG_FALLBACK, parseSlotLinkPreview, slotLinkOgCopy, slotLinkOgLines, UNAVAILABLE_OG_LINES, UNAVAILABLE_OG_TEXT } from "../../lib/slot-link/preview";
 import { sendOnWhatsApp } from "../../lib/slot-link/share";
 import { ownerSummary, reissueFailure, reissueFailureMessage, cancelFailure, slotLinkMessage, updatedLinkMessage, validityLine, REISSUE_EXPIRED, REISSUE_IN_PROGRESS, REISSUE_MP, REISSUE_PAID, REISSUE_TAKEN, CANCEL_EXPIRED, CANCEL_PAID, OWNER_NETWORK } from "../../lib/slot-link/copy";
 import { readShareMetaCache, shareMetaCacheKey, writeShareMetaCache, SHARE_META_CACHE_MAX, SHARE_META_NEGATIVE_MAX, SHARE_META_NEGATIVE_TTL_MS, SHARE_META_TTL_MS } from "../../lib/slot-link/share-meta-cache";
@@ -63,6 +63,8 @@ describe("prévia do link", () => {
     expect(copy.description).toBe("Agende pelo AgendaPix.");
     expect(slotLinkOgLines(preview).join(" ")).not.toMatch(/\d{2}\/\d{2}|às \d{2}:\d{2}|livre|ocupado/);
     expect(slotLinkOgLines(GENERIC_OG_FALLBACK)).toEqual(["AgendaPix", "Agende pelo AgendaPix"]);
+    expect(UNAVAILABLE_OG_LINES).toEqual(["AgendaPix", UNAVAILABLE_OG_TEXT]);
+    expect(UNAVAILABLE_OG_LINES.join(" ")).not.toMatch(/Salao|livre|R\$|telefone/);
   });
 
   it("sem kind não vira cartão de horário", () => {

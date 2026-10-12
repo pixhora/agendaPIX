@@ -14,6 +14,7 @@ import {
   slotLinkPayRequestSchema,
   slotLinkPayResponseSchema,
   slotLinkPreviewResponseSchema,
+  type SlotLinkPreviewResponse,
   type SlotLinkStatus,
 } from "../contracts/slot-link";
 import { consumeAbuseBucket } from "../abuse-rate-limit";
@@ -221,7 +222,11 @@ async function overlappingBooking(database: Database, link: LinkRow, now: Date) 
 
 async function linkedBooking(database: Database, link: LinkRow) {
   if (!link.bookingId) return null;
-  const [booking] = await database.select().from(schema.bookings).where(and(
+  const [booking] = await database.select({
+    id: schema.bookings.id,
+    status: schema.bookings.status,
+    expiresAt: schema.bookings.expiresAt,
+  }).from(schema.bookings).where(and(
     eq(schema.bookings.businessId, link.businessId),
     eq(schema.bookings.id, link.bookingId),
   )).limit(1);
@@ -260,7 +265,7 @@ async function writeStatus(database: Database, link: LinkRow, status: SlotLinkSt
   return updated?.status ?? status;
 }
 
-function holdStillActive(booking: typeof schema.bookings.$inferSelect, now: Date) {
+function holdStillActive(booking: { status: string; expiresAt: Date | null }, now: Date) {
   return booking.status === "pending_payment" && Boolean(booking.expiresAt && booking.expiresAt > now);
 }
 
@@ -871,6 +876,77 @@ export async function readSlotLinkPreview(
     date: localDate(link.startsAt, business.timezone),
     time: localClock(link.startsAt, business.timezone),
   });
+}
+
+/** Colunas do link para o cartão. Sem lembrete do dono e sem hash do token. */
+export const slotLinkOgLinkColumns = {
+  id: schema.slotLinks.id,
+  businessId: schema.slotLinks.businessId,
+  serviceId: schema.slotLinks.serviceId,
+  startsAt: schema.slotLinks.startsAt,
+  endsAt: schema.slotLinks.endsAt,
+  expiresAt: schema.slotLinks.expiresAt,
+  status: schema.slotLinks.status,
+  bookingId: schema.slotLinks.bookingId,
+  payStartedAt: schema.slotLinks.payStartedAt,
+  payIdempotencyHash: schema.slotLinks.payIdempotencyHash,
+  replacedByLinkId: schema.slotLinks.replacedByLinkId,
+  createdAt: schema.slotLinks.createdAt,
+  updatedAt: schema.slotLinks.updatedAt,
+};
+
+export const SLOT_LINK_OG_LINK_FIELDS = Object.keys(slotLinkOgLinkColumns);
+
+export type SlotLinkOgCard =
+  | { kind: "unavailable" }
+  | Extract<SlotLinkPreviewResponse, { kind: "slot" }>;
+
+/**
+ * Estado do link para a imagem. Pendente: nome, logo, serviço e horário públicos.
+ * Qualquer outro estado, id inválido ou id inexistente: cartão único, sem loja e sem quem reservou.
+ */
+export async function readSlotLinkOgCard(
+  previewId: string,
+  identity: string | null,
+  database: Database = getDb(),
+  config: BookingConfig = bookingConfig(),
+): Promise<SlotLinkOgCard> {
+  if (!isSlotLinkPreviewId(previewId)) return { kind: "unavailable" };
+  try {
+    await probeLimit(database, "slot-link-preview", identity, config.SLOT_LINK_OPEN_PER_CLIENT);
+    const [row] = await database.select(slotLinkOgLinkColumns).from(schema.slotLinks).where(eq(schema.slotLinks.previewId, previewId)).limit(1);
+    if (!row) return { kind: "unavailable" };
+    const status = await refreshSlotLinkStatus(database, {
+      ...row,
+      previewId,
+      tokenHash: "0".repeat(64),
+      customerLabel: null,
+    }, new Date());
+    if (status !== "pending") return { kind: "unavailable" };
+    const [business] = await database.select({
+      name: schema.businesses.name,
+      logoUrl: schema.businesses.logoUrl,
+      timezone: schema.businesses.timezone,
+    }).from(schema.businesses).where(eq(schema.businesses.id, row.businessId)).limit(1);
+    if (!business) return { kind: "unavailable" };
+    const [service] = await database.select({ name: schema.services.name }).from(schema.services).where(and(
+      eq(schema.services.businessId, row.businessId),
+      eq(schema.services.id, row.serviceId),
+    )).limit(1);
+    if (!service) return { kind: "unavailable" };
+    const card = slotLinkPreviewResponseSchema.parse({
+      kind: "slot",
+      businessName: business.name,
+      logoUrl: business.logoUrl,
+      serviceName: service.name,
+      date: localDate(row.startsAt, business.timezone),
+      time: localClock(row.startsAt, business.timezone),
+    });
+    if (card.kind !== "slot") return { kind: "unavailable" };
+    return card;
+  } catch {
+    return { kind: "unavailable" };
+  }
 }
 
 /** Apaga o lembrete do dono depois que o horário começou. A linha do link fica. */
