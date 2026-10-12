@@ -418,8 +418,7 @@ it("pagamento cancelado continua na tela de cobrança cancelada", async () => {
 
 it("400 invalid_idempotency_key pede para atualizar a página e o botão recarrega", async () => {
   const raw = "Essa chave não é válida. Tente de novo.";
-  const reload = vi.fn();
-  vi.spyOn(window.location, "reload").mockImplementation(reload);
+  const reloads = listenForPageReload();
   const user = userEvent.setup();
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
@@ -439,8 +438,18 @@ it("400 invalid_idempotency_key pede para atualizar a página e o botão recarre
   expect(document.body.textContent).not.toContain(raw);
   expect(screen.queryByText(/Gerar Pix/)).toBeNull();
   await user.click(screen.getByRole("button", { name: STALE_PAGE_RELOAD }));
-  expect(reload).toHaveBeenCalledOnce();
+  expect(reloads()).toBe(1);
 });
+
+/** jsdom não deixa substituir `location.reload`. A chamada real pede outra navegação. */
+function listenForPageReload() {
+  const virtualConsole = (globalThis as { jsdom?: { window: { _settings?: { virtualConsole?: { on: (event: string, listener: (error: Error) => void) => void } } } } }).jsdom?.window._settings?.virtualConsole;
+  let count = 0;
+  virtualConsole?.on("jsdomError", (error: Error) => {
+    if (error.message.includes("navigation to another Document")) count += 1;
+  });
+  return () => count;
+}
 
 it("pagamento expirado não vira a falha de gerar o Pix", async () => {
   const user = userEvent.setup();

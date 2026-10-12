@@ -203,8 +203,7 @@ describe("página da cliente", () => {
 
   it("400 invalid_idempotency_key pede para atualizar, esconde o erro cru e o botão recarrega", async () => {
     const raw = "Essa chave não é válida. Tente de novo.";
-    const reload = vi.fn();
-    vi.spyOn(window.location, "reload").mockImplementation(reload);
+    const reloads = listenForPageReload();
     const user = userEvent.setup();
     const stores = memorySlotLinkStores();
     const blocked = "00000000-0000-4000-8000-000000000000";
@@ -225,8 +224,18 @@ describe("página da cliente", () => {
     expect(screen.queryByRole("heading", { name: "Este link não está mais disponível." })).toBeNull();
     expect(stores.claim.snapshot[await slotLinkStorageKey(token)]).toBeUndefined();
     await user.click(screen.getByRole("button", { name: STALE_PAGE_RELOAD }));
-    expect(reload).toHaveBeenCalledOnce();
+    expect(reloads()).toBe(1);
   });
+
+  /** jsdom não deixa substituir `location.reload`. A chamada real pede outra navegação. */
+  function listenForPageReload() {
+    const virtualConsole = (globalThis as { jsdom?: { window: { _settings?: { virtualConsole?: { on: (event: string, listener: (error: Error) => void) => void } } } } }).jsdom?.window._settings?.virtualConsole;
+    let count = 0;
+    virtualConsole?.on("jsdomError", (error: Error) => {
+      if (error.message.includes("navigation to another Document")) count += 1;
+    });
+    return () => count;
+  }
 
   it("409 idempotency_conflict reenvia o payload salvo e volta ao mesmo Pix", async () => {
     const user = userEvent.setup();
