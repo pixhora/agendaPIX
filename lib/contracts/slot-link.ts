@@ -30,6 +30,8 @@ export const SLOT_LINK_CUSTOMER_LABEL_MAX = 80;
 /**
  * `Idempotency-Key` do POST de pagamento. Aleatório, gerado pelo cliente.
  * Aceita base64url e UUID (hífen entra na classe). 16 a 128 caracteres.
+ * A chave constante `00000000-0000-4000-8000-000000000000` cabe neste formato
+ * e o servidor recusa com `invalid_idempotency_key`.
  */
 export const SLOT_LINK_IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
 
@@ -58,6 +60,7 @@ export const SLOT_LINK_ERROR_CODES = [
   "mp_not_connected",
   "bookings_paused",
   "idempotency_conflict",
+  "invalid_idempotency_key",
   "invalid_input",
   "rate_limited",
   "unauthorized",

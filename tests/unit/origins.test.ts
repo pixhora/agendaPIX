@@ -21,6 +21,43 @@ it("allows credentialed preflight for exact localhost:3000", async () => {
   expect(response.headers.get("vary")).toContain("Origin");
 });
 
+it("aceita Origin null somente com Sec-Fetch-Site same-origin", async () => {
+  const run = vi.fn(async () => Response.json({ ok: true }));
+  const response = await withAppCors(new Request("http://localhost:3000/api/public/salao/bookings", {
+    method: "POST",
+    headers: { origin: "null", "Sec-Fetch-Site": "same-origin" },
+  }), run);
+  expect(response.status).toBe(200);
+  expect(run).toHaveBeenCalledOnce();
+  expect(response.headers.get("access-control-allow-origin")).toBe("null");
+  expect(response.headers.get("access-control-allow-credentials")).toBe("true");
+});
+
+it.each([
+  { origin: "null" },
+  { origin: "null", "sec-fetch-site": "cross-site" },
+  { origin: "null", "sec-fetch-site": "same-site" },
+  { origin: "null", "sec-fetch-site": "none" },
+])("recusa Origin null fora de same-origin %#", async (headers) => {
+  const run = vi.fn();
+  const response = await withAppCors(new Request("http://localhost:3000/api/public/salao/bookings", { method: "POST", headers }), run);
+  expect(response.status).toBe(403);
+  expect(await response.json()).toMatchObject({ error: { code: "origin_not_allowed", message: "Origem da solicitação não permitida." } });
+  expect(response.headers.has("access-control-allow-origin")).toBe(false);
+  expect(run).not.toHaveBeenCalled();
+});
+
+it("origem fora da lista continua falhando, mesmo com Sec-Fetch-Site same-origin", async () => {
+  const run = vi.fn();
+  const response = await withAppCors(new Request("http://localhost:3000/api/public/salao/bookings", {
+    method: "POST",
+    headers: { origin: "https://evil.example", "Sec-Fetch-Site": "same-origin" },
+  }), run);
+  expect(response.status).toBe(403);
+  expect(await response.json()).toMatchObject({ error: { code: "origin_not_allowed" } });
+  expect(run).not.toHaveBeenCalled();
+});
+
 it.each(["http://untrusted.example", "http://localhost:3000.evil.example", "http://127.0.0.1:3000", "null", "http://localhost:3000/path", "http://localhost:3000/", "http://LOCALHOST:3000", "http://localhost:3001", "http://localhost:3005", "http://localhost:3343"])("rejects origin %s before running the handler", async (origin) => {
   const run = vi.fn();
   const response = await withAppCors(new Request("http://localhost:3000/api/auth", { headers: { origin } }), run);

@@ -20,6 +20,7 @@ export const PROFILE_ERROR_COPY: Record<ApiErrorCode, string> = {
   slot_unavailable: "Esse horário acabou de ser reservado.",
   mp_not_connected: "Conecte o Mercado Pago para cobrar sinal.",
   bookings_paused: "Este estabelecimento não está aceitando novos agendamentos no momento.",
+  invalid_idempotency_key: "Essa chave não é válida. Tente de novo.",
 };
 
 export function profileErrorCopy(code: string, fallback = PROFILE_ERROR_COPY.internal_error): string {

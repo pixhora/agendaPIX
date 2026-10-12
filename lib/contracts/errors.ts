@@ -23,6 +23,7 @@ export const apiErrorCodeSchema = z.enum([
   "slot_unavailable",
   "mp_not_connected",
   "bookings_paused",
+  "invalid_idempotency_key",
 ]);
 
 export type ApiErrorCode = z.infer<typeof apiErrorCodeSchema>;

@@ -1,4 +1,4 @@
-import { configuredAppOrigins, logRejectedAppOrigin, originEqualsAllowed, pairedHostOrigin } from "./app-origins";
+import { configuredAppOrigins, logRejectedAppOrigin, opaqueNullOriginAllowed, originEqualsAllowed, pairedHostOrigin } from "./app-origins";
 import { authEnvSchema } from "./env";
 import { handleHttp, HttpError } from "./http";
 
@@ -22,11 +22,16 @@ export function trustedAppOrigins(env: Readonly<Record<string, string | undefine
   return allowed;
 }
 
-/** Header cru, comparado à allowlist já normalizada. Ausente, vazio, `null` ou diferente: recusa. Não consulta Referer. */
+/**
+ * Header cru, comparado à allowlist já normalizada. Ausente: recusa aqui
+ * (`withAppCors` segue sem Origin). Vazio ou diferente da lista: recusa.
+ * O literal `null` só passa com `Sec-Fetch-Site: same-origin`. Não consulta Referer.
+ */
 export function isAllowedAppOrigin(request: Request, env: Readonly<Record<string, string | undefined>> = process.env) {
   const allowed = trustedAppOrigins(env);
   const raw = request.headers.get("origin");
   if (raw === null) return false;
+  if (opaqueNullOriginAllowed(raw, request.headers.get("sec-fetch-site"))) return true;
   if (originEqualsAllowed(raw, allowed)) return true;
   logRejectedAppOrigin(raw, allowed);
   return false;
