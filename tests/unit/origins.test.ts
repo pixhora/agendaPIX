@@ -33,12 +33,9 @@ it("aceita Origin null somente com Sec-Fetch-Site same-origin", async () => {
   expect(response.headers.get("access-control-allow-credentials")).toBe("true");
 });
 
-it.each([
-  { origin: "null" },
-  { origin: "null", "sec-fetch-site": "cross-site" },
-  { origin: "null", "sec-fetch-site": "same-site" },
-  { origin: "null", "sec-fetch-site": "none" },
-])("recusa Origin null fora de same-origin %#", async (headers) => {
+it.each([undefined, "cross-site", "same-site", "none"] as const)("recusa Origin null fora de same-origin (%s)", async (site) => {
+  const headers = new Headers({ origin: "null" });
+  if (site) headers.set("sec-fetch-site", site);
   const run = vi.fn();
   const response = await withAppCors(new Request("http://localhost:3000/api/public/salao/bookings", { method: "POST", headers }), run);
   expect(response.status).toBe(403);
