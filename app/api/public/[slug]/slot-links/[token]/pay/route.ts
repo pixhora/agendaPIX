@@ -3,7 +3,7 @@ import { bookingClientIdentity } from "@/lib/bookings/rate-limit";
 import { paySlotLink } from "@/lib/bookings/slot-link";
 import { redactSlotLinkError, withSlotLinkPrivacy } from "@/lib/bookings/slot-link-http";
 import { json, parseJsonBody, readBody, withTiming } from "@/lib/http";
-import { appPreflight } from "@/lib/origins";
+import { appPreflight, publicPaymentOrigin } from "@/lib/origins";
 
 export const runtime = "nodejs";
 
@@ -17,10 +17,10 @@ export async function POST(request: Request, context: RouteContext<"/api/public/
     } catch (error) {
       throw redactSlotLinkError(error, token);
     }
-  });
+  }, publicPaymentOrigin);
   return withSlotLinkPrivacy(response);
 }
 
 export async function OPTIONS(request: Request) {
-  return withSlotLinkPrivacy(await appPreflight(request, ["POST"]));
+  return withSlotLinkPrivacy(await appPreflight(request, ["POST"], publicPaymentOrigin));
 }

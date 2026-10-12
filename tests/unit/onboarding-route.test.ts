@@ -33,6 +33,49 @@ it("returns safe 503 on session infrastructure errors", async () => {
   expect(response.status).toBe(503);
   expect(await response.text()).not.toContain("PRIVATE_ERROR");
 });
+it("recusa a chave de idempotência zerada antes de ler a sessão", async () => {
+  const response = await POST(new Request("http://localhost:3000/api/onboarding", {
+    method: "POST",
+    headers: {
+      origin: "http://localhost:3000",
+      "content-type": "application/json",
+      "idempotency-key": "00000000-0000-4000-8000-000000000000",
+    },
+    body: "{}",
+  }));
+  expect(response.status).toBe(400);
+  expect(await response.json()).toEqual({
+    error: { code: "invalid_idempotency_key", message: "Essa chave não é válida. Tente de novo." },
+  });
+  expect(mocks.session).not.toHaveBeenCalled();
+  expect(mocks.provision).not.toHaveBeenCalled();
+});
+
+it("recusa Origin null no onboarding mesmo com same-origin", async () => {
+  const response = await POST(new Request("http://localhost:3000/api/onboarding", {
+    method: "POST",
+    headers: { origin: "null", "sec-fetch-site": "same-origin", "idempotency-key": "6f1c2a40-7b52-4a1e-9c33-0d5e8a7b1c24" },
+    body: "{}",
+  }));
+  expect(response.status).toBe(403);
+  expect(await response.json()).toMatchObject({ error: { code: "origin_not_allowed" } });
+  expect(response.headers.has("access-control-allow-origin")).toBe(false);
+  expect(response.headers.has("access-control-allow-credentials")).toBe(false);
+  expect(mocks.session).not.toHaveBeenCalled();
+  expect(mocks.provision).not.toHaveBeenCalled();
+});
+
+it("recusa o preflight do onboarding com Origin null", async () => {
+  const response = await OPTIONS(new Request("http://localhost:3000/api/onboarding", {
+    method: "OPTIONS",
+    headers: { origin: "null", "sec-fetch-site": "same-origin", "access-control-request-method": "POST" },
+  }));
+  expect(response.status).toBe(403);
+  expect(await response.json()).toMatchObject({ error: { code: "origin_not_allowed" } });
+  expect(response.headers.has("access-control-allow-origin")).toBe(false);
+  expect(response.headers.has("access-control-allow-credentials")).toBe(false);
+});
+
 it("allows credentialed onboarding preflight including idempotency header", async () => {
   const response = await OPTIONS(new Request("http://localhost:3000/api/onboarding", { method: "OPTIONS", headers: { origin: "http://localhost:3000", "access-control-request-method": "POST", "access-control-request-headers": "Content-Type, Idempotency-Key" } }));
   expect(response.status).toBe(204);
