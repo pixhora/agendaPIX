@@ -248,6 +248,10 @@ test("gerar o link não reserva: a página normal ocupa e o link avisa sem criar
 
   // No master, horário ocupado usa a logo da loja. Sem logo a tag some e o teste esperava o previewId.
   const storeLogo = "https://cdn.example/e2e-logo-da-loja.png";
+  const originalLogo = await withPool(async (pool) => {
+    const { rows } = await pool.query<{ logo_url: string | null }>("select logo_url from businesses where slug = $1", [meta.businessASlug]);
+    return rows[0]?.logo_url ?? null;
+  });
   await withPool((pool) => pool.query("update businesses set logo_url = $1 where slug = $2", [storeLogo, meta.businessASlug]));
   try {
     const response = await page.goto(`/${meta.businessASlug}/h/${token}`);
@@ -268,7 +272,7 @@ test("gerar o link não reserva: a página normal ocupa e o link avisa sem criar
     expect(ogImage ?? "").not.toContain("/og/slot-link/");
     if (testInfo.project.name === "desktop") await shoot(page, "cliente-ocupado");
   } finally {
-    await withPool((pool) => pool.query("update businesses set logo_url = null where slug = $1", [meta.businessASlug]));
+    await withPool((pool) => pool.query("update businesses set logo_url = $1 where slug = $2", [originalLogo, meta.businessASlug]));
   }
 });
 
