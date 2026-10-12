@@ -12,7 +12,10 @@ export const CONFIRMING_PAYMENT_LABEL = "Confirmando pagamento";
  * Pix pago com reserva vencida ou cancelada vai para devolução, nunca para sucesso.
  */
 export function pixUiPhase(
-  data: Pick<BookingResponse, "status" | "payment"> | Pick<PaymentStatusResponse, "status" | "payment"> | null | undefined,
+  data: (
+    | (Pick<BookingResponse, "status" | "payment"> & { chargeFailed?: boolean })
+    | Pick<PaymentStatusResponse, "status" | "payment" | "chargeFailed">
+  ) | null | undefined,
 ): PixUiPhase {
   if (!data) return "pending";
   const paymentStatus = data.payment?.status;
@@ -21,6 +24,8 @@ export function pixUiPhase(
   if (data.status === "confirmed" || data.status === "completed") return "paid";
   if (paymentStatus === "paid" && data.status === "pending_payment") return "confirming";
   if (paymentStatus === "paid" && (data.status === "expired" || data.status === "cancelled")) return "refund_pending";
+  // GET /payment: chargeFailed true só quando o Pix não foi criado. O status failed continua o fallback.
+  if ("chargeFailed" in data && data.chargeFailed === true) return "charge_failed";
   if (data.status === "expired" || paymentStatus === "expired") return "expired";
   if (data.status === "cancelled" || paymentStatus === "cancelled") return "cancelled";
   if (paymentStatus === "failed") return "charge_failed";

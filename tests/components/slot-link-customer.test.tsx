@@ -27,6 +27,16 @@ vi.mock("@/components/booking/BookingConfirmation", () => ({
   BookingConfirmation: () => <p>Horário confirmado!</p>,
 }));
 
+function expectChargeFailedIcon() {
+  const icon = screen.getByRole("alert").querySelector("svg");
+  expect(icon).not.toBeNull();
+  expect(icon).toHaveAttribute("aria-hidden", "true");
+  expect(icon).toHaveAttribute("width", "32");
+  expect(icon).toHaveAttribute("height", "32");
+  expect(icon).toHaveClass("mx-auto");
+  expect(icon).toHaveClass("text-ink");
+}
+
 const service = { id: "6b0b4a2e-1c3d-4e5f-8a9b-0c1d2e3f4a5b", name: "Corte feminino", durationMinutes: 45, priceCents: 12000, depositCents: 4000 };
 const token = createSlotLinkToken();
 
@@ -698,6 +708,7 @@ describe("página da cliente", () => {
     await fillAndPay(user);
     expect(await screen.findByRole("heading", { name: PIX_CHARGE_FAILED_TITLE })).toBeVisible();
     expect(screen.getByText(PIX_CHARGE_FAILED_BODY)).toBeVisible();
+    expectChargeFailedIcon();
     expect(screen.queryByRole("heading", { name: "Pagamento cancelado" })).toBeNull();
     const store = screen.getByRole("link", { name: TALK_TO_STORE });
     expect(store).toHaveAttribute("href", "https://wa.me/5511988887777");
