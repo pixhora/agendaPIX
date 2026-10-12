@@ -62,6 +62,18 @@ async function freeSlot(page: Page, id: string, date: string) {
   return { startsAt: slot.startsAt, time: localTime(slot.startsAt), date };
 }
 
+/** O teste de horários fecha o domingo. Um offset fixo pode cair nesse dia. */
+async function openFreeSlot(page: Page, id: string, startOffset: number) {
+  for (let offset = startOffset; offset < startOffset + 21; offset += 1) {
+    const date = saoPauloDay(offset);
+    const response = await page.request.get(`/api/public/${meta.businessASlug}/availability?serviceId=${id}&date=${date}`);
+    const body = await response.json() as { slots?: { startsAt: string }[] };
+    const slot = body.slots?.[body.slots.length - 1];
+    if (slot) return { startsAt: slot.startsAt, time: localTime(slot.startsAt), date };
+  }
+  throw new Error(`Sem horário livre a partir de ${saoPauloDay(startOffset)}`);
+}
+
 async function occupySlot(linkId: string, priceCents: number, depositCents: number) {
   await withPool(async (pool) => {
     const link = await pool.query<{ starts_at: Date; ends_at: Date; service_id: string }>(
@@ -486,7 +498,7 @@ test("dono gera o link na agenda e a prévia do horário responde imagem", async
   await page.locator("dialog").getByRole("radiogroup", { name: "Horário" }).getByRole("radio").first().click();
   await expect(page.getByText("O horário só fica reservado quando a cliente pagar o sinal.")).toBeVisible();
   await shoot(page, "dono-sheet");
-  await page.getByRole("button", { name: "Gerar link" }).click();
+  await page.getByRole("dialog", { name: "Mandar um horário" }).getByRole("button", { name: "Gerar link", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Link pronto" })).toBeVisible();
   await expect(page.getByText(/Vale até .+ ou até alguém ocupar o horário/)).toBeVisible();
   await shootMatrix(page, "dono-link-pronto");
@@ -506,7 +518,7 @@ test("dono gera o link na agenda e a prévia do horário responde imagem", async
   const imageUrl = await page.locator('meta[property="og:image"]').count();
   void imageUrl;
   const service = await serviceId(page);
-  const slot = await freeSlot(page, service.id, saoPauloDay(6));
+  const slot = await openFreeSlot(page, service.id, 6);
   const created = await createLink(page, service.id, slot.date, slot.time);
   expect(created.status).toBe(201);
   const previewId = created.body.previewId as string;

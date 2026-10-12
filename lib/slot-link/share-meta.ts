@@ -140,7 +140,9 @@ export async function slotLinkShareMeta(slug: string, token: string, now = Date.
   try {
     const raw = parseSlotLinkPreview(await readPreview(row.previewId, identity));
     const copy = slotLinkOgCopy(raw);
-    const meta = { ...copy, image: raw.kind === "slot" ? slotLinkOgImagePath(row.previewId) : raw.logoUrl };
+    // Os dois kinds usam /og/slot-link/{previewId}. O generic (ocupado, expirado, pago)
+    // não tem logo obrigatória: sem essa URL o og:image some. O token não entra no caminho.
+    const meta = { ...copy, image: slotLinkOgImagePath(row.previewId) };
     writeShareMetaCache(shareMetaCache, cacheKey, now, meta);
     return meta;
   } catch {

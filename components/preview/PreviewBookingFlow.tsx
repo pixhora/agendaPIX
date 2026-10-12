@@ -141,7 +141,7 @@ export function PreviewBookingFlow({
   const [selectedService, setSelectedService] = useState<PublicService | null>(openingService);
   const [selectedSlot, setSelectedSlot] = useState<AvailabilitySlot | null>(openingSlot);
   const [customerName, setCustomerName] = useState("Juliana Mendes");
-  const [customerPhone, setCustomerPhone] = useState("(00) 00000-0000");
+  const [customerPhone, setCustomerPhone] = useState("(11) 98888-7777");
   const [customerCpf, setCustomerCpf] = useState("529.982.247-25");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
