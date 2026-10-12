@@ -109,6 +109,16 @@ describe("token do link", () => {
     expect(previewId).toMatch(SLOT_LINK_PREVIEW_ID_PATTERN);
     expect(previewId).not.toBe(token);
     expect(token.includes(".")).toBe(false);
+    const ids = new Set(Array.from({ length: 32 }, () => createSlotLinkPreviewId()));
+    expect(ids.size).toBe(32);
+    for (const id of ids) {
+      expect(id).toMatch(SLOT_LINK_PREVIEW_ID_PATTERN);
+      expect(/^\d+$/.test(id)).toBe(false);
+      expect(id).not.toBe(token);
+      expect(token.includes(id)).toBe(false);
+      expect(slotLinkTokenHash(token).includes(id)).toBe(false);
+      expect(Buffer.from(token, "base64url").subarray(0, 16).toString("base64url")).not.toBe(id);
+    }
   });
 
   it("redige o token no path e não deixa o valor bruto na mensagem", () => {

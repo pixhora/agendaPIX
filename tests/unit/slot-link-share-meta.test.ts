@@ -86,26 +86,23 @@ describe("generateMetadata da prévia", () => {
     expect(shareMetaCacheRecord(slug, token)?.negative).toBe(false);
   });
 
-  it("preview conhecido que não está pending usa a logo da loja, não a rota do previewId", async () => {
+  it("preview conhecido que não está pending aponta og:image para a rota do previewId", async () => {
     const { known, options } = ports();
     const token = createSlotLinkToken();
     const previewId = "previewocupado0000001";
-    const storeLogo = "https://cdn.example/logo-da-loja.png";
     remember(known, token, previewId);
     const meta = await slotLinkShareMeta(slug, token, 1_700_000_000_000, {
       ...options("peer:taken"),
       readPreview: async () => ({
         kind: "generic",
         businessName: "Negócio de teste",
-        logoUrl: storeLogo,
+        logoUrl: "https://cdn.example/logo-da-loja.png",
       }),
     });
     expect(meta.title).toBe("Negócio de teste · Agende pelo AgendaPix");
-    expect(meta.title).not.toContain(token);
-    expect(meta.image).toBe(storeLogo);
-    expect(meta.image).not.toContain(token);
-    expect(meta.image).not.toContain(previewId);
-    expect(meta.image).not.toContain("/og/slot-link/");
+    expect(meta.image).toBe(`/og/slot-link/${previewId}`);
+    expect(meta.title + (meta.image ?? "")).not.toContain(token);
+    expect(meta.image).not.toContain("logo-da-loja");
   });
 
   it("tokens falsos estouram o balde e o seguinte não consulta o token", async () => {

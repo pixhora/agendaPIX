@@ -31,6 +31,20 @@ export function slotLinkOgLines(preview: SlotLinkPreviewView): string[] {
   return [preview.businessName, preview.serviceName, `${formatDayMonth(preview.date)} às ${preview.time}`, "Sinal no Pix"];
 }
 
+export const UNAVAILABLE_OG_TEXT = "Este horário não está mais disponível";
+
+/**
+ * Cartão único de ocupado, expirado, pago e id inexistente.
+ * Sem nome de loja: um id que não existe não tem loja, e pintar a loja revelaria quais ids existem.
+ */
+export const UNAVAILABLE_OG_PREVIEW: SlotLinkPreviewView = {
+  kind: "generic",
+  businessName: "AgendaPix",
+  logoUrl: null,
+};
+
+export const UNAVAILABLE_OG_LINES = ["AgendaPix", UNAVAILABLE_OG_TEXT] as const;
+
 export const GENERIC_OG_FALLBACK: SlotLinkPreviewView = {
   kind: "generic",
   businessName: "AgendaPix",

@@ -140,7 +140,8 @@ export async function slotLinkShareMeta(slug: string, token: string, now = Date.
   try {
     const raw = parseSlotLinkPreview(await readPreview(row.previewId, identity));
     const copy = slotLinkOgCopy(raw);
-    const meta = { ...copy, image: raw.kind === "slot" ? slotLinkOgImagePath(row.previewId) : raw.logoUrl };
+    // Ocupado, expirado e pago também usam /og/slot-link/{previewId}. A rota desenha o cartão único. O token não entra.
+    const meta = { ...copy, image: slotLinkOgImagePath(row.previewId) };
     writeShareMetaCache(shareMetaCache, cacheKey, now, meta);
     return meta;
   } catch {

@@ -4,6 +4,14 @@ import { ImageResponse } from "next/og";
 import { brandColors } from "@/lib/brand/colors";
 import { slotLinkOgLines, type SlotLinkPreviewView } from "./preview";
 
+function lineLook(line: string) {
+  const accent = line === "Sinal no Pix" || line === "Agende pelo AgendaPix";
+  return {
+    fontSize: accent ? 36 : line.length > 28 ? 44 : 56,
+    color: accent ? brandColors.pix : brandColors.ink,
+  };
+}
+
 function toArrayBuffer(data: Buffer): ArrayBuffer {
   return data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer;
 }
@@ -23,10 +31,9 @@ async function loadFonts() {
   };
 }
 
-/** Cartão 1200×630. O kind decide o texto: horário fixo ou só a loja. */
-export async function renderSlotLinkOg(preview: SlotLinkPreviewView) {
+/** Cartão 1200×630. `lines` troca o texto; o padrão segue o kind. */
+export async function renderSlotLinkOg(preview: SlotLinkPreviewView, lines: readonly string[] = slotLinkOgLines(preview)) {
   const { fonts, iconSrc } = await loadFonts();
-  const lines = slotLinkOgLines(preview);
   const logo = preview.logoUrl && /^https:\/\//.test(preview.logoUrl) ? preview.logoUrl : iconSrc;
   const [title, ...rest] = lines;
   return new ImageResponse(
@@ -57,9 +64,9 @@ export async function renderSlotLinkOg(preview: SlotLinkPreviewView) {
               key={line}
               style={{
                 display: "flex",
-                fontSize: line === "Sinal no Pix" || line === "Agende pelo AgendaPix" ? 36 : 56,
+                fontSize: lineLook(line).fontSize,
                 fontWeight: 700,
-                color: line === "Sinal no Pix" || line === "Agende pelo AgendaPix" ? brandColors.pix : brandColors.ink,
+                color: lineLook(line).color,
                 marginTop: 12,
                 letterSpacing: -1,
               }}
