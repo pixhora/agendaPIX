@@ -36,11 +36,13 @@ describe("cartão OG do link", () => {
     expect(fn).not.toContain("depositCents");
     expect(fn).not.toContain("customerId");
     const og = source.slice(source.indexOf("export async function readSlotLinkOgCard"), source.indexOf("export async function purgeExpiredSlotLinkLabels"));
-    expect(og).toContain("customerLabel: null");
-    expect(og).not.toContain("schema.slotLinks.customerLabel");
-    expect(og).not.toContain("schema.slotLinks.tokenHash");
+    expect(og).toContain("deriveSlotLinkStatus");
+    expect(og).not.toContain("refreshSlotLinkStatus");
+    expect(og).not.toContain("tokenHash");
+    expect(og).not.toContain("customerLabel");
     expect(og).not.toContain("schema.customers");
     expect(og).not.toContain("amountCents");
+    expect(og).toContain("probeLimit");
     expect(og).toContain("name: schema.businesses.name");
     expect(og).toContain("logoUrl: schema.businesses.logoUrl");
     expect(og).toContain("name: schema.services.name");

@@ -203,7 +203,9 @@ async function requireMercadoPago(businessId: string, database: Database, messag
   }
 }
 
-async function overlappingBooking(database: Database, link: LinkRow, now: Date) {
+type SlotLinkFactInput = Pick<LinkRow, "id" | "businessId" | "startsAt" | "endsAt" | "bookingId" | "payIdempotencyHash">;
+
+async function overlappingBooking(database: Database, link: SlotLinkFactInput, now: Date) {
   const ownKey = link.payIdempotencyHash ? slotLinkRequestKey(link.payIdempotencyHash) : null;
   const filters = [
     eq(schema.bookings.businessId, link.businessId),
@@ -220,7 +222,7 @@ async function overlappingBooking(database: Database, link: LinkRow, now: Date) 
   return row ?? null;
 }
 
-async function linkedBooking(database: Database, link: LinkRow) {
+async function linkedBooking(database: Database, link: Pick<LinkRow, "businessId" | "bookingId">) {
   if (!link.bookingId) return null;
   const [booking] = await database.select({
     id: schema.bookings.id,
@@ -233,7 +235,7 @@ async function linkedBooking(database: Database, link: LinkRow) {
   return booking ?? null;
 }
 
-async function confirmedSlotLinkBooking(database: Database, link: LinkRow) {
+async function confirmedSlotLinkBooking(database: Database, link: Pick<LinkRow, "businessId" | "id">) {
   const [row] = await database.select({ id: schema.bookings.id }).from(schema.slotLinkBookings).innerJoin(schema.bookings, and(
     eq(schema.bookings.businessId, schema.slotLinkBookings.businessId),
     eq(schema.bookings.id, schema.slotLinkBookings.bookingId),
@@ -269,27 +271,50 @@ function holdStillActive(booking: { status: string; expiresAt: Date | null }, no
   return booking.status === "pending_payment" && Boolean(booking.expiresAt && booking.expiresAt > now);
 }
 
-/** Recalcula o status no banco. Pago e cancelado não voltam atrás. */
-export async function refreshSlotLinkStatus(database: Database, link: LinkRow, now: Date): Promise<SlotLinkStatus> {
+export type SlotLinkStatusView = Pick<LinkRow, "status" | "startsAt" | "expiresAt">;
+
+export type SlotLinkStatusFacts = {
+  overlap: { id: string } | null;
+  booking: { id: string; status: string; expiresAt: Date | null } | null;
+  origin: { id: string } | null;
+};
+
+/**
+ * Status que o link teria agora, sem gravar.
+ * Usa a linha, a reserva sobreposta, o hold do `bookingId` e `expiresAt`.
+ */
+export function deriveSlotLinkStatus(link: SlotLinkStatusView, facts: SlotLinkStatusFacts, now: Date): SlotLinkStatus {
   if (link.status === "cancelled" || link.status === "replaced") return link.status;
   if (link.status === "paid") return "paid";
+  if (facts.origin) return "paid";
+  if (facts.booking && (facts.booking.status === "confirmed" || facts.booking.status === "completed")) return "paid";
+  if (link.startsAt <= now) return "expired";
+  if (facts.overlap) return "taken";
+  if (facts.booking && !holdStillActive(facts.booking, now)) return "expired";
+  if (link.expiresAt <= now) return "expired";
+  return "pending";
+}
+
+async function loadSlotLinkStatusFacts(database: Database, link: SlotLinkFactInput, now: Date): Promise<SlotLinkStatusFacts> {
   const [booking, overlap, origin] = await Promise.all([
     linkedBooking(database, link),
     overlappingBooking(database, link, now),
     confirmedSlotLinkBooking(database, link),
   ]);
+  return { booking, overlap, origin };
+}
+
+/** Recalcula o status e grava. Pago e cancelado não voltam atrás. Quem já chamava continua gravando. */
+export async function refreshSlotLinkStatus(database: Database, link: LinkRow, now: Date): Promise<SlotLinkStatus> {
+  if (link.status === "cancelled" || link.status === "replaced") return link.status;
+  if (link.status === "paid") return "paid";
+  const facts = await loadSlotLinkStatusFacts(database, link, now);
   // Reserva antiga reconfirmada (`late_rebooked`) marca o link, mesmo que `booking_id` já aponte para outra.
-  if (origin) return pointLinkAtPaidBooking(database, link, origin.id, now);
-  if (booking && (booking.status === "confirmed" || booking.status === "completed")) {
-    return pointLinkAtPaidBooking(database, link, booking.id, now);
+  if (facts.origin) return pointLinkAtPaidBooking(database, link, facts.origin.id, now);
+  if (facts.booking && (facts.booking.status === "confirmed" || facts.booking.status === "completed")) {
+    return pointLinkAtPaidBooking(database, link, facts.booking.id, now);
   }
-  if (link.startsAt <= now) return writeStatus(database, link, "expired", now);
-  if (overlap) return writeStatus(database, link, "taken", now);
-  // Hold da reserva atual venceu e nenhuma reserva deste link confirmou: o link expira.
-  // `late_no_slot` não marca pago. Claim novo ainda passa enquanto o prazo do link existir.
-  if (booking && !holdStillActive(booking, now)) return writeStatus(database, link, "expired", now);
-  if (link.expiresAt <= now) return writeStatus(database, link, "expired", now);
-  return writeStatus(database, link, "pending", now);
+  return writeStatus(database, link, deriveSlotLinkStatus(link, facts, now), now);
 }
 
 export async function createSlotLink(businessId: string, ownerId: string, body: unknown, database: Database = getDb()) {
@@ -913,16 +938,18 @@ export async function readSlotLinkOgCard(
 ): Promise<SlotLinkOgCard> {
   if (!isSlotLinkPreviewId(previewId)) return { kind: "unavailable" };
   try {
-    await probeLimit(database, "slot-link-preview", identity, config.SLOT_LINK_OPEN_PER_CLIENT);
     const [row] = await database.select(slotLinkOgLinkColumns).from(schema.slotLinks).where(eq(schema.slotLinks.previewId, previewId)).limit(1);
-    if (!row) return { kind: "unavailable" };
-    const status = await refreshSlotLinkStatus(database, {
-      ...row,
-      previewId,
-      tokenHash: "0".repeat(64),
-      customerLabel: null,
-    }, new Date());
-    if (status !== "pending") return { kind: "unavailable" };
+    if (!row) {
+      try {
+        await probeLimit(database, "slot-link-preview", identity, config.SLOT_LINK_OPEN_PER_CLIENT);
+      } catch {
+        // Balde cheio: o cartão continua 200. A rota não responde 429.
+      }
+      return { kind: "unavailable" };
+    }
+    const now = new Date();
+    const facts = await loadSlotLinkStatusFacts(database, row, now);
+    if (deriveSlotLinkStatus(row, facts, now) !== "pending") return { kind: "unavailable" };
     const [business] = await database.select({
       name: schema.businesses.name,
       logoUrl: schema.businesses.logoUrl,
