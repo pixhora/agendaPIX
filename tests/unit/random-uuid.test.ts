@@ -53,4 +53,36 @@ describe("randomUuid", () => {
     expect(key).toMatch(V4);
     expect(key).not.toBe(ZERO_UUID);
   });
+
+  it("throws when all eight attempts stay on the zero uuid", () => {
+    let calls = 0;
+    vi.stubGlobal("crypto", {
+      randomUUID: () => ZERO_UUID,
+      getRandomValues: (buffer: ArrayBufferView) => {
+        calls += 1;
+        new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength).fill(0);
+        return buffer;
+      },
+    });
+    expect(() => randomUuid()).toThrow(new Error("Could not mint a UUID"));
+    expect(calls).toBe(8);
+  });
+
+  it("accepts a real value on the eighth attempt", () => {
+    let calls = 0;
+    vi.stubGlobal("crypto", {
+      getRandomValues: (buffer: ArrayBufferView) => {
+        calls += 1;
+        const bytes = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+        bytes.fill(0);
+        if (calls === 8) bytes[0] = 0xab;
+        return buffer;
+      },
+    });
+    const key = randomUuid();
+    expect(calls).toBe(8);
+    expect(key).toMatch(V4);
+    expect(key).not.toBe(ZERO_UUID);
+    expect(key.startsWith("ab")).toBe(true);
+  });
 });

@@ -28,10 +28,7 @@ function uuidV4FromRandomValues(source: Crypto): string {
     const minted = formatUuidV4(bytes);
     if (minted !== ZERO_UUID) return minted;
   }
-  bytes[0] |= 0x01;
-  const minted = formatUuidV4(bytes);
-  if (minted === ZERO_UUID) throw new Error("Could not mint a UUID");
-  return minted;
+  throw new Error("Could not mint a UUID");
 }
 
 /** Copia os bytes e marca versão 4 e variante RFC 4122. */
