@@ -7,6 +7,8 @@ const COMMIT = JSON.stringify({
   businessId: "00000000-0000-4000-8000-0000000000a1",
 });
 
+const CONNECT_HEADING = /Último passo: receber o sinal no Pix/;
+
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test.beforeEach(async ({ page }) => {
@@ -19,11 +21,11 @@ test("marcar a autorização do Mercado Pago não deixa a tela em branco", async
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.goto("/onboarding/recebimento");
-  await expect(page.getByRole("heading", { name: /Conecte sua conta Mercado Pago/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: CONNECT_HEADING })).toBeVisible();
   await page.locator("label").filter({ hasText: "Entendi e autorizo" }).click();
   await expect(page.getByRole("checkbox", { name: /Entendi e autorizo/ })).toBeChecked();
   await expect(page.getByRole("button", { name: "Continuar para o Mercado Pago" })).toBeInViewport();
-  await expect(page.getByRole("heading", { name: /Conecte sua conta Mercado Pago/ })).toBeAttached();
+  await expect(page.getByRole("heading", { name: CONNECT_HEADING })).toBeAttached();
   const shellScroll = await page.locator("[data-mp-shell]").evaluate((node) => node.scrollTop);
   expect(shellScroll).toBe(0);
   expect(pageErrors).toEqual([]);
@@ -54,7 +56,7 @@ test("o error boundary do retorno do Mercado Pago oferece tentar de novo", async
   expect(logged.some((line) => line.includes("onboarding_mp_return") && line.includes("onboarding_mp_return_probe"))).toBe(true);
   await page.getByRole("button", { name: "Tentar de novo" }).click();
   await expect(page).toHaveURL(/\/onboarding\/recebimento$/);
-  await expect(page.getByRole("heading", { name: /Conecte sua conta Mercado Pago/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: CONNECT_HEADING })).toBeVisible();
   const draft = await page.evaluate(() => ({
     draft: localStorage.getItem("agenda_onboarding_draft"),
     step: localStorage.getItem("agenda_onboarding_step"),

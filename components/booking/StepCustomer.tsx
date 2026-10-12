@@ -48,6 +48,8 @@ interface StepCustomerProps {
   summaryClassName?: string;
   /** Espelha `LEGAL_PAGES_PUBLISHED`. Desligado: o link de privacidade não aparece. */
   legalPagesPublished?: boolean;
+  /** A demonstração mostra o formato sem número inventado. O agendamento real mantém o exemplo de São Paulo. */
+  phonePlaceholder?: string;
 }
 
 export function StepCustomer({
@@ -72,6 +74,7 @@ export function StepCustomer({
   requiresPayerCpf,
   onOpenPolicy,
   legalPagesPublished = false,
+  phonePlaceholder = "(11) 98765-4321",
 }: StepCustomerProps) {
   const [touched, setTouched] = useState({ name: false, phone: false, cpf: false });
   const askCpf = requiresPayerCpf === true;
@@ -157,7 +160,7 @@ export function StepCustomer({
               inputMode="tel"
               required
               autoComplete="tel"
-              placeholder="(11) 98765-4321"
+              placeholder={phonePlaceholder}
               value={phone}
               onChange={handlePhoneChange}
               onBlur={(e) => {

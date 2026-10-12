@@ -62,6 +62,18 @@ async function freeSlot(page: Page, id: string, date: string) {
   return { startsAt: slot.startsAt, time: localTime(slot.startsAt), date };
 }
 
+/** O teste de horários fecha o domingo. Um offset fixo pode cair nesse dia. */
+async function openFreeSlot(page: Page, id: string, startOffset: number) {
+  for (let offset = startOffset; offset < startOffset + 21; offset += 1) {
+    const date = saoPauloDay(offset);
+    const response = await page.request.get(`/api/public/${meta.businessASlug}/availability?serviceId=${id}&date=${date}`);
+    const body = await response.json() as { slots?: { startsAt: string }[] };
+    const slot = body.slots?.[body.slots.length - 1];
+    if (slot) return { startsAt: slot.startsAt, time: localTime(slot.startsAt), date };
+  }
+  throw new Error(`Sem horário livre a partir de ${saoPauloDay(startOffset)}`);
+}
+
 async function occupySlot(linkId: string, priceCents: number, depositCents: number) {
   await withPool(async (pool) => {
     const link = await pool.query<{ starts_at: Date; ends_at: Date; service_id: string }>(
@@ -234,21 +246,34 @@ test("gerar o link não reserva: a página normal ocupa e o link avisa sem criar
   await expect(page.getByRole("button", { name: /Copiar código/ })).toBeVisible({ timeout: 20_000 });
   const afterBooking = await paymentCount(meta.businessASlug);
 
-  const response = await page.goto(`/${meta.businessASlug}/h/${token}`);
-  expect(response?.headers()["x-robots-tag"]).toContain("noindex");
-  // O proxy manda no-store. O next dev troca esse valor por no-cache, must-revalidate na hora de servir o HTML.
-  expect(response?.headers()["cache-control"] ?? "").toMatch(/no-store|no-cache/);
-  expect(response?.headers()["referrer-policy"]).toBe("no-referrer");
-  await expect(page.getByRole("heading", { name: "Esse horário acabou de ser reservado." })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Copiar código/ })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Ver horários disponíveis" })).toHaveAttribute("href", `/${meta.businessASlug}`);
-  expect(await paymentCount(meta.businessASlug)).toBe(afterBooking);
-  const robots = await page.locator('meta[name="robots"]').getAttribute("content");
-  expect(robots).toMatch(/noindex/);
-  const ogImage = await page.locator('meta[property="og:image"]').getAttribute("content");
-  expect(ogImage ?? "").not.toContain(token);
-  expect(ogImage ?? "").toContain(previewId);
-  if (testInfo.project.name === "desktop") await shoot(page, "cliente-ocupado");
+  // No master, horário ocupado usa a logo da loja. Sem logo a tag some e o teste esperava o previewId.
+  const storeLogo = "https://cdn.example/e2e-logo-da-loja.png";
+  const originalLogo = await withPool(async (pool) => {
+    const { rows } = await pool.query<{ logo_url: string | null }>("select logo_url from businesses where slug = $1", [meta.businessASlug]);
+    return rows[0]?.logo_url ?? null;
+  });
+  await withPool((pool) => pool.query("update businesses set logo_url = $1 where slug = $2", [storeLogo, meta.businessASlug]));
+  try {
+    const response = await page.goto(`/${meta.businessASlug}/h/${token}`);
+    expect(response?.headers()["x-robots-tag"]).toContain("noindex");
+    // O proxy manda no-store. O next dev troca esse valor por no-cache, must-revalidate na hora de servir o HTML.
+    expect(response?.headers()["cache-control"] ?? "").toMatch(/no-store|no-cache/);
+    expect(response?.headers()["referrer-policy"]).toBe("no-referrer");
+    await expect(page.getByRole("heading", { name: "Esse horário acabou de ser reservado." })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Copiar código/ })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Ver horários disponíveis" })).toHaveAttribute("href", `/${meta.businessASlug}`);
+    expect(await paymentCount(meta.businessASlug)).toBe(afterBooking);
+    const robots = await page.locator('meta[name="robots"]').getAttribute("content");
+    expect(robots).toMatch(/noindex/);
+    const ogImage = await page.locator('meta[property="og:image"]').getAttribute("content");
+    expect(ogImage).toContain(storeLogo);
+    expect(ogImage ?? "").not.toContain(token);
+    expect(ogImage ?? "").not.toContain(previewId);
+    expect(ogImage ?? "").not.toContain("/og/slot-link/");
+    if (testInfo.project.name === "desktop") await shoot(page, "cliente-ocupado");
+  } finally {
+    await withPool((pool) => pool.query("update businesses set logo_url = $1 where slug = $2", [originalLogo, meta.businessASlug]));
+  }
 });
 
 test("caminho feliz até a tela de Pix, com rodapé fora do pagamento", async ({ page }, testInfo) => {
@@ -486,7 +511,7 @@ test("dono gera o link na agenda e a prévia do horário responde imagem", async
   await page.locator("dialog").getByRole("radiogroup", { name: "Horário" }).getByRole("radio").first().click();
   await expect(page.getByText("O horário só fica reservado quando a cliente pagar o sinal.")).toBeVisible();
   await shoot(page, "dono-sheet");
-  await page.getByRole("button", { name: "Gerar link" }).click();
+  await page.getByRole("dialog", { name: "Mandar um horário" }).getByRole("button", { name: "Gerar link", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Link pronto" })).toBeVisible();
   await expect(page.getByText(/Vale até .+ ou até alguém ocupar o horário/)).toBeVisible();
   await shootMatrix(page, "dono-link-pronto");
@@ -506,7 +531,7 @@ test("dono gera o link na agenda e a prévia do horário responde imagem", async
   const imageUrl = await page.locator('meta[property="og:image"]').count();
   void imageUrl;
   const service = await serviceId(page);
-  const slot = await freeSlot(page, service.id, saoPauloDay(6));
+  const slot = await openFreeSlot(page, service.id, 6);
   const created = await createLink(page, service.id, slot.date, slot.time);
   expect(created.status).toBe(201);
   const previewId = created.body.previewId as string;

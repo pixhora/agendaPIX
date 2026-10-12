@@ -141,7 +141,7 @@ export function PreviewBookingFlow({
   const [selectedService, setSelectedService] = useState<PublicService | null>(openingService);
   const [selectedSlot, setSelectedSlot] = useState<AvailabilitySlot | null>(openingSlot);
   const [customerName, setCustomerName] = useState("Juliana Mendes");
-  const [customerPhone, setCustomerPhone] = useState("(00) 00000-0000");
+  const [customerPhone, setCustomerPhone] = useState("");
   const [customerCpf, setCustomerCpf] = useState("529.982.247-25");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -342,6 +342,7 @@ export function PreviewBookingFlow({
                   errorMessage={null}
                   onChangeName={setCustomerName}
                   onChangePhone={setCustomerPhone}
+                  phonePlaceholder="ex.: (14) 99999-9999"
                   cpf={customerCpf}
                   onChangeCpf={setCustomerCpf}
                   onBack={() => setStep(2)}
