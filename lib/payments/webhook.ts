@@ -12,13 +12,14 @@ import { applyPaidEvent } from "./apply-paid";
 import { getPaymentProvider } from "./index";
 import {
   drizzleRefundPorts,
-  markRefundedByExternalId,
+  logPartialRefundObserved,
   notifyDisconnectedConfirmation,
+  observeRemoteDepositReversal,
   recordUnverifiableSellerPayment,
   settleLateRefundOutsideLock,
 } from "./refund-flow";
 import { ProviderTimeoutError } from "./timeout";
-import { IgnoredWebhookEvent, ObservedRefundEvent, UnverifiableSellerPayment, paidEventSchema, type PaidEvent, type PaymentProvider } from "./provider";
+import { IgnoredWebhookEvent, ObservedPartialRefundEvent, ObservedRefundEvent, UnverifiableSellerPayment, paidEventSchema, type PaidEvent, type PaymentProvider } from "./provider";
 
 type Database = NodePgDatabase<typeof schema>;
 
@@ -36,7 +37,7 @@ export async function verifyWebhookDelivery(request: Request, providerName: stri
   try {
     event = paidEventSchema.parse(await paymentProvider.verifyWebhook(body, request.headers, now, request.url));
   } catch (error) {
-    if (error instanceof HttpError || error instanceof IgnoredWebhookEvent || error instanceof ObservedRefundEvent || error instanceof UnverifiableSellerPayment) throw error;
+    if (error instanceof HttpError || error instanceof IgnoredWebhookEvent || error instanceof ObservedRefundEvent || error instanceof ObservedPartialRefundEvent || error instanceof UnverifiableSellerPayment) throw error;
     if (error instanceof ProviderTimeoutError) throw new HttpError(503, "webhook_unavailable", "Não foi possível consultar o pagamento. Tente novamente.");
     if (error instanceof z.ZodError || error instanceof SyntaxError) throw new HttpError(400, "invalid_event", "Evento inválido.");
     throw new HttpError(401, "invalid_signature", "Assinatura inválida ou vencida.");
@@ -55,8 +56,12 @@ export async function processWebhook(request: Request, providerName: string, dat
       await recordUnverifiableSellerPayment(drizzleRefundPorts(database), error.externalId);
       return { outcome: "ignored", reason: "unverifiable_seller_disconnected" };
     }
+    if (error instanceof ObservedPartialRefundEvent) {
+      await logPartialRefundObserved(drizzleRefundPorts(database), error.externalId, now);
+      return { outcome: "ignored", reason: "partial_refund_observed" };
+    }
     if (error instanceof ObservedRefundEvent) {
-      await markRefundedByExternalId(drizzleRefundPorts(database), error.externalId, now);
+      await observeRemoteDepositReversal(drizzleRefundPorts(database), error.externalId, error.reason, now);
       return { outcome: "ignored", reason: "refund_observed" };
     }
     throw error;

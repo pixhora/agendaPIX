@@ -4,12 +4,13 @@ import type * as schema from "../../db/schema";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { getPaymentProvider } from "../../lib/payments";
 import { processWebhook } from "../../lib/payments/webhook";
-import { ObservedRefundEvent, UnverifiableSellerPayment } from "../../lib/payments/provider";
+import { ObservedPartialRefundEvent, ObservedRefundEvent, UnverifiableSellerPayment } from "../../lib/payments/provider";
 import { ProviderTimeoutError } from "../../lib/payments/timeout";
 import { MpAccountNotConnectedError, resetSellerAccountHooks } from "../../lib/payments/seller-account";
 import {
   buildMercadoPagoManifest,
   centsToTransactionAmount,
+  classifyMercadoPagoDepositReversal,
   MercadoPagoPaymentProvider,
   resolveMpAccessToken,
   signMercadoPagoWebhook,
@@ -35,6 +36,7 @@ type Payment = {
   status_detail: string | null;
   external_reference: string;
   transaction_amount: number;
+  transaction_amount_refunded?: number;
   date_created: string;
   date_of_expiration: string;
   date_approved?: string | null;
@@ -592,6 +594,54 @@ describe("MercadoPagoPaymentProvider: webhook", () => {
       paidAtSource: "fallback",
       statusDetail: "accredited",
     });
+  });
+
+  it("lê estorno e contestação só do GET, ignorando o status do corpo", async () => {
+    const { mock, mp } = provider();
+    const reference = randomUUID();
+    const created = await mp.createPixCharge({
+      idempotencyKey: randomUUID(), reference, amountCents: 1000,
+      expiresAt: new Date(now.getTime() + 40 * 60_000), customer,
+    });
+    const payment = mock.byId.get(created.externalId)!;
+    payment.status = "refunded";
+    payment.status_detail = "refunded";
+    payment.transaction_amount_refunded = 10;
+    const lyingBody = JSON.stringify({
+      id: 8, type: "payment", action: "payment.updated", status: "approved", status_detail: "accredited",
+      data: { id: created.externalId, status: "charged_back" },
+    });
+    const url = `http://localhost/api/webhooks/payments/mercadopago?data.id=${created.externalId}&type=payment`;
+    await expect(mp.verifyWebhook(lyingBody, signedHeaders(created.externalId), now, url)).rejects.toMatchObject({
+      name: "ObservedRefundEvent", externalId: created.externalId, reason: "refunded",
+    });
+
+    payment.status = "charged_back";
+    payment.status_detail = "settled";
+    const approvedBody = JSON.stringify({
+      id: 9, type: "payment", status: "approved", data: { id: created.externalId },
+    });
+    await expect(mp.verifyWebhook(approvedBody, signedHeaders(created.externalId, "req-cb"), now, url)).rejects.toMatchObject({
+      reason: "charged_back",
+    });
+
+    payment.status = "approved";
+    payment.status_detail = "partially_refunded";
+    payment.transaction_amount_refunded = 4;
+    await expect(mp.verifyWebhook(lyingBody, signedHeaders(created.externalId, "req-partial"), now, url)).rejects.toBeInstanceOf(ObservedPartialRefundEvent);
+
+    payment.status = "approved";
+    payment.status_detail = "accredited";
+    delete payment.transaction_amount_refunded;
+    const event = await mp.verifyWebhook(
+      JSON.stringify({ id: 10, type: "payment", status: "refunded", data: { id: created.externalId } }),
+      signedHeaders(created.externalId, "req-paid"),
+      now,
+      url,
+    );
+    expect(event.type).toBe("payment.paid");
+    expect(classifyMercadoPagoDepositReversal({ status: "refunded", transaction_amount: 10, transaction_amount_refunded: 3 })).toBe("partial");
+    expect(classifyMercadoPagoDepositReversal({ status: "refunded", transaction_amount: 10 })).toBe("refunded");
   });
 });
 

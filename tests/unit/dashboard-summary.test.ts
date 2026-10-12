@@ -18,6 +18,8 @@ const booking = (overrides: Partial<DashboardBooking>): DashboardBooking => ({
   manualRefundDueAt: null,
   manualRefundOverdue: false,
   manualRefundDueTomorrow: false,
+  depositStatus: "paid",
+  depositReversalSeenAt: null,
   ...overrides,
 });
 

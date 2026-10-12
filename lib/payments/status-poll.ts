@@ -44,6 +44,15 @@ export async function refreshPaidFromGateway(input: {
   } catch {
     return false;
   }
+  if (remote && (remote.reversalKind || remote.status === "refunded")) {
+    try {
+      const { drizzleRefundPorts, observeProviderCharge } = await import("./refund-flow");
+      await observeProviderCharge(drizzleRefundPorts(database), remote, now);
+    } catch {
+      return false;
+    }
+    return true;
+  }
   if (!remote || remote.status !== "paid") return false;
   try {
     const [{ applyPaidEvent }, { hash }, { drizzleRefundPorts, settleLateRefundOutsideLock }] = await Promise.all([

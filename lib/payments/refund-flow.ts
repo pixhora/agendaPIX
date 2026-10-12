@@ -1,9 +1,9 @@
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import * as schema from "../../db/schema";
 import { HttpError } from "../http";
 import { logMailFailure, sendOwnerEmail, type OwnerMailer } from "../email";
-import type { PaymentProvider } from "./provider";
+import type { PaymentProvider, ProviderCharge } from "./provider";
 import { paymentsConfig } from "./config";
 import { callProvider, ProviderTimeoutError } from "./timeout";
 import { z } from "zod";
@@ -12,6 +12,7 @@ import { MP_MANUAL_REFUND_CHANNEL } from "../mercadopago/connect-copy";
 import { INSUFFICIENT_BALANCE_MESSAGE, insufficientBalance } from "./refund-copy";
 import { assessRefund, refundBlockMessage, type RefundBlockReason, type RefundStatus } from "./refund-eligibility";
 import {
+  depositReversedNotice,
   disconnectedConfirmedNotice,
   formatAppointment,
   lateRefundCause,
@@ -49,6 +50,10 @@ export type RefundView = {
   policyText: string | null;
   policyHash: string | null;
   policyRefundDeadlineAt: string | null;
+  bookingStatus: string;
+  depositCents: number;
+  depositReversedAt: Date | null;
+  depositReversalReason: "refunded" | "charged_back" | null;
 };
 
 export type RefundPatch = {
@@ -82,6 +87,8 @@ export type RefundWriter = {
   listAttempts(): Promise<RefundAttempt[]>;
   beginAttempt(input: { kind: RefundAttemptKind; idempotencyKey: string; amountCents: number; requestedByUserId: string | null }): Promise<RefundAttempt>;
   finishAttempt(id: string, patch: { status: RefundAttemptStatus; mpRefundId: string | null; errorCode: string | null }): Promise<void>;
+  /** Grava o estorno na reserva só se ainda não houver motivo. `true` quando esta chamada gravou. */
+  markDepositReversal(input: { reason: "refunded" | "charged_back"; at: Date }): Promise<boolean>;
 };
 
 /** Chave de uma tentativa do dono. `n` conta as tentativas já gravadas, inclusive as que falharam. */
@@ -91,6 +98,20 @@ export function ownerRefundIdempotencyKey(paymentId: string, attemptNumber: numb
 
 export function automaticRefundIdempotencyKey(paymentId: string) {
   return `auto_late:${paymentId}`;
+}
+
+const ACTIVE_REFUND_ATTEMPT = new Set(["requested", "processing", "refunded"]);
+
+/** Estorno que o AgendaPix pediu. O tardio (`auto_late`) não vira aviso de sinal devolvido pelo cliente. */
+export function agendaPixRefundOrigin(attempts: { kind: string; status: string }[]): "auto_late" | "owner" | null {
+  const active = attempts.filter((row) => ACTIVE_REFUND_ATTEMPT.has(row.status));
+  if (active.some((row) => row.kind === "auto_late")) return "auto_late";
+  if (active.some((row) => row.kind === "owner_api" || row.kind === "owner_manual_mark")) return "owner";
+  return null;
+}
+
+function depositNoticeAction(reason: "refunded" | "charged_back") {
+  return reason === "charged_back" ? "notice_deposit_charged_back" : "notice_deposit_reversed";
 }
 
 export type RefundPorts = {
@@ -555,6 +576,108 @@ export async function notifyDisconnectedConfirmation(ports: RefundPorts, payment
   await notifyOnce(ports, view, "notice_seller_disconnected", mailer, notice);
 }
 
+async function markPaymentRefunded(current: RefundView, writer: RefundWriter, now: Date) {
+  if (current.refundStatus === "refunded") return;
+  await writer.setRefund({ refundStatus: "refunded", refundedAt: now, paymentStatus: "refunded" });
+  await writer.audit("refund_observed", auditDetail(current, {
+    actor: "system", status: "refunded", mpRefundId: null, failureCause: null, reason: "refund_observed",
+  }));
+}
+
+/**
+ * Estorno ou contestação lidos do gateway (GET), não do corpo do webhook.
+ * Reserva já confirmada: grava o motivo e avisa o dono, sem cancelar e sem liberar o horário.
+ * Estorno que o AgendaPix pediu (registro em payment_refunds) mantém o fluxo atual, sem esse aviso.
+ * O primeiro motivo gravado não volta atrás.
+ */
+export async function observeRemoteDepositReversal(
+  ports: RefundPorts,
+  externalId: string,
+  reason: "refunded" | "charged_back",
+  now = new Date(),
+  mailer: OwnerMailer = sendOwnerEmail,
+) {
+  const view = await ports.loadByExternalId(externalId);
+  if (!view) return "missing" as const;
+  const notify = await ports.withPaymentLock(view.paymentId, async (current, writer) => {
+    const origin = agendaPixRefundOrigin(await writer.listAttempts());
+    if (origin) {
+      await markPaymentRefunded(current, writer, now);
+      return false;
+    }
+    const holdsSlot = current.bookingStatus === "confirmed" || current.bookingStatus === "completed";
+    if (!holdsSlot) {
+      await markPaymentRefunded(current, writer, now);
+      return false;
+    }
+    if (current.depositReversalReason) return false;
+    await markPaymentRefunded(current, writer, now);
+    const wrote = await writer.markDepositReversal({ reason, at: now });
+    if (!wrote) return false;
+    if (!(await writer.hasAudit("deposit_reversal_observed"))) {
+      await writer.audit("deposit_reversal_observed", auditDetail(current, {
+        actor: "system", status: reason, mpRefundId: null, failureCause: null, reason,
+      }));
+    }
+    const action = depositNoticeAction(reason);
+    if (!(await writer.hasAudit(action))) {
+      await writer.audit(action, { actor: "system", reason, paymentId: current.paymentId });
+    }
+    return true;
+  });
+  if (!notify) return "recorded" as const;
+  try {
+    const fresh = await ports.loadByExternalId(externalId);
+    if (fresh) {
+      const notice = depositReversedNotice({
+        customerName: fresh.customerName,
+        serviceName: fresh.serviceName,
+        when: formatAppointment(fresh.startsAt, fresh.timezone),
+        reason,
+      });
+      await mailer(fresh.ownerEmail, notice.subject, notice.text);
+    }
+  } catch {
+    logMailFailure("deposit_reversal");
+  }
+  return "marked" as const;
+}
+
+/** Devolução parcial: auditoria, sem mudar reserva nem pagamento. */
+export async function logPartialRefundObserved(ports: RefundPorts, externalId: string, now = new Date()) {
+  console.warn("[payments] partial_refund_observed code=partial_refund");
+  const view = await ports.loadByExternalId(externalId);
+  if (!view) return "missing" as const;
+  await ports.withPaymentLock(view.paymentId, async (current, writer) => {
+    if (await writer.hasAudit("partial_refund_observed")) return;
+    await writer.audit("partial_refund_observed", {
+      ...auditDetail(current, {
+        actor: "system", status: null, mpRefundId: null, failureCause: null, reason: "partial_refund",
+      }),
+      observedAt: now.toISOString(),
+    });
+  });
+  return "logged" as const;
+}
+
+export async function observeProviderCharge(
+  ports: RefundPorts,
+  charge: Pick<ProviderCharge, "externalId" | "status" | "reversalKind">,
+  now = new Date(),
+  mailer?: OwnerMailer,
+) {
+  if (charge.reversalKind === "partial") {
+    await logPartialRefundObserved(ports, charge.externalId, now);
+    return "partial" as const;
+  }
+  if (charge.reversalKind === "charged_back" || charge.reversalKind === "refunded" || charge.status === "refunded") {
+    const reason = charge.reversalKind === "charged_back" ? "charged_back" : "refunded";
+    await observeRemoteDepositReversal(ports, charge.externalId, reason, now, mailer);
+    return "reversal" as const;
+  }
+  return null;
+}
+
 export async function markRefundedByExternalId(ports: RefundPorts, externalId: string, now = new Date()) {
   const view = await ports.loadByExternalId(externalId);
   if (!view || view.refundStatus === "refunded") return false;
@@ -605,9 +728,9 @@ export async function observeInProcessRefunds(
       const remote = await callProvider(paymentsConfig().PAYMENT_PROVIDER_TIMEOUT_MS, (signal) => provider.getCharge(view.externalId!, {
         signal, businessId: view.businessId, purpose: "settlement",
       }));
-      if (remote?.status !== "refunded") continue;
-      const marked = await markRefundedByExternalId(ports, view.externalId, now);
-      if (marked) observed += 1;
+      if (!remote) continue;
+      const observedCharge = await observeProviderCharge(ports, remote, now);
+      if (observedCharge === "reversal") observed += 1;
     } catch (error) {
       // Sem token ou gateway fora: o próximo ciclo tenta de novo. Não estorna daqui.
       onPaymentError?.(paymentId, error);
@@ -640,6 +763,8 @@ function toView(row: {
   policyRefundRequestedOn: string | null; paidAt: Date | null;
   customerName: string; customerEmail: string | null; serviceName: string; startsAt: Date; timezone: string;
   latePaymentPolicy: "refund" | "rebook_if_free";
+  bookingStatus: string; depositCents: number; depositReversedAt: Date | null;
+  depositReversalReason: "refunded" | "charged_back" | null;
 }, policy: PolicySnapshot): RefundView {
   return { ...row, policyText: policy.text, policyHash: policy.hash, policyRefundDeadlineAt: policy.refundDeadlineAt };
 }
@@ -664,6 +789,10 @@ const refundColumns = {
   startsAt: schema.bookings.startsAt,
   timezone: schema.businesses.timezone,
   latePaymentPolicy: schema.businesses.latePaymentPolicy,
+  bookingStatus: schema.bookings.status,
+  depositCents: schema.bookings.depositCents,
+  depositReversedAt: schema.bookings.depositReversedAt,
+  depositReversalReason: schema.bookings.depositReversalReason,
 };
 
 function refundQuery(database: Database) {
@@ -786,6 +915,20 @@ export function createDrizzleRefundPorts(database: Database): RefundPorts {
               eq(schema.paymentRefunds.id, id),
               eq(schema.paymentRefunds.businessId, view.businessId),
             ));
+          },
+          async markDepositReversal(input) {
+            const updated = await tx.update(schema.bookings).set({
+              depositReversedAt: input.at,
+              depositReversalReason: input.reason,
+            }).where(and(
+              eq(schema.bookings.businessId, view.businessId),
+              eq(schema.bookings.id, view.bookingId),
+              isNull(schema.bookings.depositReversedAt),
+            )).returning({ id: schema.bookings.id });
+            if (updated.length === 0) return false;
+            view.depositReversedAt = input.at;
+            view.depositReversalReason = input.reason;
+            return true;
           },
         };
         return run(view, writer);

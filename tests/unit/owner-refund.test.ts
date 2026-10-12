@@ -59,6 +59,10 @@ function view(overrides: Partial<RefundView> = {}): RefundView {
     policyHash: null,
     policyRefundDeadlineAt: null,
     latePaymentPolicy: "refund",
+    bookingStatus: "confirmed",
+    depositCents: 1500,
+    depositReversedAt: null,
+    depositReversalReason: null,
     ...overrides,
   };
 }
@@ -95,6 +99,11 @@ function memory(initial: RefundView): RefundPorts & { audits: { action: string; 
     async finishAttempt(id, patch) {
       const found = attempts.find((row) => row.id === id);
       if (found) Object.assign(found, patch);
+    },
+    async markDepositReversal(input) {
+      if (current.depositReversedAt) return false;
+      current = { ...current, depositReversedAt: input.at, depositReversalReason: input.reason };
+      return true;
     },
   });
   return {

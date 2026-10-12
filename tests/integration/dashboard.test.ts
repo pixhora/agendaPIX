@@ -36,8 +36,10 @@ describe("painel isolado por negócio com PostgreSQL", () => {
     expect((await dashboardCustomers(ownerA, businessA, database)).map((row) => row.name)).toEqual(["Cliente A"]);
     expect((await dashboardHours(ownerA, businessA, database)).map((row) => row.businessId)).toEqual([businessA]);
     const rows = await dashboardBookings(ownerA, businessA, ["2030-01-01"], database);
-    expect(rows.map((row) => row.customerName)).toEqual(["Cliente A"]);
-    expect(await dashboardBookings(ownerA, businessA, ["2030-01-02"], database)).toEqual([]);
+    expect(rows.bookings.map((row) => row.customerName)).toEqual(["Cliente A"]);
+    expect(rows.bookings[0]?.depositStatus).toBe("paid");
+    expect(rows.reversedDepositsPendingCount).toBe(0);
+    expect(await dashboardBookings(ownerA, businessA, ["2030-01-02"], database)).toEqual({ bookings: [], reversedDepositsPendingCount: 0 });
     for (const read of [dashboardServices, dashboardCustomers, dashboardHours]) await expect(read(ownerA, businessB, database)).rejects.toMatchObject({ status: 404 });
     await expect(dashboardBookings(ownerA, businessB, ["2030-01-01"], database)).rejects.toMatchObject({ status: 404 });
   });
@@ -48,7 +50,7 @@ describe("painel isolado por negócio com PostgreSQL", () => {
     await expect(saveDashboardHours(ownerA, businessB, [], database)).rejects.toMatchObject({ status: 404 });
     await saveDashboardService(ownerA, { ...input, id: serviceA }, database);
     expect((await dashboardServices(ownerB, businessB, database))[0].name).toBe("Corte B");
-    expect((await dashboardBookings(ownerA, businessA, ["2030-01-01"], database))[0].priceCents).toBe(5000);
+    expect((await dashboardBookings(ownerA, businessA, ["2030-01-01"], database)).bookings[0].priceCents).toBe(5000);
   });
   it("recusa gravar serviço com sinal sem Mercado Pago conectado", async () => {
     await database.delete(schema.mercadopagoConnections).where(eq(schema.mercadopagoConnections.businessId, businessA));
@@ -79,7 +81,7 @@ describe("painel isolado por negócio com PostgreSQL", () => {
       paidAt: new Date("2030-01-01T12:00:00.000Z"),
       refundStatus: "in_process",
     });
-    const [row] = await dashboardBookings(ownerA, businessA, ["2030-01-01"], database);
+    const [row] = (await dashboardBookings(ownerA, businessA, ["2030-01-01"], database)).bookings;
     expect(row.refundStatus).toBe("in_process");
     expect(row.manualRefundOverdue).toBe(false);
   });

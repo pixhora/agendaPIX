@@ -9,7 +9,7 @@ import { applyPaidEvent } from "./apply-paid";
 import { getPaymentProvider } from "./index";
 import { polledPaidEvent, type PaymentProvider, type ProviderCharge } from "./provider";
 import { createDrizzleReminderPorts, runManualRefundReminders } from "./manual-refund-reminders";
-import { drizzleRefundPorts, observeInProcessRefunds, retryAutomaticLateRefunds } from "./refund-flow";
+import { drizzleRefundPorts, observeInProcessRefunds, observeProviderCharge, retryAutomaticLateRefunds } from "./refund-flow";
 import { createDrizzleMpStore } from "../mercadopago-oauth/repository";
 import { purgeDisconnectedMercadoPagoTokens } from "../mercadopago-oauth/refresh";
 import { MpAccountNotConnectedError } from "./seller-account";
@@ -294,7 +294,7 @@ async function settleExpiredCreating(
   let remote: ProviderCharge | null = null;
   try {
     remote = await withTimeout(config, (signal) => provider.findChargeByReference(payment.id, { signal, businessId: payment.businessId }));
-    if (remote && remote.status !== "paid" && remote.status !== "refunded") {
+    if (remote && remote.status !== "paid" && remote.status !== "refunded" && !remote.reversalKind) {
       const cancelled = await withTimeout(config, (signal) => provider.cancelCharge(remote!.externalId, { signal, businessId: payment.businessId }));
       if (cancelled) remote = cancelled;
     }
@@ -403,6 +403,7 @@ async function retryOpenCreating(
 
 function remoteCancelSettled(remote: ProviderCharge | null) {
   if (!remote) return true;
+  if (remote.reversalKind) return true;
   return remote.status === "cancelled" || remote.status === "expired" || remote.status === "refunded";
 }
 
@@ -510,6 +511,10 @@ async function pollPendingForMissedWebhooks(
     if (!payment.externalId) continue;
     try {
       const remote = await withTimeout(config, (signal) => provider.getCharge(payment.externalId!, { signal, businessId: payment.businessId }));
+      if (remote && (remote.reversalKind || remote.status === "refunded")) {
+        await observeProviderCharge(drizzleRefundPorts(database), remote, now);
+        continue;
+      }
       if (!remote || remote.status !== "paid") continue;
       await database.transaction(async (tx) => {
         const result = await applyPaidEvent(tx, provider.name, polledPaidEvent(remote, hash, now), now);

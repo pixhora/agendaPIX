@@ -52,27 +52,36 @@ export async function applyPaidEvent(database: Database, providerName: string, e
       .where(and(eq(schema.bookings.businessId, found.businessId), eq(schema.bookings.id, payment.bookingId))).for("update");
     const [business] = await database.select().from(schema.businesses).where(eq(schema.businesses.id, found.businessId)).limit(1);
     const decision = decidePaidEvent(payment, booking, event, processingNow);
+    const reversalTerminal = booking.depositReversalReason === "refunded" || booking.depositReversalReason === "charged_back";
 
-    if (decision.recordPaid && payment.status !== "paid") {
-      await database.update(schema.payments).set({ status: "paid", paidAt: new Date(event.paidAt) })
-        .where(and(eq(schema.payments.businessId, found.businessId), eq(schema.payments.id, payment.id)));
-    }
     const ids = { paymentId: payment.id, businessId: found.businessId, bookingId: booking.id };
-    if (decision.confirm) {
-      await database.update(schema.bookings).set({ status: "confirmed" })
-        .where(and(eq(schema.bookings.businessId, found.businessId), eq(schema.bookings.id, booking.id), eq(schema.bookings.status, "pending_payment")));
-      await markSlotLinkPaid(database, found.businessId, booking.id, processingNow);
+    if (reversalTerminal) {
       await audit(database, {
-        businessId: found.businessId, paymentId: payment.id, bookingId: booking.id, action: "payment_confirmed",
-        detail: { eventId: event.eventId, statusDetail: event.statusDetail ?? null },
+        businessId: found.businessId, paymentId: payment.id, bookingId: booking.id, action: "deposit_reversal_terminal",
+        detail: { eventId: event.eventId, statusDetail: event.statusDetail ?? null, reason: booking.depositReversalReason },
       });
-      result = { outcome: decision.outcome, reason: decision.reason, ...ids };
-    } else if (decision.reason === "on_time_hold_released") {
-      result = await reclaimOnTimeBooking(database, { business, payment, booking, event, now: processingNow });
-    } else if (decision.outcome === "ignored" && decision.reason === "late_payment") {
-      result = await resolveLatePayment(database, { business, payment, booking, event, now: processingNow });
+      result = { outcome: "ignored", reason: "deposit_reversal_terminal", ...ids };
     } else {
-      result = { outcome: decision.outcome, reason: decision.reason, ...ids };
+      if (decision.recordPaid && payment.status !== "paid") {
+        await database.update(schema.payments).set({ status: "paid", paidAt: new Date(event.paidAt) })
+          .where(and(eq(schema.payments.businessId, found.businessId), eq(schema.payments.id, payment.id)));
+      }
+      if (decision.confirm) {
+        await database.update(schema.bookings).set({ status: "confirmed" })
+          .where(and(eq(schema.bookings.businessId, found.businessId), eq(schema.bookings.id, booking.id), eq(schema.bookings.status, "pending_payment")));
+        await markSlotLinkPaid(database, found.businessId, booking.id, processingNow);
+        await audit(database, {
+          businessId: found.businessId, paymentId: payment.id, bookingId: booking.id, action: "payment_confirmed",
+          detail: { eventId: event.eventId, statusDetail: event.statusDetail ?? null },
+        });
+        result = { outcome: decision.outcome, reason: decision.reason, ...ids };
+      } else if (decision.reason === "on_time_hold_released") {
+        result = await reclaimOnTimeBooking(database, { business, payment, booking, event, now: processingNow });
+      } else if (decision.outcome === "ignored" && decision.reason === "late_payment") {
+        result = await resolveLatePayment(database, { business, payment, booking, event, now: processingNow });
+      } else {
+        result = { outcome: decision.outcome, reason: decision.reason, ...ids };
+      }
     }
   }
   await database.update(schema.paymentEvents).set({ outcome: result.outcome, reason: result.reason }).where(eq(schema.paymentEvents.id, inserted.id));

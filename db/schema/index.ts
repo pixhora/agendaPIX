@@ -150,6 +150,14 @@ export const bookings = pgTable("bookings", {
   refundDeadlineAt: timestamp("refund_deadline_at", { withTimezone: true }),
   rescheduleDeadlineAt: timestamp("reschedule_deadline_at", { withTimezone: true }),
   policyHash: text("policy_hash"),
+  /**
+   * Sinal devolvido ou contestado depois da confirmação. Não cancela a reserva
+   * e não libera o horário: o dono decide. Primeiro motivo gravado é terminal.
+   */
+  depositReversedAt: timestamp("deposit_reversed_at", { withTimezone: true }),
+  depositReversalReason: text("deposit_reversal_reason", { enum: ["refunded", "charged_back"] }),
+  /** Dono viu o aviso. Null enquanto o sinal devolvido ou contestado segue pendente. */
+  depositReversalSeenAt: timestamp("deposit_reversal_seen_at", { withTimezone: true }),
   ...timestamps(),
 }, (table) => [
   unique("bookings_business_id_unique").on(table.businessId, table.id),
@@ -157,6 +165,7 @@ export const bookings = pgTable("bookings", {
   index("bookings_business_start_idx").on(table.businessId, table.startsAt),
   index("bookings_pending_hold_idx").on(table.businessId, table.expiresAt).where(sql`${table.status} = 'pending_payment'`),
   index("bookings_pending_client_idx").on(table.businessId, table.clientHash).where(sql`${table.status} = 'pending_payment'`),
+  index("bookings_deposit_reversal_unseen_idx").on(table.businessId).where(sql`${table.depositReversalReason} IS NOT NULL AND ${table.depositReversalSeenAt} IS NULL`),
   foreignKey({ name: "bookings_service_tenant_fk", columns: [table.businessId, table.serviceId], foreignColumns: [services.businessId, services.id] }),
   foreignKey({ name: "bookings_customer_tenant_fk", columns: [table.businessId, table.customerId], foreignColumns: [customers.businessId, customers.id] }),
   check("bookings_interval_valid", sql`${table.startsAt} < ${table.endsAt}`),
@@ -164,6 +173,9 @@ export const bookings = pgTable("bookings", {
   check("bookings_pending_expiry_required", sql`${table.status} <> 'pending_payment' OR (${table.expiresAt} IS NOT NULL AND ${table.expiresAt} > ${table.createdAt})`),
   check("bookings_policy_hash_format", sql`${table.policyHash} IS NULL OR ${table.policyHash} ~ '^[a-f0-9]{64}$'`),
   check("bookings_policy_snapshot_pair", sql`(${table.policySnapshot} IS NULL) = (${table.policyText} IS NULL) AND (${table.policySnapshot} IS NULL) = (${table.policyHash} IS NULL)`),
+  check("bookings_deposit_reversal_reason_valid", sql`${table.depositReversalReason} IS NULL OR ${table.depositReversalReason} IN ('refunded', 'charged_back')`),
+  check("bookings_deposit_reversal_pair", sql`(${table.depositReversalReason} IS NULL) = (${table.depositReversedAt} IS NULL)`),
+  check("bookings_deposit_reversal_seen_after_reversal", sql`${table.depositReversalSeenAt} IS NULL OR ${table.depositReversedAt} IS NOT NULL`),
 ]);
 
 export const slotLinkStatus = pgEnum("slot_link_status", ["pending", "paid", "expired", "taken", "cancelled", "replaced"]);

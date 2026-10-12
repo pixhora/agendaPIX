@@ -2,6 +2,8 @@ import { and, asc, desc, eq, gt, gte, inArray, lt, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "../../db";
 import { businesses, bookings, businessHours, customers, services } from "../../db/schema";
+import { deriveDepositStatus, ownerAgendaResponseSchema, type DepositReversalReason, type DepositStatus } from "../contracts/deposit-status";
+import { isPostgresCode, isUndefinedColumn } from "../postgres-error";
 import { loadBookingAccess } from "../billing/load";
 import { serviceListingBookability } from "../bookings/deposit-bookability";
 import { invalidatePublicCatalog } from "../bookings/public-cache";
@@ -61,36 +63,31 @@ export async function dashboardHours(ownerId: string, businessId: string, databa
 }
 export async function dashboardBookings(ownerId: string, businessId: string, dates: string[], database: Database = getDb(), known?: OwnedBusiness) {
   const business = await resolveOwned(ownerId, businessId, database, known);
-  const first = dateSchema.parse(dates[0]);
-  const last = shiftDate(dateSchema.parse(dates[dates.length - 1]), 1);
-  // Intervalo amplo de UTC cobre o dia local em qualquer offset; filtro final usa o fuso do negócio.
-  const rows = await database.select(bookingRefundColumns())
-    .from(bookings)
-    .innerJoin(services, and(eq(services.id, bookings.serviceId), eq(services.businessId, bookings.businessId)))
-    .innerJoin(customers, and(eq(customers.id, bookings.customerId), eq(customers.businessId, bookings.businessId)))
-    .where(and(eq(bookings.businessId, businessId), gte(bookings.startsAt, new Date(`${shiftDate(first, -1)}T00:00:00Z`)), lt(bookings.startsAt, new Date(`${shiftDate(last, 1)}T00:00:00Z`))))
-    .orderBy(asc(bookings.startsAt), asc(bookings.id));
-  return rows.filter((row) => dates.includes(localDate(row.startsAt, business.timezone))).map((row) => presentBooking(withPayment(row), business.timezone));
+  const loaded = await readAgendaTolerant(database, async (source, reversalColumns) => {
+    const rows = await selectAgendaRows(source, businessId, dates, business.timezone, reversalColumns);
+    const reversedDepositsPendingCount = reversalColumns ? await countUnackedReversals(source, businessId) : 0;
+    return ownerAgendaResponseSchema.parse({ bookings: rows, reversedDepositsPendingCount });
+  });
+  return loaded;
 }
 export async function dashboardBookingDetail(ownerId: string, businessId: string, bookingId: string, database: Database = getDb(), known?: OwnedBusiness) {
   const business = await resolveOwned(ownerId, businessId, database, known);
-  const [row] = await database.select(bookingRefundColumns())
-    .from(bookings)
-    .innerJoin(services, and(eq(services.id, bookings.serviceId), eq(services.businessId, bookings.businessId)))
-    .innerJoin(customers, and(eq(customers.id, bookings.customerId), eq(customers.businessId, bookings.businessId)))
-    .where(and(eq(bookings.businessId, businessId), eq(bookings.id, bookingId)))
-    .limit(1);
-  if (!row) throw new HttpError(404, "booking_not_found", "Agendamento não encontrado.");
-  return presentBooking(withPayment(row), business.timezone);
+  return readAgendaTolerant(database, async (source, reversalColumns) => {
+    const [row] = await selectAgendaRows(source, businessId, null, business.timezone, reversalColumns, bookingId);
+    if (!row) throw new HttpError(404, "booking_not_found", "Agendamento não encontrado.");
+    return row;
+  });
 }
 type PaymentRefundJson = {
   refundStatus: string | null;
   refundedAt: string | null;
   manualRefundDueAt: string | null;
   manualRefundOpen: boolean;
+  paymentStatus: string | null;
+  autoLateRefund: boolean;
 } | null;
 
-function bookingRefundColumns() {
+function bookingRefundColumns(reversalColumns: boolean) {
   return {
     id: bookings.id,
     startsAt: bookings.startsAt,
@@ -102,11 +99,21 @@ function bookingRefundColumns() {
     serviceName: services.name,
     customerName: customers.name,
     customerPhone: customers.phone,
+    depositReversedAt: reversalColumns ? bookings.depositReversedAt : sql<Date | null>`null`,
+    depositReversalReason: reversalColumns ? bookings.depositReversalReason : sql<DepositReversalReason | null>`null`,
+    depositReversalSeenAt: reversalColumns ? bookings.depositReversalSeenAt : sql<Date | null>`null`,
     payment: sql<PaymentRefundJson>`(
       select json_build_object(
         'refundStatus', p.refund_status,
         'refundedAt', p.refunded_at,
         'manualRefundDueAt', p.manual_refund_due_at,
+        'paymentStatus', p.status,
+        'autoLateRefund', exists (
+          select 1 from payment_refunds r
+          where r.payment_id = p.id
+            and r.kind = 'auto_late'
+            and r.status in ('requested', 'processing', 'refunded')
+        ),
         'manualRefundOpen', (
           p.manual_refund_due_at is not null
           and p.status is distinct from 'refunded'
@@ -129,6 +136,67 @@ function bookingRefundColumns() {
     )`,
   };
 }
+async function selectAgendaRows(database: Database, businessId: string, dates: string[] | null, timezone: string, reversalColumns: boolean, bookingId?: string) {
+  const first = dates ? dateSchema.parse(dates[0]) : null;
+  const last = dates ? shiftDate(dateSchema.parse(dates[dates.length - 1]), 1) : null;
+  const rows = await database.select(bookingRefundColumns(reversalColumns))
+    .from(bookings)
+    .innerJoin(services, and(eq(services.id, bookings.serviceId), eq(services.businessId, bookings.businessId)))
+    .innerJoin(customers, and(eq(customers.id, bookings.customerId), eq(customers.businessId, bookings.businessId)))
+    .where(and(
+      eq(bookings.businessId, businessId),
+      bookingId ? eq(bookings.id, bookingId) : undefined,
+      first && last ? gte(bookings.startsAt, new Date(`${shiftDate(first, -1)}T00:00:00Z`)) : undefined,
+      first && last ? lt(bookings.startsAt, new Date(`${shiftDate(last, 1)}T00:00:00Z`)) : undefined,
+    ))
+    .orderBy(asc(bookings.startsAt), asc(bookings.id));
+  const visible = dates ? rows.filter((row) => dates.includes(localDate(row.startsAt, timezone))) : rows;
+  return visible.map((row) => presentBooking(withPayment(row), timezone));
+}
+async function countUnackedReversals(database: Database, businessId: string) {
+  const [row] = await database.select({ count: sql<number>`count(*)::int` }).from(bookings).where(and(
+    eq(bookings.businessId, businessId),
+    sql`${bookings.depositReversalReason} in ('refunded', 'charged_back')`,
+    sql`${bookings.depositReversalSeenAt} is null`,
+  ));
+  return row?.count ?? 0;
+}
+function usesDedicatedConnection(database: Database) {
+  const client = (database as { $client?: { release?: unknown } }).$client;
+  return typeof client?.release === "function";
+}
+async function readAgendaTolerant<T>(database: Database, read: (source: Database, reversalColumns: boolean) => Promise<T>) {
+  const savepoint = usesDedicatedConnection(database);
+  if (savepoint) {
+    try {
+      await database.execute(sql`SAVEPOINT agenda_deposit_reversal`);
+    } catch (error) {
+      if (!isPostgresCode(error, "25P01")) throw error;
+      return readWithoutSavepoint(database, read);
+    }
+    try {
+      const value = await read(database, true);
+      await database.execute(sql`RELEASE SAVEPOINT agenda_deposit_reversal`);
+      return value;
+    } catch (error) {
+      await database.execute(sql`ROLLBACK TO SAVEPOINT agenda_deposit_reversal`);
+      await database.execute(sql`RELEASE SAVEPOINT agenda_deposit_reversal`);
+      if (!isUndefinedColumn(error)) throw error;
+      console.warn("[agenda] colunas de devolução do sinal ausentes (42703); depositStatus derivado dos dados atuais");
+      return read(database, false);
+    }
+  }
+  return readWithoutSavepoint(database, read);
+}
+async function readWithoutSavepoint<T>(database: Database, read: (source: Database, reversalColumns: boolean) => Promise<T>) {
+  try {
+    return await read(database, true);
+  } catch (error) {
+    if (!isUndefinedColumn(error)) throw error;
+    console.warn("[agenda] colunas de devolução do sinal ausentes (42703); depositStatus derivado dos dados atuais");
+    return read(database, false);
+  }
+}
 function withPayment<T extends { payment: PaymentRefundJson }>(row: T) {
   const payment = row.payment;
   const { payment: _payment, ...rest } = row;
@@ -139,6 +207,8 @@ function withPayment<T extends { payment: PaymentRefundJson }>(row: T) {
     refundedAt: payment?.refundedAt ?? null,
     manualRefundDueAt: payment?.manualRefundDueAt ?? null,
     manualRefundOpen: Boolean(payment?.manualRefundOpen),
+    paymentStatus: payment?.paymentStatus ?? null,
+    autoLateRefund: Boolean(payment?.autoLateRefund),
   };
 }
 function isoOrNull(value: Date | string | null) {
@@ -146,8 +216,24 @@ function isoOrNull(value: Date | string | null) {
   const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
-function presentBooking<T extends { refundStatus: string | null; refundedAt: Date | string | null; manualRefundDueAt: Date | string | null; manualRefundOpen: boolean | null }>(row: T, timezone: string, now = new Date()) {
-  const { manualRefundOpen, manualRefundDueAt, ...rest } = row;
+function reversalReasonOf(value: unknown): DepositReversalReason | null {
+  return value === "refunded" || value === "charged_back" ? value : null;
+}
+function presentBooking<T extends {
+  refundStatus: string | null;
+  refundedAt: Date | string | null;
+  manualRefundDueAt: Date | string | null;
+  manualRefundOpen: boolean | null;
+  paymentStatus: string | null;
+  autoLateRefund: boolean;
+  depositCents: number;
+  status: string;
+  depositReversalReason: DepositReversalReason | string | null;
+  depositReversalSeenAt: Date | string | null;
+  depositReversedAt: Date | string | null;
+}>(row: T, timezone: string, now = new Date()) {
+  const { manualRefundOpen, manualRefundDueAt, paymentStatus, autoLateRefund, depositReversedAt, depositReversalReason, depositReversalSeenAt, ...rest } = row;
+  void depositReversedAt;
   const refundStatus = row.refundStatus === "in_process" || row.refundStatus === "refunded" || row.refundStatus === "failed" ? row.refundStatus : null;
   const dueAt = isoOrNull(manualRefundDueAt);
   const flags = manualRefundFlags({
@@ -156,9 +242,18 @@ function presentBooking<T extends { refundStatus: string | null; refundedAt: Dat
     now,
     timeZone: timezone,
   });
-  return { ...rest, refundStatus, refundedAt: isoOrNull(row.refundedAt), manualRefundDueAt: dueAt, ...flags };
+  const reason = reversalReasonOf(depositReversalReason);
+  const depositStatus: DepositStatus = deriveDepositStatus({
+    depositCents: row.depositCents,
+    bookingStatus: row.status,
+    paymentStatus,
+    refundStatus,
+    reversalReason: reason,
+    autoLateRefund,
+  });
+  return { ...rest, refundStatus, refundedAt: isoOrNull(row.refundedAt), manualRefundDueAt: dueAt, ...flags, depositStatus, depositReversalSeenAt: isoOrNull(depositReversalSeenAt) };
 }
-export type DashboardBooking = Awaited<ReturnType<typeof dashboardBookings>>[number];
+export type DashboardBooking = ReturnType<typeof presentBooking>;
 export async function saveDashboardService(ownerId: string, input: unknown, database: Database = getDb()) {
   const { businessId, id, ...values } = serviceFormSchema.parse(input);
   const business = await authorize(ownerId, businessId, database);

@@ -1,4 +1,17 @@
 export {
+  depositReversalAckResponseSchema,
+  depositReversalReasonSchema,
+  depositStatusSchema,
+  deriveDepositStatus,
+  ownerAgendaBookingSchema,
+  ownerAgendaResponseSchema,
+  type DepositReversalAckResponse,
+  type DepositReversalReason,
+  type DepositStatus,
+  type OwnerAgendaResponse,
+} from "./deposit-status";
+
+export {
   apiErrorBodySchema,
   apiErrorCodeSchema,
   apiErrorDetailsSchema,
