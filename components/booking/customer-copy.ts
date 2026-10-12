@@ -57,3 +57,13 @@ export const BUSINESS_SLOW_COPY = "A conexão demorou muito para responder. Veri
 
 /** Botão de WhatsApp quando o número existe e o nome do negócio não. */
 export const WHATSAPP_CONTACT_LABEL = "Falar no WhatsApp";
+
+/** WhatsApp do cliente ainda curto depois de tirar +55, zero de operadora e símbolos. */
+export const CUSTOMER_PHONE_ERROR = "Confira o DDD e o número, ex.: (14) 99999-9999";
+
+/** 400 `invalid_idempotency_key`. A mensagem do servidor não entra na tela. */
+export const STALE_PAGE_TITLE = "Atualize a página para continuar";
+
+export const STALE_PAGE_BODY = "Esta página ficou desatualizada. Atualize e escolha o horário de novo. Nenhum Pix foi gerado.";
+
+export const STALE_PAGE_RELOAD = "Atualizar página";

@@ -135,6 +135,18 @@ describe("serviço com sinal sem conta conectada", () => {
     expect(shouldRotatePixIdempotencyKey(false, 1)).toBe(true);
   });
 
+  it("400 invalid_idempotency_key pede para atualizar e esconde a mensagem do servidor", () => {
+    const raw = "Essa chave não é válida. Tente de novo.";
+    const view = publicBookingErrorView(400, { error: { code: "invalid_idempotency_key", message: raw } });
+    expect(view).toEqual({ kind: "stale_page" });
+    expect(JSON.stringify(view)).not.toContain(raw);
+    expect(publicBookingErrorView(400, { error: { code: "invalid_idempotency_key" } })).toEqual({ kind: "stale_page" });
+    expect(publicBookingErrorView(500, { error: { code: "invalid_idempotency_key", message: raw } })).toEqual({
+      kind: "message",
+      message: raw,
+    });
+  });
+
   it("não trata payout_key_missing como indisponível", () => {
     const view = publicBookingErrorView(409, {
       error: { code: "payout_key_missing", message: "Falta a chave de repasse." },

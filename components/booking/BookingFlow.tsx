@@ -31,9 +31,11 @@ import { BookingSummary } from "./BookingSummary";
 import { GENERIC_SUBMIT_MESSAGE, OFFLINE_MESSAGE, POLICY_CHANGED_MESSAGE, businessLoadCopy, isOfflineError, publicBookingErrorView, shouldRotatePixIdempotencyKey, whatsappHref } from "./booking-error";
 import { isFailedPixCharge } from "./pix-status";
 import { PIX_CREATE_FAILED_COPY } from "./customer-copy";
+import { StalePageNotice } from "./stale-page";
 import { pixRetryPaymentRequest } from "./pix-retry";
 import { PIX_RESUME_UNKNOWN, getPixResumeServerSnapshot, migratedPixResumePayload, pixResumePayload, pixResumeStorageKey, readPixResume, readPixResumeRaw, replacePixResume, subscribePixResume, shouldClearExpiredResume, shouldResumePix, type PixResumeSession } from "./pix-resume";
 import { keptAccessToken } from "@/lib/slot-link/idempotency";
+import { randomUuid } from "@/lib/random-uuid";
 import { TrackingUnavailable } from "./tracking-unavailable";
 import { buildPublicBookingBody } from "./booking-payload";
 import { PausedState } from "./PausedState";
@@ -92,6 +94,7 @@ export function BookingFlow({
   /** `payment_unavailable` seguidas nesta visita. A primeira mantém a chave. */
   const pixCreateFailures = React.useRef(0);
   const [depositBlocked, setDepositBlocked] = useState(false);
+  const [stalePage, setStalePage] = useState(false);
   const [policySheet, setPolicySheet] = useState<{ open: boolean; notice: string | null; trigger: HTMLElement | null }>({
     open: false,
     notice: null,
@@ -115,18 +118,13 @@ export function BookingFlow({
   }, [step, selectedService]);
 
   // Chave de Idempotência fixa por tentativa de reserva
-  const [idempotencyKey, setIdempotencyKey] = useState<string>(() => {
-    if (typeof crypto !== "undefined" && crypto.randomUUID) {
-      return crypto.randomUUID();
-    }
-    return "00000000-0000-4000-8000-000000000000";
-  });
+  const [idempotencyKey, setIdempotencyKey] = useState<string>(() => randomUuid());
   const rotateIdempotencyKey = () => {
     pixCreateFailures.current = 0;
-    if (typeof crypto !== "undefined" && crypto.randomUUID) setIdempotencyKey(crypto.randomUUID());
+    setIdempotencyKey(randomUuid());
   };
   const replaceIdempotencyKey = () => {
-    if (typeof crypto !== "undefined" && crypto.randomUUID) setIdempotencyKey(crypto.randomUUID());
+    setIdempotencyKey(randomUuid());
   };
 
   const [reloadCount, setReloadCount] = useState(0);
@@ -307,7 +305,7 @@ export function BookingFlow({
   }, [business, slug, initialBookingId, step, isCompleted, bookingResponse, trackingMiss, pixResumeAttempt, resumeRaw]);
 
   // Cria a reserva chamando POST /api/public/[slug]/bookings
-  const handleCreateBooking = async () => {
+  const handleCreateBooking = async (submittedPhone?: string) => {
     if (createInFlight.current) return;
     if (!selectedService || !selectedSlot) return;
 
@@ -319,7 +317,7 @@ export function BookingFlow({
       service: selectedService,
       startsAt: selectedSlot.startsAt,
       name: customerName.trim(),
-      phone: normalizePhoneToE164(customerPhone),
+      phone: normalizePhoneToE164(submittedPhone ?? customerPhone),
       cpfDigits: cpfDigitsOnly(customerCpf),
       requiresPayerCpf: business?.requiresPayerCpf,
     });
@@ -339,6 +337,11 @@ export function BookingFlow({
       if (!res.ok) {
         const failure = publicBookingErrorView(res.status, data);
         if (failure.kind !== "pix_create_failed") pixCreateFailures.current = 0;
+        if (failure.kind === "stale_page") {
+          setBookingError(null);
+          setStalePage(true);
+          return;
+        }
         if (failure.kind === "paused") {
           setBusiness((current) => (current ? { ...current, bookingsPaused: true } : current));
           setBookingError(null);
@@ -656,6 +659,18 @@ export function BookingFlow({
         <main id="content" className="mx-auto flex min-h-[40vh] w-full max-w-xl items-center justify-center px-4 py-8" role="status">
           <p className="text-sm text-muted">Carregando seu Pix…</p>
         </main>
+      </div>
+    );
+  }
+
+  if (stalePage) {
+    return (
+      <div className="min-h-dvh bg-paper">
+        {pageHeader}
+        <main id="content" className="mx-auto w-full max-w-xl px-4 py-8">
+          <StalePageNotice />
+        </main>
+        {pageFooter}
       </div>
     );
   }

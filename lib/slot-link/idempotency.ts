@@ -1,4 +1,5 @@
 import { SLOT_LINK_IDEMPOTENCY_KEY_PATTERN } from "@/lib/contracts/slot-link";
+import { randomUuid } from "@/lib/random-uuid";
 
 /** localStorage. Idempotency-Key + nome/WhatsApp. Nunca leva accessToken nem CPF. */
 export const SLOT_LINK_CLAIM_PREFIX = "agendapix.slot-link.pay.";
@@ -100,7 +101,7 @@ export async function slotLinkSessionKey(token: string) {
 
 /** UUID aceito pelo POST pay (16–128, base64url ou UUID). */
 export function createIdempotencyKey() {
-  return crypto.randomUUID();
+  return randomUuid();
 }
 
 export function memoryKeyedStore(initial: Record<string, string> = {}): KeyedStore & { snapshot: Record<string, string> } {

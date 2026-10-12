@@ -11,6 +11,7 @@ import {
   formatDateFull,
   formatAppointmentMeta,
 } from "../../components/booking/formatters";
+import { CUSTOMER_PHONE_ERROR } from "../../components/booking/customer-copy";
 
 describe("Booking UI formatters and helpers", () => {
   it("formats cents to BRL currency string correctly", () => {
@@ -36,6 +37,22 @@ describe("Booking UI formatters and helpers", () => {
     expect(formatPhoneMask("5511987654321")).toBe("(11) 98765-4321");
     expect(formatPhoneMask("1133334444")).toBe("(11) 3333-4444");
     expect(formatPhoneMask("abc11def987654321xyz")).toBe("(11) 98765-4321");
+    expect(formatPhoneMask("011 99999-9999")).toBe("(11) 99999-9999");
+    expect(formatPhoneMask("+55 14 99999-9999")).toBe("(14) 99999-9999");
+    expect(formatPhoneMask("(14) 99999-9999 ")).toBe("(14) 99999-9999");
+    expect(formatPhoneMask("14999999999")).toBe("(14) 99999-9999");
+  });
+
+  it("accepts autofill phones and only rejects a number that is still short", () => {
+    const accepted = ["011 99999-9999", "+55 14 99999-9999", "(14) 99999-9999 ", "14999999999"] as const;
+    expect(accepted.map((value) => isValidBrazilianPhone(value))).toEqual([true, true, true, true]);
+    expect(normalizePhoneToE164("011 99999-9999")).toBe("+5511999999999");
+    expect(normalizePhoneToE164("+55 14 99999-9999")).toBe("+5514999999999");
+    expect(normalizePhoneToE164("(14) 99999-9999 ")).toBe("+5514999999999");
+    expect(normalizePhoneToE164("14999999999")).toBe("+5514999999999");
+    expect(isValidBrazilianPhone("14999")).toBe(false);
+    expect(isValidBrazilianPhone("(14) 999")).toBe(false);
+    expect(CUSTOMER_PHONE_ERROR).toBe("Confira o DDD e o número, ex.: (14) 99999-9999");
   });
 
   it("validates Brazilian phone numbers", () => {

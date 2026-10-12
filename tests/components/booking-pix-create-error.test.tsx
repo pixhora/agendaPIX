@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { BookingFlow } from "@/components/booking/BookingFlow";
-import { PIX_CHARGE_FAILED_BODY, PIX_CHARGE_FAILED_RETRY, PIX_CHARGE_FAILED_TITLE, PIX_CREATE_FAILED_COPY, PIX_CREATE_FAILED_STORE, PIX_GENERATING_LABEL, TALK_TO_STORE } from "@/components/booking/customer-copy";
+import { PIX_CHARGE_FAILED_BODY, PIX_CHARGE_FAILED_RETRY, PIX_CHARGE_FAILED_TITLE, PIX_CREATE_FAILED_COPY, PIX_CREATE_FAILED_STORE, PIX_GENERATING_LABEL, STALE_PAGE_BODY, STALE_PAGE_RELOAD, STALE_PAGE_TITLE, TALK_TO_STORE } from "@/components/booking/customer-copy";
 import { EXPIRED_PIX_TITLE } from "@/components/booking/pix-deadline-copy";
 
 const slug = "studio-tatuarte";
@@ -415,6 +415,41 @@ it("pagamento cancelado continua na tela de cobrança cancelada", async () => {
   expect(screen.getByText(/Esta cobrança Pix foi cancelada/)).toBeVisible();
   expect(screen.queryByRole("heading", { name: PIX_CHARGE_FAILED_TITLE })).toBeNull();
 });
+
+it("400 invalid_idempotency_key pede para atualizar a página e o botão recarrega", async () => {
+  const raw = "Essa chave não é válida. Tente de novo.";
+  const reloads = listenForPageReload();
+  const user = userEvent.setup();
+  vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.includes("/availability")) return availability(url);
+    if (url.includes("/bookings") && init?.method === "POST") {
+      return new Response(JSON.stringify({ error: { code: "invalid_idempotency_key", message: raw } }), {
+        status: 400,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    throw new Error(`pedido inesperado: ${url}`);
+  }));
+  await reachGenerate(user);
+  await user.click(screen.getByRole("button", { name: /Gerar Pix de R\$\s*0,50/ }));
+  expect(await screen.findByRole("heading", { name: STALE_PAGE_TITLE })).toBeVisible();
+  expect(screen.getByText(STALE_PAGE_BODY)).toBeVisible();
+  expect(document.body.textContent).not.toContain(raw);
+  expect(screen.queryByText(/Gerar Pix/)).toBeNull();
+  await user.click(screen.getByRole("button", { name: STALE_PAGE_RELOAD }));
+  expect(reloads()).toBe(1);
+});
+
+/** jsdom não deixa substituir `location.reload`. A chamada real pede outra navegação. */
+function listenForPageReload() {
+  const virtualConsole = (globalThis as { jsdom?: { window: { _settings?: { virtualConsole?: { on: (event: string, listener: (error: Error) => void) => void } } } } }).jsdom?.window._settings?.virtualConsole;
+  let count = 0;
+  virtualConsole?.on("jsdomError", (error: Error) => {
+    if (error.message.includes("navigation to another Document")) count += 1;
+  });
+  return () => count;
+}
 
 it("pagamento expirado não vira a falha de gerar o Pix", async () => {
   const user = userEvent.setup();

@@ -10,7 +10,7 @@ import { SlotLinkStorageSweep } from "@/components/slot-link/storage-sweep";
 import { SentLinks } from "@/components/slot-link/sent-links";
 import { createSlotLinkToken } from "../../lib/bookings/slot-link-token";
 import { CANCEL_EXPIRED, CANCEL_PAID, CONNECT_MERCADO_PAGO, CUSTOMER_BOOKINGS_PAUSED, CUSTOMER_CONFLICT_BODY, CUSTOMER_CONFLICT_TITLE, CUSTOMER_CPF_REQUIRED, CUSTOMER_IN_PROGRESS, CUSTOMER_PAUSED_LATER, CUSTOMER_PAUSED_RECEIPT, CUSTOMER_RETRY_BODY, CUSTOMER_RETRY_TITLE, CUSTOMER_USED_TITLE, OWNER_NETWORK, REISSUE_BODY, REISSUE_EXPIRED, REISSUE_IN_PROGRESS, REISSUE_MP, REISSUE_PAID, REISSUE_TAKEN, REISSUE_TITLE, formatDayMonth, isoDateInZone, weekdayShort } from "@/lib/slot-link/copy";
-import { PIX_CHARGE_FAILED_BODY, PIX_CHARGE_FAILED_RETRY, PIX_CHARGE_FAILED_TITLE, PIX_CREATE_FAILED_COPY, PIX_CREATE_FAILED_STORE, PIX_GENERATING_LABEL, TALK_TO_STORE } from "@/components/booking/customer-copy";
+import { CUSTOMER_PHONE_ERROR, PIX_CHARGE_FAILED_BODY, PIX_CHARGE_FAILED_RETRY, PIX_CHARGE_FAILED_TITLE, PIX_CREATE_FAILED_COPY, PIX_CREATE_FAILED_STORE, PIX_GENERATING_LABEL, STALE_PAGE_BODY, STALE_PAGE_RELOAD, STALE_PAGE_TITLE, TALK_TO_STORE } from "@/components/booking/customer-copy";
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
@@ -200,6 +200,42 @@ describe("página da cliente", () => {
     expect(expiredStores.claim.snapshot[await slotLinkStorageKey(token)]).toBeUndefined();
     expect(expiredStores.session.snapshot[await slotLinkSessionKey(token)]).toBeUndefined();
   });
+
+  it("400 invalid_idempotency_key pede para atualizar, esconde o erro cru e o botão recarrega", async () => {
+    const raw = "Essa chave não é válida. Tente de novo.";
+    const reloads = listenForPageReload();
+    const user = userEvent.setup();
+    const stores = memorySlotLinkStores();
+    const blocked = "00000000-0000-4000-8000-000000000000";
+    await readOrCreatePayKey(token, stores, "2030-10-18T18:00:00.000Z", () => blocked, Date.parse("2030-10-01T12:00:00.000Z"));
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/pay")) {
+        expect((init?.headers as Record<string, string>)["Idempotency-Key"]).toBe(blocked);
+        return json(400, { error: { code: "invalid_idempotency_key", message: raw } });
+      }
+      return json(200, openBody());
+    });
+    render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" stores={stores} fetchImpl={fetchImpl} now={() => new Date("2030-10-01T12:00:00.000Z")} />);
+    await fillAndPay(user);
+    expect(await screen.findByRole("heading", { name: STALE_PAGE_TITLE })).toBeVisible();
+    expect(screen.getByText(STALE_PAGE_BODY)).toBeVisible();
+    expect(document.body.textContent).not.toContain(raw);
+    expect(screen.queryByRole("heading", { name: "Este link não está mais disponível." })).toBeNull();
+    expect(stores.claim.snapshot[await slotLinkStorageKey(token)]).toBeUndefined();
+    await user.click(screen.getByRole("button", { name: STALE_PAGE_RELOAD }));
+    expect(reloads()).toBe(1);
+  });
+
+  /** jsdom não deixa substituir `location.reload`. A chamada real pede outra navegação. */
+  function listenForPageReload() {
+    const virtualConsole = (globalThis as { jsdom?: { window: { _settings?: { virtualConsole?: { on: (event: string, listener: (error: Error) => void) => void } } } } }).jsdom?.window._settings?.virtualConsole;
+    let count = 0;
+    virtualConsole?.on("jsdomError", (error: Error) => {
+      if (error.message.includes("navigation to another Document")) count += 1;
+    });
+    return () => count;
+  }
 
   it("409 idempotency_conflict reenvia o payload salvo e volta ao mesmo Pix", async () => {
     const user = userEvent.setup();
@@ -1044,6 +1080,46 @@ describe("links enviados", () => {
     await user.click(screen.getByRole("button", { name: "Manter link" }));
     await vi.waitFor(() => expect(gets).toBeGreaterThan(before));
     vi.unstubAllGlobals();
+  });
+});
+
+describe("telefone da cliente no link", () => {
+  it("aceita +55 com espaços e envia o E.164", async () => {
+    const user = userEvent.setup();
+    const stores = memorySlotLinkStores();
+    const bodies: string[] = [];
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith("/pay")) {
+        bodies.push(String(init?.body ?? ""));
+        return json(201, payBody());
+      }
+      return json(200, openBody());
+    });
+    render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" stores={stores} fetchImpl={fetchImpl} now={() => new Date("2030-10-01T12:00:00.000Z")} />);
+    await user.type(await screen.findByLabelText("Nome"), "Ana Souza");
+    fireEvent.change(screen.getByLabelText("WhatsApp"), { target: { value: "+55 14 99999-9999" } });
+    expect(screen.getByLabelText("WhatsApp")).toHaveValue("(14) 99999-9999");
+    await user.click(screen.getByLabelText("Li e concordo com a política"));
+    await user.click(screen.getByRole("button", { name: /Pagar sinal de/ }));
+    expect(await screen.findByText(/Pix 00020126580014BR.GOV.BCB.PIX/)).toBeVisible();
+    expect(bodies[0]).toContain("+5514999999999");
+    expect(screen.queryByText(CUSTOMER_PHONE_ERROR)).toBeNull();
+  });
+
+  it("avisa com o texto do DDD quando o número está curto", async () => {
+    const user = userEvent.setup();
+    const stores = memorySlotLinkStores();
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith("/pay")) throw new Error("não deveria pagar");
+      return json(200, openBody());
+    });
+    render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" stores={stores} fetchImpl={fetchImpl} now={() => new Date("2030-10-01T12:00:00.000Z")} />);
+    await user.type(await screen.findByLabelText("Nome"), "Ana Souza");
+    fireEvent.change(screen.getByLabelText("WhatsApp"), { target: { value: "14999" } });
+    await user.click(screen.getByLabelText("Li e concordo com a política"));
+    await user.click(screen.getByRole("button", { name: /Pagar sinal de/ }));
+    expect(await screen.findByText(CUSTOMER_PHONE_ERROR)).toBeVisible();
+    expect(screen.queryByText(/Pix /)).toBeNull();
   });
 });
 

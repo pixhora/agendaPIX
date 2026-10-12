@@ -16,7 +16,7 @@ import { PolicySummaryLine } from "@/components/policy/PolicySummaryLine";
 import { POLICY_MISSING_MESSAGE } from "./booking-error";
 import { policyLineTone, servicePolicyState } from "./policy-gate";
 import { privacyPolicyLink } from "@/lib/marketing/flags";
-import { PIX_GENERATING_LABEL } from "./customer-copy";
+import { CUSTOMER_PHONE_ERROR, PIX_GENERATING_LABEL } from "./customer-copy";
 import { PixCreateStoreLine } from "./pix-create-error";
 
 interface StepCustomerProps {
@@ -39,7 +39,8 @@ interface StepCustomerProps {
   onChangePhone: (phone: string) => void;
   onChangeCpf: (cpf: string) => void;
   onBack: () => void;
-  onSubmit: () => void;
+  /** Recebe o WhatsApp já normalizado, inclusive quando o autofill ainda não entrou no estado. */
+  onSubmit: (phone: string) => void;
   /** `false`: esconde o CPF. Ausente: o campo continua, a API atual ainda pede o documento. */
   requiresPayerCpf?: boolean;
   onOpenPolicy?: (trigger: HTMLElement) => void;
@@ -80,7 +81,6 @@ export function StepCustomer({
   const isNameValid = name.trim().length >= 2;
   const isPhoneValid = isValidBrazilianPhone(phone);
   const isCpfValid = !askCpf || isValidCpf(cpf);
-  const canSubmit = isNameValid && isPhoneValid && isCpfValid && !isSubmitting && !policyBlocked;
   const privacy = privacyPolicyLink(legalPagesPublished);
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -91,16 +91,19 @@ export function StepCustomer({
     onChangeCpf(formatCpfMask(e.target.value));
   };
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const input = e.currentTarget.querySelector<HTMLInputElement>("#customer-phone");
+    const normalizedPhone = formatPhoneMask(input?.value ?? phone);
+    if (normalizedPhone !== phone) onChangePhone(normalizedPhone);
     setTouched({ name: true, phone: true, cpf: true });
-    if (canSubmit) {
-      onSubmit();
+    if (isNameValid && isValidBrazilianPhone(normalizedPhone) && isCpfValid && !isSubmitting && !policyBlocked) {
+      onSubmit(normalizedPhone);
     }
   };
 
   const nameError = touched.name && !isNameValid ? "Informe seu nome (pelo menos 2 letras)." : null;
-  const phoneError = touched.phone && !isPhoneValid ? "Informe um celular válido com DDD, por exemplo (11) 98765-4321." : null;
+  const phoneError = touched.phone && !isPhoneValid ? CUSTOMER_PHONE_ERROR : null;
   const cpfError = touched.cpf && !isCpfValid ? "Informe um CPF válido." : null;
 
   return (
@@ -157,7 +160,11 @@ export function StepCustomer({
               placeholder="(11) 98765-4321"
               value={phone}
               onChange={handlePhoneChange}
-              onBlur={() => setTouched((prev) => ({ ...prev, phone: true }))}
+              onBlur={(e) => {
+                const normalized = formatPhoneMask(e.target.value);
+                if (normalized !== phone) onChangePhone(normalized);
+                setTouched((prev) => ({ ...prev, phone: true }));
+              }}
               aria-invalid={phoneError ? true : undefined}
               aria-describedby={phoneError ? "phone-error phone-hint" : "phone-hint"}
               className="pl-10"
