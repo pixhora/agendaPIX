@@ -246,21 +246,30 @@ test("gerar o link não reserva: a página normal ocupa e o link avisa sem criar
   await expect(page.getByRole("button", { name: /Copiar código/ })).toBeVisible({ timeout: 20_000 });
   const afterBooking = await paymentCount(meta.businessASlug);
 
-  const response = await page.goto(`/${meta.businessASlug}/h/${token}`);
-  expect(response?.headers()["x-robots-tag"]).toContain("noindex");
-  // O proxy manda no-store. O next dev troca esse valor por no-cache, must-revalidate na hora de servir o HTML.
-  expect(response?.headers()["cache-control"] ?? "").toMatch(/no-store|no-cache/);
-  expect(response?.headers()["referrer-policy"]).toBe("no-referrer");
-  await expect(page.getByRole("heading", { name: "Esse horário acabou de ser reservado." })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Copiar código/ })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Ver horários disponíveis" })).toHaveAttribute("href", `/${meta.businessASlug}`);
-  expect(await paymentCount(meta.businessASlug)).toBe(afterBooking);
-  const robots = await page.locator('meta[name="robots"]').getAttribute("content");
-  expect(robots).toMatch(/noindex/);
-  const ogImage = await page.locator('meta[property="og:image"]').getAttribute("content");
-  expect(ogImage ?? "").not.toContain(token);
-  expect(ogImage ?? "").toContain(previewId);
-  if (testInfo.project.name === "desktop") await shoot(page, "cliente-ocupado");
+  // No master, horário ocupado usa a logo da loja. Sem logo a tag some e o teste esperava o previewId.
+  const storeLogo = "https://cdn.example/e2e-logo-da-loja.png";
+  await withPool((pool) => pool.query("update businesses set logo_url = $1 where slug = $2", [storeLogo, meta.businessASlug]));
+  try {
+    const response = await page.goto(`/${meta.businessASlug}/h/${token}`);
+    expect(response?.headers()["x-robots-tag"]).toContain("noindex");
+    // O proxy manda no-store. O next dev troca esse valor por no-cache, must-revalidate na hora de servir o HTML.
+    expect(response?.headers()["cache-control"] ?? "").toMatch(/no-store|no-cache/);
+    expect(response?.headers()["referrer-policy"]).toBe("no-referrer");
+    await expect(page.getByRole("heading", { name: "Esse horário acabou de ser reservado." })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Copiar código/ })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Ver horários disponíveis" })).toHaveAttribute("href", `/${meta.businessASlug}`);
+    expect(await paymentCount(meta.businessASlug)).toBe(afterBooking);
+    const robots = await page.locator('meta[name="robots"]').getAttribute("content");
+    expect(robots).toMatch(/noindex/);
+    const ogImage = await page.locator('meta[property="og:image"]').getAttribute("content");
+    expect(ogImage).toContain(storeLogo);
+    expect(ogImage ?? "").not.toContain(token);
+    expect(ogImage ?? "").not.toContain(previewId);
+    expect(ogImage ?? "").not.toContain("/og/slot-link/");
+    if (testInfo.project.name === "desktop") await shoot(page, "cliente-ocupado");
+  } finally {
+    await withPool((pool) => pool.query("update businesses set logo_url = null where slug = $1", [meta.businessASlug]));
+  }
 });
 
 test("caminho feliz até a tela de Pix, com rodapé fora do pagamento", async ({ page }, testInfo) => {
