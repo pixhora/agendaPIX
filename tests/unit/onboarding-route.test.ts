@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ session: vi.fn(), provision: vi.fn() }));
 vi.mock("../../lib/auth", () => ({ getAuth: () => ({ api: { getSession: mocks.session } }) }));
 vi.mock("../../lib/onboarding/service", () => ({ provisionBusiness: mocks.provision }));
+import { INVALID_ONBOARDING_IDEMPOTENCY_KEY_MESSAGE } from "../../lib/bookings/idempotency-key";
 import { POST, OPTIONS } from "../../app/api/onboarding/route";
 beforeEach(() => {
   vi.stubEnv("NODE_ENV", "development");
@@ -44,8 +45,9 @@ it("recusa a chave de idempotência zerada antes de ler a sessão", async () => 
     body: "{}",
   }));
   expect(response.status).toBe(400);
+  expect(INVALID_ONBOARDING_IDEMPOTENCY_KEY_MESSAGE).toBe("Esta página ficou desatualizada. Atualize e tente de novo. Nada foi salvo ainda.");
   expect(await response.json()).toEqual({
-    error: { code: "invalid_idempotency_key", message: "Essa chave não é válida. Tente de novo." },
+    error: { code: "invalid_idempotency_key", message: INVALID_ONBOARDING_IDEMPOTENCY_KEY_MESSAGE },
   });
   expect(mocks.session).not.toHaveBeenCalled();
   expect(mocks.provision).not.toHaveBeenCalled();

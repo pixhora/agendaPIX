@@ -1,5 +1,5 @@
 import { getAuth } from "@/lib/auth";
-import { rejectBlockedIdempotencyKey } from "@/lib/bookings/idempotency-key";
+import { INVALID_ONBOARDING_IDEMPOTENCY_KEY_MESSAGE, rejectBlockedIdempotencyKey } from "@/lib/bookings/idempotency-key";
 import { HttpError, json, readBody } from "@/lib/http";
 import { provisionBusiness } from "@/lib/onboarding/service";
 import { appPreflight, requireAppOrigin, withAppCors } from "@/lib/origins";
@@ -7,7 +7,7 @@ import { appPreflight, requireAppOrigin, withAppCors } from "@/lib/origins";
 export const runtime = "nodejs";
 export function POST(request: Request) {
   return withAppCors(request, async () => {
-    rejectBlockedIdempotencyKey(request.headers.get("idempotency-key") ?? "");
+    rejectBlockedIdempotencyKey(request.headers.get("idempotency-key") ?? "", INVALID_ONBOARDING_IDEMPOTENCY_KEY_MESSAGE);
     requireAppOrigin(request);
     const session = await getAuth().api.getSession({ headers: request.headers }).catch(() => {
       throw new HttpError(503, "auth_unavailable", "O acesso está indisponível. Tente novamente mais tarde.");

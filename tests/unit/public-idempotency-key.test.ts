@@ -33,6 +33,7 @@ afterEach(() => vi.unstubAllEnvs());
 describe("chave constante de reserva pública", () => {
   it("recusa a chave fixa com 400 invalid_idempotency_key e não lê o banco", async () => {
     expect(BLOCKED_PUBLIC_IDEMPOTENCY_KEY).toBe(CONSTANT_KEY);
+    expect(INVALID_IDEMPOTENCY_KEY_MESSAGE).toBe("Esta página ficou desatualizada. Atualize e tente de novo. Nenhum Pix foi gerado.");
     const response = await handleHttp(async () => {
       await createBooking("salao", body, CONSTANT_KEY, untouchedDatabase() as never);
       return Response.json({ ok: true });
