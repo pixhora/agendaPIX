@@ -10,7 +10,7 @@ import { SlotLinkStorageSweep } from "@/components/slot-link/storage-sweep";
 import { SentLinks } from "@/components/slot-link/sent-links";
 import { createSlotLinkToken } from "../../lib/bookings/slot-link-token";
 import { CANCEL_EXPIRED, CANCEL_PAID, CONNECT_MERCADO_PAGO, CUSTOMER_BOOKINGS_PAUSED, CUSTOMER_CONFLICT_BODY, CUSTOMER_CONFLICT_TITLE, CUSTOMER_CPF_REQUIRED, CUSTOMER_IN_PROGRESS, CUSTOMER_PAUSED_LATER, CUSTOMER_PAUSED_RECEIPT, CUSTOMER_RETRY_BODY, CUSTOMER_RETRY_TITLE, CUSTOMER_USED_TITLE, OWNER_NETWORK, REISSUE_BODY, REISSUE_EXPIRED, REISSUE_IN_PROGRESS, REISSUE_MP, REISSUE_PAID, REISSUE_TAKEN, REISSUE_TITLE, formatDayMonth, isoDateInZone, weekdayShort } from "@/lib/slot-link/copy";
-import { CUSTOMER_PHONE_ERROR, PIX_CHARGE_FAILED_BODY, PIX_CHARGE_FAILED_RETRY, PIX_CHARGE_FAILED_TITLE, PIX_CREATE_FAILED_COPY, PIX_CREATE_FAILED_STORE, PIX_GENERATING_LABEL, TALK_TO_STORE } from "@/components/booking/customer-copy";
+import { CUSTOMER_PHONE_ERROR, PIX_CHARGE_FAILED_BODY, PIX_CHARGE_FAILED_RETRY, PIX_CHARGE_FAILED_TITLE, PIX_CREATE_FAILED_COPY, PIX_CREATE_FAILED_STORE, PIX_GENERATING_LABEL, STALE_PAGE_BODY, STALE_PAGE_RELOAD, STALE_PAGE_TITLE, TALK_TO_STORE } from "@/components/booking/customer-copy";
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
@@ -199,6 +199,33 @@ describe("página da cliente", () => {
     expect(await screen.findByRole("heading", { name: "Este link expirou." })).toBeVisible();
     expect(expiredStores.claim.snapshot[await slotLinkStorageKey(token)]).toBeUndefined();
     expect(expiredStores.session.snapshot[await slotLinkSessionKey(token)]).toBeUndefined();
+  });
+
+  it("400 invalid_idempotency_key pede para atualizar, esconde o erro cru e o botão recarrega", async () => {
+    const raw = "Essa chave não é válida. Tente de novo.";
+    const reload = vi.fn();
+    vi.spyOn(window.location, "reload").mockImplementation(reload);
+    const user = userEvent.setup();
+    const stores = memorySlotLinkStores();
+    const blocked = "00000000-0000-4000-8000-000000000000";
+    await readOrCreatePayKey(token, stores, "2030-10-18T18:00:00.000Z", () => blocked, Date.parse("2030-10-01T12:00:00.000Z"));
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/pay")) {
+        expect((init?.headers as Record<string, string>)["Idempotency-Key"]).toBe(blocked);
+        return json(400, { error: { code: "invalid_idempotency_key", message: raw } });
+      }
+      return json(200, openBody());
+    });
+    render(<SlotLinkCustomer slug="salao" token={token} timezone="America/Sao_Paulo" stores={stores} fetchImpl={fetchImpl} now={() => new Date("2030-10-01T12:00:00.000Z")} />);
+    await fillAndPay(user);
+    expect(await screen.findByRole("heading", { name: STALE_PAGE_TITLE })).toBeVisible();
+    expect(screen.getByText(STALE_PAGE_BODY)).toBeVisible();
+    expect(document.body.textContent).not.toContain(raw);
+    expect(screen.queryByRole("heading", { name: "Este link não está mais disponível." })).toBeNull();
+    expect(stores.claim.snapshot[await slotLinkStorageKey(token)]).toBeUndefined();
+    await user.click(screen.getByRole("button", { name: STALE_PAGE_RELOAD }));
+    expect(reload).toHaveBeenCalledOnce();
   });
 
   it("409 idempotency_conflict reenvia o payload salvo e volta ao mesmo Pix", async () => {

@@ -39,6 +39,7 @@ export type BookingFailure =
   | { kind: "unavailable"; message: string; contactWhatsapp: string | null }
   | { kind: "slot_unavailable"; message: string }
   | { kind: "pix_create_failed"; retrySameKey: boolean | null }
+  | { kind: "stale_page" }
   | { kind: "message"; message: string };
 
 /** Falha de rede do `fetch` (TypeError ou mensagem de conexão). */
@@ -157,6 +158,7 @@ export function publicBookingErrorView(status: number, body: unknown): BookingFa
   if (status === 409 && code === "slot_unavailable") {
     return { kind: "slot_unavailable", message: SLOT_TAKEN_MESSAGE };
   }
+  if (status === 400 && code === "invalid_idempotency_key") return { kind: "stale_page" };
   const pixFailure = pixCreateFailure(body);
   if (pixFailure) return { kind: "pix_create_failed", retrySameKey: pixFailure.retrySameKey };
   const serverMessage = readApiErrorMessage(body);

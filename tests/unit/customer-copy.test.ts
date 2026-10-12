@@ -11,6 +11,9 @@ import {
   PIX_CREATE_FAILED_COPY,
   PIX_CREATE_FAILED_STORE,
   SLOTS_LOAD_COPY,
+  STALE_PAGE_BODY,
+  STALE_PAGE_RELOAD,
+  STALE_PAGE_TITLE,
   SUBMIT_RETRY_COPY,
   refundPendingBody,
   refundedBody,
@@ -71,6 +74,9 @@ describe("textos da tela de Pix e de erro", () => {
     expect(PIX_CREATE_FAILED_COPY).toBe("Não conseguimos gerar o Pix agora. Seus dados continuam salvos, é só tocar em Gerar Pix de novo.");
     expect(PIX_CREATE_FAILED_STORE).toBe("Se continuar, fale com a loja");
     expect(PIX_CREATE_FAILED_COPY).not.toMatch(/chave/i);
+    expect(STALE_PAGE_TITLE).toBe("Atualize a página para continuar");
+    expect(STALE_PAGE_BODY).toBe("Esta página ficou desatualizada. Atualize e escolha o horário de novo. Nenhum Pix foi gerado.");
+    expect(STALE_PAGE_RELOAD).toBe("Atualizar página");
     const roots = ["components", "app"];
     const hits = roots.flatMap((root) => bookingSources(root).flatMap((file) => {
       const source = readFileSync(file, "utf8");

@@ -26,7 +26,8 @@ import {
 } from "@/lib/slot-link/customer-state";
 import { browserSlotLinkStores, clearPayKey, createIdempotencyKey, lockPayPayload, payRequestBody, readPayResume, rotatePayIdempotencyKey, savePayAccess, type SlotLinkPayDraft, type SlotLinkPayPayload, type SlotLinkPayStores } from "@/lib/slot-link/idempotency";
 import { paySlotLinkUrl, publicSlotLinkUrl } from "@/lib/slot-link/paths";
-import { isOfflineError, pixCreateFailure as readPixCreateFailure, shouldRotatePixIdempotencyKey, whatsappHref } from "@/components/booking/booking-error";
+import { isOfflineError, pixCreateFailure as readPixCreateFailure, readApiErrorCode, shouldRotatePixIdempotencyKey, whatsappHref } from "@/components/booking/booking-error";
+import { StalePageNotice } from "@/components/booking/stale-page";
 import { CUSTOMER_PHONE_ERROR, PIX_GENERATING_LABEL } from "@/components/booking/customer-copy";
 import { PixChargeFailedScreen } from "@/components/booking/pix-charge-failed";
 import { PixCreateFailureAlert } from "@/components/booking/pix-create-error";
@@ -37,6 +38,7 @@ import { SlotLinkNotice } from "./slot-link-notice";
 
 type Phase =
   | { kind: "loading" }
+  | { kind: "stale_page" }
   | CustomerScreen
   | { kind: "pix"; link: SlotLinkOpenResponse; booking: BookingResponse }
   | { kind: "confirmed"; link: SlotLinkOpenResponse; booking: BookingResponse; customerName: string; customerPhone: string };
@@ -234,6 +236,16 @@ export function SlotLinkCustomer({
       }, now().getTime());
       return booking;
     }
+    if (response.status === 400 && readApiErrorCode(body) === "invalid_idempotency_key") {
+      pixCreateFailures.current = 0;
+      setChargeFailed(false);
+      setFormError(null);
+      setPixCreateFailure(null);
+      await clearPayKey(token, payStores);
+      setSavedPayload(null);
+      setPhase({ kind: "stale_page" });
+      return null;
+    }
     const current = linkRef.current;
     const pixFailure = readPixCreateFailure(body);
     if (pixFailure && current) {
@@ -316,7 +328,8 @@ export function SlotLinkCustomer({
       </header>
       <main id="content" className="mx-auto w-full max-w-xl px-4 py-6">
         {phase.kind === "loading" ? <CardSkeleton /> : null}
-        {phase.kind !== "loading" && phase.kind !== "form" && phase.kind !== "pix" && phase.kind !== "confirmed" ? (
+        {phase.kind === "stale_page" ? <StalePageNotice /> : null}
+        {phase.kind !== "loading" && phase.kind !== "form" && phase.kind !== "pix" && phase.kind !== "confirmed" && phase.kind !== "stale_page" ? (
           <SlotLinkNotice
             screen={phase}
             onRetry={phase.kind === "offline" || phase.kind === "in_progress" || phase.kind === "error" || phase.kind === "retry"
