@@ -1,4 +1,5 @@
-import { CheckIcon } from "./icons";
+import { Icon } from "@/components/ui/icon";
+import { PIX_ICONS, SUMMARY_ICONS } from "@/lib/icons/registry";
 
 /**
  * Composição do hero. No desktop, cartões flutuantes num quadro que só escala.
@@ -18,7 +19,7 @@ function StoreCard() {
   return (
     <>
       <div className="flex items-center gap-3">
-        <span className="hero-mark flex size-10 shrink-0 items-center justify-center rounded-2xl bg-brand-tile text-[13px] font-bold tracking-tight text-brand-tile-foreground">
+        <span className="hero-mark flex size-11 shrink-0 items-center justify-center rounded-full text-[13px] font-bold tracking-tight">
           SB
         </span>
         <span className="min-w-0">
@@ -26,43 +27,43 @@ function StoreCard() {
           <span className="mt-0.5 block text-[12px] text-muted">Página de agendamento</span>
         </span>
       </div>
+      <div className="hero-rule mt-3.5" />
 
-      <p className="mt-4 font-display text-xl font-bold tracking-tight text-ink">Corte feminino</p>
-      <p className="mt-0.5 text-[13px] text-muted">1 h · sábado</p>
+      <p className="mt-3.5 flex items-center gap-2 font-display text-xl font-bold tracking-tight text-ink">
+        <Icon icon={SUMMARY_ICONS.service} size="md" className="text-pix" />
+        Corte feminino
+      </p>
+      <p className="mt-1 flex items-center gap-2 text-[13px] text-muted">
+        <Icon icon={SUMMARY_ICONS.duration} size="sm" className="text-pix" />
+        1 h · sábado
+      </p>
 
       <div className="mt-4 flex gap-1.5">
         {days.map((day) => (
-          <span
-            key={day.label}
-            className={
-              day.selected
-                ? "inline-flex min-h-9 flex-1 items-center justify-center rounded-full bg-ink px-1 text-[12px] font-semibold text-paper"
-                : "inline-flex min-h-9 flex-1 items-center justify-center rounded-full bg-subtle px-1 text-[12px] font-semibold text-ink"
-            }
-          >
+          <span key={day.label} className={day.selected ? "hero-day hero-day-on" : "hero-day"}>
             {day.label}
           </span>
         ))}
       </div>
 
-      <div className="mt-2.5 grid grid-cols-2 gap-1.5">
+      <div className="mt-2.5 grid grid-cols-2 gap-2">
         {times.map((time) =>
           time === "11:30" ? (
-            <span key={time} className="inline-flex min-h-11 items-center justify-between rounded-full bg-ink px-3 text-[13px] font-semibold text-paper tabular-nums">
+            <span key={time} className="hero-slot hero-slot-on">
               {time}
-              <CheckIcon className="size-3.5" />
+              <Icon icon={PIX_ICONS.copied} size="sm" className="text-pix" />
             </span>
           ) : (
-            <span key={time} className="inline-flex min-h-11 items-center rounded-full border border-line bg-paper px-3 text-[13px] font-semibold text-ink tabular-nums">
+            <span key={time} className="hero-slot">
               {time}
             </span>
           ),
         )}
       </div>
 
-      <div className="mt-3 flex items-center justify-between gap-3 rounded-field bg-pix-soft px-3 py-2">
-        <span className="text-[12px] font-semibold text-pix">Sinal no Pix</span>
-        <span className="font-display text-sm font-bold text-ink tabular-nums">R$ 40,00</span>
+      <div className="hero-deposit mt-3">
+        <span className="hero-deposit-label">Sinal no Pix</span>
+        <span className="hero-deposit-value">R$ 40,00</span>
       </div>
     </>
   );
@@ -72,8 +73,8 @@ function PixCard() {
   return (
     <>
       <div className="flex items-center gap-2">
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-pix text-pix-foreground">
-          <CheckIcon className="size-4" />
+        <span className="hero-check">
+          <Icon icon={PIX_ICONS.copied} size="sm" />
         </span>
         <p className="whitespace-nowrap text-[13px] font-semibold leading-tight text-ink">Sinal recebido pelo Pix</p>
       </div>
@@ -86,8 +87,8 @@ function PixCard() {
 function ConfirmChip() {
   return (
     <>
-      <span className="flex size-7 items-center justify-center rounded-full bg-success-soft text-success">
-        <CheckIcon className="size-3.5" />
+      <span className="hero-check">
+        <Icon icon={PIX_ICONS.copied} size="sm" />
       </span>
       <span className="text-[13px] font-semibold text-ink">Horário confirmado</span>
     </>
@@ -113,7 +114,7 @@ export function HeroMotion() {
           </div>
           <div className="hero-rise hero-delay-2">
             <div className="hero-float hero-float-late w-fit max-w-full">
-              <div className="hero-panel inline-flex max-w-full items-center gap-2 rounded-full py-1.5 pr-3.5 pl-1.5">
+              <div className="hero-panel hero-chip inline-flex max-w-full items-center gap-2 rounded-full py-1.5 pr-3.5 pl-1.5">
                 <ConfirmChip />
               </div>
             </div>
@@ -123,8 +124,6 @@ export function HeroMotion() {
 
       <div className="hero-frame-sizer hidden lg:block">
         <div aria-hidden="true" className="hero-canvas">
-          <div className="bg-dots pointer-events-none absolute inset-0 opacity-80 [mask-image:radial-gradient(ellipse_at_center,black_22%,transparent_74%)]" />
-
           <div className="hero-panel hero-card-main rounded-frame p-4">
             <div className="hero-rise">
               <StoreCard />
@@ -144,7 +143,7 @@ export function HeroMotion() {
           <div className="hero-card-chip">
             <div className="hero-rise hero-delay-2">
               <div className="hero-float hero-float-late">
-                <div className="hero-panel inline-flex items-center gap-2 rounded-full py-1.5 pr-3.5 pl-1.5">
+                <div className="hero-panel hero-chip inline-flex items-center gap-2 rounded-full py-1.5 pr-3.5 pl-1.5">
                   <ConfirmChip />
                 </div>
               </div>
