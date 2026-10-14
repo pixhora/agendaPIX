@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Wallet, X } from "lucide-react";
 import { Icon } from "@/components/ui/icon";
 import { ACTION_ICONS, SUMMARY_ICONS } from "@/lib/icons/registry";
+import { bookingWhatsapp } from "@/lib/dashboard/whatsapp-reminder";
 import { StatusBadge, type BookingStatusValue } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -20,7 +21,10 @@ export type AgendaItem = {
   price: string;
   deposit: string;
   remaining: string;
+  remainingCents: number;
   hasDeposit: boolean;
+  /** Começa depois de agora. Só reserva confirmada e futura vira lembrete no WhatsApp. */
+  upcoming: boolean;
 };
 
 export type AgendaDay = { date: string; label: string; weekday: string; dayNumber: string; isToday: boolean };
@@ -35,7 +39,9 @@ function BookingDetail({ booking, day, businessName, onClose }: { booking: Agend
     if (booking && !dialog.open) dialog.showModal();
     if (!booking && dialog.open) dialog.close();
   }, [booking]);
-  const phoneDigits = booking?.customerPhone.replace(/\D/g, "") ?? "";
+  const whatsapp = booking ? bookingWhatsapp({ ...booking, businessName, dayLabel: day?.label ?? "" }) : null;
+  // "Lembrar no WhatsApp" não cabe em meia largura a 375px: no lembrete os dois botões ocupam a linha toda.
+  const reminder = whatsapp?.kind === "reminder";
   return (
     <dialog
       ref={ref}
@@ -71,8 +77,8 @@ function BookingDetail({ booking, day, businessName, onClose }: { booking: Agend
           </div>
         </dl>
         <div className="mt-auto grid grid-cols-2 gap-2 border-t border-line px-5 py-4 sm:px-6">
-          <a className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-ink px-4 text-sm font-semibold text-paper hover:bg-ink-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" href={`https://wa.me/${phoneDigits}?text=${encodeURIComponent(`Olá, ${booking.customerName}! Aqui é ${businessName}.`)}`} target="_blank" rel="noopener noreferrer"><Icon icon={ACTION_ICONS.whatsapp} size="md" />WhatsApp<span className="sr-only"> (abre em nova aba)</span></a>
-          <a className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-line bg-surface px-4 text-sm font-semibold hover:bg-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" href={`tel:${booking.customerPhone}`}><Icon icon={ACTION_ICONS.phone} size="md" />Ligar</a>
+          <a className={cn("inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-ink px-4 text-sm font-semibold text-paper hover:bg-ink-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring", reminder && "col-span-2")} href={whatsapp?.url} target="_blank" rel="noopener noreferrer"><Icon icon={ACTION_ICONS.whatsapp} size="md" />{reminder ? "Lembrar no WhatsApp" : "WhatsApp"}<span className="sr-only"> (abre em nova aba)</span></a>
+          <a className={cn("inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-line bg-surface px-4 text-sm font-semibold hover:bg-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring", reminder && "col-span-2")} href={`tel:${booking.customerPhone}`}><Icon icon={ACTION_ICONS.phone} size="md" />Ligar</a>
         </div>
       </div>}
     </dialog>
