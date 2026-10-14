@@ -18,6 +18,8 @@ import type { OnboardingData, StoreDay } from "@/components/onboarding/types";
 import { LogoUpload } from "./LogoUpload";
 import { SlugField } from "./SlugField";
 import { useStoreSlug } from "./use-store-slug";
+import { SEGMENT_CHOICES, applySegmentTemplate } from "@/lib/onboarding/segment-templates";
+import { cn } from "@/lib/utils";
 
 const FOCUS: Record<string, string> = {
   name: "store-name",
@@ -113,6 +115,35 @@ export function StoreProfileForm({
             {formError}
           </div>
         ) : null}
+
+        <fieldset className="grid gap-2" aria-describedby="store-segment-hint">
+          <legend className="text-sm font-semibold">Tipo de negócio</legend>
+          <p id="store-segment-hint" className="text-sm text-muted-foreground">Já preenchemos o serviço e os horários mais comuns. O preço é com você.</p>
+          <div className="flex flex-wrap gap-2">
+            {SEGMENT_CHOICES.map(({ segment, label }) => {
+              const checked = data.segment === segment;
+              return (
+                <label
+                  key={segment}
+                  className={cn(
+                    "control-shell inline-flex min-h-11 cursor-pointer items-center rounded-full border-2 px-3 text-sm font-semibold",
+                    checked ? "border-ink bg-ink text-paper" : "border-line bg-surface text-ink",
+                  )}
+                >
+                  <input
+                    className="sr-only"
+                    type="radio"
+                    name="store-segment"
+                    value={segment}
+                    checked={checked}
+                    onChange={() => onChange(applySegmentTemplate(data, segment))}
+                  />
+                  {label}
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
 
         <div className="grid gap-1.5">
           <Label htmlFor="store-name">Nome da loja</Label>
