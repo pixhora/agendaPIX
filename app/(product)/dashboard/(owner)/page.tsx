@@ -95,7 +95,9 @@ export default async function AgendaPage({ searchParams }: { searchParams: Promi
     price: money(booking.priceCents),
     deposit: money(booking.depositCents),
     remaining: money(Math.max(0, booking.priceCents - booking.depositCents)),
+    remainingCents: Math.max(0, booking.priceCents - booking.depositCents),
     hasDeposit: booking.depositCents > 0,
+    upcoming: booking.startsAt.getTime() > now.getTime(),
   }));
 
   const periodWord = weekly ? "na semana" : date === today ? "hoje" : "no dia";
