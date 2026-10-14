@@ -21,6 +21,21 @@ function saoPauloDay(offset: number) {
   return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}-${String(next.getUTCDate()).padStart(2, "0")}`;
 }
 
+/**
+ * N-ésimo dia a partir de hoje sem contar domingos. O teste de horários fecha o domingo no meio da
+ * execução, então um offset fixo que cai num domingo quebra conforme o dia em que o CI roda.
+ * Pular domingos mantém um dia diferente para cada offset (os testes não disputam o mesmo horário).
+ */
+function slotDay(offset: number) {
+  let found = -1;
+  for (let day = 0; ; day += 1) {
+    const date = saoPauloDay(day);
+    if (new Date(`${date}T12:00:00Z`).getUTCDay() === 0) continue;
+    found += 1;
+    if (found === offset) return date;
+  }
+}
+
 function localTime(iso: string) {
   const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(iso));
   const read = (type: string) => parts.find((part) => part.type === type)?.value ?? "00";
@@ -62,16 +77,16 @@ async function freeSlot(page: Page, id: string, date: string) {
   return { startsAt: slot.startsAt, time: localTime(slot.startsAt), date };
 }
 
-/** O teste de horários fecha o domingo. Um offset fixo pode cair nesse dia. */
+/** Procura a partir do offset, já sem domingos (`slotDay`), para não cair no dia de outro teste. */
 async function openFreeSlot(page: Page, id: string, startOffset: number) {
   for (let offset = startOffset; offset < startOffset + 21; offset += 1) {
-    const date = saoPauloDay(offset);
+    const date = slotDay(offset);
     const response = await page.request.get(`/api/public/${meta.businessASlug}/availability?serviceId=${id}&date=${date}`);
     const body = await response.json() as { slots?: { startsAt: string }[] };
     const slot = body.slots?.[body.slots.length - 1];
     if (slot) return { startsAt: slot.startsAt, time: localTime(slot.startsAt), date };
   }
-  throw new Error(`Sem horário livre a partir de ${saoPauloDay(startOffset)}`);
+  throw new Error(`Sem horário livre a partir de ${slotDay(startOffset)}`);
 }
 
 async function occupySlot(linkId: string, priceCents: number, depositCents: number) {
@@ -223,7 +238,7 @@ async function shootMatrix(page: Page, name: string) {
 
 test("gerar o link não reserva: a página normal ocupa e o link avisa sem criar Pix", async ({ page }, testInfo) => {
   const service = await serviceId(page);
-  const slot = await freeSlot(page, service.id, saoPauloDay(2));
+  const slot = await freeSlot(page, service.id, slotDay(2));
   const before = await paymentCount(meta.businessASlug);
   const created = await createLink(page, service.id, slot.date, slot.time);
   expect(created.status).toBe(201);
@@ -269,7 +284,7 @@ test("caminho feliz até a tela de Pix, com rodapé fora do pagamento", async ({
   await expect(page.getByRole("link", { name: "Crie a sua grátis" })).toHaveAttribute("href", "/?utm_source=agendapix&utm_medium=rodape&utm_campaign=pagina_publica");
 
   const service = await serviceId(page);
-  const slot = await freeSlot(page, service.id, saoPauloDay(3));
+  const slot = await freeSlot(page, service.id, slotDay(3));
   const created = await createLink(page, service.id, slot.date, slot.time);
   expect(created.status).toBe(201);
   await page.goto(`/${meta.businessASlug}/h/${created.body.token}`);
@@ -299,7 +314,7 @@ test("retomada com o prazo do link vencido devolve o mesmo Pix", async ({ page }
   test.setTimeout(180_000);
   const phone = testInfo.project.name === "desktop" ? "11987653002" : "11987653001";
   const service = await serviceId(page);
-  const slot = await freeSlot(page, service.id, saoPauloDay(7));
+  const slot = await freeSlot(page, service.id, slotDay(7));
   const created = await createLink(page, service.id, slot.date, slot.time);
   expect(created.status).toBe(201);
   const token = created.body.token as string;
@@ -363,7 +378,7 @@ test("mesma chave com outros dados oferece continuar o pagamento", async ({ page
   test.setTimeout(120_000);
   const phone = testInfo.project.name === "desktop" ? "11987654002" : "11987654001";
   const service = await serviceId(page);
-  const slot = await freeSlot(page, service.id, saoPauloDay(8));
+  const slot = await freeSlot(page, service.id, slotDay(8));
   const created = await createLink(page, service.id, slot.date, slot.time);
   expect(created.status).toBe(201);
   const token = created.body.token as string;
@@ -425,7 +440,7 @@ test("mesma chave com outros dados oferece continuar o pagamento", async ({ page
 test("link expirado e link cancelado", async ({ page }, testInfo) => {
   test.setTimeout(180_000);
   const service = await serviceId(page);
-  const expiredSlot = await freeSlot(page, service.id, saoPauloDay(4));
+  const expiredSlot = await freeSlot(page, service.id, slotDay(4));
   const expired = await createLink(page, service.id, expiredSlot.date, expiredSlot.time);
   expect(expired.status).toBe(201);
   await withPool((pool) => pool.query(
@@ -442,7 +457,7 @@ test("link expirado e link cancelado", async ({ page }, testInfo) => {
   await expect(page.getByRole("link", { name: "Ver horários disponíveis" })).toBeVisible();
   if (testInfo.project.name === "desktop") await shootMatrix(page, "cliente-expirado");
 
-  const cancelledSlot = await freeSlot(page, service.id, saoPauloDay(5));
+  const cancelledSlot = await freeSlot(page, service.id, slotDay(5));
   const cancelled = await createLink(page, service.id, cancelledSlot.date, cancelledSlot.time);
   expect(cancelled.status).toBe(201);
   const cancelResponse = await page.evaluate(async ({ businessId, linkId }) => {
@@ -459,7 +474,7 @@ test("link expirado e link cancelado", async ({ page }, testInfo) => {
   await expect(page.getByRole("heading", { name: "Este link não está mais disponível." })).toBeVisible();
   if (testInfo.project.name === "desktop") await shoot(page, "cliente-invalido");
 
-  const paidSlot = await freeSlot(page, service.id, saoPauloDay(1));
+  const paidSlot = await freeSlot(page, service.id, slotDay(1));
   const paid = await createLink(page, service.id, paidSlot.date, paidSlot.time);
   expect(paid.status).toBe(201);
   await withPool((pool) => pool.query(
@@ -577,7 +592,7 @@ test("dono gera o link na agenda e a prévia do horário responde imagem", async
 test("gerar novo link na rota real substitui, recusa e a cliente pede o link novo", async ({ page }, testInfo) => {
   test.setTimeout(240_000);
   const service = await serviceId(page);
-  const dayFor = (offset: number) => saoPauloDay(testInfo.project.name === "desktop" ? offset + 20 : offset);
+  const dayFor = (offset: number) => slotDay(testInfo.project.name === "desktop" ? offset + 20 : offset);
   const slot = await freeSlot(page, service.id, dayFor(9));
   const label = `Reemitir ${testInfo.project.name}`;
   const created = await createLink(page, service.id, slot.date, slot.time, label);
